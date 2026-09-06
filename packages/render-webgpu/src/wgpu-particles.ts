@@ -64,7 +64,10 @@ import {
   PARTICLE_COLOR_OFFSET,
   PARTICLE_INSTANCE_FLOATS,
   PARTICLE_POSITION_OFFSET,
+  PARTICLE_ROTATION_OFFSET,
   PARTICLE_SIZE_OFFSET,
+  PARTICLE_SOFTNESS_OFFSET,
+  PARTICLE_WIDE_INSTANCE_FLOATS,
   type ParticleRenderItem,
 } from "@four/render";
 
@@ -264,6 +267,121 @@ export const PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS: readonly GpuVertexBufferLayout[
  * same one multiply-add. The fragment stage is the interpolated instance
  * colour, unchanged — a solid, opaque-edged square, the honest §36 MVP.
  */
+/** Bytes per instance of the R-32 wide stream (rotation + softness). */
+export const PARTICLE_WIDE_INSTANCE_STRIDE_BYTES =
+  PARTICLE_WIDE_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
+
+/**
+ * Wide instance layout (R-32): the 8-float stream plus rotation and softness.
+ * Default emitters never use this table.
+ */
+export const PARTICLE_WIDE_INSTANCE_BUFFER_LAYOUT: GpuVertexBufferLayout =
+  Object.freeze({
+    arrayStride: PARTICLE_WIDE_INSTANCE_STRIDE_BYTES,
+    stepMode: "instance",
+    attributes: Object.freeze([
+      Object.freeze({
+        format: "float32x3",
+        offset: PARTICLE_POSITION_OFFSET * Float32Array.BYTES_PER_ELEMENT,
+        shaderLocation: 1,
+      }),
+      Object.freeze({
+        format: "float32",
+        offset: PARTICLE_SIZE_OFFSET * Float32Array.BYTES_PER_ELEMENT,
+        shaderLocation: 2,
+      }),
+      Object.freeze({
+        format: "float32x4",
+        offset: PARTICLE_COLOR_OFFSET * Float32Array.BYTES_PER_ELEMENT,
+        shaderLocation: 3,
+      }),
+      Object.freeze({
+        format: "float32",
+        offset: PARTICLE_ROTATION_OFFSET * Float32Array.BYTES_PER_ELEMENT,
+        shaderLocation: 4,
+      }),
+      Object.freeze({
+        format: "float32",
+        offset: PARTICLE_SOFTNESS_OFFSET * Float32Array.BYTES_PER_ELEMENT,
+        shaderLocation: 5,
+      }),
+    ]),
+  });
+
+/**
+ * R-32 appearance WGSL — textured / rotated / soft. Not the default pipeline
+ * (`PARTICLE_SHADER_SOURCE` stays the 8-float flat quad). Soft fade samples
+ * a bound scene-depth texture when `hasSceneDepth` is set; otherwise
+ * `saturate(1 − |viewZ| · softness)`.
+ */
+export const PARTICLE_APPEARANCE_SHADER_SOURCE = `${PARTICLE_UNIFORM_WGSL}
+
+struct AppearanceUniforms {
+  useMap : f32,
+  hasSceneDepth : f32,
+  pad0 : f32,
+  pad1 : f32,
+};
+
+@group(0) @binding(1) var<uniform> appearance : AppearanceUniforms;
+@group(1) @binding(0) var mapTexture : texture_2d<f32>;
+@group(1) @binding(1) var mapSampler : sampler;
+@group(1) @binding(2) var sceneDepth : texture_2d<f32>;
+
+struct AppearanceVertexOutput {
+  @builtin(position) position : vec4<f32>,
+  @location(0) color : vec4<f32>,
+  @location(1) uv : vec2<f32>,
+  @location(2) softness : f32,
+  @location(3) viewZ : f32,
+};
+
+@vertex
+fn ${VERTEX_ENTRY_POINT}(
+  @location(0) corner : vec3<f32>,
+  @location(1) instancePosition : vec3<f32>,
+  @location(2) instanceSize : f32,
+  @location(3) instanceColor : vec4<f32>,
+  @location(4) instanceRotation : f32,
+  @location(5) instanceSoftness : f32,
+) -> AppearanceVertexOutput {
+  var output : AppearanceVertexOutput;
+  var center = draw.view * draw.model * vec4<f32>(instancePosition, 1.0);
+  let c = cos(instanceRotation);
+  let s = sin(instanceRotation);
+  let rx = corner.x * c - corner.y * s;
+  let ry = corner.x * s + corner.y * c;
+  center.x = center.x + rx * instanceSize;
+  center.y = center.y + ry * instanceSize;
+  let clip = draw.projection * center;
+  output.position = vec4<f32>(clip.x, clip.y, (clip.z + clip.w) * 0.5, clip.w);
+  output.color = instanceColor;
+  output.uv = vec2<f32>(corner.x + 0.5, corner.y + 0.5);
+  output.softness = instanceSoftness;
+  output.viewZ = center.z;
+  return output;
+}
+
+@fragment
+fn ${FRAGMENT_ENTRY_POINT}(input : AppearanceVertexOutput) -> @location(0) vec4<f32> {
+  var color = input.color;
+  if (appearance.useMap > 0.5) {
+    color = color * textureSample(mapTexture, mapSampler, input.uv);
+  }
+  var fade = 1.0;
+  if (input.softness > 0.0) {
+    if (appearance.hasSceneDepth > 0.5) {
+      let sceneZ = textureSample(sceneDepth, mapSampler, input.position.xy).r;
+      fade = clamp(abs(sceneZ - input.position.z) / max(input.softness, 1e-5), 0.0, 1.0);
+    } else {
+      fade = clamp(1.0 - abs(input.viewZ) * input.softness, 0.0, 1.0);
+    }
+  }
+  color.a = color.a * fade;
+  return color;
+}
+`;
+
 export const PARTICLE_SHADER_SOURCE = `${PARTICLE_UNIFORM_WGSL}
 
 struct VertexOutput {
@@ -414,7 +532,7 @@ export class WgpuParticleCache {
       0,
       item.instances,
       0,
-      item.count * PARTICLE_INSTANCE_FLOATS,
+      item.count * (item.instanceFloats ?? PARTICLE_INSTANCE_FLOATS),
     );
     record.uploadedFrame = frame;
   }

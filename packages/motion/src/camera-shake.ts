@@ -32,7 +32,7 @@
  * ## Trauma
  *
  * `trauma` is a unitless 0–1 envelope. The sampled offset is scaled by
- * `trauma²` (Perlin's falloff — a linear envelope looks like a step). 
+ * `trauma²` (Perlin's falloff — a linear envelope looks like a step).
  * {@link CameraShake.impulse} raises it (clamped); `traumaDecay` is the
  * drop per second. Default trauma is `1` and default decay is `0`, so a
  * shake with no impulse still runs at full amplitude until the application

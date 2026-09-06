@@ -870,6 +870,27 @@ describe("wanderSpherical (WP-8.2) — heading-aligned sphere", () => {
     // Forward +X, up +Y, right +Z. az=0, el=0 → target = (10, 0, 0) + (2, 0, 0).
     expectVector(out, 5, 0, 0);
   });
+
+  it("builds a Gram-Schmidt frame when velocity is along +Y", () => {
+    const context = makeContext({
+      position: [0, 0, 0],
+      velocity: [0, 4, 0],
+      maxSpeed: 4,
+      maxAcceleration: 100,
+    });
+    const state = new WanderState({
+      radius: 2,
+      distance: 3,
+      jitter: 0,
+      angle: Math.PI / 2,
+      elevation: 0,
+    });
+    const out = new Vector3();
+    wanderSpherical(context, state, new SeededRandom(1), DT, out);
+    expect(Number.isFinite(out.x + out.y + out.z)).toBe(true);
+    // Heading +Y, fallback up +Z, right = +Y × +Z = +X. az=π/2 → +right.
+    expect(Math.abs(out.z)).toBeLessThan(1e-12);
+  });
 });
 
 // ---------------------------------------------------------------------------

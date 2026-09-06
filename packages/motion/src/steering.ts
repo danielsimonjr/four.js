@@ -690,7 +690,8 @@ export function wanderSpherical(
   state.angle = angle;
 
   let elevation = state.elevation + random.nextRange(-spread, spread);
-  elevation = elevation < -HALF_PI ? -HALF_PI : elevation > HALF_PI ? HALF_PI : elevation;
+  elevation =
+    elevation < -HALF_PI ? -HALF_PI : elevation > HALF_PI ? HALF_PI : elevation;
   state.elevation = elevation;
 
   const { position, velocity } = context;

@@ -658,14 +658,22 @@ function tipError(tip: Vector3, target: Vector3): number {
  * keeping the current direction from `anchor` to `point`. A coincident
  * pair falls back to `+X`.
  */
-function placeAtDistance(point: Vector3, anchor: Vector3, length: number): void {
+function placeAtDistance(
+  point: Vector3,
+  anchor: Vector3,
+  length: number,
+): void {
   const dx = point.x - anchor.x;
   const dy = point.y - anchor.y;
   const dz = point.z - anchor.z;
   const current = Math.sqrt(dx * dx + dy * dy + dz * dz);
   if (current > DEGENERATE_LENGTH) {
     const scale = length / current;
-    point.set(anchor.x + dx * scale, anchor.y + dy * scale, anchor.z + dz * scale);
+    point.set(
+      anchor.x + dx * scale,
+      anchor.y + dy * scale,
+      anchor.z + dz * scale,
+    );
     return;
   }
   point.set(anchor.x + length, anchor.y, anchor.z);
@@ -689,7 +697,9 @@ function rotateJointToward(
   const toTargetX = target.x - joint.x;
   const toTargetY = target.y - joint.y;
   const toTargetZ = target.z - joint.z;
-  const tipLength = Math.sqrt(toTipX * toTipX + toTipY * toTipY + toTipZ * toTipZ);
+  const tipLength = Math.sqrt(
+    toTipX * toTipX + toTipY * toTipY + toTipZ * toTipZ,
+  );
   const targetLength = Math.sqrt(
     toTargetX * toTargetX + toTargetY * toTargetY + toTargetZ * toTargetZ,
   );

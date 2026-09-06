@@ -5,7 +5,7 @@
 
 import { Quaternion, Vector3 } from "@four/math";
 import { Group } from "@four/scene";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { OrbitRig } from "../src/camera-rigs.js";
 import { CameraShake } from "../src/camera-shake.js";
@@ -28,9 +28,11 @@ function makeContext(
 describe("CameraShake (§44)", () => {
   it("is a component keyed CameraShake, one per node", () => {
     expect(CameraShake.typeName).toBe("CameraShake");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const node = new Group();
     const first = node.addComponent(new CameraShake({ seed: 1 }));
     const second = node.addComponent(new CameraShake({ seed: 2 }));
+    warn.mockRestore();
     expect(node.getComponent(CameraShake)).toBe(second);
     expect(first.host).toBeNull();
     expect(second.host).toBe(node);
@@ -158,6 +160,35 @@ describe("CameraShake (§44)", () => {
     expect(() => shake.impulse(Number.NaN)).toThrow(RangeError);
   });
 
+  it("accumulates time when apply is called without simulationTime", () => {
+    const a = new Group();
+    const b = new Group();
+    const options = {
+      amplitude: new Vector3(0.2, 0.2, 0.2),
+      frequency: 3,
+      seed: 5,
+    };
+    new CameraShake(options).apply(a, 0.5);
+    new CameraShake(options).apply(b, 0, 0.5);
+    expect(Object.is(a.position.x, b.position.x)).toBe(true);
+    expect(Object.is(a.position.y, b.position.y)).toBe(true);
+    expect(Object.is(a.position.z, b.position.z)).toBe(true);
+  });
+
+  it("counts a skipped step when the parent cannot be inverted", () => {
+    const parent = new Group();
+    parent.scale.set(0, 0, 0);
+    const child = new Group();
+    parent.add(child);
+    const shake = new CameraShake({
+      amplitude: new Vector3(1, 0, 0),
+      seed: 1,
+      frequency: 1,
+    });
+    expect(shake.apply(child, 0, 0.3)).toBe(false);
+    expect(shake.skippedSteps).toBe(1);
+  });
+
   it("adds an optional rotational offset", () => {
     const node = new Group();
     const identity = new Quaternion();
@@ -168,9 +199,9 @@ describe("CameraShake (§44)", () => {
       frequency: 3,
     });
     shake.apply(node, 0, 0.8);
-    expect(node.rotation.x === identity.x && node.rotation.y === identity.y).toBe(
-      false,
-    );
+    expect(
+      node.rotation.x === identity.x && node.rotation.y === identity.y,
+    ).toBe(false);
   });
 });
 

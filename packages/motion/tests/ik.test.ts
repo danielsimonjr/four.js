@@ -360,9 +360,7 @@ describe("solveTwoBoneIK — allocation and determinism", () => {
   });
 });
 
-function boneLengths(
-  positions: readonly Vector3[],
-): readonly number[] {
+function boneLengths(positions: readonly Vector3[]): readonly number[] {
   const lengths: number[] = [];
   for (let i = 0; i < positions.length - 1; i += 1) {
     lengths.push(distance(positions[i]!, positions[i + 1]!));
@@ -371,6 +369,34 @@ function boneLengths(
 }
 
 describe("solveCCD / solveFABRIK", () => {
+  it("reports iterations 0 when the tip already meets tolerance", () => {
+    const chain = [
+      new Vector3(0, 0, 0),
+      new Vector3(1, 0, 0),
+      new Vector3(2, 0, 0),
+    ];
+    const out = [new Vector3(), new Vector3(), new Vector3()];
+    const result = solveCCD(chain, new Vector3(2, 0, 0), undefined, out);
+    expect(result.iterations).toBe(0);
+    expect(result.converged).toBe(true);
+    expect(result.error).toBeLessThan(DEFAULT_IK_TOLERANCE);
+  });
+
+  it("unfolds an anti-parallel CCD joint toward a target behind the tip", () => {
+    const chain = [
+      new Vector3(0, 0, 0),
+      new Vector3(2, 0, 0),
+      new Vector3(4, 0, 0),
+    ];
+    const target = new Vector3(-1, 0, 0);
+    const out = [new Vector3(), new Vector3(), new Vector3()];
+    const result = solveCCD(chain, target, { maxIterations: 24 }, out);
+    expect(result.error).toBeLessThan(
+      result.converged ? DEFAULT_IK_TOLERANCE : 4,
+    );
+    expect(out[2]!.x).toBeLessThan(4);
+  });
+
   it("matches two-bone analytic within tolerance on a bent XY start", () => {
     const target = new Vector3(3, 0, 0);
     const pole = new Vector3(0, 1, 0);
@@ -383,7 +409,12 @@ describe("solveCCD / solveFABRIK", () => {
     const chain = [ORIGIN.clone(), joint, end];
     const out = [new Vector3(), new Vector3(), new Vector3()];
 
-    const result = solveCCD(chain, target, { tolerance: 1e-4, maxIterations: 32 }, out);
+    const result = solveCCD(
+      chain,
+      target,
+      { tolerance: 1e-4, maxIterations: 32 },
+      out,
+    );
     expect(result.converged).toBe(true);
     expect(result.error).toBeLessThan(DEFAULT_IK_TOLERANCE);
     expect(distance(out[2]!, analytic.end)).toBeLessThan(1e-3);
@@ -479,7 +510,8 @@ describe("solveCCD / solveFABRIK", () => {
       out[2]!.y - out[1]!.y,
       out[2]!.z - out[1]!.z,
     ).normalize();
-    const signed = Math.atan2(outgoing.y, outgoing.x) - Math.atan2(rest.y, rest.x);
+    const signed =
+      Math.atan2(outgoing.y, outgoing.x) - Math.atan2(rest.y, rest.x);
     expect(signed).toBeGreaterThanOrEqual(hinge.min - 1e-6);
     expect(signed).toBeLessThanOrEqual(hinge.max + 1e-6);
   });
@@ -558,7 +590,11 @@ describe("solveCCD / solveFABRIK", () => {
   });
 
   it("does not mutate the input chain", () => {
-    const chain = [new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(2, 0, 0)];
+    const chain = [
+      new Vector3(0, 0, 0),
+      new Vector3(1, 0, 0),
+      new Vector3(2, 0, 0),
+    ];
     const snapshot = chain.map((p) => p.clone());
     solveCCD(chain, new Vector3(1, 1, 0));
     solveFABRIK(chain, new Vector3(0.5, 0.5, 0));
@@ -580,25 +616,19 @@ describe("solveCCD / solveFABRIK", () => {
       ),
     ).toThrow(RangeError);
     expect(() =>
-      solveCCD(
-        [new Vector3(), new Vector3(1, 0, 0)],
-        new Vector3(1, 0, 0),
-        { tolerance: 0 },
-      ),
+      solveCCD([new Vector3(), new Vector3(1, 0, 0)], new Vector3(1, 0, 0), {
+        tolerance: 0,
+      }),
     ).toThrow(RangeError);
     expect(() =>
-      solveCCD(
-        [new Vector3(), new Vector3(1, 0, 0)],
-        new Vector3(1, 0, 0),
-        { maxIterations: 0 },
-      ),
+      solveCCD([new Vector3(), new Vector3(1, 0, 0)], new Vector3(1, 0, 0), {
+        maxIterations: 0,
+      }),
     ).toThrow(RangeError);
     expect(() =>
-      solveFABRIK(
-        [new Vector3(), new Vector3(1, 0, 0)],
-        new Vector3(1, 0, 0),
-        { limits: [{ min: 1, max: 0 }] },
-      ),
+      solveFABRIK([new Vector3(), new Vector3(1, 0, 0)], new Vector3(1, 0, 0), {
+        limits: [{ min: 1, max: 0 }],
+      }),
     ).toThrow(RangeError);
   });
 });

@@ -84,10 +84,12 @@ import {
 } from "./gl-effect.js";
 import { GeometryCache } from "./gl-geometry.js";
 import {
+  ParticleAppearanceProgram,
   ParticleBatchCache,
   ParticleProgram,
   ParticleTrailBatchCache,
   ParticleTrailProgram,
+  particleItemFloats,
   type ParticleGlContext,
 } from "./gl-particles.js";
 import {
@@ -1294,6 +1296,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
 
   #particleProgram: ParticleProgram | null = null;
 
+  /** R-32 appearance program — compiled on first opt-in draw (§61-safe). */
+  #particleAppearanceProgram: ParticleAppearanceProgram | null = null;
+
   #particleTrailProgram: ParticleTrailProgram | null = null;
 
   #litProgram: LitProgram | null = null;
@@ -1515,6 +1520,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#program = null;
     this.#spriteProgram = null;
     this.#particleProgram = null;
+    this.#particleAppearanceProgram = null;
     this.#particleTrailProgram = null;
     this.#litProgram = null;
     this.#standardProgram = null;
@@ -1959,7 +1965,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       // The unlit pipeline is the frame's starting state, so a scene with no
       // sprites issues exactly the GL sequence it issued before sprites existed.
       program.use();
-      let activeKind: RenderItemKind | "particle-trail" = "unlit";
+      let activeKind: RenderItemKind | "particle-trail" | "particle-appearance" =
+        "unlit";
       let particleTrailActive = false;
       // The GL state mirror starts where `#applyFixedState` and GL's own defaults
       // left it; every draw below moves it only where its material asks.
@@ -2410,9 +2417,50 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             if (batch === null) {
               continue;
             }
-            if (activeKind !== "particles") {
+            const needsAppearance =
+              particleItemFloats(item) >= 10 ||
+              item.particleTexture !== undefined;
+            let appearanceProgram: ParticleAppearanceProgram | null = null;
+            if (needsAppearance) {
+              appearanceProgram = this.#particleAppearanceProgram;
+              if (appearanceProgram === null) {
+                try {
+                  appearanceProgram = ParticleAppearanceProgram.create(gl);
+                  this.#particleAppearanceProgram = appearanceProgram;
+                } catch {
+                  // §61: a compile refusal costs the appearance draw, not the frame.
+                  appearanceProgram = null;
+                }
+              }
+            }
+            if (appearanceProgram !== null) {
+              if (activeKind !== "particle-appearance") {
+                appearanceProgram.use();
+                appearanceProgram.setSceneDepth(false);
+                activeKind = "particle-appearance";
+                particleViewUploaded = false;
+              }
+              appearanceProgram.setUseMap(item.particleTexture !== undefined);
+              if (
+                item.particleTexture !== undefined &&
+                item.particleTexture !== true
+              ) {
+                const map = resolveTexture(
+                  textures,
+                  renderTargets,
+                  activeTarget,
+                  item.particleTexture as CacheableTexture,
+                );
+                if (map !== null) {
+                  gl.activeTexture(GL.TEXTURE0);
+                  gl.bindTexture(GL.TEXTURE_2D, map);
+                  textureBound = true;
+                }
+              }
+            } else if (activeKind !== "particles") {
               particleProgram.use();
               activeKind = "particles";
+              particleViewUploaded = false;
             }
             // Particles are transparent by construction (§36's colour ramp) and
             // carry no material to say otherwise, so they blend with the straight
@@ -2427,11 +2475,20 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               // The billboard offset happens between the view and the projection,
               // so this pipeline takes the two matrices separately rather than
               // the premultiplied `viewProjection` the other two use.
-              particleProgram.setProjection(camera.projectionMatrix);
-              particleProgram.setView(camera.viewMatrix);
+              if (appearanceProgram !== null) {
+                appearanceProgram.setProjection(camera.projectionMatrix);
+                appearanceProgram.setView(camera.viewMatrix);
+              } else {
+                particleProgram.setProjection(camera.projectionMatrix);
+                particleProgram.setView(camera.viewMatrix);
+              }
               particleViewUploaded = true;
             }
-            particleProgram.setModel(item.worldMatrix);
+            if (appearanceProgram !== null) {
+              appearanceProgram.setModel(item.worldMatrix);
+            } else {
+              particleProgram.setModel(item.worldMatrix);
+            }
             particleBatches.upload(batch, item);
             gl.bindVertexArray(batch.vertexArray);
             gl.drawArraysInstanced(record.mode, 0, record.count, item.count);
@@ -3237,6 +3294,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       this.#program?.dispose();
       this.#spriteProgram?.dispose();
       this.#particleProgram?.dispose();
+      this.#particleAppearanceProgram?.dispose();
       this.#particleTrailProgram?.dispose();
       this.#litProgram?.dispose();
       this.#standardProgram?.dispose();
@@ -3255,6 +3313,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#program = null;
     this.#spriteProgram = null;
     this.#particleProgram = null;
+    this.#particleAppearanceProgram = null;
     this.#particleTrailProgram = null;
     this.#litProgram = null;
     this.#standardProgram = null;
