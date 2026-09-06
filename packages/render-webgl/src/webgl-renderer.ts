@@ -51,7 +51,6 @@ import {
   isRenderTargetTexture,
   isSkinnedLitItem,
   isSkinnedUnlitItem,
-  intersectScissor,
   isSpriteItem,
   isStandardItem,
   validateReadbackRegion,
@@ -849,10 +848,8 @@ function metalRoughnessMapOf(material: {
   return material.metalRoughnessMap ?? null;
 }
 
-function unlitColorBlends(material: {
-  color?: readonly [number, number, number, number];
-}): boolean {
-  const color = material.color;
+function unlitColorBlends(material: object): boolean {
+  const color = (material as { color?: readonly [number, number, number, number] }).color;
   return color !== undefined && color[3] !== 1;
 }
 
@@ -2024,29 +2021,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
           viewListOptions,
         );
 
-        // §67 per-item scissor: apply an intersected rect when the item
-        // names one, restore the view rect for the next item (or after the
-        // last). A scene that names none never sets `itemScissorActive`, so
-        // not one extra `scissor` call is issued.
-        let itemScissorActive = false;
         for (let index = 0; index < viewItems.length; index += 1) {
           const item = viewItems[index];
-          const itemScissor = item.scissor;
-          if (itemScissor != null) {
-            const cut = intersectScissor(
-              viewScissorX,
-              viewScissorY,
-              viewScissorW,
-              viewScissorH,
-              itemScissor,
-            );
-            gl.scissor(cut.x, cut.y, cut.width, cut.height);
-            itemScissorActive = true;
-          } else if (itemScissorActive) {
-            gl.scissor(viewScissorX, viewScissorY, viewScissorW, viewScissorH);
-            itemScissorActive = false;
-          }
-
           // §65 (R-9), and only when the application assigned a batcher: does a
           // run of compatible draws start here? `batching` is `null` by
           // default, so a renderer that never opted in pays this one comparison
@@ -2683,9 +2659,6 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             // instance, `record.count` elements either way (§84).
             countDraw(statistics, record.mode, record.count, 1);
           }
-        }
-        if (itemScissorActive) {
-          gl.scissor(viewScissorX, viewScissorY, viewScissorW, viewScissorH);
         }
       }
     } finally {
