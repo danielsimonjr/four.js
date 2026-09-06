@@ -51,6 +51,7 @@ import {
   isRenderTargetTexture,
   isSkinnedLitItem,
   isSkinnedUnlitItem,
+  intersectScissor,
   isSpriteItem,
   isStandardItem,
   validateReadbackRegion,
@@ -90,6 +91,7 @@ import {
   GL,
   LitProgram,
   MAP_TEXTURE_UNIT,
+  METAL_ROUGHNESS_TEXTURE_UNIT,
   SHADOW_TEXTURE_UNIT,
   SpriteProgram,
   UnlitProgram,
@@ -550,7 +552,8 @@ function resetGlState(state: GlState): void {
  * `blend` is the material's `transparent` flag — except on the two pipelines
  * that blend by construction (sprites and §36 particles), where the caller
  * passes `true` because they did so before the flag existed and a scene that
- * never heard of it must not lose its compositing.
+ * never heard of it must not lose its compositing, and on unlit draws whose
+ * authored `color[3]` is not 1 (WP-4.7).
  *
  * The blend *function* is only re-issued while blending is on: a mode change on
  * an opaque material would be a call with no observable effect, and `render`
@@ -838,6 +841,19 @@ function mapOf(material: {
   map?: CacheableTexture | null;
 }): CacheableTexture | null {
   return material.map ?? null;
+}
+
+function metalRoughnessMapOf(material: {
+  metalRoughnessMap?: CacheableTexture | null;
+}): CacheableTexture | null {
+  return material.metalRoughnessMap ?? null;
+}
+
+function unlitColorBlends(material: {
+  color?: readonly [number, number, number, number];
+}): boolean {
+  const color = material.color;
+  return color !== undefined && color[3] !== 1;
 }
 
 /**
@@ -1144,7 +1160,7 @@ function resolveRect(
  * driven by {@link WebglRenderer.renderEffect} and never by a render item):
  *
  * - **unlit** — flat colour, the §120 MVP pipeline, depth-tested, and opaque
- *   unless its material declares `transparent`;
+ *   unless its material declares `transparent` or its colour alpha is not 1;
  * - **lit** — Lambert diffuse under §68's directional light plus the scene
  *   ambient term, depth-tested and opaque-by-default like unlit. The
  *   frame's lights are collected once per `render` call (`collectSceneLights`,
@@ -1761,6 +1777,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // mapped unlit or lit draw selects it once, on the first one — both target
     // the same unit, so a frame that mixes them issues one call either way.
     let mapUnitActive = false;
+    let metalRoughnessBound = false;
     // §69 (R-18): whether this frame bound a shadow map to
     // `SHADOW_TEXTURE_UNIT`, so the `finally` knows whether it has one to
     // unbind. A frame in which nothing casts never touches unit 1 at all.
@@ -1928,8 +1945,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         // the same reason, and equally free when no material named a stencil.
         restoreStencilWriteMask(gl, state);
         resolveRect(view, surfaceWidth, surfaceHeight);
-        gl.scissor(rect.x, rect.y, rect.width, rect.height);
-        gl.viewport(rect.x, rect.y, rect.width, rect.height);
+        // Captured: the view rectangle every per-item scissor restores to.
+        const viewScissorX = rect.x;
+        const viewScissorY = rect.y;
+        const viewScissorW = rect.width;
+        const viewScissorH = rect.height;
+        gl.scissor(viewScissorX, viewScissorY, viewScissorW, viewScissorH);
+        gl.viewport(viewScissorX, viewScissorY, viewScissorW, viewScissorH);
 
         let mask = GL.DEPTH_BUFFER_BIT;
         const clearColor = view.clearColor;
@@ -2002,8 +2024,28 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
           viewListOptions,
         );
 
+        // §67 per-item scissor: apply an intersected rect when the item
+        // names one, restore the view rect for the next item (or after the
+        // last). A scene that names none never sets `itemScissorActive`, so
+        // not one extra `scissor` call is issued.
+        let itemScissorActive = false;
         for (let index = 0; index < viewItems.length; index += 1) {
           const item = viewItems[index];
+          const itemScissor = item.scissor;
+          if (itemScissor != null) {
+            const cut = intersectScissor(
+              viewScissorX,
+              viewScissorY,
+              viewScissorW,
+              viewScissorH,
+              itemScissor,
+            );
+            gl.scissor(cut.x, cut.y, cut.width, cut.height);
+            itemScissorActive = true;
+          } else if (itemScissorActive) {
+            gl.scissor(viewScissorX, viewScissorY, viewScissorW, viewScissorH);
+            itemScissorActive = false;
+          }
 
           // §65 (R-9), and only when the application assigned a batcher: does a
           // run of compatible draws start here? `batching` is `null` by
@@ -2050,7 +2092,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                   gl,
                   state,
                   batch.material,
-                  batch.kind === "sprite",
+                  batch.kind === "sprite" || unlitColorBlends(batch.material),
                   // §67 (R-23): the run's shared clip — the batcher broke the
                   // run wherever the record changed, so one apply covers every
                   // merged draw. `?? null` for a hand-built batch predating
@@ -2113,7 +2155,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                 gl,
                 state,
                 item.material,
-                false,
+                unlitColorBlends(item.material),
                 item.clip ?? null,
               );
               if (!skinnedUnlitViewUploaded) {
@@ -2561,7 +2603,26 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               gl.bindTexture(GL.TEXTURE_2D, standardTexture);
               textureBound = true;
             }
-            standardProgram.setFeatures(standardTexture !== null);
+            const metalRoughnessSource = metalRoughnessMapOf(item.material);
+            const metalRoughnessTexture =
+              metalRoughnessSource === null
+                ? null
+                : resolveTexture(
+                    textures,
+                    renderTargets,
+                    activeTarget,
+                    metalRoughnessSource,
+                  );
+            if (metalRoughnessTexture !== null) {
+              gl.activeTexture(GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT);
+              mapUnitActive = false;
+              gl.bindTexture(GL.TEXTURE_2D, metalRoughnessTexture);
+              metalRoughnessBound = true;
+            }
+            standardProgram.setFeatures(
+              standardTexture !== null,
+              metalRoughnessTexture !== null,
+            );
             standardProgram.setReceivesShadow(
               shadowActive && item.receiveShadow,
             );
@@ -2584,7 +2645,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               gl,
               state,
               item.material,
-              false,
+              unlitColorBlends(item.material),
               item.clip ?? null,
             );
             const map = mapOf(item.material);
@@ -2623,6 +2684,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             countDraw(statistics, record.mode, record.count, 1);
           }
         }
+        if (itemScissorActive) {
+          gl.scissor(viewScissorX, viewScissorY, viewScissorW, viewScissorH);
+        }
       }
     } finally {
       // Restore the fixed state the frame borrowed, and leave nothing bound:
@@ -2640,7 +2704,15 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       // mid-frame throw cost exactly the frame it happened in.
       restoreGlState(gl, state);
       if (textureBound) {
+        if (!mapUnitActive) {
+          gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
+        }
         gl.bindTexture(GL.TEXTURE_2D, null);
+      }
+      if (metalRoughnessBound && nodeUnitsBound === 0) {
+        gl.activeTexture(GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT);
+        gl.bindTexture(GL.TEXTURE_2D, null);
+        gl.activeTexture(GL.TEXTURE0);
       }
       // §60's node texture units (RFC 0001), released on the same terms as
       // unit 0's albedo: bound during the frame, left bound by nothing. Zero

@@ -55,8 +55,13 @@
  *
  * All-`vec4` slots for `wgpu-lights.ts`'s alignment reason: every byte named,
  * none implied. The lights, the eye position and §57's `map` bind exactly as
- * the lit family's do (`wgpu-lights.ts`); §59's normal/roughness/metalness
- * *textures* are staged with the material tier that carries them.
+ * the lit family's do (`wgpu-lights.ts`).
+ *
+ * ## Second texture unit — staged on this backend (2026-09-06)
+ *
+ * `StandardMaterial.metalRoughnessMap` is a real field and WebGL samples it.
+ * This family still shades from the scalar factors only. `normalMap` /
+ * `occlusionMap` / `emissiveMap` remain unstaged on both backends.
  */
 
 import {
