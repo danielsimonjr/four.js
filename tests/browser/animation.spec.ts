@@ -755,7 +755,7 @@ test.describe("§107: authored animation reaches the screen", () => {
     await context.close();
   });
 
-  test("the diamond's vector tween moves it, and its colour tween pulses", async () => {
+  test("the diamond's vector tween moves it, and its colour tween pulses", () => {
     expectUsableSweep(samples);
     expectShapeFound(samples, (s) => s.beacon, "diamond");
 
@@ -820,7 +820,7 @@ test.describe("§107: authored animation reaches the screen", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the vane's clip turns it and its scale tween pops it", async () => {
+  test("the vane's clip turns it and its scale tween pops it", () => {
     expectUsableSweep(samples);
     expectShapeFound(samples, (s) => s.vane, "vane");
 
@@ -856,7 +856,7 @@ test.describe("§107: authored animation reaches the screen", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the timeline's marker steps the vane through its palette", async () => {
+  test("the timeline's marker steps the vane through its palette", () => {
     expectUsableSweep(samples);
     expectShapeFound(samples, (s) => s.vane, "vane");
 
@@ -905,7 +905,7 @@ test.describe("§107: authored animation reaches the screen", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the animated cluster is invisible to the orbiter and box classifiers", async () => {
+  test("the animated cluster is invisible to the orbiter and box classifiers", () => {
     expectUsableSweep(samples);
 
     // The WP-4.7 invariant, promoted to a standing gate. `smoothness.spec.ts`
