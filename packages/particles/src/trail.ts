@@ -237,7 +237,6 @@ export function buildTrailRibbonMesh(
   headWidth: number,
   tailWidthFactor: number,
 ): number {
-  const trailLength = store.length;
   const sizeStride = 2;
   const colorStride = 8;
   let vertex = 0;

@@ -2556,12 +2556,12 @@ export class Rapier3dAdapter
    * and where it should end up.
    */
   #requireJointWorld(): RapierJointWorld3d {
-    return this.#requireWorld() as unknown as RapierJointWorld3d;
+    return this.#requireWorld();
   }
 
   /** The Rapier module under the module-private joint view. See above. */
   #requireJointModule(): RapierJointModule3d {
-    return this.#requireRapier() as unknown as RapierJointModule3d;
+    return this.#requireRapier();
   }
 
   /** Joint counterpart of {@link Rapier3dAdapter.#requireBody} (§28, §37). */

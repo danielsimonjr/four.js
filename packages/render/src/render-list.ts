@@ -938,6 +938,7 @@ function itemAt(
       jointMatrices: EMPTY_JOINT_MATRICES,
       jointCount: 0,
       morphWeights: null,
+      trailVertexCount: 0,
     };
     pool.items[index] = item;
   }

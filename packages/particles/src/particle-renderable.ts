@@ -98,9 +98,6 @@ const VECTOR_STRIDE = 3;
 /** Components per particle in `ParticlePool.sizes` (start, end). */
 const SIZE_STRIDE = 2;
 
-/** Components per particle in `ParticlePool.colors` (RGBA start, RGBA end). */
-const COLOR_STRIDE = 8;
-
 /**
  * `age / lifetime` clamped to `[0, 1]`, matching `ParticlePool.getNormalizedAge`
  * exactly — including its rule that a non-positive lifetime reports `1` rather

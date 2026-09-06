@@ -245,7 +245,6 @@ const BEACON_HIGH_Y = 1.7;
 const VANE_X = -3.25;
 const VANE_Y = -0.75;
 const VANE_RADIUS = 0.26;
-const VANE_SCALE_POP = 1.35;
 
 /**
  * `Timeline.loop` is infinite and one iteration is 2.2 s (the label `"beat"`

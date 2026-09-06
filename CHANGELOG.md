@@ -8,6 +8,26 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — Open-TODO subagent pass (third landing)
+
+- **Windows browser gate.** `animation.spec.ts` watches published cluster
+  metrics (`#status` on `first-2d-scene`) instead of screenshot throughput;
+  Windows Playwright timeout 180 s.
+- **`buildRenderList`.** Homogeneous sort skip, sprite fast path, and
+  `ALL_LAYERS` layer test; benchmark re-recorded.
+- **Size budgets.** `.size-limit.json` bumped (first-3d 39 kB, particles
+  37.5 kB, ui-demo 46 kB); rationale in `tools/size-budgets.mjs`.
+- **Rapier types.** `physics-rapier` uses `moduleResolution: bundler` and
+  upstream `@dimforge/rapier*` type aliases instead of the transcribed subset.
+- **`app.stats.contacts`.** Rapier adapters expose `countContacts()`; wired
+  through `SolverStatistics` to `Application.stats`.
+- **A-4/A-5 partial.** `@four/diagnostics` §85 validation catalogue; §83 dev
+  warnings (disposed-in-use, detached listeners, per-frame allocations);
+  extended leak audit; format-aware `RenderTarget.byteLength`; materials and
+  solver live-instance counts.
+- **CPU particle trails.** Optional `trail` on `ParticleEmitter`; ribbon mesh
+  in `@four/render` + WebGL trail pipeline; multi-stop lifetime ramps.
+
 ### 2026-09-06 — WebGL F13 / metal-roughness restore
 
 - **Unlit draw order.** Texture bind and `setFeatures` run before

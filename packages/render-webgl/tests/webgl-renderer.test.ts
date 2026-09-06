@@ -2642,12 +2642,12 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
 
     canvas.dispatch("webglcontextrestored");
 
-    // Unlit, sprite (WP-3a.3), particles (WP-9.3), lit (§68, 2026-08-04),
-    // standard (§59, R-13, 2026-08-08), the §70 effect pipeline (R-6,
-    // 2026-08-07), and §69's depth-only caster pipeline (R-18, 2026-08-09):
-    // §61 requires engine-owned GPU resources to be re-created before
-    // `contextrestored` is emitted, and every pipeline is.
-    expect(gl.countOf("createProgram")).toBe(7);
+    // Unlit, sprite (WP-3a.3), particles (WP-9.3), particle trails (§36),
+    // lit (§68, 2026-08-04), standard (§59, R-13, 2026-08-08), the §70 effect
+    // pipeline (R-6, 2026-08-07), and §69's depth-only caster pipeline (R-18,
+    // 2026-08-09): §61 requires engine-owned GPU resources to be re-created
+    // before `contextrestored` is emitted, and every pipeline is.
+    expect(gl.countOf("createProgram")).toBe(8);
     expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
       GL.DEPTH_TEST,
       GL.SCISSOR_TEST,
@@ -2753,7 +2753,7 @@ describe("WebglRenderer — disposal (§83)", () => {
 
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(7);
+    expect(gl.countOf("deleteProgram")).toBe(8);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(3);
     expect(renderer.disposed).toBe(true);
@@ -2777,7 +2777,7 @@ describe("WebglRenderer — disposal (§83)", () => {
     renderer.dispose();
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(7);
+    expect(gl.countOf("deleteProgram")).toBe(8);
   });
 
   it("succeeds during a lost context, without touching the context", async () => {
@@ -8170,7 +8170,7 @@ describe("WebglRenderer — §61 context-loss recovery (A-24)", () => {
     // could throw where §61 forbids throwing; everything keyed by an
     // application object comes back on the next draw that asks for it, because
     // the caches cannot know which of them the next frame will use.
-    expect(gl.countOf("createProgram")).toBe(7);
+    expect(gl.countOf("createProgram")).toBe(8);
     for (const allocator of RESOURCE_ALLOCATORS) {
       expect([allocator, gl.countOf(allocator)]).toEqual([allocator, 0]);
     }
@@ -10575,8 +10575,8 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     const { root, skeleton } = skinnedScene();
     skeleton.jointMatrices[13] = 5;
     const views = [createView(camera)];
-    // Seven programs at initialize, none of them skinned.
-    expect(gl.countOf("createProgram")).toBe(7);
+    // Eight programs at initialize (incl. particle trails), none skinned.
+    expect(gl.countOf("createProgram")).toBe(8);
     gl.reset();
 
     renderer.render(root, views);
@@ -10629,8 +10629,8 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     registerSkinningPipeline();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      // Program 8 is the first skinned compile (7 at initialize).
-      const { renderer, gl, camera } = await initialized({ failProgramAt: 8 });
+      // Program 9 is the first skinned compile (8 at initialize).
+      const { renderer, gl, camera } = await initialized({ failProgramAt: 9 });
       const { root } = skinnedScene();
       const views = [createView(camera)];
       gl.reset();
@@ -10659,9 +10659,9 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     canvas.dispatch("webglcontextlost");
     gl.reset();
     canvas.dispatch("webglcontextrestored");
-    // The restore rebuilds the seven eager programs only — the skinned pair
+    // The restore rebuilds the eight eager programs only — the skinned pair
     // waits for the next skinned draw.
-    expect(gl.countOf("createProgram")).toBe(7);
+    expect(gl.countOf("createProgram")).toBe(8);
 
     gl.reset();
     renderer.render(root, views);
@@ -10678,8 +10678,8 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
 
     renderer.dispose();
 
-    // Seven eager programs plus the skinned pair.
-    expect(gl.countOf("deleteProgram")).toBe(9);
+    // Eight eager programs plus the skinned pair.
+    expect(gl.countOf("deleteProgram")).toBe(10);
   });
 
   it("excludes skinned casters from the §69 shadow pass (bind pose)", async () => {
@@ -11161,7 +11161,7 @@ describe("WebglRenderer — §60 node materials (RFC 0001)", () => {
       renderer.render(root, [createView(camera)]);
       expect(gl.countOf("drawArrays")).toBe(0);
       expect(gl.countOf("bufferData")).toBe(0);
-      expect(warn).toHaveBeenCalledTimes(2);
+      expect(warn).toHaveBeenCalledTimes(3);
     } finally {
       warn.mockRestore();
     }

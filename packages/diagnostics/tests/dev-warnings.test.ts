@@ -5,9 +5,7 @@ import { resetDevWarnings } from "@four/core";
 import {
   beginFrameAllocationCheck,
   endFrameAllocationCheck,
-  warnDetachedNodeListeners,
   warnDisposedResourceInUse,
-  warnPerFrameAllocations,
 } from "../src/dev-warnings.js";
 
 afterEach(() => {

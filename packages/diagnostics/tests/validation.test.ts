@@ -7,11 +7,7 @@ import {
   COORDINATE_ENVELOPE,
   assertFinite,
   assertNoSceneGraphCycle,
-  validateSceneNode,
-  validateSceneSubtree,
   warnCoordinateEnvelope,
-  warnSingularScale,
-  warnUnstableScale,
 } from "../src/validation.js";
 
 afterEach(() => {

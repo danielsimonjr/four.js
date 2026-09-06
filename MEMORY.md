@@ -30,6 +30,15 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — open-TODO subagent pass (third landing).** Six parallel
+  agents landed: Windows animation gate (simulation-bound sampling, not
+  screenshot throughput); `buildRenderList` sort skip + sprite fast path;
+  size budgets with measured A/B in `tools/size-budgets.mjs`; Rapier upstream
+  types via `moduleResolution: bundler`; partial A-4/A-5 (validation catalogue,
+  §83 warnings, format-aware render-target bytes); CPU particle trails. Still
+  owner-gated or deferred: rapier 0.20, typedoc/TS 7, first publish, RFC
+  residues, PH-11c, batching follow-ups, GPU particle items.
+
 - **2026-09-06 — unlit `color` is read after bind + features (F13).**
   `unlitColorBlends` must not run before the texture unit and
   `setFeatures` mirrors are borrowed. A throwing `color` accessor is
