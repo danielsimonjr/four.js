@@ -6,6 +6,39 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [ ] **A dynamic body with no collider cannot rotate, and nothing says so.** Found by the
+      two-piston-engine persona dogfood. A flat-twin built from `RigidBody({ type:
+      "dynamic", mass: 1 })` with no colliders — reasonable for a pure linkage, where the
+      joints are the only constraints — sat frozen at its assembly angle forever. Every
+      accuracy invariant scored a **perfect 0.0 error**, because nothing moved: the exact
+      shape of a green result that means nothing. Adding a `Collider` was the whole fix.
+      Cause: `mass` supplies mass, not the **inertia tensor**. Without a collider to derive
+      it from and with no explicit `inertiaTensor`, angular inertia is zero and the solver
+      will not turn the body. The adapter states this — but only inside a *3D-only*
+      validation message ("omit inertiaTensor and let the solver derive it from the collider
+      geometry"), which never fires when the tensor is simply absent.
+      A `#warnOnce`-style diagnostic would fit: `PhysicsWorld` already has that pattern for
+      §32 sleeping thresholds. **Not implemented, and the reason is a real design tension,
+      not scope:** PH-5 supports adding colliders at runtime
+      (`#refreshMassAfterColliderChange`), so a body may legitimately register with none and
+      gain them later — a warning at `addBody` would false-positive on a supported
+      workflow. Where it should fire (first step? first non-zero motor torque?) is an owner
+      call.
+- [ ] **The `world.initialize()` ordering rule is demonstrated but never stated.**
+      `addBody` throws unless `world.initialize()` has already run, because that call
+      decodes the wasm solver (§37). The error text is excellent and says exactly what to
+      do. But the rule appears in no guide and no README as a *rule* — it is only modelled,
+      in `docs/guides/collision-filtering.md` and `examples/mechanism`. Building the scene
+      first and initializing last is the order the rest of four reads in (`app.initialize()`
+      comes after the scene is built), so the natural guess is the wrong one.
+- [x] **Physics accuracy verified against closed form — the joint solver is good.** A
+      flat-twin's pistons tracked the slider-crank equation
+      `x = r·cos(θ) + √(L² − r²sin²θ)` to a **mean 1.56 mm error on a 1.0 m stroke**
+      (0.16%), max 9.2 mm. The opposed-piston mirror invariant `x_A + x_B = 0` held to
+      3.6 mm. Piston drift off the slider axis was **exactly 0** — the prismatic constraint
+      is not approximate. The hinge motor held 6.23 rad/s against a commanded 6.0 (3.7%).
+      Measured over a full revolution from outside the library, via the published packages.
+
 - [x] **`FollowRig.apply()` kills the frame loop on a zero-delta frame.** FIXED — skips a Found by the
       flight-sim persona dogfood: the chase camera threw on frame 1 and the rAF loop never
       recovered. `apply()` passes `deltaSeconds` straight into `SpringDamper`, which
