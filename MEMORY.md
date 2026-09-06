@@ -32,6 +32,16 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — Browser-gate leftovers from #76.** The four Chromium
+  failures on `cursor/ci-fix-after-merge-8caa` were #76-on-main fallout
+  (Docs / graph died first on that PR, so `test:browser` never ran). Twin
+  `contacts` is produced by `recordSolverStatistics` now — assert finite
+  ≥ 0, keep `gpuframe` as `nan` on SwiftShader. Playground settle keeps
+  `SETTLED_CENTROID_TOLERANCE` (0.25) and drops `toBeCloseTo(..., 1)`.
+  Impulse rise is 0.5 after a recorded 0.85 on 0.20. Flagship panel
+  chrome is glyphs with `x ≥ PANEL_LEFT_EDGE`; left-side HUD in the
+  lower 60 % is world glyphs.
+
 - **2026-09-06 — R-32 particle offsets are allowlisted duplicates.**
   `PARTICLE_WIDE_INSTANCE_FLOATS` / `PARTICLE_ROTATION_OFFSET` /
   `PARTICLE_SOFTNESS_OFFSET` sit in both `@four/particles` and

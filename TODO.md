@@ -1493,6 +1493,12 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ## Done
 
+- [x] 2026-09-06 — **CI after #76.** Allowlisted R-32 wide particle offsets
+      (particles↔render duck-type); TypeDoc fixtures for NodeSpace,
+      PH-11c shape-cast `body`, and widget accessibility. Browser-gate
+      leftovers: twin contacts finite; playground 0.20 settle/impulse
+      bands; one-scene panel column for `panelLeft`.
+
 - [x] 2026-09-06 — **Open-TODO subagent pass (fourth landing).** Parallel
       packets: Rapier 0.20; `NodeSpace` + local-plane; PH-11c push; §40 units;
       live velocity writes; CameraShake / spherical wander / CCD+FABRIK;

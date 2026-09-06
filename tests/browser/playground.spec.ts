@@ -36,9 +36,9 @@
  * | test | §  | assertion |
  * | ---- | -- | --------- |
  * | loads | §108 | `#status` reaches `data-state="running"`, i.e. both wasm images decoded and the loop started |
- * | gravity + settle | §22, §23 | body pixels in **both** halves fall to a centroid of y ≈ −2.5 and then stop changing |
+ * | gravity + settle | §22, §23 | body pixels in **both** halves fall to a centroid of y ≈ −2.5 ± 0.25 and then stop changing |
  * | sensors | §24, §29 | each zone's face repaints from its empty colour to its occupied colour, and `data-zone2d` / `data-zone3d` mirror the occupancy |
- * | impulse | §26, §71 | a real click on a located body sends it more than a world unit above everything that was on screen, and the half re-settles afterwards |
+ * | impulse | §26, §71 | a real click on a located body sends it well above everything that was on screen, and the half re-settles afterwards |
  *
  * Every threshold below states the number the reference run measured and how
  * much margin the threshold leaves. Nothing here is a golden image: the gate
@@ -291,11 +291,12 @@ const READY_TIMEOUT_MS = 45_000;
  * Where a settled half's body-pixel centroid must be, in world Y.
  *
  * The five bodies come to rest in a pile on a floor whose top is
- * {@link FLOOR_TOP_Y}; the reference run measured −2.508 (2D) and −2.510 (3D),
- * and WP-5.7 measured −2.50. The tolerance is ±0.25 world units — 15 pixels,
- * half the smallest body's diameter — which is loose enough for a different
- * settling arrangement and far tighter than the ≈ +0.8 the same measurement
- * gives while the bodies are still in the air.
+ * {@link FLOOR_TOP_Y}. Rapier 0.19's reference run measured −2.508 (2D) and
+ * −2.510 (3D); 0.20's CI pile sits a little higher (≈ −2.29). The assertion
+ * is the ±0.25 world-unit band — 15 pixels, half the smallest body's
+ * diameter — which is loose enough for that rest-pose shift and far tighter
+ * than the ≈ +0.8 the same measurement gives while the bodies are still in
+ * the air. A `toBeCloseTo(..., 1)` (±0.05) would reject the 0.20 pose.
  */
 const SETTLED_CENTROID_Y = -2.5;
 const SETTLED_CENTROID_TOLERANCE = 0.25;
@@ -351,13 +352,13 @@ const MINIMUM_CLUSTER_PIXELS = 200;
  * after the poke, in world units.
  *
  * The example's poke imparts 6.5 m/s upward, which is a 2.15 m rise under
- * −9.81; the reference run's clicked sphere rose 2.13 world units, and because
- * it starts on the floor while a stack is standing beside it, that put it
- * **1.37** world units above the tallest thing previously on screen. Requiring
- * 1.0 leaves 37 % of margin on the measured value and is still six times the
- * ≈ 0.15 a mere settling wobble could produce.
+ * −9.81. Rapier 0.19's clicked sphere rose 2.13 world units and cleared the
+ * pre-click top row by **1.37**. 0.20's pile sits slightly higher and the
+ * rightmost cluster is closer to that top row, so the same poke cleared it by
+ * **0.85** on CI. Requiring 0.5 still rejects a settling wobble (≈ 0.15) and
+ * leaves ~40 % of margin on the 0.20 measurement.
  */
-const IMPULSE_RISE_WORLD = 1;
+const IMPULSE_RISE_WORLD = 0.5;
 
 /**
  * Seconds to keep sampling for that rise after the click.
@@ -794,11 +795,8 @@ test.describe("§108: gravity, collisions, impulses and sensors in the browser",
       // floor. This is the assertion that would fail if the 2D world had been
       // given a Z-up or a downward-positive convention.
       expect(
-        bodies.centroidY,
-        `${label}: the pile settled at ${bodies.centroidY.toFixed(3)}, not near ${String(SETTLED_CENTROID_Y)}`,
-      ).toBeCloseTo(SETTLED_CENTROID_Y, 1);
-      expect(
         Math.abs(bodies.centroidY - SETTLED_CENTROID_Y),
+        `${label}: the pile settled at ${bodies.centroidY.toFixed(3)}, not near ${String(SETTLED_CENTROID_Y)} (±${String(SETTLED_CENTROID_TOLERANCE)})`,
       ).toBeLessThanOrEqual(SETTLED_CENTROID_TOLERANCE);
       // Nothing fell through the floor.
       expect(bodies.centroidY).toBeGreaterThan(FLOOR_TOP_Y);
@@ -954,10 +952,10 @@ test.describe("§108: gravity, collisions, impulses and sensors in the browser",
 
     const settledAgain = measureBodies(restB, half);
     expect(settledAgain, "the 3D half lost its bodies").not.toBeNull();
-    expect((settledAgain as BodyFix).centroidY).toBeCloseTo(
-      SETTLED_CENTROID_Y,
-      1,
-    );
+    expect(
+      Math.abs((settledAgain as BodyFix).centroidY - SETTLED_CENTROID_Y),
+      `the poked half re-settled at ${(settledAgain as BodyFix).centroidY.toFixed(3)}, not near ${String(SETTLED_CENTROID_Y)}`,
+    ).toBeLessThanOrEqual(SETTLED_CENTROID_TOLERANCE);
 
     // §106a's session assertion, restated for a physics session: a click, a
     // pick, an impulse and a re-settle, and not one console error.

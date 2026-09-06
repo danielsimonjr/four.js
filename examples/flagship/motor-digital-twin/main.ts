@@ -3054,9 +3054,12 @@ const solverStats: SolverStatistics = {
  * do it: `solverStatistics` counts §32's awake set off the adapter's body seam,
  * and `recordSolverStatistics` writes the one field §84 has a name for.
  *
- * `gpuFrameTime`, `physicsStepTime` and `contacts` stay `NaN` on purpose. §84's
- * rule is that **`NaN` means "not measured" and `0` means "measured zero"**, so
- * this page publishes them as `nan` rather than inventing a zero.
+ * `gpuFrameTime` and `physicsStepTime` stay `NaN` when no producer timed them
+ * (SwiftShader has neither timestamp-query nor a physics-step clock on this
+ * page). `contacts` is no longer in that set: `recordSolverStatistics` writes
+ * `SolverStatistics.contactCount` whenever the adapter can walk manifolds.
+ * §84's rule is still **`NaN` means "not measured" and `0` means "measured
+ * zero"** — this page publishes whichever of those the producer actually has.
  */
 function updateStatistics(): void {
   if (app.stats === null) return;
