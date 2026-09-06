@@ -82,7 +82,11 @@ function bodyNode(options: {
     node.addComponent(new Collider({ shape: { type: "circle", radius: 0.5 } }));
   }
   if (options.position !== undefined) {
-    node.transform.position.set(...options.position);
+    node.transform.position.set(
+      options.position[0],
+      options.position[1],
+      options.position[2],
+    );
   }
   return node;
 }
@@ -681,13 +685,31 @@ describe("ForceFieldSystem batch path (§27 sampleAll)", () => {
       [-0.75, 0.5, 0],
     ] as const;
 
-    for (const [i, position] of positions.entries()) {
+    for (let i = 0; i < positions.length; i += 1) {
+      const position = positions[i];
+      const velocity = velocities[i];
       batchedWorld.addBody(bodyNode({ mass: 1 + i, position }));
       scalarWorld.addBody(bodyNode({ mass: 1 + i, position }));
-      batchedAdapter.body(i + 1).position.set(...position);
-      scalarAdapter.body(i + 1).position.set(...position);
-      batchedAdapter.body(i + 1).linearVelocity.set(...velocities[i]);
-      scalarAdapter.body(i + 1).linearVelocity.set(...velocities[i]);
+      batchedAdapter.body(i + 1).position.set(
+        position[0],
+        position[1],
+        position[2],
+      );
+      scalarAdapter.body(i + 1).position.set(
+        position[0],
+        position[1],
+        position[2],
+      );
+      batchedAdapter.body(i + 1).linearVelocity.set(
+        velocity[0],
+        velocity[1],
+        velocity[2],
+      );
+      scalarAdapter.body(i + 1).linearVelocity.set(
+        velocity[0],
+        velocity[1],
+        velocity[2],
+      );
     }
     batchedWorld.step(1 / 60);
     scalarWorld.step(1 / 60);
