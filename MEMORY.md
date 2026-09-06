@@ -30,6 +30,13 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — unlit `color` is read after bind + features (F13).**
+  `unlitColorBlends` must not run before the texture unit and
+  `setFeatures` mirrors are borrowed. A throwing `color` accessor is
+  F13's mid-draw raise; blend still applies before `draw*`. Metal-
+  roughness restore on unit 2 skips `activeTexture(TEXTURE2)` only when
+  that unit is still active (no unit-0 restore in the same `finally`).
+
 - **2026-09-06 — §83 duplicate-load warns on a settled cache hit.**
   Concurrent `load`s of the same key coalesce without a warning — that
   is the API. A later `load` of a slot that already decoded is the
