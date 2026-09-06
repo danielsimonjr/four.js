@@ -847,6 +847,8 @@ export interface FakeJoint {
   motor: SolverJointMotor | null;
   /** Whether the joined bodies still collide (§28); PH-22f. */
   collisionEnabled: boolean;
+  /** The last body-local anchors `setJointAnchors` received, or `null`. */
+  anchors: { anchorA: Vector3; anchorB: Vector3 } | null;
   alive: boolean;
 }
 
@@ -923,6 +925,7 @@ export class FakeJointSolverAdapter
       limits: null,
       motor: null,
       collisionEnabled: desc.collisionEnabled ?? false,
+      anchors: null,
       alive: true,
     });
     this.#recordJoint("createJoint", id, desc.type);
@@ -965,6 +968,22 @@ export class FakeJointSolverAdapter
     const joint = this.#requireJoint(handle);
     joint.collisionEnabled = enabled;
     this.#recordJoint("setJointCollisionEnabled", joint.id, enabled);
+  }
+
+  setJointAnchors(
+    handle: PhysicsJointHandle,
+    anchorA: Vector3,
+    anchorB: Vector3,
+  ): void {
+    const joint = this.#requireJoint(handle);
+    joint.anchors = {
+      anchorA: anchorA.clone(),
+      anchorB: anchorB.clone(),
+    };
+    this.#recordJoint("setJointAnchors", joint.id, {
+      anchorA: { x: anchorA.x, y: anchorA.y, z: anchorA.z },
+      anchorB: { x: anchorB.x, y: anchorB.y, z: anchorB.z },
+    });
   }
 
   getJointId(handle: PhysicsJointHandle): number {

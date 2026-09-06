@@ -387,6 +387,8 @@ type RapierJointData3d = object;
 interface RapierImpulseJoint3d {
   readonly handle: number;
   setContactsEnabled(enabled: boolean): void;
+  setAnchor1(newPos: { x: number; y: number; z: number }): void;
+  setAnchor2(newPos: { x: number; y: number; z: number }): void;
 }
 
 /**
@@ -2466,6 +2468,28 @@ export class Rapier3dAdapter
    */
   setJointCollisionEnabled(handle: PhysicsJointHandle, enabled: boolean): void {
     this.#requireJoint(handle).joint.setContactsEnabled(enabled);
+  }
+
+  /**
+   * Replaces both body-local anchors, live (§28, PH-22f).
+   *
+   * `ImpulseJoint.setAnchor1` / `setAnchor2` are on Rapier's **base** joint
+   * class, so unlike `setLimits` this works for every §28 type this adapter
+   * builds. The vectors are already body-local — the same space `createJoint`
+   * received — and are not re-measured against any pose.
+   */
+  setJointAnchors(
+    handle: PhysicsJointHandle,
+    anchorA: Vector3,
+    anchorB: Vector3,
+  ): void {
+    const record = this.#requireJoint(handle);
+    record.joint.setAnchor1(
+      toRapierVector3("anchorA", anchorA, createRapierVector3()),
+    );
+    record.joint.setAnchor2(
+      toRapierVector3("anchorB", anchorB, createRapierVector3()),
+    );
   }
 
   /** @inheritDoc */

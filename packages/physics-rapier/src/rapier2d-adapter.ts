@@ -2465,6 +2465,25 @@ export class Rapier2dAdapter
     this.#requireJoint(handle).joint.setContactsEnabled(enabled);
   }
 
+  /**
+   * Replaces both body-local anchors, live (§28, PH-22f).
+   *
+   * `ImpulseJoint.setAnchor1` / `setAnchor2` are on Rapier's **base** joint
+   * class, so unlike `setLimits` this works for every §28 type this adapter
+   * builds. The vectors are already body-local — the same space `createJoint`
+   * received — and are not re-measured against any pose. A `"2d"` world still
+   * rejects a non-zero z through {@link toRapierVector2}.
+   */
+  setJointAnchors(
+    handle: PhysicsJointHandle,
+    anchorA: Vector3,
+    anchorB: Vector3,
+  ): void {
+    const record = this.#requireJoint(handle);
+    record.joint.setAnchor1(this.#jointAnchor("anchorA", anchorA));
+    record.joint.setAnchor2(this.#jointAnchor("anchorB", anchorB));
+  }
+
   /** @inheritDoc */
   getJointId(handle: PhysicsJointHandle): number {
     return this.#requireJoint(handle).id;

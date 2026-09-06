@@ -810,6 +810,78 @@ describe("collisionEnabled (§28)", () => {
   });
 });
 
+describe("live anchors (§28, PH-22f)", () => {
+  it("moves a rope's body-local attachment without re-measuring poses", async () => {
+    const adapter = await createAdapter();
+    const anchor = anchorBody(adapter);
+    const bob = disc(adapter, 0, -1, 0.05);
+    const joint = adapter.createJoint({
+      type: "rope",
+      bodyA: anchor,
+      bodyB: bob,
+      maxLength: 1,
+      anchorA: new Vector2(0, 0),
+      anchorB: new Vector2(0, 0),
+    });
+    run(adapter, 180);
+    // Hanging at maxLength with both locals at the origin.
+    expect(positionOf(adapter, bob).y).toBeCloseTo(-1, 2);
+
+    // Body-local: attach 0.5 m above the bob's origin. Gravity hangs the
+    // new world-space pair at 1 m, so the COM drops to y = -1.5. Re-measuring
+    // against the current pose would have left the COM where it is.
+    adapter.setJointAnchors(
+      joint,
+      new Vector3(0, 0, 0),
+      new Vector3(0, 0.5, 0),
+    );
+    run(adapter, 180);
+    expect(positionOf(adapter, bob).y).toBeCloseTo(-1.5, 2);
+    adapter.dispose();
+  });
+
+  it("rejects a non-planar live anchor (§21)", async () => {
+    const adapter = await createAdapter();
+    const anchor = anchorBody(adapter);
+    const bob = disc(adapter, 1, 0, 0.05);
+    const joint = adapter.createJoint({
+      type: "rope",
+      bodyA: anchor,
+      bodyB: bob,
+      maxLength: 2,
+    });
+    expect(() => {
+      adapter.setJointAnchors(
+        joint,
+        new Vector3(0, 0, 1),
+        new Vector3(0, 0, 0),
+      );
+    }).toThrowError(/anchorA\.z must be 0/u);
+    adapter.dispose();
+  });
+
+  it("refuses a destroyed joint handle", async () => {
+    const adapter = await createAdapter();
+    const anchor = anchorBody(adapter);
+    const bob = disc(adapter, 1, 0, 0.05);
+    const joint = adapter.createJoint({
+      type: "rope",
+      bodyA: anchor,
+      bodyB: bob,
+      maxLength: 2,
+    });
+    adapter.destroyJoint(joint);
+    expect(() => {
+      adapter.setJointAnchors(
+        joint,
+        new Vector3(0, 0, 0),
+        new Vector3(0, 0, 0),
+      );
+    }).toThrowError(/not valid for this Rapier2dAdapter/u);
+    adapter.dispose();
+  });
+});
+
 describe("the joint registry (§33, §37)", () => {
   it("mints monotonic ids and visits joints in creation order", async () => {
     const adapter = await createAdapter();

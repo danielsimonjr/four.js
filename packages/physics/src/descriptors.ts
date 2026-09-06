@@ -487,12 +487,13 @@ export interface SphericalJointLimits {
  * `anchorA` and `anchorB` are in the **local frame of their own body**, which
  * is what §37's original descriptor already said and what every solver wants
  * (Rapier's `JointData.*` anchors are body-local). The user-facing
- * {@link Joint} classes take **world-space** anchors instead, because that is
+ * {@link Joint} constructors take **world-space** anchors, because that is
  * where §28's example puts them — the point in the scene where the hinge pin
  * goes — and `PhysicsWorld.addJoint` converts world to local **once, at
  * registration**, from each body's pose as the solver holds it at that moment.
- * Descriptors are therefore pose-independent and replayable (§34); the class
- * surface is the ergonomic one.
+ * After that, {@link Joint.setAnchors} and the field setters are body-local
+ * (PH-22f) and push through `SolverJointAccess.setJointAnchors`. Descriptors
+ * stay pose-independent and replayable (§34).
  *
  * An omitted anchor means the body's own origin.
  */

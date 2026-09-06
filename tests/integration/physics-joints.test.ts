@@ -493,6 +493,39 @@ for (const kit of DIMENSION_KITS) {
       expect(second).toBeGreaterThan(-1.21);
     });
 
+    it("re-anchors a live rope in body-local space without re-measuring (PH-22f)", async () => {
+      const rig = await openRig();
+      const world = await createJointWorld(rig, kit);
+      const rope = buildRope(world, kit, {
+        origin: new Vector3(0, 0, 0),
+        maxLength: 1,
+        slack: 1,
+      });
+      // Construction is world-space; addJoint writes the locals back.
+      expect(rope.joint.anchorsAreLocal).toBe(true);
+      expect(rope.joint.anchorA?.y).toBeCloseTo(0, 12);
+      expect(rope.joint.anchorB?.y).toBeCloseTo(0, 12);
+
+      stepFrames(rig.app, 180);
+      // Slack start at y = -1 with maxLength 1: hanging at the origin distance.
+      expect(rope.load.node.transform.position.y).toBeCloseTo(-1, 2);
+
+      // Same locals again: not re-measured against the current pose, so the
+      // COM stays on the same circle.
+      rope.joint.setAnchors(new Vector3(0, 0, 0), new Vector3(0, 0, 0));
+      expect(rope.joint.commands.anchorsDirty).toBe(true);
+      rig.app.step(DT);
+      expect(rope.joint.commands.anchorsDirty).toBe(false);
+      stepFrames(rig.app, 60);
+      expect(rope.load.node.transform.position.y).toBeCloseTo(-1, 2);
+
+      // New body-local attachment 0.5 m above the load origin. Gravity hangs
+      // the new pair at 1 m, so the COM drops to y = -1.5.
+      rope.joint.setAnchors(new Vector3(0, 0, 0), new Vector3(0, 0.5, 0));
+      stepFrames(rig.app, 180);
+      expect(rope.load.node.transform.position.y).toBeCloseTo(-1.5, 2);
+    });
+
     // --- (h, first half) breakage is refused on Rapier (§28, plan P6-2) -----
 
     it("refuses a breakable joint because the adapter reports no reactions", async () => {

@@ -595,6 +595,8 @@ interface ScriptedJoint {
   motor: SolverJointMotor | null;
   /** Whether the joined bodies still collide (§28); PH-22f. */
   collisionEnabled: boolean;
+  /** The last body-local anchors the world pushed, or `null`. */
+  anchors: { anchorA: Vector3; anchorB: Vector3 } | null;
   alive: boolean;
 }
 
@@ -774,6 +776,7 @@ export class ScriptedJointAdapter
       limits: null,
       motor: null,
       collisionEnabled: false,
+      anchors: null,
       alive: true,
     });
     return handle;
@@ -1032,6 +1035,17 @@ export class ScriptedJointAdapter
 
   setJointCollisionEnabled(handle: PhysicsJointHandle, enabled: boolean): void {
     this.#requireJoint(handle).collisionEnabled = enabled;
+  }
+
+  setJointAnchors(
+    handle: PhysicsJointHandle,
+    anchorA: Vector3,
+    anchorB: Vector3,
+  ): void {
+    this.#requireJoint(handle).anchors = {
+      anchorA: anchorA.clone(),
+      anchorB: anchorB.clone(),
+    };
   }
 
   getJointId(handle: PhysicsJointHandle): number {

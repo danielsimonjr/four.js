@@ -980,6 +980,54 @@ describe("joint lifetime", () => {
   });
 });
 
+describe("live anchors (§28, PH-22f)", () => {
+  it("moves a rope's body-local attachment without re-measuring poses", async () => {
+    const adapter = await createAdapter();
+    const anchor = anchorAt(adapter, new Vector3(0, 0, 0));
+    const bob = ballAt(adapter, new Vector3(0, -1, 0), 0.05, 100);
+    const joint = adapter.createJoint({
+      type: "rope",
+      bodyA: anchor,
+      bodyB: bob,
+      maxLength: 1,
+      anchorA: new Vector3(0, 0, 0),
+      anchorB: new Vector3(0, 0, 0),
+    });
+    step(adapter, 180);
+    expect(positionOf(adapter, bob).y).toBeCloseTo(-1, 2);
+
+    adapter.setJointAnchors(
+      joint,
+      new Vector3(0, 0, 0),
+      new Vector3(0, 0.5, 0),
+    );
+    step(adapter, 180);
+    expect(positionOf(adapter, bob).y).toBeCloseTo(-1.5, 2);
+    adapter.dispose();
+  });
+
+  it("refuses a destroyed joint handle", async () => {
+    const adapter = await createAdapter();
+    const anchor = anchorAt(adapter, new Vector3(0, 0, 0));
+    const bob = ballAt(adapter, new Vector3(1, 0, 0), 0.05, 1);
+    const joint = adapter.createJoint({
+      type: "rope",
+      bodyA: anchor,
+      bodyB: bob,
+      maxLength: 2,
+    });
+    adapter.destroyJoint(joint);
+    expect(() => {
+      adapter.setJointAnchors(
+        joint,
+        new Vector3(0, 0, 0),
+        new Vector3(0, 0, 0),
+      );
+    }).toThrowError(/not valid for this Rapier3dAdapter/u);
+    adapter.dispose();
+  });
+});
+
 describe("snapshots with joints (§34)", () => {
   it("round-trips a jointed world and continues it identically", async () => {
     const build = async (): Promise<{
