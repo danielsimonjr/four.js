@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **65 open**, 124 done.
+Counts as of 2026-09-06: **64 open**, 125 done.
 
 ### 1 · Minutes — mechanical, no design in them
 
@@ -22,7 +22,7 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
 - Capability-table note: Rapier derives kinematic velocity itself, so inheritVelocityFrom is nearly a no-op there; other solvers may need it
 - Document SolverBodyAccess in the §90/§102 compatibility material when adapters beyond Rapier arrive (it is required engine surface beyond §37's sketch)
 - §28 motor cap: both Rapier adapters supply maxTorque/maxForce as a ForceBased gain, not a hard ceiling (documented in the stable API docs); name it in the §90/§102 capability tables when a capping adapter (Box2D) arrives
-- Coverage thresholds are package-level; consider per-file granularity so a weak file can't hide behind a strong package average
+- Coverage thresholds are package-level — DONE 2026-09-06 (80% per-file floor under the 95% package gate).
 
 ### 2 · Hours — one contained fix, already diagnosed
 
@@ -1441,8 +1441,12 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Chores (Phase 4 exit-verifier notes, 2026-08-01)
 
-- [ ] Coverage thresholds are package-level; consider per-file granularity so a weak file
-      can't hide behind a strong package average
+- [x] Coverage thresholds are package-level; consider per-file granularity so a weak file
+      can't hide behind a strong package average — DONE 2026-09-06: 80%
+      lines/functions/statements per file via `tools/per-file-coverage-floor.cjs`;
+      package gate stays ≥95%. Weakest real file is `physics-rapier/src/init.ts`
+      at 86.95%. Branches stay package-only (`alloc-counter.ts` is 75% on the
+      wrap).
 - [ ] Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is
       invisible; schedule blending with §60a color management work
 

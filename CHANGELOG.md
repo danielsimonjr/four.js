@@ -37,6 +37,9 @@ specification; until then, entries are grouped by date under **Unreleased**.
   manifest, loads each key, and returns a synchronous `SceneResourceCatalog`.
 - **§27 field batch + interceptTime.** `ForceField.sampleAll` is the optional
   stride-3 SoA path; steering's intercept-time now calls prediction's export.
+- **Per-file coverage floor.** Package gate stays ≥95%. An Istanbul reporter
+  (`tools/per-file-coverage-floor.cjs`) fails any non-empty file below 80%
+  lines/functions/statements so a 0% file cannot hide behind the average.
 
 ### 2026-09-06 — `js-yaml 5` breaks the dependency-graph tool, and the fix is not ours
 
