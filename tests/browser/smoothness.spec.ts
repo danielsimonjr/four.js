@@ -591,23 +591,32 @@ async function virtualFrameCount(page: Page): Promise<number> {
 }
 
 /**
- * Waits until the injected clock has delivered a new frame of the requested
- * parity (odd = alpha 0.5, even = alpha 0.0). The wait is on the rAF counter,
- * not on wall-clock, so the phase is chosen instead of inherited.
+ * Waits until the injected clock has delivered at least `minimum` virtual
+ * frames. Each poll pumps one real `requestAnimationFrame` turn so headless
+ * SwiftShader advances the example's patched loop between checks.
  */
-async function waitForVirtualFrameParity(
+async function waitForVirtualFrameCount(
   page: Page,
-  parity: 0 | 1,
+  minimum: number,
 ): Promise<number> {
-  const start = await virtualFrameCount(page);
-  await page.waitForFunction(
-    ({ since, odd }) => {
-      const n = window.__fourVirtualFrames ?? 0;
-      return n > since && n % 2 === (odd ? 1 : 0);
-    },
-    { since: start, odd: parity === 1 },
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const n = await virtualFrameCount(page);
+    if (n >= minimum) {
+      return n;
+    }
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        }),
+    );
+  }
+  const stuck = await virtualFrameCount(page);
+  throw new Error(
+    `virtual frame ${String(minimum)} not reached within 30 s ` +
+      `(stuck at ${String(stuck)})`,
   );
-  return virtualFrameCount(page);
 }
 
 /** Screenshots until a drawn frame appears or the budget runs out. */
@@ -793,12 +802,10 @@ test.describe("§106: moving primitives render smoothly under fixed-step simulat
     const fractions: number[] = [];
     const frameNumbers: number[] = [];
     for (let i = 0; i < INTERPOLATION_SAMPLE_COUNT; i++) {
-      // Alternate odd / even virtual frames so both alpha 0.5 and alpha 0.0
-      // appear. Waiting on the rAF counter, not wall-clock, is what breaks
-      // the even-frame alias.
-      frameNumbers.push(
-        await waitForVirtualFrameParity(page, i % 2 === 0 ? 1 : 0),
-      );
+      // One new virtual frame per sample — consecutive counts alternate parity,
+      // so both alpha 0.5 and 0.0 appear without a wall-clock alias.
+      const start = await virtualFrameCount(page);
+      frameNumbers.push(await waitForVirtualFrameCount(page, start + 1));
       const image = await grab(canvas);
       const fix = locateOrbiter(image);
       expect(
