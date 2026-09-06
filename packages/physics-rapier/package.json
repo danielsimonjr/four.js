@@ -13,8 +13,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@dimforge/rapier2d-compat": "0.20.0",
-    "@dimforge/rapier3d-compat": "0.20.0",
+    "@dimforge/rapier2d-compat": "0.19.3",
+    "@dimforge/rapier3d-compat": "0.19.3",
     "@four/core": "workspace:*",
     "@four/math": "workspace:*",
     "@four/physics": "workspace:*"

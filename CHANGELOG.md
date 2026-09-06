@@ -8,27 +8,6 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
-### 2026-09-05 — rapier 0.20: `contactPair` gained a `bodies` parameter
-
-- **`@four/physics-rapier` passed its callback into rapier's new argument slot.** rapier 0.20
-  changed `NarrowPhase.contactPair(collider1, collider2, f)` to
-  `contactPair(collider1, collider2, bodies, f)`. The adapter kept the old shape, so rapier
-  invoked the callback as a `RigidBodySet` and threw `TypeError: C is not a function` **from its
-  own `narrow_phase.ts`** — a minified symbol in a stack that pointed nowhere near the cause.
-  Eight tests failed on it, all on the contact path: contact-solve iterations (§28), CCD
-  prediction distance (§31), collider-destruction pair forgetting, restitution bounce (§24/§25)
-  and collision events (§29/§32).
-  Fixed at six sites — the 2d and 3d `contactPair` declarations in `init.ts` (which also gain the
-  `bodies` member the world interfaces never needed before) and four call sites, two per adapter.
-  The world's own body set is forwarded straight back; it is opaque to us.
-  **Before:** 12 test files failed, no tests ran. **After:** 337 passed, 4 failed.
-- **The 4 remaining failures are NOT this bug and were not papered over.** They are numeric —
-  a bullet that no longer tunnels (9.90 where `> 10` was expected), a contact distance of 0.005
-  where `<= 0` was expected, and a restored joint at −0.75 where `> −0.22` was expected. Our
-  wiring is intact (`setSoftCcdPrediction` still exists in 0.20 and the adapter still calls it),
-  so this is **rapier 0.20 solver behaviour drift**, not a second defect on our side. Widening the
-  assertions to get green would hide exactly the information that matters.
-
 ### 2026-09-05 — repository configuration repairs (Docs, Release, Dependabot)
 
 - **GitHub Pages enabled (`build_type: workflow`).** The `Docs` workflow had been failing on every

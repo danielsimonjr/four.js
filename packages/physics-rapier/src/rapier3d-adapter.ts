@@ -2952,7 +2952,6 @@ export class Rapier3dAdapter
     world.narrowPhase.contactPair(
       a.rapierHandle,
       b.rapierHandle,
-      world.bodies,
       (manifold, flipped) => {
         const manifoldNormal = manifold.normal();
         normalX = flipped ? -manifoldNormal.x : manifoldNormal.x;
@@ -3181,7 +3180,6 @@ export class Rapier3dAdapter
         narrowPhase.contactPair(
           record.rapierHandle,
           otherHandle,
-          world.bodies,
           (manifold) => {
             touching ||= manifold.numContacts() > 0;
           },
