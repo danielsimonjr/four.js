@@ -5,6 +5,7 @@
  * `pointer.test.ts` does for pointers.
  */
 
+import { FourError } from "@four/core";
 import { Group, type Node } from "@four/scene";
 import { describe, expect, it, vi } from "vitest";
 
@@ -15,6 +16,7 @@ import {
 } from "../src/key-events.js";
 import {
   KeyboardInput,
+  type KeyboardInputOptions,
   type KeySurface,
   type SurfaceKeyEvent,
   type SurfaceKeyListener,
@@ -329,6 +331,40 @@ describe("dispatchKeyEvent — capture, target, bubble (§72)", () => {
 });
 
 describe("KeyboardInput", () => {
+  it("refuses a malformed options object with a message that names the call shape", () => {
+    const surface = new FakeKeySurface();
+
+    // The natural mistake: one options object, the way most of four's constructors read.
+    // This used to throw `TypeError: Cannot read properties of undefined (reading
+    // 'focusTarget')` -- an internal property access naming a private field, with no hint
+    // of the real signature.
+    expect(
+      () =>
+        new KeyboardInput(
+          { surface } as unknown as KeySurface,
+          undefined as unknown as KeyboardInputOptions,
+        ),
+    ).toThrow(/focusTarget/);
+    expect(
+      () =>
+        new KeyboardInput(
+          { surface } as unknown as KeySurface,
+          undefined as unknown as KeyboardInputOptions,
+        ),
+    ).toThrow(FourError);
+
+    // A present-but-not-callable focusTarget is the same mistake one step later.
+    expect(
+      () =>
+        new KeyboardInput(surface, {
+          focusTarget: null as unknown as () => Node | null,
+        }),
+    ).toThrow(FourError);
+
+    // Control: the correct shape still constructs.
+    expect(() => new KeyboardInput(surface, { focusTarget: () => null })).not.toThrow();
+  });
+
   it("subscribes to keydown and keyup", () => {
     const surface = new FakeKeySurface();
     new KeyboardInput(surface, { focusTarget: () => null });

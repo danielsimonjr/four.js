@@ -8,6 +8,27 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — `KeyboardInput` now refuses a malformed options object clearly
+
+- **`new KeyboardInput({ surface: window })` threw `TypeError: Cannot read properties of
+  undefined (reading 'focusTarget')`** — an internal property access naming a private
+  field, with no hint of the real signature. The constructor takes **two** arguments,
+  `(surface, { focusTarget })`, and `focusTarget` is required.
+  It now throws a `FourError` naming the call shape, the way `SpringDamper` answers the
+  same class of mistake ("options must supply either {stiffness, damping} or {frequencyHz,
+  dampingRatio}") — a message that makes the fix a one-step correction instead of a
+  source-reading exercise.
+- **The message also says what the class is for**, because the name is what invites the
+  mistake. In a package called `@four/input`, `KeyboardInput` reads like "the way to read
+  the keyboard", but it routes events to a *focused scene node* and pairs with
+  `@four/ui`'s `keyboardFocusTarget(root)`. Game code reading WASD wants neither, and
+  four offers no first-class alternative: its own `examples/character-controller` uses
+  plain DOM listeners. The error now points there rather than leaving a game developer to
+  discover it by reading the examples.
+
+  Found by building a flight simulator against the library. No call site changes: all
+  three in-repo constructions already pass `keyboardFocusTarget(uiRoot)`.
+
 ### 2026-09-06 — the WebGPU gate ran nowhere on Windows; 22 skips are now 22 passes
 
 - **All 22 specs in the `webgpu` project skipped on Windows**, so four's second render

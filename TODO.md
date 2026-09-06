@@ -25,7 +25,7 @@ changes in `CHANGELOG.md`.
       Fix must be platform-conditional. CI (Linux) runs 103/103 with today's flags, so the
       non-Windows argument list must not change at all.
 
-- [ ] **`KeyboardInput` is UI focus-routing, and its name sends game code to the wrong
+- [x] **`KeyboardInput` is UI focus-routing, and its name sends game code to the wrong
       tool.** Found by the flight-sim persona; never filed until now, which is why it is
       dated late. `@four/input`'s `KeyboardInput` takes
       `(surface, { focusTarget: () => Node | null })` and dispatches to a *focused scene
@@ -37,7 +37,10 @@ changes in `CHANGELOG.md`.
       Second half, cheap and separable: passing the wrong shape throws
       `TypeError: Cannot read properties of undefined (reading 'focusTarget')` — an internal
       property access, where `SpringDamper` in the same package family names both accepted
-      option shapes. Validating the options object would make the two consistent.
+      option shapes. **Validation half DONE 2026-09-06** — a `FourError` now names the call
+      shape and points game input at DOM listeners. The naming/first-class-game-input half
+      remains open: it is an API-surface decision (a new class? a documented recipe?) and
+      belongs to the owner.
 
 - [ ] **A dynamic body with no collider cannot rotate, and nothing says so.** Found by the
       two-piston-engine persona dogfood. A flat-twin built from `RigidBody({ type:

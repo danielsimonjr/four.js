@@ -85,6 +85,8 @@ import { buildPropagationPath } from "./propagation.js";
  * side of the normalization: the whole point is that the DOM's own event
  * satisfies the interface without a wrapper.
  */
+import { FourError } from "@four/core";
+
 export interface SurfaceKeyEvent extends KeyDefaultSuppressor {
   /** The character or named key produced — `"a"`, `"Enter"`, `" "`. */
   readonly key: string;
@@ -153,6 +155,37 @@ export class KeyboardInput {
   };
 
   constructor(surface: KeySurface, options: KeyboardInputOptions) {
+    /*
+     * Validated rather than destructured, because the failure this replaces was
+     * unreadable. Calling `new KeyboardInput({ surface: window })` -- one options
+     * object, the shape most of four's constructors take -- threw
+     * `TypeError: Cannot read properties of undefined (reading 'focusTarget')`: an
+     * internal property access naming a private field, with no hint of the real
+     * signature. `SpringDamper` answers the same class of mistake by naming both
+     * accepted shapes, and that is what makes such a message a one-step correction.
+     *
+     * The message also says what this class is for, because the *name* is what invites
+     * the mistake: in a package called `@four/input`, `KeyboardInput` reads like "the
+     * way to read the keyboard", but it routes to a focused scene node and pairs with
+     * `@four/ui`'s `keyboardFocusTarget(root)`. Game code reading WASD wants neither;
+     * `examples/character-controller` uses plain DOM listeners for exactly that reason.
+     */
+    if (
+      typeof options !== "object" ||
+      options === null ||
+      typeof options.focusTarget !== "function"
+    ) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        "KeyboardInput takes two arguments: (surface, { focusTarget }). " +
+          "`focusTarget` is required and must be a function returning the focused " +
+          "Node or null — it is how key events are routed into the scene (§72). " +
+          "For a widget tree, pass `keyboardFocusTarget(root)` from `@four/ui`. " +
+          "For raw game input (WASD and the like) this class is the wrong tool: " +
+          "listen to the DOM directly, as `examples/character-controller` does.",
+        { context: { received: typeof options } },
+      );
+    }
     this.#surface = surface;
     this.#focusTarget = options.focusTarget;
 
