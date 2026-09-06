@@ -6,6 +6,39 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [x] **Make the WebGPU gate run on Windows: `--use-angle=swiftshader` is what blocks it.** DONE — 22 passed, 0 skipped.
+      Measured 2026-09-06, both binaries x four flag sets, on a served origin:
+
+      | binary | flags | `requestAdapter()` |
+      | --- | --- | --- |
+      | full | `--use-gl=angle --use-angle=swiftshader --enable-unsafe-webgpu` (today's) | **null** |
+      | shell | same | **null** |
+      | full | `--enable-unsafe-webgpu` only | nvidia / pascal, 20 features |
+      | full | `+ --use-webgpu-adapter=swiftshader` | **google / swiftshader, 18 features** |
+      | shell | `--use-gl=angle --enable-unsafe-webgpu` | nvidia / pascal, 20 features |
+
+      `--use-angle=swiftshader` governs ANGLE (WebGL) and is right for the `chromium` and
+      `visual` projects — it is what makes a GPU machine measure like CI. But on Windows it
+      also denies Dawn an adapter, so all 22 `webgpu` specs skip.
+      `--use-webgpu-adapter=swiftshader` is the WebGPU-side equivalent and keeps the
+      determinism the config is actually after: a *software* adapter, not this box's NVIDIA.
+      Fix must be platform-conditional. CI (Linux) runs 103/103 with today's flags, so the
+      non-Windows argument list must not change at all.
+
+- [ ] **`KeyboardInput` is UI focus-routing, and its name sends game code to the wrong
+      tool.** Found by the flight-sim persona; never filed until now, which is why it is
+      dated late. `@four/input`'s `KeyboardInput` takes
+      `(surface, { focusTarget: () => Node | null })` and dispatches to a *focused scene
+      node* — it pairs with `@four/ui`'s `keyboardFocusTarget(root)`. A game reading WASD
+      wants none of that, and four offers no first-class alternative: its own
+      `examples/character-controller` uses raw `window.addEventListener("keydown")`. So the
+      sanctioned path for game input is the DOM, undocumented, while the class whose name
+      says "keyboard input" is for widgets.
+      Second half, cheap and separable: passing the wrong shape throws
+      `TypeError: Cannot read properties of undefined (reading 'focusTarget')` — an internal
+      property access, where `SpringDamper` in the same package family names both accepted
+      option shapes. Validating the options object would make the two consistent.
+
 - [ ] **A dynamic body with no collider cannot rotate, and nothing says so.** Found by the
       two-piston-engine persona dogfood. A flat-twin built from `RigidBody({ type:
       "dynamic", mass: 1 })` with no colliders — reasonable for a pure linkage, where the
@@ -59,9 +92,12 @@ changes in `CHANGELOG.md`.
       defect and not a CI coverage hole; both were checked before writing this down.
       Two separate causes:
       - **All 22 `webgpu` specs skip.** They self-skip when `requestAdapter()` is `null`.
-        Playwright's default headless binary is `chrome-headless-shell`, whose Windows tree
-        **lacks `dxcompiler.dll`** (the full `chromium-*` tree has it) — Dawn's D3D12 backend
-        needs DXC to compile WGSL. Not a hardware absence: a real Chrome on this same box
+        **CORRECTED 2026-09-06 — the first diagnosis below was WRONG.** I wrote that
+        `chrome-headless-shell` lacked `dxcompiler.dll` and that this denied Dawn an adapter.
+        Measured across both binaries and four flag sets, that is false: the FULL chromium
+        build ships `dxcompiler.dll` and still returns a null adapter under the config's
+        flags. The binary was never the variable — **`--use-angle=swiftshader` is.** Drop
+        it and an adapter appears on both binaries. Not a hardware absence either: Chrome
         reports an NVIDIA/Pascal adapter with 19 features, and four's own `WebgpuRenderer`
         renders through it. On Linux the shell reaches SwiftShader's Vulkan, which is why
         CI runs all 22.

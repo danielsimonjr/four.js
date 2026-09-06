@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { defineConfig } from "@playwright/test";
+import { chromium, defineConfig } from "@playwright/test";
 
 /**
  * Playwright configuration for the browser gates (WP-3.8, extended by WP-5.8,
@@ -109,6 +109,59 @@ function findPreinstalledChromium(): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * The **full** Chromium build matching the revision Playwright would launch by default,
+ * on Windows only. `undefined` everywhere else, and whenever it cannot be found.
+ *
+ * Why this exists (measured 2026-09-06, both binaries against four flag sets on a served
+ * origin): on Windows `chrome-headless-shell` cannot produce a WebGPU adapter under any
+ * flag set that also pins a software adapter, so all 22 specs in the `webgpu` project
+ * skipped themselves and the second render backend was gated by tests that never ran.
+ * The full build can. On Linux the shell reaches SwiftShader's Vulkan on its own, which
+ * is why CI has always run those specs and never needed this.
+ *
+ * The path is *derived* from `chromium.executablePath()` rather than searched for, so the
+ * revision cannot drift from the one this Playwright release expects: the two trees are
+ * siblings, `chromium_headless_shell-<rev>` and `chromium-<rev>`.
+ */
+function windowsFullChromium(): string | undefined {
+  if (process.platform !== "win32") return undefined;
+  let shellPath: string;
+  try {
+    shellPath = chromium.executablePath();
+  } catch {
+    return undefined;
+  }
+  const match = /^(.*[\\/])chromium_headless_shell-(\d+)[\\/]/.exec(shellPath);
+  if (match === null) return undefined;
+  const candidate = join(
+    `${match[1]}chromium-${match[2]}`,
+    "chrome-win64",
+    "chrome.exe",
+  );
+  return existsSync(candidate) ? candidate : undefined;
+}
+
+/**
+ * Launch arguments for the `webgpu` project.
+ *
+ * Non-Windows is **byte-identical to what CI runs today** (103/103 green): a Windows-only
+ * defect must not change the argv of the platform that already works.
+ *
+ * On Windows, `--use-angle=swiftshader` is dropped and `--use-webgpu-adapter=swiftshader`
+ * takes its place. That flag is what denies Dawn an adapter here — it governs ANGLE, which
+ * is WebGL's rasteriser, and is still exactly right for the `chromium` and `visual`
+ * projects. The replacement keeps the property the config actually cares about: the gate
+ * measures a **software** adapter (`google` / `swiftshader`), not this machine's NVIDIA
+ * one, so a developer box and CI still measure the same thing.
+ */
+function webgpuLaunchArgs(): string[] {
+  if (process.platform !== "win32") {
+    return ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-webgpu"];
+  }
+  return ["--use-gl=angle", "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader"];
 }
 
 /** Preview port for `examples/first-2d-scene` — the suite's `baseURL`. */
@@ -322,12 +375,11 @@ export default defineConfig({
         // keeps every landed WebGL and visual gate launching exactly the
         // browser it launched before (WP-R1.1, 2026-08-21).
         launchOptions: {
-          executablePath: findPreinstalledChromium(),
-          args: [
-            "--use-gl=angle",
-            "--use-angle=swiftshader",
-            "--enable-unsafe-webgpu",
-          ],
+          // `windowsFullChromium()` first: on Windows the headless shell cannot hand out
+          // a WebGPU adapter at all, so without it every spec here skips. `undefined`
+          // on every other platform, which leaves CI's resolution exactly as it was.
+          executablePath: windowsFullChromium() ?? findPreinstalledChromium(),
+          args: webgpuLaunchArgs(),
         },
       },
     },

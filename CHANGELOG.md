@@ -8,6 +8,42 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — the WebGPU gate ran nowhere on Windows; 22 skips are now 22 passes
+
+- **All 22 specs in the `webgpu` project skipped on Windows**, so four's second render
+  backend was gated by tests that never executed. They self-skip when
+  `requestAdapter()` resolves `null`, and it always did.
+
+  Measured across both Chromium builds and four flag sets, on a served origin:
+
+  | binary | flags | `requestAdapter()` |
+  | --- | --- | --- |
+  | full | `--use-gl=angle --use-angle=swiftshader --enable-unsafe-webgpu` (previous) | **null** |
+  | shell | same | **null** |
+  | full | `--enable-unsafe-webgpu` only | nvidia / pascal, 20 features |
+  | full | `+ --use-webgpu-adapter=swiftshader` | google / swiftshader, 18 features |
+  | shell | `--use-gl=angle --enable-unsafe-webgpu` | nvidia / pascal, 20 features |
+
+  **`--use-angle=swiftshader` is the cause.** It governs ANGLE — WebGL's rasteriser —
+  and remains exactly right for the `chromium` and `visual` projects, but on Windows it
+  also denies Dawn an adapter. `--use-webgpu-adapter=swiftshader` is its WebGPU-side
+  counterpart, so the gate still measures a **software** adapter rather than whatever GPU
+  the developer happens to own — the property the flag was there to protect.
+
+  The `webgpu` project additionally needs the **full** Chromium build on Windows: the
+  headless shell yields no adapter under any flag set that also pins a software one. Its
+  path is derived from `chromium.executablePath()` rather than searched for, so the
+  revision cannot drift from the one Playwright expects.
+
+  **Non-Windows argv is unchanged, deliberately.** CI runs 103/103 on Linux with the
+  previous flags; a Windows-only defect must not perturb the platform that already works.
+
+  Result on Windows: **22 passed, 0 skipped, 0 failed** (2.7 min), where it was 22 skipped.
+
+  An earlier diagnosis in `TODO.md` blamed `chrome-headless-shell` for lacking
+  `dxcompiler.dll`. That was **wrong** and is corrected there: the full build ships the
+  DLL and still returned a null adapter. The binary was never the variable.
+
 ### 2026-09-06 — `FollowRig` killed the frame loop on a zero-length step
 
 - **`FollowRig.apply()` threw on the first frame and the application never recovered.**
