@@ -1000,7 +1000,24 @@ changes in `CHANGELOG.md`.
 - [ ] **Flaky gate (pre-existing, confirmed at baseline 2026-08-07):**
       `tests/browser/blending.spec.ts:978` ("RECOVER: a second click blends the chain
       back onto its animation") fails intermittently under load, passes in isolation —
-      needs a de-flake pass of its own
+      needs a de-flake pass of its own.
+
+      **Widened 2026-09-06: it is the file's sampling strategy, not one test.** A CI run
+      failed two *different* tests in the same file — "ANIMATED" (`:836`) and "RAGDOLL"
+      (`:907`) — and both failed on **sample counts**, not on physics:
+
+      | assertion | expected | got |
+      | --- | --- | --- |
+      | `bandDeltas.length` | `>= 8` | 7 |
+      | `samples.length` | `> 10` | 8 |
+
+      The run was simply slower: **101 passed in 8.1 min**, against **103 passed in
+      6.8 min** on the last green run — the same suite, 19% slower, on a different
+      runner. A test that samples over wall-clock and then asserts it collected enough
+      samples is asserting the runner's throughput, which is not what §110 is about.
+      The fix is to make the sampling bounded by *simulation* progress rather than
+      elapsed real time, or to sample until the count is met with a generous deadline —
+      not to widen the threshold, which would just move the cliff.
 
 - [x] **A-26 DONE 2026-08-07.** `docs/COMPATIBILITY.md` (§90's five tables) +
       `tools/generate-compatibility.mjs` (solver-adapter block generated from live
