@@ -4,6 +4,116 @@ Task tracker for four.js. Keep entries short and actionable; move finished items
 (newest first) with the date. Larger context and decisions belong in `MEMORY.md`; released
 changes in `CHANGELOG.md`.
 
+## Priority order
+
+Every open item in the **Now** section, ranked least-to-most complex. This is an *index*: each
+entry keeps its body where it already lives, so the thematic grouping and the
+`R-`/`PH-`/`A-` series stay readable. Line numbers drift — the titles are the key.
+
+Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
+and tier 4 surfaces the decisions that block otherwise-small work.
+
+Counts as of 2026-09-06: **74 open**, 115 done.
+
+### 1 · Minutes — mechanical, no design in them
+
+Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
+
+- Regenerate `docs/Architecture/` graph artifacts
+- `playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.
+- Capability-table note: Rapier derives kinematic velocity itself, so inheritVelocityFrom is nearly a no-op there; other solvers may need it
+- Document SolverBodyAccess in the §90/§102 compatibility material when adapters beyond Rapier arrive (it is required engine surface beyond §37's sketch)
+- §28 motor cap: both Rapier adapters supply maxTorque/maxForce as a ForceBased gain, not a hard ceiling (documented in the stable API docs); name it in the §90/§102 capability tables when a capping adapter (Box2D) arrives
+- Coverage thresholds are package-level; consider per-file granularity so a weak file can't hide behind a strong package average
+
+### 2 · Hours — one contained fix, already diagnosed
+
+Each has its cause written down. The thinking is done; what remains is the change and its test.
+
+- `smoothness.spec.ts` "frames are drawn between simulation states" aliases against its own virtual frame clock.
+- `blending.spec.ts` "RECOVER" still fails on a slow machine, and the reason is now measured.
+- Run the README snippet in the browser gate, not just a text check.
+- Scissor clipping (§67's first bullet, small)
+- §59 second texture unit
+- Dogfooding coverage map (standing assignment) — surfaces DONE, so they are not redone.
+
+### 3 · A day — a real packet, cause known
+
+Bounded work with a clear shape, but more than a single edit.
+
+- Five tests time out under `bun run test` on Windows; none is a code defect.
+- The browser gate is not runnable on Windows — 22 skipped, 17 failed, while CI is green (103/103).
+- Pre-existing test-isolation defect, still unfixed and now hidden again.
+- four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.
+- Dependabot bumps will need manual `bun.lock` regeneration.
+- Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is invisible; schedule blending with §60a color management work
+- §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API is the scoped fix; benchmark attribution in benchmarks/results/)
+- Size budgets are thin after R-36 (measured A/B, 2026-08-09)
+- Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
+- Extend `tools/check-docs.mjs` as new mechanically-checkable claims appear (candidates: package counts, test-suite counts in `tests/README.md`, the §120 verdict totals) — each addition must stay decidable by reading files
+
+### 4 · Blocked on a decision, then small
+
+The work is modest; the judgement in front of it is not. Cheapest to unblock, so worth raising early.
+
+- rapier 0.20 adoption is a real decision, not a bump.
+- Lift the TypeScript/vitest pin once typedoc supports TS 7.
+- PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends against; solver bodies have no scale)
+- Rotational root motion (staged 2026-08-02 — quaternion track throws)
+- A-25 owner decisions before first publish:
+- A-25 remainder:
+
+### 5 · Feature packets — multi-day, deliberately deferred
+
+The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's §6 table; these are the post-1.0 roadmap rather than release work.
+
+- Fold steering's private interceptTime into prediction's export (dated note in steering.ts); spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
+- RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
+- RFC 0005 residue (staged in source, 2026-08-29):
+- RFC 0001 residue (staged in source, 2026-08-28):
+- RFC 0003 residue (staged in source, 2026-08-28):
+- RFC 0003 prototype measurements still owed:
+- Tokens for the five absent §81 extension points
+- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color strings on lights, light layers; hoist the lit shader's per-vertex inverse-transpose to a per-draw normal-matrix uniform when @four/math grows a Matrix3 utility (dated note in gl-program.ts)
+- First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
+- Follow-ups the R-1 plan explicitly defers
+- PH-11c — character/dynamics push interaction (`@four/physics`).
+- R-32 — textured / rotated / soft particles.
+- R-33 — §112's exit, rendered as well as simulated.
+- R-31 — GPU particle simulation.
+- PH-22 residue (re-read 2026-08-21):
+- R-8 follow-ups:
+- §8 node-level `NodeSpace` component (PH-12 remainder).
+- §21 `"local-plane"` simulation frame (PH-12 remainder).
+- §27 field torque and field-driven waking (PH-8 remainders).
+- Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals); glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas material batch as they are); texture-atlas _grouping_ of distinct textures (needs a packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's idle-scene row — today a batched run re-uploads every frame); making batching the default, which needs A-4's build-time pipeline-selection seam (the opt-in seam already costs every bundle +0.17 kB).
+- `buildRenderList` is now ~40% of a 100 000-sprite frame's preparation (`benchmarks/results/render-batching.json`, 2026-08-09) — the next §86 batching win is in list construction, not in batching. Worth a look together with `R-8`'s per-view restructure.
+- R-30c — the rest of §77, scoped by why each is not ordinary work:
+- §12 character controllers, and first-person camera control with them (PH-11 residue, 2026-08-09)
+- Staged rigs (R-36/R-37 residue, 2026-08-09):
+- §44/§47 camera rigs residue
+- R-23 follow-ups (solid-fill tier shipped 2026-08-09):
+- R-26 follow-ups (path-data tier shipped 2026-08-09):
+- Auto-selection follow-ups:
+- PH-9 follow-ups (staged 2026-08-07):
+- R-6 follow-ups (§70 tier 2):
+- §40 follow-ups:
+- PH-1 follow-ups:
+- A-4 remainder:
+- A-5 remainder (dev-warning tier, folded into A-4):
+- A-5 follow-ups:
+- A-1 follow-ups:
+- A-18 remainder:
+- A-16 remainder (manifest half):
+- A-19 remainder:
+- §96 residue:
+- R-19/R-20 follow-ups:
+- Flaky gate (pre-existing, confirmed at baseline 2026-08-07):
+- A-26 follow-up:
+- A-13 PARTIAL
+- Particle trails (position-history ring buffer + ribbon path), multi-stop ramps, GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
+- §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/ heightfield/compound) — staged out by P5-6, widen in a later packet
+
 ## Now
 
 - [ ] **`smoothness.spec.ts` "frames are drawn between simulation states" aliases against
@@ -392,7 +502,7 @@ changes in `CHANGELOG.md`.
       optional migration of unit suites to `bun:test` once coverage parity is
       proven.
 
-- [ ] **The implementation plan is COMPLETE (2026-08-02).** All 13 phase sections
+- [x] **The implementation plan is COMPLETE (2026-08-02).** All 13 phase sections
       (§103–§113a) built, tested, verified. What remains is post-plan work, in the
       verifier's priority order:
 
