@@ -32,6 +32,11 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — A-5 materials / solver-handle counts.** Process-wide
+  `liveMaterialCount` and `liveSolver{Body,Collider,Joint,Handle}Count` are
+  always-on numbers (no `DEV` in those packages). `auditResourceLeaks` still
+  gates the *message*. No new `FrameStats` fields.
+
 - **2026-09-06 — RFCs 0007–0009 proposed (owner pending).** Path-planning
   adapters (`0007`: waypoint polyline + `followWaypoints`, grid/navmesh later);
   §56 shaping (`0008`: optional HarfBuzz-compatible WASM, identity default);

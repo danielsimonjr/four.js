@@ -42,6 +42,8 @@ specification; until then, entries are grouped by date under **Unreleased**.
   and render warn modules.
 - **RFCs 0007–0009 proposed** (path-planning adapters, §56 shaping engine,
   GPU readback as a raster source). Owner acceptance pending; not implemented.
+- **A-5 live counts.** `liveMaterialCount` and solver-handle counters
+  (`body` / `collider` / `joint` / sum) plus `readLiveResourceCounts()`.
 
 ### 2026-09-06 — Open-TODO subagent pass (third landing)
 

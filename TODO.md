@@ -102,7 +102,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - PH-1 follow-ups:
 - A-4 remainder — PARTIAL 2026-09-06: §85 validation catalogue + §83 dev warnings (disposed-in-use, detached listeners, per-frame allocations); systematic `devAssert` migration still open.
 - A-5 remainder — PARTIAL 2026-09-06: duplicate-load DONE; `RenderTarget.byteLength` format-aware; materials/solver live counts; leak audit extended.
-- A-5 follow-ups: materials + solver handles accounted at count tier; `RenderTarget.byteLength` moved with §67 formats.
+- A-5 follow-ups: materials + solver handles accounted at count tier — DONE 2026-09-06; `RenderTarget.byteLength` moved with §67 formats.
 - A-1 follow-ups: contacts wired via `SolverStatistics.contactCount` → `app.stats.contacts` (2026-09-06); `physicsStepTime`/`gpuFrameTime` still wait on their packets.
 - A-18 remainder — DONE 2026-09-06 (progress, stream, dependency graph, injected worker decode, injected watch).
 - A-16 remainder (manifest half): DONE 2026-09-06 (`preloadManifestIntoCatalog`).
@@ -1173,9 +1173,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       **DONE 2026-09-06** (`rejectStalePhysicsHandle` in Rapier + fake adapters),
       ~~per-frame allocations~~ **DONE 2026-09-06** (`auditFrameAllocations`);
       creation-site capture and FinalizationRegistry leak detection need A-4's dev flag
-- [ ] **A-5 follow-ups:** ~~AssetManager duplicate-load warning~~ **DONE 2026-09-06**;
-      materials + solver
-      handles unaccounted (§83 names "GPU and solver resources");
+- [x] **A-5 follow-ups:** ~~AssetManager duplicate-load warning~~ **DONE 2026-09-06**;
+      ~~materials + solver handles unaccounted~~ **DONE 2026-09-06**
+      (`liveMaterialCount`, `liveSolver{Body,Collider,Joint,Handle}Count`,
+      `readLiveResourceCounts`);
       ~~`RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
       with §67's DEPTH24_STENCIL8 and float formats~~ **DONE 2026-09-06**
 - [ ] **A-1 follow-ups:** (a) `physicsStepTime`/`contacts`/`activeBodies` wiring
