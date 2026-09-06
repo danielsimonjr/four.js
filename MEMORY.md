@@ -32,6 +32,13 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — PH-22f live joint anchors are body-local.** `setAnchors`
+  and the field setters take the same local frames `addJoint` stores after
+  converting world-space constructor options. They are not re-measured
+  against current or authoring world poses. The world drains them through
+  `SolverJointAccess.setJointAnchors` (Rapier `setAnchor1`/`setAnchor2`).
+  Axis / rope length / spring terms / swing cone stay frozen.
+
 - **2026-09-06 — A-5 materials / solver-handle counts.** Process-wide
   `liveMaterialCount` and `liveSolver{Body,Collider,Joint,Handle}Count` are
   always-on numbers (no `DEV` in those packages). `auditResourceLeaks` still

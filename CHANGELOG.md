@@ -44,6 +44,8 @@ specification; until then, entries are grouped by date under **Unreleased**.
   GPU readback as a raster source). Owner acceptance pending; not implemented.
 - **A-5 live counts.** `liveMaterialCount` and solver-handle counters
   (`body` / `collider` / `joint` / sum) plus `readLiveResourceCounts()`.
+- **PH-22f live anchors.** Body-local `Joint.setAnchors` +
+  `SolverJointAccess.setJointAnchors` on Rapier 2D/3D.
 
 ### 2026-09-06 — Open-TODO subagent pass (third landing)
 

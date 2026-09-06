@@ -888,8 +888,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `physics-event-system.ts`.
 - [x] **PH-20 — §33 rollback (2026-08-21).** `RollbackBuffer` + `RollbackTarget` in
       `@four/diagnostics`; `tests/determinism/rollback.test.ts`.
-- [ ] **PH-22 residue (re-read 2026-08-21):** `PH-22f` joint-anchor mutability still
-      blocked on the which-pose decision (physics-joints packet); ~~CCD/FABRIK/limits~~
+- [x] **PH-22 residue (re-read 2026-08-21):** ~~`PH-22f` joint-anchor mutability~~
+      **DONE 2026-09-06** (`Joint.setAnchors` is body-local; drained via
+      `setJointAnchors` / Rapier `setAnchor1`/`setAnchor2`); ~~CCD/FABRIK/limits~~
       **DONE 2026-09-06** (`solveCCD` / `solveFABRIK` + joint limits + iteration
       budget); ~~path-planning adapters still want an RFC~~ **Proposed
       2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`);
