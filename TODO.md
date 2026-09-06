@@ -6,6 +6,15 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [ ] **Dogfooding coverage map (standing assignment) — surfaces DONE, so they are not redone.**
+      Verified from a clean consumer against the staged published-name packages, each with a
+      control: JS runtime · TypeScript types (strict, `skipLibCheck: false`) · publish/staging
+      path · all 25 umbrella subpaths · §33/§34 determinism · §34 snapshot round-trip · §7a
+      Y-up in 2D. Evidence in MEMORY.md under 2026-09-06.
+      NOT yet exercised: the browser/render path (WebGL + WebGPU, all 12 examples are browser and
+      I have only run headless), animation/tweens (§93 timeline), assets/glTF loading, UI, input,
+      particles, and the 2D↔3D mixed-scene story. Those are where the next findings are.
+
 - [ ] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
       one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`
       helper hits `INVALID_APPLICATION_STATE` on the second construction. The error is explicit and
