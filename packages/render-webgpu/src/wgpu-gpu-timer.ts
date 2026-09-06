@@ -161,13 +161,14 @@ export class WgpuGpuTimer {
     this.#wroteThisFrame = false;
     const slots = this.#slots;
     const slot = slots?.[this.#slot];
-    if (slot === undefined || slot.buffer.mapAsync === undefined) {
+    const mapped = slot?.buffer.mapAsync?.(GPU_MAP_MODE.READ);
+    if (slot === undefined || mapped === undefined) {
       return;
     }
     const captured = slot;
     captured.busy = true;
     this.#slot ^= 1;
-    void captured.buffer.mapAsync(GPU_MAP_MODE.READ).then(() => {
+    void mapped.then(() => {
       const range = captured.buffer.getMappedRange?.();
       if (range !== undefined) {
         const times = new BigUint64Array(range);
