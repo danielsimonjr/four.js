@@ -16,7 +16,7 @@
  */
 
 import { planeGeometry } from "@four/geometry";
-import { constructionCount, resetConstructionCount } from "@four/math";
+import { Vector3, constructionCount, resetConstructionCount } from "@four/math";
 import { SpriteMaterial, UnlitMaterial } from "@four/materials";
 import {
   DEFAULT_LAYER_MASK,
@@ -453,5 +453,48 @@ describe("particle items and §69 shadows (R-18)", () => {
     buildRenderList(scene, out);
     const item = particlesAt(out, 0);
     expect([item.castShadow, item.receiveShadow]).toEqual([false, false]);
+  });
+});
+
+describe("buildRenderList — live particle bounds (R-8 follow-up b)", () => {
+  it("leaves frustumCulled false when the emitter publishes no AABB", () => {
+    const [item] = buildRenderList(sceneWith(new TestParticles(4)), []);
+
+    expect(item.frustumCulled).toBe(false);
+    expect(item.worldBounds).toBeNull();
+  });
+
+  it("copies a published local AABB onto the item as a world sphere", () => {
+    class BoundedParticles extends TestParticles {
+      computeBounds(outMin: Vector3, outMax: Vector3): boolean {
+        outMin.set(-2, -1, -0.5);
+        outMax.set(2, 1, 0.5);
+        return true;
+      }
+    }
+    const node = new BoundedParticles(4);
+    node.transform.position.set(10, 0, 0);
+    const scene = sceneWith(node);
+    resolveWorldTransforms(scene);
+
+    const [item] = buildRenderList(scene, []);
+
+    expect(item.frustumCulled).toBe(true);
+    expect(item.worldBounds).not.toBeNull();
+    expect(item.worldBounds?.center.x).toBeCloseTo(10, 12);
+    expect(item.worldBounds?.radius).toBeGreaterThan(2);
+  });
+
+  it("stays un-culled when computeBounds returns false (empty / GPU)", () => {
+    class EmptyParticles extends TestParticles {
+      computeBounds(): boolean {
+        return false;
+      }
+    }
+
+    const [item] = buildRenderList(sceneWith(new EmptyParticles(4)), []);
+
+    expect(item.frustumCulled).toBe(false);
+    expect(item.worldBounds).toBeNull();
   });
 });

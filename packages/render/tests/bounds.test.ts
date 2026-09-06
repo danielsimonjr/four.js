@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeWorldBoundingSphere,
+  computeWorldBoundingSphereFromBox,
   type BoundingSphere,
 } from "../src/index.js";
 
@@ -228,5 +229,29 @@ describe("computeWorldBoundingSphere — allocation (§7b, plan D7)", () => {
 
     expect(out.center).toBe(center);
     expect(out.center.x).toBe(1);
+  });
+});
+
+describe("computeWorldBoundingSphereFromBox — particle AABB path", () => {
+  it("matches computeWorldBoundingSphere for the same local box", () => {
+    const geometry = boxGeometry();
+    const bounds = geometry.computeBounds();
+    const matrix = transform(new Vector3(2, 0, 0));
+    const fromGeometry = sphere();
+    const fromBox = sphere();
+
+    expect(computeWorldBoundingSphere(geometry, matrix, fromGeometry)).toBe(
+      true,
+    );
+    expect(
+      computeWorldBoundingSphereFromBox(
+        bounds.min,
+        bounds.max,
+        matrix,
+        fromBox,
+      ),
+    ).toBe(true);
+    expect(fromBox.center.x).toBeCloseTo(fromGeometry.center.x, 12);
+    expect(fromBox.radius).toBeCloseTo(fromGeometry.radius, 12);
   });
 });

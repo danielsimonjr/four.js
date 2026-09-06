@@ -9,11 +9,9 @@
  * call sequence" an assertable claim rather than an assurance.
  *
  * `render-to-texture.test.ts` (R-4) grew its own copy of this before the file
- * existed; this module is the extracted form, used by `render-graph.test.ts`.
- * They are deliberately not merged in the same change — the R-4 suite is a
- * landed gate and rewriting it to prove a different packet's point would put a
- * passing test at risk for no gain. Adopting this helper there is a mechanical
- * follow-up.
+ * existed; this module is the extracted form. That suite now imports it
+ * (mechanical follow-up): same double, same assertions, one list of GL entry
+ * points so a backend surface growth cannot drift between the two files.
  */
 
 import {

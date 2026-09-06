@@ -43,6 +43,7 @@ export { COMPUTE_ENTRY_POINT, supportsCompute } from "./compute.js";
 export type {
   ColorGradeEffect,
   CopyEffect,
+  EffectDestinationRect,
   EffectRenderPass,
   GraphEffect,
   OutputTransformEffect,
@@ -104,6 +105,7 @@ export type {
 export {
   buildInterpolatedRenderList,
   buildRenderList,
+  compareRenderItems,
   groupRenderListByPipeline,
   isLitItem,
   isNodeItem,

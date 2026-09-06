@@ -426,19 +426,16 @@ describe("R-8 — §66 sort key 4 on a view's own list", () => {
 
   it("orders a view's opaque draws near to far and its blended ones far to near", async () => {
     const test = await harness();
-    const opaqueFar = new Renderable(planeGeometry(), new UnlitMaterial());
+    // Shared materials so key 3 ties and key 4 (depth) is what this pins.
+    const opaque = new UnlitMaterial();
+    const blend = new UnlitMaterial({ transparent: true });
+    const opaqueFar = new Renderable(planeGeometry(), opaque);
     opaqueFar.transform.position.set(0, 0, -2);
-    const opaqueNear = new Renderable(planeGeometry(), new UnlitMaterial());
+    const opaqueNear = new Renderable(planeGeometry(), opaque);
     opaqueNear.transform.position.set(0, 0, 2);
-    const blendedNear = new Renderable(
-      planeGeometry(),
-      new UnlitMaterial({ transparent: true }),
-    );
+    const blendedNear = new Renderable(planeGeometry(), blend);
     blendedNear.transform.position.set(0, 0, 3);
-    const blendedFar = new Renderable(
-      planeGeometry(),
-      new UnlitMaterial({ transparent: true }),
-    );
+    const blendedFar = new Renderable(planeGeometry(), blend);
     blendedFar.transform.position.set(0, 0, -3);
     test.scene.add(opaqueFar, opaqueNear, blendedNear, blendedFar);
     const items = frameList(test.scene);

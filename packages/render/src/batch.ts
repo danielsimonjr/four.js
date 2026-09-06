@@ -293,6 +293,21 @@ export interface RenderBatch {
 
   /** Indices into {@link RenderBatch.vertices}, already offset per item. */
   readonly indices: Uint32Array;
+
+  /**
+   * Change-detection stamp for §65 / §86's idle batch cache (R-8 follow-up).
+   *
+   * A non-zero value is an FNV-1a mix of each merged item's geometry version,
+   * transform version, and world-matrix elements. The WebGL uploader skips
+   * `bufferSubData` when this stamp and the vertex/index counts match the
+   * last upload into the same layout slot.
+   *
+   * **`0` means "versions unavailable — always re-upload."** That is today's
+   * default: a hand-built item with no `transformVersion`, or any run that
+   * includes one, keeps the pre-cache upload path so a scene that never
+   * opted into versioning is bit-identical.
+   */
+  readonly contentVersion?: number;
 }
 
 /** The record the batcher fills; `RenderBatch` is its read-only face. */
@@ -313,6 +328,7 @@ interface MutableBatch {
   hasColors: boolean;
   vertices: Float32Array;
   indices: Uint32Array;
+  contentVersion: number;
 }
 
 /**
@@ -335,6 +351,53 @@ interface FramedItem {
  * (§53) and is skipped rather than drawn — so a run never straddles an item the
  * backend would have declined.
  */
+/** FNV-1a offset basis — the idle-cache mix starts here. */
+const FNV_OFFSET = 2166136261;
+
+/** FNV-1a 32-bit prime. */
+const FNV_PRIME = 16777619;
+
+/**
+ * Scratch for folding IEEE-754 bits into the content hash without allocating.
+ * Shared: the planner is not re-entrant.
+ */
+const floatBits = new Float32Array(1);
+const floatBitsView = new Uint32Array(floatBits.buffer);
+
+/** Mixes one 32-bit word into an FNV-1a hash. */
+function fnvMix(hash: number, value: number): number {
+  return Math.imul(hash ^ value, FNV_PRIME);
+}
+
+/**
+ * Idle-cache stamp for the run `[from, from + count)`. Returns `0` when any
+ * item has no `transformVersion`, which is the "always re-upload" signal.
+ */
+function contentVersionOf(
+  items: readonly RenderItem[],
+  from: number,
+  count: number,
+): number {
+  let hash = FNV_OFFSET;
+  for (let i = 0; i < count; i += 1) {
+    const item = items[from + i];
+    const transformVersion = item.transformVersion;
+    if (transformVersion === undefined) {
+      return 0;
+    }
+    hash = fnvMix(hash, item.geometry.version | 0);
+    hash = fnvMix(hash, transformVersion | 0);
+    const e = item.worldMatrix.elements;
+    for (let k = 0; k < 16; k += 1) {
+      floatBits[0] = e[k];
+      hash = fnvMix(hash, floatBitsView[0]);
+    }
+  }
+  // `0` is reserved for "versions unavailable". A real mix that lands on 0
+  // is remapped so an idle, versioned run is still skippable.
+  return hash === 0 ? 1 : hash;
+}
+
 function isBatchable(item: RenderItem): item is BatchableItem {
   if (item.kind !== "unlit" && item.kind !== "sprite") {
     return false;
@@ -435,6 +498,7 @@ export class RenderBatcher {
     hasColors: false,
     vertices: this.#vertices,
     indices: this.#indices,
+    contentVersion: 0,
   };
 
   constructor(options: RenderBatchOptions = {}) {
@@ -603,6 +667,7 @@ export class RenderBatcher {
     batch.hasColors = hasColors;
     batch.vertices = vertices;
     batch.indices = indices;
+    batch.contentVersion = contentVersionOf(items, from, count);
     return batch;
   }
 

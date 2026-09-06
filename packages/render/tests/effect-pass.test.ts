@@ -164,6 +164,30 @@ describe("validateEffectRenderPass — the §85 boundary (§70)", () => {
     }).toThrow(/destination render target is tagged "linear"/);
   });
 
+  it("accepts a destination rectangle (R-6 follow-up)", () => {
+    expect(() => {
+      validateEffectRenderPass({
+        ...pass(COPY_EFFECT),
+        rect: { x: 8, y: 16, width: 32, height: 24 },
+      });
+    }).not.toThrow();
+  });
+
+  it("refuses a non-finite or negative destination rectangle", () => {
+    expect(() => {
+      validateEffectRenderPass({
+        ...pass(COPY_EFFECT),
+        rect: { x: Number.NaN, y: 0, width: 8, height: 8 },
+      });
+    }).toThrow(/rect\.x/);
+    expect(() => {
+      validateEffectRenderPass({
+        ...pass(COPY_EFFECT),
+        rect: { x: 0, y: 0, width: -1, height: 8 },
+      });
+    }).toThrow(/width and height must be >= 0/);
+  });
+
   it("refuses an effect kind outside the closed union", () => {
     // `{ kind: "bloom" }` is a compile error; this is the same value arriving
     // from JSON or from JavaScript, and it has to be refused rather than

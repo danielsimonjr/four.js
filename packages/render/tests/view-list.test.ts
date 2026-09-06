@@ -16,12 +16,14 @@ import { SpriteMaterial, UnlitMaterial } from "@four/materials";
 import {
   Frustum,
   Matrix4,
+  Vector3,
   constructionCount,
   resetConstructionCount,
 } from "@four/math";
 import {
   ALL_LAYERS,
   Group,
+  Node,
   OrthographicCamera,
   PerspectiveCamera,
   Scene,
@@ -34,12 +36,15 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  PARTICLE_INSTANCE_FLOATS,
   Renderable,
   Sprite,
   Texture,
   buildRenderList,
   buildViewRenderList,
+  compareRenderItems,
   sortRenderListByDepth,
+  type ParticleDrawable,
   type RenderItem,
 } from "../src/index.js";
 
@@ -48,10 +53,16 @@ afterEach(() => {
 });
 
 /** A quad-carrying renderable at `(x, y, z)`. */
-function quad(x = 0, y = 0, z = 0, size = 1): Renderable {
+function quad(
+  x = 0,
+  y = 0,
+  z = 0,
+  size = 1,
+  material: UnlitMaterial = new UnlitMaterial(),
+): Renderable {
   const node = new Renderable(
     planeGeometry({ width: size, height: size }),
-    new UnlitMaterial(),
+    material,
   );
   node.transform.position.set(x, y, z);
   return node;
@@ -311,9 +322,11 @@ describe("sortRenderListByDepth — §66 sort key 4", () => {
 
   it("orders opaque draws near to far", () => {
     const scene = new Scene();
-    const far = quad(0, 0, -5);
-    const near = quad(0, 0, 5);
-    const middle = quad(0, 0, 0);
+    // One material so key 3 ties and key 4 (depth) is what this test pins.
+    const material = new UnlitMaterial();
+    const far = quad(0, 0, -5, 1, material);
+    const near = quad(0, 0, 5, 1, material);
+    const middle = quad(0, 0, 0, 1, material);
     scene.add(far, near, middle);
     const items = frameList(scene);
 
@@ -326,15 +339,10 @@ describe("sortRenderListByDepth — §66 sort key 4", () => {
 
   it("orders transparent draws far to near, under the opaque ones", () => {
     const scene = new Scene();
-    const nearBlend = new Renderable(
-      planeGeometry(),
-      new UnlitMaterial({ transparent: true }),
-    );
+    const blend = new UnlitMaterial({ transparent: true });
+    const nearBlend = new Renderable(planeGeometry(), blend);
     nearBlend.transform.position.set(0, 0, 5);
-    const farBlend = new Renderable(
-      planeGeometry(),
-      new UnlitMaterial({ transparent: true }),
-    );
+    const farBlend = new Renderable(planeGeometry(), blend);
     farBlend.transform.position.set(0, 0, -5);
     scene.add(nearBlend, farBlend, quad(0, 0, 0));
     const items = frameList(scene);
@@ -346,6 +354,44 @@ describe("sortRenderListByDepth — §66 sort key 4", () => {
     expect(items.map((item) => item.worldMatrix.elements[14])).toEqual([
       0, -5, 5,
     ]);
+  });
+
+  it("lets pipeline/material (key 3) outrank depth (key 4)", () => {
+    // §66: layer → opaque/transparent → pipeline/material → depth → order.
+    // Two materials interleaved in depth must stay grouped by material.
+    const scene = new Scene();
+    const first = new UnlitMaterial();
+    const second = new UnlitMaterial();
+    const nearFirst = quad(0, 0, 5, 1, first);
+    const farSecond = quad(0, 0, -5, 1, second);
+    const farFirst = quad(0, 0, -4, 1, first);
+    const nearSecond = quad(0, 0, 4, 1, second);
+    scene.add(nearFirst, farSecond, farFirst, nearSecond);
+    const items = frameList(scene);
+
+    sortRenderListByDepth(items, eyeAt(10));
+
+    expect(items.map((item) => item.materialId)).toEqual([
+      first.id,
+      first.id,
+      second.id,
+      second.id,
+    ]);
+    expect(items.map((item) => item.worldMatrix.elements[14])).toEqual([
+      5, -4, 4, -5,
+    ]);
+  });
+
+  it("exports compareRenderItems as the one §66 comparator", () => {
+    const scene = new Scene();
+    const material = new UnlitMaterial();
+    scene.add(quad(0, 0, -2, 1, material), quad(0, 0, 2, 1, material));
+    const items = frameList(scene);
+    sortRenderListByDepth(items, eyeAt(10));
+
+    expect(compareRenderItems(items[0], items[1])).toBeLessThan(0);
+    expect(compareRenderItems(items[1], items[0])).toBeGreaterThan(0);
+    expect(compareRenderItems(items[0], items[0])).toBe(0);
   });
 
   it("writes the measurement onto the item, larger meaning farther", () => {
@@ -448,7 +494,7 @@ describe("sortRenderListByDepth — §66 sort key 4", () => {
   });
 });
 
-describe("buildViewRenderList — particles are never culled (§36, §87)", () => {
+describe("buildViewRenderList — particles are culled only with live bounds (§36, §87)", () => {
   it("gives a boxed renderable frustumCulled true and a particle system false", () => {
     // The exemption is data on the item, so this is where it is pinned; the
     // particle half is covered by `render-list.test.ts`'s drawable double.
@@ -457,6 +503,33 @@ describe("buildViewRenderList — particles are never culled (§36, §87)", () =
     const items = frameList(scene);
 
     expect(items[0].frustumCulled).toBe(true);
+  });
+
+  it("culls a particle system whose live world sphere misses the frustum", () => {
+    class BoundedParticles extends Node implements ParticleDrawable {
+      readonly isParticleDrawable = true as const;
+      renderLayer = 0;
+      renderOrder = 0;
+      particleCount = 1;
+      readonly particleInstances = new Float32Array(PARTICLE_INSTANCE_FLOATS);
+      updateParticleInstances(): void {
+        // Bounds, not the instance stream, are under test.
+      }
+      computeBounds(outMin: Vector3, outMax: Vector3): boolean {
+        outMin.set(-0.1, -0.1, -0.1);
+        outMax.set(0.1, 0.1, 0.1);
+        return true;
+      }
+    }
+    const scene = new Scene();
+    const particles = new BoundedParticles();
+    particles.transform.position.set(40, 0, 0);
+    scene.add(particles);
+    const items = frameList(scene);
+    const { view, frustum } = orthoView();
+
+    expect(items[0].frustumCulled).toBe(true);
+    expect(buildViewRenderList(items, view, [], { frustum })).toHaveLength(0);
   });
 
   it("starts every item's viewDepth at 0 before a view measures it", () => {

@@ -9395,17 +9395,37 @@ describe("WebglRenderer — §65 batching, opt-in (R-9)", () => {
       12,
       0,
     ]);
-    // The first frame allocates the stores; the second only writes into them.
+    // The first frame allocates the stores. An idle second frame whose
+    // geometry versions and transforms have not moved skips the re-upload
+    // (§65 / §86 change-detecting batch cache).
     gl.reset();
     renderer.render(root, [createView(camera)]);
     expect(gl.countOf("bufferData")).toBe(0);
     expect(gl.countOf("createVertexArray")).toBe(0);
-    const uploads = gl.callsOf("bufferSubData");
-    expect(uploads).toHaveLength(2);
-    expect(uploads[0].args[0]).toBe(GL.ARRAY_BUFFER);
-    expect(uploads[0].args[4]).toBe(24);
-    expect(uploads[1].args[0]).toBe(GL.ELEMENT_ARRAY_BUFFER);
-    expect(uploads[1].args[4]).toBe(12);
+    expect(gl.countOf("bufferSubData")).toBe(0);
+  });
+
+  it("skips batch re-upload while the source is idle, and uploads after a move", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const root = createRoot();
+    const material = new TestMaterial();
+    const a = new Renderable(quadGeometry().asGeometry, material.asMaterial);
+    const b = new Renderable(quadGeometry().asGeometry, material.asMaterial);
+    root.add(a, b);
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("bufferSubData")).toBe(0);
+    expect(gl.countOf("drawElements")).toBe(1);
+
+    b.transform.worldMatrix.fromArray([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0, 0, 1,
+    ]);
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("bufferSubData")).toBe(2);
   });
 
   it("uploads the identity model matrix, because positions arrive in world space", async () => {

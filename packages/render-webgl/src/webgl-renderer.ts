@@ -1071,6 +1071,39 @@ function readCapabilities(gl: ParticleGlContext): RendererCapabilities {
  * Values are rounded (GL takes integers) and extents are clamped at zero, since
  * a negative width or height is a GL error rather than an empty rectangle.
  */
+/**
+ * Viewport and scissor for a §70 effect pass (R-6 follow-up).
+ *
+ * Omitted `pass.rect` covers the whole destination — the pre-follow-up
+ * sequence, so a graph that never names a rectangle stays
+ * transcript-identical. A named rectangle is destination pixels, origin
+ * bottom-left (§7a). `SCISSOR_TEST` is on for this renderer's lifetime, so
+ * both rectangles are always written: leaving them would clip the blit to
+ * the previous view.
+ */
+function applyEffectDestination(
+  gl: {
+    viewport(x: number, y: number, width: number, height: number): void;
+    scissor(x: number, y: number, width: number, height: number): void;
+  },
+  pass: EffectRenderPass,
+  width: number,
+  height: number,
+): void {
+  const dest = pass.rect;
+  if (dest === undefined) {
+    gl.viewport(0, 0, width, height);
+    gl.scissor(0, 0, width, height);
+    return;
+  }
+  const x = Math.round(dest.x);
+  const y = Math.round(dest.y);
+  const w = Math.max(0, Math.round(dest.width));
+  const h = Math.max(0, Math.round(dest.height));
+  gl.viewport(x, y, w, h);
+  gl.scissor(x, y, w, h);
+}
+
 function resolveRect(
   view: RenderView,
   bufferWidth: number,
