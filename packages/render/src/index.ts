@@ -166,12 +166,11 @@ export {
   supportsPicking,
 } from "./picking.js";
 export type {
-  RenderTargetByteLengthOptions,
   RenderTargetFormat,
   RenderTargetOptions,
   RenderTargetTexture,
 } from "./render-target.js";
-export { RenderTarget, isRenderTargetTexture, renderTargetBytesPerTexel } from "./render-target.js";
+export { RenderTarget, isRenderTargetTexture } from "./render-target.js";
 export {
   RENDER_TARGET_COLOR_BYTES,
   RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES,

@@ -3,9 +3,9 @@
     "name": "four.js-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-09-06",
-    "totalFiles": 286,
+    "totalFiles": 290,
     "totalModules": 24,
-    "totalExports": 2888
+    "totalExports": 2903
   },
   "entryPoints": [
     {
@@ -2557,6 +2557,13 @@
             "imports": [
               "RenderTarget"
             ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "warnDisposedInUse"
+            ]
           }
         ],
         "exports": [
@@ -2603,6 +2610,13 @@
             "directory": "packages/render",
             "imports": [
               "RenderItem"
+            ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "warnDisposedInUse"
             ]
           }
         ],
@@ -2658,6 +2672,13 @@
             "directory": "packages/render",
             "imports": [
               "RenderItem"
+            ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "warnDisposedInUse"
             ]
           }
         ],
@@ -4589,18 +4610,17 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
-            "directory": "packages/core",
+            "package": "@four/render",
+            "directory": "packages/render",
             "imports": [
-              "DEV",
-              "devWarnOnce"
+              "SpriteRenderItem"
             ]
           },
           {
             "package": "@four/render",
             "directory": "packages/render",
             "imports": [
-              "SpriteRenderItem"
+              "warnDisposedInUse"
             ]
           }
         ],
@@ -5158,6 +5178,13 @@
             "imports": [
               "RenderTarget"
             ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "warnDisposedInUse"
+            ]
           }
         ],
         "exports": [
@@ -5292,6 +5319,13 @@
             "directory": "packages/render",
             "imports": [
               "RenderItem"
+            ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "warnDisposedInUse"
             ]
           }
         ],
@@ -6913,6 +6947,7 @@
               "ComponentRegistry",
               "EventEmitter",
               "FourError",
+              "devWarnOnce",
               "Component",
               "ComponentHost",
               "ComponentType"
@@ -9550,9 +9585,8 @@
             "package": "@four/diagnostics",
             "directory": "packages/diagnostics",
             "imports": [
-              "beginFrameAllocationCheck",
+              "auditFrameAllocations",
               "createFrameStats",
-              "endFrameAllocationCheck",
               "monotonicNowSeconds",
               "recordRenderStatistics",
               "recordResourceMemory",
@@ -9588,14 +9622,8 @@
             "package": "@four/math",
             "directory": "packages/math",
             "imports": [
+              "constructionCount",
               "DepthRange"
-            ]
-          },
-          {
-            "package": "@four/math",
-            "directory": "packages/math",
-            "imports": [
-              "constructionCount"
             ]
           },
           {
@@ -10185,6 +10213,12 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./render-target-bytes.js",
+            "imports": [
+              "renderTargetByteLength"
+            ]
+          },
+          {
             "file": "./resource-memory.js",
             "imports": [
               "noteRenderTarget"
@@ -10217,9 +10251,6 @@
         "exports": [
           "isRenderTargetTexture",
           "validateColorSpace",
-          "colorAttachmentBytesPerTexel",
-          "depthAttachmentBytesPerTexel",
-          "renderTargetBytesPerTexel",
           "RenderTarget"
         ],
         "classes": [
@@ -10227,15 +10258,11 @@
         ],
         "interfaces": [
           "RenderTargetOptions",
-          "RenderTargetTexture",
-          "RenderTargetByteLengthOptions"
+          "RenderTargetTexture"
         ],
         "functions": [
           "isRenderTargetTexture",
-          "validateColorSpace",
-          "colorAttachmentBytesPerTexel",
-          "depthAttachmentBytesPerTexel",
-          "renderTargetBytesPerTexel"
+          "validateColorSpace"
         ]
       },
       "packages/render/src/picking.ts": {
@@ -10303,6 +10330,28 @@
         ],
         "constants": [
           "MAX_PICK_CANDIDATES"
+        ]
+      },
+      "packages/render/src/resource-warnings.ts": {
+        "description": "§83's \"disposed resource still in use\" development warning (A-4/A-5).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "DEV",
+              "devWarnOnce"
+            ]
+          }
+        ],
+        "exports": [
+          "warnDisposedInUse"
+        ],
+        "functions": [
+          "warnDisposedInUse"
         ]
       },
       "packages/render/src/particles.ts": {
@@ -10569,10 +10618,23 @@
             "file": "./render-target.js",
             "imports": [
               "RenderTarget",
+              "isRenderTargetTexture"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./render-target-bytes.js",
+            "imports": [
+              "RENDER_TARGET_COLOR_BYTES",
+              "RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES",
+              "RENDER_TARGET_DEPTH_STENCIL_BYTES",
+              "RENDER_TARGET_DEPTH_TEXTURE_BYTES",
+              "RENDER_TARGET_RGBA16F_BYTES",
+              "RENDER_TARGET_RGBA32F_BYTES",
+              "RENDER_TARGET_RGBA8_BYTES",
               "colorAttachmentBytesPerTexel",
               "depthAttachmentBytesPerTexel",
-              "isRenderTargetTexture",
-              "renderTargetBytesPerTexel"
+              "renderTargetByteLength"
             ],
             "reExport": true
           },
@@ -10620,6 +10682,13 @@
               "liveRenderTargetCount",
               "liveTextureCount",
               "textureMemoryBytes"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./resource-warnings.js",
+            "imports": [
+              "warnDisposedInUse"
             ],
             "reExport": true
           },
@@ -10834,7 +10903,6 @@
           {
             "file": "./render-target.js",
             "imports": [
-              "RenderTargetByteLengthOptions",
               "RenderTargetFormat",
               "RenderTargetOptions",
               "RenderTargetTexture"
@@ -10876,6 +10944,14 @@
               "RendererEventMap",
               "RendererOptions",
               "ResizeRecord"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./resource-warnings.js",
+            "imports": [
+              "DisposedResourceKind"
             ],
             "reExport": true,
             "typeOnly": true
@@ -11050,10 +11126,17 @@
           "encodePickId",
           "supportsPicking",
           "RenderTarget",
+          "isRenderTargetTexture",
+          "RENDER_TARGET_COLOR_BYTES",
+          "RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES",
+          "RENDER_TARGET_DEPTH_STENCIL_BYTES",
+          "RENDER_TARGET_DEPTH_TEXTURE_BYTES",
+          "RENDER_TARGET_RGBA16F_BYTES",
+          "RENDER_TARGET_RGBA32F_BYTES",
+          "RENDER_TARGET_RGBA8_BYTES",
           "colorAttachmentBytesPerTexel",
           "depthAttachmentBytesPerTexel",
-          "isRenderTargetTexture",
-          "renderTargetBytesPerTexel",
+          "renderTargetByteLength",
           "Renderable",
           "MAX_SKINNING_JOINTS",
           "Mesh",
@@ -11071,6 +11154,7 @@
           "liveRenderTargetCount",
           "liveTextureCount",
           "textureMemoryBytes",
+          "warnDisposedInUse",
           "createRenderStatistics",
           "resetRenderStatistics",
           "supportsRenderStatistics",
@@ -11165,7 +11249,6 @@
           "PickRequest",
           "PickResult",
           "PickingService",
-          "RenderTargetByteLengthOptions",
           "RenderTargetFormat",
           "RenderTargetOptions",
           "RenderTargetTexture",
@@ -11186,6 +11269,7 @@
           "RendererEventMap",
           "RendererOptions",
           "ResizeRecord",
+          "DisposedResourceKind",
           "RenderStatistics",
           "RenderStatisticsReporter",
           "ArcOptions",
@@ -11289,10 +11373,17 @@
           "encodePickId",
           "supportsPicking",
           "RenderTarget",
+          "isRenderTargetTexture",
+          "RENDER_TARGET_COLOR_BYTES",
+          "RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES",
+          "RENDER_TARGET_DEPTH_STENCIL_BYTES",
+          "RENDER_TARGET_DEPTH_TEXTURE_BYTES",
+          "RENDER_TARGET_RGBA16F_BYTES",
+          "RENDER_TARGET_RGBA32F_BYTES",
+          "RENDER_TARGET_RGBA8_BYTES",
           "colorAttachmentBytesPerTexel",
           "depthAttachmentBytesPerTexel",
-          "isRenderTargetTexture",
-          "renderTargetBytesPerTexel",
+          "renderTargetByteLength",
           "Renderable",
           "MAX_SKINNING_JOINTS",
           "Mesh",
@@ -11310,6 +11401,7 @@
           "liveRenderTargetCount",
           "liveTextureCount",
           "textureMemoryBytes",
+          "warnDisposedInUse",
           "createRenderStatistics",
           "resetRenderStatistics",
           "supportsRenderStatistics",
@@ -11403,7 +11495,6 @@
           "PickRequest",
           "PickResult",
           "PickingService",
-          "RenderTargetByteLengthOptions",
           "RenderTargetFormat",
           "RenderTargetOptions",
           "RenderTargetTexture",
@@ -11424,6 +11515,7 @@
           "RendererEventMap",
           "RendererOptions",
           "ResizeRecord",
+          "DisposedResourceKind",
           "RenderStatistics",
           "RenderStatisticsReporter",
           "ArcOptions",
@@ -11753,6 +11845,47 @@
           "textureMemoryBytes",
           "liveTextureCount",
           "liveRenderTargetCount"
+        ]
+      },
+      "packages/render/src/render-target-bytes.ts": {
+        "description": "Per-texel byte accounting for {@link RenderTarget} attachments (§83, §84).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./render-target.js",
+            "imports": [
+              "RenderTargetFormat"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "RENDER_TARGET_RGBA8_BYTES",
+          "RENDER_TARGET_RGBA16F_BYTES",
+          "RENDER_TARGET_RGBA32F_BYTES",
+          "RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES",
+          "RENDER_TARGET_DEPTH_TEXTURE_BYTES",
+          "RENDER_TARGET_DEPTH_STENCIL_BYTES",
+          "RENDER_TARGET_COLOR_BYTES",
+          "colorAttachmentBytesPerTexel",
+          "depthAttachmentBytesPerTexel",
+          "renderTargetByteLength"
+        ],
+        "functions": [
+          "colorAttachmentBytesPerTexel",
+          "depthAttachmentBytesPerTexel",
+          "renderTargetByteLength"
+        ],
+        "constants": [
+          "RENDER_TARGET_RGBA8_BYTES",
+          "RENDER_TARGET_RGBA16F_BYTES",
+          "RENDER_TARGET_RGBA32F_BYTES",
+          "RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES",
+          "RENDER_TARGET_DEPTH_TEXTURE_BYTES",
+          "RENDER_TARGET_DEPTH_STENCIL_BYTES",
+          "RENDER_TARGET_COLOR_BYTES"
         ]
       },
       "packages/render/src/batch.ts": {
@@ -12703,6 +12836,29 @@
           "DEFAULT_SLEEPING_CONFIG"
         ]
       },
+      "packages/physics/src/stale-handle.ts": {
+        "description": "§83's stale physics handle development warning (A-4/A-5).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError",
+              "devWarnOnce",
+              "FourErrorCode"
+            ]
+          }
+        ],
+        "exports": [
+          "rejectStalePhysicsHandle"
+        ],
+        "functions": [
+          "rejectStalePhysicsHandle"
+        ]
+      },
       "packages/physics/src/swept-character-controller.ts": {
         "description": "§12's **solver-backed** character controller — {@link SweptCharacterController}",
         "externalDependencies": [],
@@ -12895,6 +13051,13 @@
             "file": "./physics-system.js",
             "imports": [
               "PhysicsSystem"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./stale-handle.js",
+            "imports": [
+              "rejectStalePhysicsHandle"
             ],
             "reExport": true
           },
@@ -13158,6 +13321,14 @@
             "typeOnly": true
           },
           {
+            "file": "./stale-handle.js",
+            "imports": [
+              "StalePhysicsHandleKind"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./queries.js",
             "imports": [
               "OverlapHit",
@@ -13326,6 +13497,7 @@
           "worldAxisToLocal",
           "PhysicsEventSystem",
           "PhysicsSystem",
+          "rejectStalePhysicsHandle",
           "DEFAULT_DENSITY",
           "DEFAULT_FRICTION",
           "DEFAULT_FRICTION_COMBINE_MODE",
@@ -13450,6 +13622,7 @@
           "PhysicsMaterialOptions",
           "PhysicsEventSystemOptions",
           "PhysicsSystemOptions",
+          "StalePhysicsHandleKind",
           "OverlapHit",
           "OverlapQuery",
           "PointHit",
@@ -13562,6 +13735,7 @@
           "worldAxisToLocal",
           "PhysicsEventSystem",
           "PhysicsSystem",
+          "rejectStalePhysicsHandle",
           "DEFAULT_DENSITY",
           "DEFAULT_FRICTION",
           "DEFAULT_FRICTION_COMBINE_MODE",
@@ -13685,6 +13859,7 @@
           "PhysicsMaterialOptions",
           "PhysicsEventSystemOptions",
           "PhysicsSystemOptions",
+          "StalePhysicsHandleKind",
           "OverlapHit",
           "OverlapQuery",
           "PointHit",
@@ -17151,8 +17326,8 @@
           "DEFAULT_REPLAY_MAXIMUM_SUB_STEPS"
         ]
       },
-      "packages/diagnostics/src/dev-warnings.ts": {
-        "description": "§83's development warnings (A-5 remainder, 2026-09-06).",
+      "packages/diagnostics/src/allocation-audit.ts": {
+        "description": "§83's \"excessive per-frame allocations\" development warning (A-4/A-5,",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
@@ -17167,24 +17342,18 @@
           }
         ],
         "exports": [
-          "DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD",
-          "warnDisposedResourceInUse",
-          "warnDetachedNodeListeners",
-          "warnStalePhysicsHandle",
-          "warnPerFrameAllocations",
-          "beginFrameAllocationCheck",
-          "endFrameAllocationCheck"
+          "NO_FRAME_ALLOCATIONS",
+          "auditFrameAllocations"
+        ],
+        "interfaces": [
+          "FrameAllocationReport",
+          "AuditFrameAllocationsOptions"
         ],
         "functions": [
-          "warnDisposedResourceInUse",
-          "warnDetachedNodeListeners",
-          "warnStalePhysicsHandle",
-          "warnPerFrameAllocations",
-          "beginFrameAllocationCheck",
-          "endFrameAllocationCheck"
+          "auditFrameAllocations"
         ],
         "constants": [
-          "DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD"
+          "NO_FRAME_ALLOCATIONS"
         ]
       },
       "packages/diagnostics/src/index.ts": {
@@ -17287,15 +17456,10 @@
             "reExport": true
           },
           {
-            "file": "./dev-warnings.js",
+            "file": "./allocation-audit.js",
             "imports": [
-              "DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD",
-              "beginFrameAllocationCheck",
-              "endFrameAllocationCheck",
-              "warnDetachedNodeListeners",
-              "warnDisposedResourceInUse",
-              "warnPerFrameAllocations",
-              "warnStalePhysicsHandle"
+              "NO_FRAME_ALLOCATIONS",
+              "auditFrameAllocations"
             ],
             "reExport": true
           },
@@ -17413,6 +17577,15 @@
             "typeOnly": true
           },
           {
+            "file": "./allocation-audit.js",
+            "imports": [
+              "AuditFrameAllocationsOptions",
+              "FrameAllocationReport"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./stats.js",
             "imports": [
               "ClockSource",
@@ -17471,13 +17644,8 @@
           "warnCoordinateEnvelope",
           "warnSingularScale",
           "warnUnstableScale",
-          "DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD",
-          "beginFrameAllocationCheck",
-          "endFrameAllocationCheck",
-          "warnDetachedNodeListeners",
-          "warnDisposedResourceInUse",
-          "warnPerFrameAllocations",
-          "warnStalePhysicsHandle",
+          "NO_FRAME_ALLOCATIONS",
+          "auditFrameAllocations",
           "copyFrameStats",
           "createFrameStats",
           "createMonotonicClock",
@@ -17530,6 +17698,8 @@
           "ValidationCheckOptions",
           "ValidationNodeLike",
           "ValidationTransformLike",
+          "AuditFrameAllocationsOptions",
+          "FrameAllocationReport",
           "ClockSource",
           "FrameStats",
           "RenderStatisticsLike"
@@ -17581,13 +17751,8 @@
           "warnCoordinateEnvelope",
           "warnSingularScale",
           "warnUnstableScale",
-          "DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD",
-          "beginFrameAllocationCheck",
-          "endFrameAllocationCheck",
-          "warnDetachedNodeListeners",
-          "warnDisposedResourceInUse",
-          "warnPerFrameAllocations",
-          "warnStalePhysicsHandle",
+          "NO_FRAME_ALLOCATIONS",
+          "auditFrameAllocations",
           "copyFrameStats",
           "createFrameStats",
           "createMonotonicClock",
@@ -17639,6 +17804,8 @@
           "ValidationCheckOptions",
           "ValidationNodeLike",
           "ValidationTransformLike",
+          "AuditFrameAllocationsOptions",
+          "FrameAllocationReport",
           "ClockSource",
           "FrameStats",
           "RenderStatisticsLike"
@@ -19769,6 +19936,23 @@
           "FIRST_PERSON_LOOK_SERIALIZER"
         ]
       },
+      "packages/motion/src/spatial-hash.ts": {
+        "description": "Uniform-grid spatial hash for radius neighbour queries (§12 flocking, §36",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": [
+          "SpatialHash"
+        ],
+        "classes": [
+          "SpatialHash"
+        ],
+        "interfaces": [
+          "SpatialHashOptions",
+          "SpatialHashEntry"
+        ]
+      },
       "packages/motion/src/capabilities.ts": {
         "description": "This package's §81 capability token (RFC 0002; declared here since",
         "externalDependencies": [],
@@ -20278,6 +20462,13 @@
             "reExport": true
           },
           {
+            "file": "./spatial-hash.js",
+            "imports": [
+              "SpatialHash"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./steering.js",
             "imports": [
               "SteeringAgent",
@@ -20462,6 +20653,15 @@
             "typeOnly": true
           },
           {
+            "file": "./spatial-hash.js",
+            "imports": [
+              "SpatialHashEntry",
+              "SpatialHashOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./steering.js",
             "imports": [
               "SteeringAgentOptions",
@@ -20553,6 +20753,7 @@
           "SeededRandom",
           "Scheduler",
           "SpringDamper",
+          "SpatialHash",
           "SteeringAgent",
           "WanderState",
           "alignment",
@@ -20622,6 +20823,8 @@
           "SpringDamperOptions",
           "SpringDamperResult",
           "SpringDamperVector3Result",
+          "SpatialHashEntry",
+          "SpatialHashOptions",
           "SteeringAgentOptions",
           "SteeringContext",
           "SteeringNeighbor",
@@ -20692,6 +20895,7 @@
           "SeededRandom",
           "Scheduler",
           "SpringDamper",
+          "SpatialHash",
           "SteeringAgent",
           "WanderState",
           "alignment",
@@ -20760,6 +20964,8 @@
           "SpringDamperOptions",
           "SpringDamperResult",
           "SpringDamperVector3Result",
+          "SpatialHashEntry",
+          "SpatialHashOptions",
           "SteeringAgentOptions",
           "SteeringContext",
           "SteeringNeighbor",
@@ -21224,7 +21430,8 @@
               "validateJointDescriptor",
               "validatePhysicsWorldOptions",
               "validateQueryShape",
-              "validateRigidBodyDescriptor"
+              "validateRigidBodyDescriptor",
+              "rejectStalePhysicsHandle"
             ]
           },
           {
@@ -21681,7 +21888,8 @@
               "validateJointDescriptor",
               "validatePhysicsWorldOptions",
               "validateQueryShape",
-              "validateRigidBodyDescriptor"
+              "validateRigidBodyDescriptor",
+              "rejectStalePhysicsHandle"
             ]
           },
           {
@@ -22149,6 +22357,11 @@
           "packages/scene/src/node.ts"
         ],
         [
+          "packages/render/src/render-target.ts",
+          "packages/render/src/render-target-bytes.ts",
+          "packages/render/src/render-target.ts"
+        ],
+        [
           "packages/render/src/renderer.ts",
           "packages/render/src/picking.ts",
           "packages/render/src/renderer.ts"
@@ -22159,9 +22372,9 @@
           "packages/physics/src/world.ts"
         ]
       ],
-      "total": 3,
+      "total": 4,
       "runtimeCount": 0,
-      "typeOnlyCount": 3
+      "typeOnlyCount": 4
     },
     "layers": [
       {
@@ -22374,6 +22587,7 @@
           "packages/render/src/capabilities.ts",
           "packages/render/src/render-target.ts",
           "packages/render/src/picking.ts",
+          "packages/render/src/resource-warnings.ts",
           "packages/render/src/particles.ts",
           "packages/render/src/statistics.ts",
           "packages/render/src/effect-pass.ts",
@@ -22383,6 +22597,7 @@
           "packages/render/src/read-pixels.ts",
           "packages/render/src/shape-paint.ts",
           "packages/render/src/resource-memory.ts",
+          "packages/render/src/render-target-bytes.ts",
           "packages/render/src/batch.ts",
           "packages/render/src/render-graph.ts",
           "packages/render/src/raster.ts",
@@ -22404,6 +22619,7 @@
           "packages/physics/src/descriptors.ts",
           "packages/physics/src/physics-event-system.ts",
           "packages/physics/src/types.ts",
+          "packages/physics/src/stale-handle.ts",
           "packages/physics/src/swept-character-controller.ts",
           "packages/physics/src/index.ts",
           "packages/physics/src/material.ts",
@@ -22481,7 +22697,7 @@
           "packages/diagnostics/src/stats.ts",
           "packages/diagnostics/src/rollback.ts",
           "packages/diagnostics/src/replay-player.ts",
-          "packages/diagnostics/src/dev-warnings.ts",
+          "packages/diagnostics/src/allocation-audit.ts",
           "packages/diagnostics/src/index.ts",
           "packages/diagnostics/src/resource-audit.ts",
           "packages/diagnostics/src/validation.ts",
@@ -22538,6 +22754,7 @@
           "packages/motion/src/integrators.ts",
           "packages/motion/src/clock.ts",
           "packages/motion/src/serializers.ts",
+          "packages/motion/src/spatial-hash.ts",
           "packages/motion/src/capabilities.ts",
           "packages/motion/src/steering.ts",
           "packages/motion/src/kinematic-controller.ts",
@@ -22573,20 +22790,20 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 286,
+    "totalTypeScriptFiles": 290,
     "totalModules": 24,
-    "totalLinesOfCode": 139009,
-    "totalExports": 2888,
-    "totalClasses": 182,
-    "totalInterfaces": 543,
-    "totalFunctions": 460,
+    "totalLinesOfCode": 139571,
+    "totalExports": 2903,
+    "totalClasses": 183,
+    "totalInterfaces": 546,
+    "totalFunctions": 457,
     "totalTypeGuards": 23,
     "totalEnums": 0,
-    "totalConstants": 425,
-    "totalReExports": 1844,
-    "totalTypeOnlyImports": 359,
+    "totalConstants": 432,
+    "totalReExports": 1854,
+    "totalTypeOnlyImports": 364,
     "runtimeCircularDeps": 0,
-    "typeOnlyCircularDeps": 3,
+    "typeOnlyCircularDeps": 4,
     "unusedFilesCount": 0,
     "unusedExportsCount": 2
   }

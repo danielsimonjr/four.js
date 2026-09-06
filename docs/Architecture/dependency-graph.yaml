@@ -2,9 +2,9 @@ metadata:
   name: four.js-monorepo
   version: 0.0.0
   lastUpdated: "2026-09-06"
-  totalFiles: 286
+  totalFiles: 290
   totalModules: 24
-  totalExports: 2888
+  totalExports: 2903
 entryPoints:
   - file: packages/render-webgpu/src/index.ts
     type: main
@@ -1976,6 +1976,10 @@ modules:
           directory: packages/render
           imports:
             - RenderTarget
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - warnDisposedInUse
       exports:
         - RENDER_TARGET_COLOR_FORMAT
         - RENDER_TARGET_DEPTH_FORMAT
@@ -2009,6 +2013,10 @@ modules:
           directory: packages/render
           imports:
             - RenderItem
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - warnDisposedInUse
       exports:
         - WgpuGeometryCache
       classes:
@@ -2046,6 +2054,10 @@ modules:
           directory: packages/render
           imports:
             - RenderItem
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - warnDisposedInUse
       exports:
         - MIPMAP_SHADER_SOURCE
         - mipLevelCount
@@ -3450,15 +3462,14 @@ modules:
             - GlTexture
             - WebglContext
       workspaceDependencies:
-        - package: "@four/core"
-          directory: packages/core
-          imports:
-            - DEV
-            - devWarnOnce
         - package: "@four/render"
           directory: packages/render
           imports:
             - SpriteRenderItem
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - warnDisposedInUse
       exports:
         - TextureCache
       classes:
@@ -3893,6 +3904,10 @@ modules:
           directory: packages/render
           imports:
             - RenderTarget
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - warnDisposedInUse
       exports:
         - RenderTargetCache
       classes:
@@ -3983,6 +3998,10 @@ modules:
           directory: packages/render
           imports:
             - RenderItem
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - warnDisposedInUse
       exports:
         - GeometryCache
       classes:
@@ -5175,6 +5194,7 @@ modules:
             - ComponentRegistry
             - EventEmitter
             - FourError
+            - devWarnOnce
             - Component
             - ComponentHost
             - ComponentType
@@ -7155,9 +7175,8 @@ modules:
         - package: "@four/diagnostics"
           directory: packages/diagnostics
           imports:
-            - beginFrameAllocationCheck
+            - auditFrameAllocations
             - createFrameStats
-            - endFrameAllocationCheck
             - monotonicNowSeconds
             - recordRenderStatistics
             - recordResourceMemory
@@ -7184,11 +7203,8 @@ modules:
         - package: "@four/math"
           directory: packages/math
           imports:
-            - DepthRange
-        - package: "@four/math"
-          directory: packages/math
-          imports:
             - constructionCount
+            - DepthRange
         - package: "@four/assets"
           directory: packages/assets
           imports:
@@ -7591,6 +7607,9 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./render-target-bytes.js
+          imports:
+            - renderTargetByteLength
         - file: ./resource-memory.js
           imports:
             - noteRenderTarget
@@ -7610,22 +7629,15 @@ modules:
       exports:
         - isRenderTargetTexture
         - validateColorSpace
-        - colorAttachmentBytesPerTexel
-        - depthAttachmentBytesPerTexel
-        - renderTargetBytesPerTexel
         - RenderTarget
       classes:
         - RenderTarget
       interfaces:
         - RenderTargetOptions
         - RenderTargetTexture
-        - RenderTargetByteLengthOptions
       functions:
         - isRenderTargetTexture
         - validateColorSpace
-        - colorAttachmentBytesPerTexel
-        - depthAttachmentBytesPerTexel
-        - renderTargetBytesPerTexel
     packages/render/src/picking.ts:
       description: Pixel/GPU-id picking — the backend-neutral half (§71; RFC 0005, accepted
       externalDependencies: []
@@ -7671,6 +7683,21 @@ modules:
         - decodePickId
       constants:
         - MAX_PICK_CANDIDATES
+    packages/render/src/resource-warnings.ts:
+      description: §83's "disposed resource still in use" development warning (A-4/A-5).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - DEV
+            - devWarnOnce
+      exports:
+        - warnDisposedInUse
+      functions:
+        - warnDisposedInUse
     packages/render/src/particles.ts:
       description: The particle drawing contract (§36, §49, plan P9-3) — one batched render item
       externalDependencies: []
@@ -7863,10 +7890,20 @@ modules:
         - file: ./render-target.js
           imports:
             - RenderTarget
+            - isRenderTargetTexture
+          reExport: true
+        - file: ./render-target-bytes.js
+          imports:
+            - RENDER_TARGET_COLOR_BYTES
+            - RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES
+            - RENDER_TARGET_DEPTH_STENCIL_BYTES
+            - RENDER_TARGET_DEPTH_TEXTURE_BYTES
+            - RENDER_TARGET_RGBA16F_BYTES
+            - RENDER_TARGET_RGBA32F_BYTES
+            - RENDER_TARGET_RGBA8_BYTES
             - colorAttachmentBytesPerTexel
             - depthAttachmentBytesPerTexel
-            - isRenderTargetTexture
-            - renderTargetBytesPerTexel
+            - renderTargetByteLength
           reExport: true
         - file: ./renderable.js
           imports:
@@ -7899,6 +7936,10 @@ modules:
             - liveRenderTargetCount
             - liveTextureCount
             - textureMemoryBytes
+          reExport: true
+        - file: ./resource-warnings.js
+          imports:
+            - warnDisposedInUse
           reExport: true
         - file: ./statistics.js
           imports:
@@ -8053,7 +8094,6 @@ modules:
           typeOnly: true
         - file: ./render-target.js
           imports:
-            - RenderTargetByteLengthOptions
             - RenderTargetFormat
             - RenderTargetOptions
             - RenderTargetTexture
@@ -8086,6 +8126,11 @@ modules:
             - RendererEventMap
             - RendererOptions
             - ResizeRecord
+          reExport: true
+          typeOnly: true
+        - file: ./resource-warnings.js
+          imports:
+            - DisposedResourceKind
           reExport: true
           typeOnly: true
         - file: ./statistics.js
@@ -8235,10 +8280,17 @@ modules:
         - encodePickId
         - supportsPicking
         - RenderTarget
+        - isRenderTargetTexture
+        - RENDER_TARGET_COLOR_BYTES
+        - RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES
+        - RENDER_TARGET_DEPTH_STENCIL_BYTES
+        - RENDER_TARGET_DEPTH_TEXTURE_BYTES
+        - RENDER_TARGET_RGBA16F_BYTES
+        - RENDER_TARGET_RGBA32F_BYTES
+        - RENDER_TARGET_RGBA8_BYTES
         - colorAttachmentBytesPerTexel
         - depthAttachmentBytesPerTexel
-        - isRenderTargetTexture
-        - renderTargetBytesPerTexel
+        - renderTargetByteLength
         - Renderable
         - MAX_SKINNING_JOINTS
         - Mesh
@@ -8256,6 +8308,7 @@ modules:
         - liveRenderTargetCount
         - liveTextureCount
         - textureMemoryBytes
+        - warnDisposedInUse
         - createRenderStatistics
         - resetRenderStatistics
         - supportsRenderStatistics
@@ -8350,7 +8403,6 @@ modules:
         - PickRequest
         - PickResult
         - PickingService
-        - RenderTargetByteLengthOptions
         - RenderTargetFormat
         - RenderTargetOptions
         - RenderTargetTexture
@@ -8371,6 +8423,7 @@ modules:
         - RendererEventMap
         - RendererOptions
         - ResizeRecord
+        - DisposedResourceKind
         - RenderStatistics
         - RenderStatisticsReporter
         - ArcOptions
@@ -8473,10 +8526,17 @@ modules:
         - encodePickId
         - supportsPicking
         - RenderTarget
+        - isRenderTargetTexture
+        - RENDER_TARGET_COLOR_BYTES
+        - RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES
+        - RENDER_TARGET_DEPTH_STENCIL_BYTES
+        - RENDER_TARGET_DEPTH_TEXTURE_BYTES
+        - RENDER_TARGET_RGBA16F_BYTES
+        - RENDER_TARGET_RGBA32F_BYTES
+        - RENDER_TARGET_RGBA8_BYTES
         - colorAttachmentBytesPerTexel
         - depthAttachmentBytesPerTexel
-        - isRenderTargetTexture
-        - renderTargetBytesPerTexel
+        - renderTargetByteLength
         - Renderable
         - MAX_SKINNING_JOINTS
         - Mesh
@@ -8494,6 +8554,7 @@ modules:
         - liveRenderTargetCount
         - liveTextureCount
         - textureMemoryBytes
+        - warnDisposedInUse
         - createRenderStatistics
         - resetRenderStatistics
         - supportsRenderStatistics
@@ -8587,7 +8648,6 @@ modules:
         - PickRequest
         - PickResult
         - PickingService
-        - RenderTargetByteLengthOptions
         - RenderTargetFormat
         - RenderTargetOptions
         - RenderTargetTexture
@@ -8608,6 +8668,7 @@ modules:
         - RendererEventMap
         - RendererOptions
         - ResizeRecord
+        - DisposedResourceKind
         - RenderStatistics
         - RenderStatisticsReporter
         - ArcOptions
@@ -8870,6 +8931,39 @@ modules:
         - textureMemoryBytes
         - liveTextureCount
         - liveRenderTargetCount
+    packages/render/src/render-target-bytes.ts:
+      description: Per-texel byte accounting for {@link RenderTarget} attachments (§83, §84).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./render-target.js
+          imports:
+            - RenderTargetFormat
+          typeOnly: true
+      workspaceDependencies: []
+      exports:
+        - RENDER_TARGET_RGBA8_BYTES
+        - RENDER_TARGET_RGBA16F_BYTES
+        - RENDER_TARGET_RGBA32F_BYTES
+        - RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES
+        - RENDER_TARGET_DEPTH_TEXTURE_BYTES
+        - RENDER_TARGET_DEPTH_STENCIL_BYTES
+        - RENDER_TARGET_COLOR_BYTES
+        - colorAttachmentBytesPerTexel
+        - depthAttachmentBytesPerTexel
+        - renderTargetByteLength
+      functions:
+        - colorAttachmentBytesPerTexel
+        - depthAttachmentBytesPerTexel
+        - renderTargetByteLength
+      constants:
+        - RENDER_TARGET_RGBA8_BYTES
+        - RENDER_TARGET_RGBA16F_BYTES
+        - RENDER_TARGET_RGBA32F_BYTES
+        - RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES
+        - RENDER_TARGET_DEPTH_TEXTURE_BYTES
+        - RENDER_TARGET_DEPTH_STENCIL_BYTES
+        - RENDER_TARGET_COLOR_BYTES
     packages/render/src/batch.ts:
       description: §65 batching — merging consecutive compatible draws into one (R-9,
       externalDependencies: []
@@ -9504,6 +9598,22 @@ modules:
         - DEFAULT_DETERMINISM_LEVEL
         - COMBINE_MODES
         - DEFAULT_SLEEPING_CONFIG
+    packages/physics/src/stale-handle.ts:
+      description: §83's stale physics handle development warning (A-4/A-5).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+            - devWarnOnce
+            - FourErrorCode
+      exports:
+        - rejectStalePhysicsHandle
+      functions:
+        - rejectStalePhysicsHandle
     packages/physics/src/swept-character-controller.ts:
       description: §12's **solver-backed** character controller — {@link SweptCharacterController}
       externalDependencies: []
@@ -9637,6 +9747,10 @@ modules:
         - file: ./physics-system.js
           imports:
             - PhysicsSystem
+          reExport: true
+        - file: ./stale-handle.js
+          imports:
+            - rejectStalePhysicsHandle
           reExport: true
         - file: ./material.js
           imports:
@@ -9834,6 +9948,11 @@ modules:
             - PhysicsSystemOptions
           reExport: true
           typeOnly: true
+        - file: ./stale-handle.js
+          imports:
+            - StalePhysicsHandleKind
+          reExport: true
+          typeOnly: true
         - file: ./queries.js
           imports:
             - OverlapHit
@@ -9978,6 +10097,7 @@ modules:
         - worldAxisToLocal
         - PhysicsEventSystem
         - PhysicsSystem
+        - rejectStalePhysicsHandle
         - DEFAULT_DENSITY
         - DEFAULT_FRICTION
         - DEFAULT_FRICTION_COMBINE_MODE
@@ -10102,6 +10222,7 @@ modules:
         - PhysicsMaterialOptions
         - PhysicsEventSystemOptions
         - PhysicsSystemOptions
+        - StalePhysicsHandleKind
         - OverlapHit
         - OverlapQuery
         - PointHit
@@ -10213,6 +10334,7 @@ modules:
         - worldAxisToLocal
         - PhysicsEventSystem
         - PhysicsSystem
+        - rejectStalePhysicsHandle
         - DEFAULT_DENSITY
         - DEFAULT_FRICTION
         - DEFAULT_FRICTION_COMBINE_MODE
@@ -10336,6 +10458,7 @@ modules:
         - PhysicsMaterialOptions
         - PhysicsEventSystemOptions
         - PhysicsSystemOptions
+        - StalePhysicsHandleKind
         - OverlapHit
         - OverlapQuery
         - PointHit
@@ -12890,8 +13013,8 @@ modules:
         - ReplayPlayerOptions
       constants:
         - DEFAULT_REPLAY_MAXIMUM_SUB_STEPS
-    packages/diagnostics/src/dev-warnings.ts:
-      description: §83's development warnings (A-5 remainder, 2026-09-06).
+    packages/diagnostics/src/allocation-audit.ts:
+      description: §83's "excessive per-frame allocations" development warning (A-4/A-5,
       externalDependencies: []
       nodeDependencies: []
       internalDependencies: []
@@ -12902,22 +13025,15 @@ modules:
             - DEV
             - devWarnOnce
       exports:
-        - DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD
-        - warnDisposedResourceInUse
-        - warnDetachedNodeListeners
-        - warnStalePhysicsHandle
-        - warnPerFrameAllocations
-        - beginFrameAllocationCheck
-        - endFrameAllocationCheck
+        - NO_FRAME_ALLOCATIONS
+        - auditFrameAllocations
+      interfaces:
+        - FrameAllocationReport
+        - AuditFrameAllocationsOptions
       functions:
-        - warnDisposedResourceInUse
-        - warnDetachedNodeListeners
-        - warnStalePhysicsHandle
-        - warnPerFrameAllocations
-        - beginFrameAllocationCheck
-        - endFrameAllocationCheck
+        - auditFrameAllocations
       constants:
-        - DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD
+        - NO_FRAME_ALLOCATIONS
     packages/diagnostics/src/index.ts:
       description: "--- PH-20 (§33 rollback) ---------------------------------------------------"
       externalDependencies: []
@@ -12993,15 +13109,10 @@ modules:
             - warnSingularScale
             - warnUnstableScale
           reExport: true
-        - file: ./dev-warnings.js
+        - file: ./allocation-audit.js
           imports:
-            - DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD
-            - beginFrameAllocationCheck
-            - endFrameAllocationCheck
-            - warnDetachedNodeListeners
-            - warnDisposedResourceInUse
-            - warnPerFrameAllocations
-            - warnStalePhysicsHandle
+            - NO_FRAME_ALLOCATIONS
+            - auditFrameAllocations
           reExport: true
         - file: ./stats.js
           imports:
@@ -13089,6 +13200,12 @@ modules:
             - ValidationTransformLike
           reExport: true
           typeOnly: true
+        - file: ./allocation-audit.js
+          imports:
+            - AuditFrameAllocationsOptions
+            - FrameAllocationReport
+          reExport: true
+          typeOnly: true
         - file: ./stats.js
           imports:
             - ClockSource
@@ -13144,13 +13261,8 @@ modules:
         - warnCoordinateEnvelope
         - warnSingularScale
         - warnUnstableScale
-        - DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD
-        - beginFrameAllocationCheck
-        - endFrameAllocationCheck
-        - warnDetachedNodeListeners
-        - warnDisposedResourceInUse
-        - warnPerFrameAllocations
-        - warnStalePhysicsHandle
+        - NO_FRAME_ALLOCATIONS
+        - auditFrameAllocations
         - copyFrameStats
         - createFrameStats
         - createMonotonicClock
@@ -13203,6 +13315,8 @@ modules:
         - ValidationCheckOptions
         - ValidationNodeLike
         - ValidationTransformLike
+        - AuditFrameAllocationsOptions
+        - FrameAllocationReport
         - ClockSource
         - FrameStats
         - RenderStatisticsLike
@@ -13253,13 +13367,8 @@ modules:
         - warnCoordinateEnvelope
         - warnSingularScale
         - warnUnstableScale
-        - DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD
-        - beginFrameAllocationCheck
-        - endFrameAllocationCheck
-        - warnDetachedNodeListeners
-        - warnDisposedResourceInUse
-        - warnPerFrameAllocations
-        - warnStalePhysicsHandle
+        - NO_FRAME_ALLOCATIONS
+        - auditFrameAllocations
         - copyFrameStats
         - createFrameStats
         - createMonotonicClock
@@ -13311,6 +13420,8 @@ modules:
         - ValidationCheckOptions
         - ValidationNodeLike
         - ValidationTransformLike
+        - AuditFrameAllocationsOptions
+        - FrameAllocationReport
         - ClockSource
         - FrameStats
         - RenderStatisticsLike
@@ -14920,6 +15031,19 @@ modules:
         - LOOK_AT_CONSTRAINT_SERIALIZER
         - CHARACTER_CONTROLLER_SERIALIZER
         - FIRST_PERSON_LOOK_SERIALIZER
+    packages/motion/src/spatial-hash.ts:
+      description: Uniform-grid spatial hash for radius neighbour queries (§12 flocking, §36
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies: []
+      exports:
+        - SpatialHash
+      classes:
+        - SpatialHash
+      interfaces:
+        - SpatialHashOptions
+        - SpatialHashEntry
     packages/motion/src/capabilities.ts:
       description: This package's §81 capability token (RFC 0002; declared here since
       externalDependencies: []
@@ -15275,6 +15399,10 @@ modules:
           imports:
             - SpringDamper
           reExport: true
+        - file: ./spatial-hash.js
+          imports:
+            - SpatialHash
+          reExport: true
         - file: ./steering.js
           imports:
             - SteeringAgent
@@ -15408,6 +15536,12 @@ modules:
             - SpringDamperVector3Result
           reExport: true
           typeOnly: true
+        - file: ./spatial-hash.js
+          imports:
+            - SpatialHashEntry
+            - SpatialHashOptions
+          reExport: true
+          typeOnly: true
         - file: ./steering.js
           imports:
             - SteeringAgentOptions
@@ -15490,6 +15624,7 @@ modules:
         - SeededRandom
         - Scheduler
         - SpringDamper
+        - SpatialHash
         - SteeringAgent
         - WanderState
         - alignment
@@ -15559,6 +15694,8 @@ modules:
         - SpringDamperOptions
         - SpringDamperResult
         - SpringDamperVector3Result
+        - SpatialHashEntry
+        - SpatialHashOptions
         - SteeringAgentOptions
         - SteeringContext
         - SteeringNeighbor
@@ -15628,6 +15765,7 @@ modules:
         - SeededRandom
         - Scheduler
         - SpringDamper
+        - SpatialHash
         - SteeringAgent
         - WanderState
         - alignment
@@ -15696,6 +15834,8 @@ modules:
         - SpringDamperOptions
         - SpringDamperResult
         - SpringDamperVector3Result
+        - SpatialHashEntry
+        - SpatialHashOptions
         - SteeringAgentOptions
         - SteeringContext
         - SteeringNeighbor
@@ -16036,6 +16176,7 @@ modules:
             - validatePhysicsWorldOptions
             - validateQueryShape
             - validateRigidBodyDescriptor
+            - rejectStalePhysicsHandle
         - package: "@four/physics"
           directory: packages/physics
           imports:
@@ -16396,6 +16537,7 @@ modules:
             - validatePhysicsWorldOptions
             - validateQueryShape
             - validateRigidBodyDescriptor
+            - rejectStalePhysicsHandle
         - package: "@four/physics"
           directory: packages/physics
           imports:
@@ -16725,15 +16867,18 @@ dependencyGraph:
       - - packages/scene/src/node.ts
         - packages/scene/src/world-transforms.ts
         - packages/scene/src/node.ts
+      - - packages/render/src/render-target.ts
+        - packages/render/src/render-target-bytes.ts
+        - packages/render/src/render-target.ts
       - - packages/render/src/renderer.ts
         - packages/render/src/picking.ts
         - packages/render/src/renderer.ts
       - - packages/physics/src/world.ts
         - packages/physics/src/solver-registry.ts
         - packages/physics/src/world.ts
-    total: 3
+    total: 4
     runtimeCount: 0
-    typeOnlyCount: 3
+    typeOnlyCount: 4
   layers:
     - name: Packages/render-webgpu
       files:
@@ -16911,6 +17056,7 @@ dependencyGraph:
         - packages/render/src/capabilities.ts
         - packages/render/src/render-target.ts
         - packages/render/src/picking.ts
+        - packages/render/src/resource-warnings.ts
         - packages/render/src/particles.ts
         - packages/render/src/statistics.ts
         - packages/render/src/effect-pass.ts
@@ -16920,6 +17066,7 @@ dependencyGraph:
         - packages/render/src/read-pixels.ts
         - packages/render/src/shape-paint.ts
         - packages/render/src/resource-memory.ts
+        - packages/render/src/render-target-bytes.ts
         - packages/render/src/batch.ts
         - packages/render/src/render-graph.ts
         - packages/render/src/raster.ts
@@ -16938,6 +17085,7 @@ dependencyGraph:
         - packages/physics/src/descriptors.ts
         - packages/physics/src/physics-event-system.ts
         - packages/physics/src/types.ts
+        - packages/physics/src/stale-handle.ts
         - packages/physics/src/swept-character-controller.ts
         - packages/physics/src/index.ts
         - packages/physics/src/material.ts
@@ -17000,7 +17148,7 @@ dependencyGraph:
         - packages/diagnostics/src/stats.ts
         - packages/diagnostics/src/rollback.ts
         - packages/diagnostics/src/replay-player.ts
-        - packages/diagnostics/src/dev-warnings.ts
+        - packages/diagnostics/src/allocation-audit.ts
         - packages/diagnostics/src/index.ts
         - packages/diagnostics/src/resource-audit.ts
         - packages/diagnostics/src/validation.ts
@@ -17042,6 +17190,7 @@ dependencyGraph:
         - packages/motion/src/integrators.ts
         - packages/motion/src/clock.ts
         - packages/motion/src/serializers.ts
+        - packages/motion/src/spatial-hash.ts
         - packages/motion/src/capabilities.ts
         - packages/motion/src/steering.ts
         - packages/motion/src/kinematic-controller.ts
@@ -17070,19 +17219,19 @@ dependencyGraph:
         - packages/physics-rapier/src/init.ts
         - packages/physics-rapier/src/ccd.ts
 statistics:
-  totalTypeScriptFiles: 286
+  totalTypeScriptFiles: 290
   totalModules: 24
-  totalLinesOfCode: 139009
-  totalExports: 2888
-  totalClasses: 182
-  totalInterfaces: 543
-  totalFunctions: 460
+  totalLinesOfCode: 139571
+  totalExports: 2903
+  totalClasses: 183
+  totalInterfaces: 546
+  totalFunctions: 457
   totalTypeGuards: 23
   totalEnums: 0
-  totalConstants: 425
-  totalReExports: 1844
-  totalTypeOnlyImports: 359
+  totalConstants: 432
+  totalReExports: 1854
+  totalTypeOnlyImports: 364
   runtimeCircularDeps: 0
-  typeOnlyCircularDeps: 3
+  typeOnlyCircularDeps: 4
   unusedFilesCount: 0
   unusedExportsCount: 2

@@ -401,47 +401,6 @@ export function validateColorSpace(
   return colorSpace;
 }
 
-export interface RenderTargetByteLengthOptions {
-  readonly format?: RenderTargetFormat;
-  readonly depth?: boolean;
-  readonly depthTexture?: boolean;
-  readonly stencil?: boolean;
-}
-
-export function colorAttachmentBytesPerTexel(
-  format: RenderTargetFormat = "rgba8",
-): number {
-  switch (format) {
-    case "rgba8":
-      return 4;
-    default: {
-      const exhaustive: never = format;
-      return exhaustive;
-    }
-  }
-}
-
-export function depthAttachmentBytesPerTexel(
-  options: Pick<
-    RenderTargetByteLengthOptions,
-    "depth" | "depthTexture" | "stencil"
-  >,
-): number {
-  const depth = options.depth ?? true;
-  if (!depth) return 0;
-  if (options.depthTexture === true || options.stencil === true) return 4;
-  return 2;
-}
-
-export function renderTargetBytesPerTexel(
-  options: RenderTargetByteLengthOptions = {},
-): number {
-  return (
-    colorAttachmentBytesPerTexel(options.format ?? "rgba8") +
-    depthAttachmentBytesPerTexel(options)
-  );
-}
-
 /**
  * The colour attachment view handed out by {@link RenderTarget.colorTexture}.
  *
