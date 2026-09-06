@@ -702,7 +702,7 @@ function scissorJson(node: {
   readonly scissor: ScissorRect | null;
 }): Record<string, JsonValue> {
   const rect = node.scissor;
-  if (rect === null) {
+  if (rect == null) {
     return {};
   }
   return {
@@ -719,13 +719,14 @@ function readScissor(data: {
   readonly [key: string]: JsonValue;
 }): { scissor?: ScissorRect } {
   const value = data.scissor;
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+  if (value === undefined || value === null || typeof value !== "object") {
     return {};
   }
-  const x = readNumber(value.x);
-  const y = readNumber(value.y);
-  const width = readNumber(value.width);
-  const height = readNumber(value.height);
+  const rect = record(value);
+  const x = readNumber(rect.x);
+  const y = readNumber(rect.y);
+  const width = readNumber(rect.width);
+  const height = readNumber(rect.height);
   if (
     x === undefined ||
     y === undefined ||

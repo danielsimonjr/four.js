@@ -5,7 +5,7 @@
  */
 
 import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { SpriteMaterial, UnlitMaterial } from "@four/materials";
 import { Scene, resolveWorldTransforms } from "@four/scene";
 import { describe, expect, it } from "vitest";
 
@@ -14,7 +14,6 @@ import {
   RenderBatcher,
   Renderable,
   Sprite,
-  SpriteMaterial,
   Texture,
   buildRenderList,
   intersectScissor,

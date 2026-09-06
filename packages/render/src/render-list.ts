@@ -169,8 +169,8 @@ interface ScissoredDrawable {
 }
 
 /** `undefined` and `null` both mean "inherit the view scissor only". */
-function scissorOf(node: ScissoredDrawable): ScissorRect | null {
-  return node.scissor ?? null;
+function scissorOf(node: object): ScissorRect | null {
+  return (node as ScissoredDrawable).scissor ?? null;
 }
 
 /**

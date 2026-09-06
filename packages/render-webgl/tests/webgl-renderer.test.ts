@@ -2068,6 +2068,7 @@ describe("WebglRenderer.render — viewport and clear semantics (§61, §48)", (
 describe("WebglRenderer.render — per-item scissor (§67)", () => {
   it("issues no extra scissor calls when no item names a rectangle", async () => {
     const { renderer, gl, camera } = await initialized();
+    renderer.resize(640, 480);
     const root = createRoot();
     root.add(renderable(quadGeometry()));
     gl.reset();
@@ -2080,6 +2081,7 @@ describe("WebglRenderer.render — per-item scissor (§67)", () => {
 
   it("intersects the item rectangle with the view and restores it after", async () => {
     const { renderer, gl, camera } = await initialized();
+    renderer.resize(640, 480);
     const root = createRoot();
     const child = renderable(quadGeometry());
     child.scissor = { x: 100, y: 50, width: 200, height: 100 };
