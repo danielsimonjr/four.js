@@ -362,14 +362,6 @@ export function radialField(
   const scratch = new Vector3();
 
   const field: ParticleForceField = {
-    gpuField: {
-      kind: "radial",
-      originX: cx,
-      originY: cy,
-      originZ: cz,
-      strength: s,
-      minDistance,
-    },
     sample(position, _velocity, _time, out = scratch): Vector3 {
       const rx = position.x - cx;
       const ry = position.y - cy;

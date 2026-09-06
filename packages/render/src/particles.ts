@@ -53,7 +53,7 @@
  *   and three attribute bindings instead of one.
  *
  * So the item carries **one interleaved `Float32Array`**, stride
- * {@link PARTICLE_INSTANCE_FLOATS} = 8 floats (32 bytes) by default:
+ * {@link PARTICLE_INSTANCE_FLOATS} = 8 floats (32 bytes):
  *
  * | Offset (floats) | Components | Meaning                                   |
  * | --------------: | ---------: | ----------------------------------------- |
@@ -61,13 +61,7 @@
  * | 3               | 1          | current size, in world units (diameter)   |
  * | 4               | 4          | current colour, **straight** RGBA         |
  *
- * R-32 widens to {@link PARTICLE_WIDE_INSTANCE_FLOATS} = 10 **only** when
- * the emitter opts in (`texture`, `alignToVelocity`, or `softness > 0`).
- * Extra floats: rotation (radians) at offset 8, softness in `[0, 1]` at 9.
- * Default emitters stay on the 8-float stream so goldens and budgets do
- * not move. The 8-float layout has no spare channel.
- *
- * The first `count × stride` floats are live; everything after them is stale and must
+ * The first `count × 8` floats are live; everything after them is stale and must
  * not be uploaded. The array itself is capacity-sized and **allocated once**, so
  * a frame costs one `bufferSubData` of `count × 32` bytes and no allocation at
  * all (plan D7).
@@ -107,16 +101,12 @@
  */
 
 import { BufferGeometry } from "@four/geometry";
-import type { Vector3 } from "@four/math";
 
 /**
  * Floats per particle in {@link ParticleDrawable.particleInstances} — the
  * interleaved stride. See the module header for the layout table.
  */
 export const PARTICLE_INSTANCE_FLOATS = 8;
-
-/** Opt-in stride when the emitter sets texture / alignToVelocity / softness (R-32). */
-export const PARTICLE_WIDE_INSTANCE_FLOATS = 10;
 
 /** Offset, in floats, of a particle's centre (`vec3`) within its instance. */
 export const PARTICLE_POSITION_OFFSET = 0;
@@ -126,12 +116,6 @@ export const PARTICLE_SIZE_OFFSET = 3;
 
 /** Offset, in floats, of a particle's current straight-alpha RGBA (`vec4`). */
 export const PARTICLE_COLOR_OFFSET = 4;
-
-/** Offset, in floats, of billboard rotation (radians) in the wide stream. */
-export const PARTICLE_ROTATION_OFFSET = 8;
-
-/** Offset, in floats, of softness (`[0, 1]`) in the wide stream. */
-export const PARTICLE_SOFTNESS_OFFSET = 9;
 
 /**
  * Floats per trail ribbon vertex — position `xyz` plus straight-alpha `rgba`.
@@ -194,8 +178,7 @@ export interface ParticleDrawable {
 
   /**
    * The interleaved upload array described in the module header. Owned by the
-   * node, reused every frame, and valid for
-   * `particleCount × particleInstanceFloats` floats.
+   * node, reused every frame, and valid for `particleCount × 8` floats.
    *
    * Read it, upload it, do not mutate it and do not retain it past the frame:
    * the next `updateParticleInstances` rewrites it in place.
@@ -233,28 +216,6 @@ export interface ParticleDrawable {
    * `trailVertexCount × TRAIL_VERTEX_FLOATS` floats after repack.
    */
   readonly trailVertices?: Float32Array;
-
-  /**
-   * Instance stride in floats — `8` by default, `10` when R-32 appearance
-   * is opted in. Absent means {@link PARTICLE_INSTANCE_FLOATS}.
-   */
-  readonly particleInstanceFloats?: number;
-
-  /**
-   * Texture-like handle or `true`. Truthy means the backend should sample
-   * `map` like an unlit sprite.
-   */
-  readonly particleTexture?: object | true;
-
-  /**
-   * Optional live-particle AABB in the node's **local** space (R-8 follow-up
-   * b). `@four/particles`' `ParticleRenderable` already publishes this;
-   * `buildRenderList` probes it structurally, converts the box to a world
-   * sphere, and sets `frustumCulled` so §87 can hide an emitter whose
-   * particles are all off screen. Absent or `false` keeps the item
-   * un-culled — the shared instance quad is not an honest bound.
-   */
-  computeBounds?(outMin: Vector3, outMax: Vector3): boolean;
 }
 
 /**

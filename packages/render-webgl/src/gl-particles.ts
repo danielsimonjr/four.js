@@ -95,10 +95,7 @@ import {
   PARTICLE_COLOR_OFFSET,
   PARTICLE_INSTANCE_FLOATS,
   PARTICLE_POSITION_OFFSET,
-  PARTICLE_ROTATION_OFFSET,
   PARTICLE_SIZE_OFFSET,
-  PARTICLE_SOFTNESS_OFFSET,
-  PARTICLE_WIDE_INSTANCE_FLOATS,
   TRAIL_COLOR_OFFSET,
   TRAIL_POSITION_OFFSET,
   TRAIL_VERTEX_FLOATS,
@@ -108,7 +105,6 @@ import {
 import {
   GL,
   POSITION_ATTRIBUTE_LOCATION,
-  MAP_TEXTURE_UNIT,
   createLinkedProgram,
   matrixScratch,
   requireUniform,
@@ -152,16 +148,11 @@ export const PARTICLE_ATTRIBUTE_LOCATIONS = {
   instanceSize: 2,
   /** Current straight-alpha RGBA (`vec4`). */
   instanceColor: 3,
-  /** Billboard rotation in radians — wide stream only (R-32). */
-  instanceRotation: 4,
-  /** Softness in `[0, 1]` — wide stream only (R-32). */
-  instanceSoftness: 5,
 } as const;
 
-/** Instance stride in floats for `item` — 8 unless the emitter opted into R-32. */
-export function particleItemFloats(item: ParticleRenderItem): number {
-  return item.instanceFloats ?? PARTICLE_INSTANCE_FLOATS;
-}
+/** Bytes per instance — `@four/render`'s interleaved stride. */
+const INSTANCE_STRIDE_BYTES =
+  PARTICLE_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 
 /**
  * The GL 2 entry points the particle path adds to `WebglContext` — see the
@@ -389,195 +380,6 @@ export class ParticleProgram implements Disposable {
   }
 }
 
-/**
- * R-32 appearance pipeline — textured / rotated / soft particles. Compiled
- * only when an emitter opts in; the default {@link ParticleProgram} is
- * unchanged so goldens and the 8-float path do not move.
- *
- * Soft particles: fade by depth difference vs `sceneDepth` when
- * `hasSceneDepth` is set; otherwise `saturate(1 − |viewZ| · softness)`.
- */
-const APPEARANCE_VERTEX_SHADER_SOURCE = `#version 300 es
-layout(location = 0) in vec3 corner;
-layout(location = 1) in vec3 instancePosition;
-layout(location = 2) in float instanceSize;
-layout(location = 3) in vec4 instanceColor;
-layout(location = 4) in float instanceRotation;
-layout(location = 5) in float instanceSoftness;
-uniform mat4 projection;
-uniform mat4 view;
-uniform mat4 model;
-out vec4 vColor;
-out vec2 vUv;
-out float vSoftness;
-out float vViewZ;
-void main() {
-  vec4 center = view * model * vec4(instancePosition, 1.0);
-  float c = cos(instanceRotation);
-  float s = sin(instanceRotation);
-  vec2 r = vec2(corner.x * c - corner.y * s, corner.x * s + corner.y * c);
-  center.xy += r * instanceSize;
-  gl_Position = projection * center;
-  vColor = instanceColor;
-  vUv = corner.xy + 0.5;
-  vSoftness = instanceSoftness;
-  vViewZ = center.z;
-}
-`;
-
-const APPEARANCE_FRAGMENT_SHADER_SOURCE = `#version 300 es
-precision highp float;
-uniform sampler2D map;
-uniform int useMap;
-uniform int hasSceneDepth;
-uniform sampler2D sceneDepth;
-uniform float depthWidth;
-uniform float depthHeight;
-in vec4 vColor;
-in vec2 vUv;
-in float vSoftness;
-in float vViewZ;
-out vec4 fragColor;
-void main() {
-  vec4 color = vColor;
-  if (useMap > 0) color *= texture(map, vUv);
-  float fade = 1.0;
-  if (vSoftness > 0.0) {
-    if (hasSceneDepth > 0) {
-      float sceneZ = texture(sceneDepth, gl_FragCoord.xy / vec2(depthWidth, depthHeight)).r;
-      fade = clamp(abs(sceneZ - gl_FragCoord.z) / max(vSoftness, 1e-5), 0.0, 1.0);
-    } else {
-      fade = clamp(1.0 - abs(vViewZ) * vSoftness, 0.0, 1.0);
-    }
-  }
-  color.a *= fade;
-  fragColor = color;
-}
-`;
-
-/** Texture unit for the optional scene-depth soft-particle sample. */
-export const PARTICLE_DEPTH_TEXTURE_UNIT = 1;
-
-/**
- * Opt-in R-32 particle program. Same matrix setters as {@link ParticleProgram},
- * plus `map` / soft-depth uniforms.
- */
-export class ParticleAppearanceProgram implements Disposable {
-  readonly #gl: WebglContext;
-  readonly #program: GlProgramHandle;
-  readonly #projectionLocation: GlUniformLocation;
-  readonly #viewLocation: GlUniformLocation;
-  readonly #modelLocation: GlUniformLocation;
-  readonly #useMapLocation: GlUniformLocation;
-  readonly #hasSceneDepthLocation: GlUniformLocation;
-  readonly #depthWidthLocation: GlUniformLocation;
-  readonly #depthHeightLocation: GlUniformLocation;
-  #disposed = false;
-
-  private constructor(
-    gl: WebglContext,
-    program: GlProgramHandle,
-    projectionLocation: GlUniformLocation,
-    viewLocation: GlUniformLocation,
-    modelLocation: GlUniformLocation,
-    useMapLocation: GlUniformLocation,
-    hasSceneDepthLocation: GlUniformLocation,
-    depthWidthLocation: GlUniformLocation,
-    depthHeightLocation: GlUniformLocation,
-  ) {
-    this.#gl = gl;
-    this.#program = program;
-    this.#projectionLocation = projectionLocation;
-    this.#viewLocation = viewLocation;
-    this.#modelLocation = modelLocation;
-    this.#useMapLocation = useMapLocation;
-    this.#hasSceneDepthLocation = hasSceneDepthLocation;
-    this.#depthWidthLocation = depthWidthLocation;
-    this.#depthHeightLocation = depthHeightLocation;
-  }
-
-  static create(gl: WebglContext): ParticleAppearanceProgram {
-    const program = createLinkedProgram(
-      gl,
-      "particle-appearance",
-      APPEARANCE_VERTEX_SHADER_SOURCE,
-      APPEARANCE_FRAGMENT_SHADER_SOURCE,
-    );
-    try {
-      const created = new ParticleAppearanceProgram(
-        gl,
-        program,
-        requireUniform(gl, program, "projection", "particle-appearance"),
-        requireUniform(gl, program, "view", "particle-appearance"),
-        requireUniform(gl, program, "model", "particle-appearance"),
-        requireUniform(gl, program, "useMap", "particle-appearance"),
-        requireUniform(gl, program, "hasSceneDepth", "particle-appearance"),
-        requireUniform(gl, program, "depthWidth", "particle-appearance"),
-        requireUniform(gl, program, "depthHeight", "particle-appearance"),
-      );
-      gl.useProgram(program);
-      const mapLocation = gl.getUniformLocation(program, "map");
-      if (mapLocation !== null) {
-        gl.uniform1i(mapLocation, MAP_TEXTURE_UNIT);
-      }
-      const depthLocation = gl.getUniformLocation(program, "sceneDepth");
-      if (depthLocation !== null) {
-        gl.uniform1i(depthLocation, PARTICLE_DEPTH_TEXTURE_UNIT);
-      }
-      return created;
-    } catch (error: unknown) {
-      gl.deleteProgram(program);
-      throw error;
-    }
-  }
-
-  get disposed(): boolean {
-    return this.#disposed;
-  }
-
-  use(): void {
-    this.#gl.useProgram(this.#program);
-  }
-
-  setProjection(matrix: Matrix4): void {
-    matrixScratch.set(matrix.elements);
-    this.#gl.uniformMatrix4fv(this.#projectionLocation, false, matrixScratch);
-  }
-
-  setView(matrix: Matrix4): void {
-    matrixScratch.set(matrix.elements);
-    this.#gl.uniformMatrix4fv(this.#viewLocation, false, matrixScratch);
-  }
-
-  setModel(matrix: Matrix4): void {
-    matrixScratch.set(matrix.elements);
-    this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
-  }
-
-  /** `true` samples `map` (unit 0) like an unlit sprite. */
-  setUseMap(enabled: boolean): void {
-    this.#gl.uniform1i(this.#useMapLocation, enabled ? 1 : 0);
-  }
-
-  /**
-   * Soft-particle depth. When `bound` is false, fade is the view-Z fallback
-   * documented on `ParticleEmitterOptions.softness`.
-   */
-  setSceneDepth(bound: boolean, width = 1, height = 1): void {
-    this.#gl.uniform1i(this.#hasSceneDepthLocation, bound ? 1 : 0);
-    this.#gl.uniform1f(this.#depthWidthLocation, width);
-    this.#gl.uniform1f(this.#depthHeightLocation, height);
-  }
-
-  dispose(): void {
-    if (this.#disposed) {
-      return;
-    }
-    this.#disposed = true;
-    this.#gl.deleteProgram(this.#program);
-  }
-}
-
 /** Everything one particle system needs at draw time. */
 export interface ParticleBatchRecord {
   /** Vertex array holding the corner attribute and the three instance attributes. */
@@ -680,11 +482,7 @@ export class ParticleBatchCache {
       return null;
     }
 
-    const record = this.#create(
-      item.instances,
-      cornerBuffer,
-      particleItemFloats(item),
-    );
+    const record = this.#create(item.instances, cornerBuffer);
     if (record === null) {
       return null;
     }
@@ -704,7 +502,7 @@ export class ParticleBatchCache {
    * that moves no bytes, and the caller skips the draw anyway.
    */
   upload(record: ParticleBatchRecord, item: ParticleRenderItem): void {
-    const floats = item.count * particleItemFloats(item);
+    const floats = item.count * PARTICLE_INSTANCE_FLOATS;
     if (floats === 0) {
       return;
     }
@@ -754,7 +552,6 @@ export class ParticleBatchCache {
   #create(
     instances: Float32Array,
     cornerBuffer: GlBuffer,
-    instanceFloats: number,
   ): ParticleBatchRecord | null {
     const gl = this.#gl;
     const vertexArray = gl.createVertexArray();
@@ -768,7 +565,6 @@ export class ParticleBatchCache {
     }
 
     const locations = PARTICLE_ATTRIBUTE_LOCATIONS;
-    const strideBytes = instanceFloats * Float32Array.BYTES_PER_ELEMENT;
     gl.bindVertexArray(vertexArray);
 
     gl.bindBuffer(GL.ARRAY_BUFFER, cornerBuffer);
@@ -784,7 +580,7 @@ export class ParticleBatchCache {
       3,
       GL.FLOAT,
       false,
-      strideBytes,
+      INSTANCE_STRIDE_BYTES,
       PARTICLE_POSITION_OFFSET * Float32Array.BYTES_PER_ELEMENT,
     );
     gl.vertexAttribDivisor(locations.instancePosition, 1);
@@ -795,7 +591,7 @@ export class ParticleBatchCache {
       1,
       GL.FLOAT,
       false,
-      strideBytes,
+      INSTANCE_STRIDE_BYTES,
       PARTICLE_SIZE_OFFSET * Float32Array.BYTES_PER_ELEMENT,
     );
     gl.vertexAttribDivisor(locations.instanceSize, 1);
@@ -806,34 +602,10 @@ export class ParticleBatchCache {
       4,
       GL.FLOAT,
       false,
-      strideBytes,
+      INSTANCE_STRIDE_BYTES,
       PARTICLE_COLOR_OFFSET * Float32Array.BYTES_PER_ELEMENT,
     );
     gl.vertexAttribDivisor(locations.instanceColor, 1);
-
-    if (instanceFloats >= PARTICLE_WIDE_INSTANCE_FLOATS) {
-      gl.enableVertexAttribArray(locations.instanceRotation);
-      gl.vertexAttribPointer(
-        locations.instanceRotation,
-        1,
-        GL.FLOAT,
-        false,
-        strideBytes,
-        PARTICLE_ROTATION_OFFSET * Float32Array.BYTES_PER_ELEMENT,
-      );
-      gl.vertexAttribDivisor(locations.instanceRotation, 1);
-
-      gl.enableVertexAttribArray(locations.instanceSoftness);
-      gl.vertexAttribPointer(
-        locations.instanceSoftness,
-        1,
-        GL.FLOAT,
-        false,
-        strideBytes,
-        PARTICLE_SOFTNESS_OFFSET * Float32Array.BYTES_PER_ELEMENT,
-      );
-      gl.vertexAttribDivisor(locations.instanceSoftness, 1);
-    }
 
     gl.bindVertexArray(null);
     gl.bindBuffer(GL.ARRAY_BUFFER, null);

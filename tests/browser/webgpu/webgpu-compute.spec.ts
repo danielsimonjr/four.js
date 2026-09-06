@@ -66,9 +66,7 @@ const PAGE_SCRIPT = `async (options) => {
   };
   // deltaSeconds 0.5, count 2, pad, pad, gravity (0, -2, 0, 0) — the layout
   // writeParticleSimulationParams packs.
-  const params = storage(
-    new Float32Array([0.5, 2, 0, 0, 0, -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-  );
+  const params = storage(new Float32Array([0.5, 2, 0, 0, 0, -2, 0, 0]));
   const positions = storage(new Float32Array([0, 0, 0, 10, 20, 30, 7, 7, 7]));
   const velocities = storage(new Float32Array([1, 0, 0, 0, 0, 0, 5, 5, 5]));
 

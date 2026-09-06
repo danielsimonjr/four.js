@@ -39,10 +39,7 @@ export {
 export type { ParticleRenderableOptions } from "./particle-renderable.js";
 export {
   PARTICLE_INSTANCE_FLOATS,
-  PARTICLE_ROTATION_OFFSET,
-  PARTICLE_SOFTNESS_OFFSET,
   PARTICLE_TRAIL_VERTEX_FLOATS,
-  PARTICLE_WIDE_INSTANCE_FLOATS,
   ParticleRenderable,
 } from "./particle-renderable.js";
 // --- WP-9.3: batched particle rendering (end) ---
@@ -69,17 +66,13 @@ export {
 } from "./trail.js";
 export type {
   ParticleBurst,
-  ParticleCollisionMode,
   ParticleColor,
   ParticleForceField,
-  ParticleGpuIntegrateExtras,
-  ParticleGpuRadialField,
   ParticleGpuSimulation,
   ParticleLifetimeRamp,
   ParticleLifetimeStop,
   ParticleRange,
   ParticleSimulationMode,
-  ParticleTexture,
 } from "./types.js";
 export {
   evaluateLifetimeRampColor,

@@ -32,10 +32,7 @@ import {
   PARTICLE_COLOR_OFFSET,
   PARTICLE_INSTANCE_FLOATS,
   PARTICLE_POSITION_OFFSET,
-  PARTICLE_ROTATION_OFFSET,
   PARTICLE_SIZE_OFFSET,
-  PARTICLE_SOFTNESS_OFFSET,
-  PARTICLE_WIDE_INSTANCE_FLOATS,
   Renderable,
   Sprite,
   Texture,
@@ -380,9 +377,6 @@ describe("the interleaved instance layout (the cross-package contract)", () => {
     expect(PARTICLE_COLOR_OFFSET).toBe(4);
     // Position (3) + size (1) + colour (4) fill the stride exactly.
     expect(PARTICLE_COLOR_OFFSET + 4).toBe(PARTICLE_INSTANCE_FLOATS);
-    expect(PARTICLE_WIDE_INSTANCE_FLOATS).toBe(10);
-    expect(PARTICLE_ROTATION_OFFSET).toBe(8);
-    expect(PARTICLE_SOFTNESS_OFFSET).toBe(9);
   });
 
   it("is 32 bytes per particle — 3.2 MB for §112's 100 000-particle budget", () => {

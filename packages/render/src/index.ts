@@ -9,21 +9,12 @@ export type {
 export { DEFAULT_MAX_BATCH_VERTICES, RenderBatcher } from "./batch.js";
 
 export type { BoundingSphere } from "./bounds.js";
-export {
-  computeWorldBoundingSphere,
-  computeWorldBoundingSphereFromBox,
-} from "./bounds.js";
+export { computeWorldBoundingSphere } from "./bounds.js";
 
 // §81's render-side capability tokens (RFC 0002), declared by the package
 // that owns each registry; `@four/four`'s `plugins.ts` re-exports the same
 // objects, so both import paths hand out one identity.
-export {
-  COMPUTE_WORKLOADS,
-  RENDERER_REGISTRY,
-  RENDER_GRAPH,
-} from "./capabilities.js";
-export type { ComputeWorkloadFactory } from "./compute-workloads.js";
-export { ComputeWorkloadRegistry } from "./compute-workloads.js";
+export { RENDERER_REGISTRY, RENDER_GRAPH } from "./capabilities.js";
 
 export type { ClipScope, RenderItemClip, RenderItemStencil } from "./clip.js";
 export { ClipPlaneAllocator, MAX_CLIP_PLANES } from "./clip.js";
@@ -79,10 +70,7 @@ export {
   PARTICLE_COLOR_OFFSET,
   PARTICLE_INSTANCE_FLOATS,
   PARTICLE_POSITION_OFFSET,
-  PARTICLE_ROTATION_OFFSET,
   PARTICLE_SIZE_OFFSET,
-  PARTICLE_SOFTNESS_OFFSET,
-  PARTICLE_WIDE_INSTANCE_FLOATS,
   TRAIL_COLOR_OFFSET,
   TRAIL_POSITION_OFFSET,
   TRAIL_VERTEX_FLOATS,
@@ -104,7 +92,6 @@ export type {
 export {
   buildInterpolatedRenderList,
   buildRenderList,
-  compareRenderItems,
   groupRenderListByPipeline,
   isLitItem,
   isNodeItem,

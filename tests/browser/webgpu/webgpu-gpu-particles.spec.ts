@@ -101,9 +101,7 @@ const PAGE_SCRIPT = `async (options) => {
   const velocities = storage(new Float32Array([2, 0, 0, 0, 0, 0]));
   // dt 0.25, count 2, pads, gravity (0, -4, 0, 0) — the params layout
   // writeParticleSimulationParams packs.
-  const params = storage(
-    new Float32Array([0.25, 2, 0, 0, 0, -4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-  );
+  const params = storage(new Float32Array([0.25, 2, 0, 0, 0, -4, 0, 0]));
 
   // Integrate one step — the backend's "rww" compute layout.
   const computeLayout = device.createBindGroupLayout({

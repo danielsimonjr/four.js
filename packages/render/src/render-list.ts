@@ -45,15 +45,10 @@
  * sorts by **render layer, then opaque before transparent, then explicit render
  * order, then scene-graph order** — keys 1, 2, and 5.
  *
- * {@link compareRenderItems} is the one §66 comparator: layer, opaque before
- * transparent, pipeline and material, depth, explicit render order. Key 3
- * (pipeline/material) outranks key 4 (depth), so transparent items sort
- * back-to-front only *within* the same pipeline and material. The builders
- * still default to keys 1, 2 and 5 — a scene that never asks for depth sort
- * keeps the order it has had since 2026-08-06, byte for byte. Depth sort is
- * {@link sortRenderListByDepth}, which writes `viewDepth` and then applies
- * the combined comparator. Key 3 also ships as the
- * {@link groupRenderListByPipeline} verb:
+ * Key 3 (pipeline and material compatibility) ships as
+ * {@link groupRenderListByPipeline} and key 4 (depth) as `view-list.ts`'s
+ * `sortRenderListByDepth` — both **second verbs** rather than modes of the
+ * builders:
  *
  * - key 3 cannot be the default order, and the reason is stronger than
  *   byte-identity (R-10, 2026-08-09). Grouping by pipeline permutes draws that
@@ -74,8 +69,7 @@
  *   ships there — on the derived list, never on this one. It is opt-in for key
  *   3's reason, unchanged: under `LEQUAL` a depth sort permutes co-planar
  *   opaque draws, and co-planar opaque draws are what a 2D scene is made of.
- *   See `view-list.ts`'s `sortRenderListByDepth`, which now applies
- *   {@link compareRenderItems} after writing `viewDepth`.
+ *   See `view-list.ts`'s `sortRenderListByDepth`.
  *
  * Key 2 landed on 2026-08-06 with §57's `transparent` flag (`material.ts`).
  * It is a **no-op for every scene that does not use it**: with the base's
@@ -125,16 +119,8 @@ import {
   type Viewport,
 } from "@four/scene";
 
-import {
-  computeWorldBoundingSphereFromBox,
-  type BoundingSphere,
-} from "./bounds.js";
 import { ClipPlaneAllocator, type RenderItemClip } from "./clip.js";
-import {
-  PARTICLE_INSTANCE_FLOATS,
-  isParticleDrawable,
-  particleQuadGeometry,
-} from "./particles.js";
+import { isParticleDrawable, particleQuadGeometry } from "./particles.js";
 import { Renderable } from "./renderable.js";
 import type { ScissorRect } from "./scissor.js";
 import type { SpriteFrame } from "./sprite.js";
@@ -381,30 +367,15 @@ interface RenderItemBase {
    * render items in the first place — and because a compact item has no node
    * reference to reach through.
    *
-   * **`false` on a particle item that has no live-particle bound** — the
-   * shared instance quad sits at the emitter and says nothing about where
-   * the particles are. When the emitter publishes a local AABB via
-   * structural `computeBounds(outMin, outMax)`, the builders copy a world
-   * sphere onto {@link RenderItemBase.worldBounds} and set this `true` so
-   * §87 can cull the system (R-8 follow-up b).
+   * Always **`false` on a particle item**, and that is a statement about §36
+   * rather than a default: a particle item's `geometry` is the shared unit quad
+   * that every particle is *instanced* from, so its bounds describe a square at
+   * the emitter and say nothing about where the particles are. Culling by them
+   * would make a wide, slow-moving system vanish the moment its emitter left
+   * the screen. A bound over the live particles is the fix, and it belongs to
+   * §36.
    */
   frustumCulled: boolean;
-
-  /**
-   * Optional world-space cull sphere, written when the drawable publishes
-   * a bound that is not its `geometry` box — today, a §36 particle system
-   * whose node has structural `computeBounds`. `null` / absent means
-   * "derive from geometry" (the ordinary path). Optional so a hand-built
-   * item predating the field still typechecks.
-   */
-  worldBounds?: BoundingSphere | null;
-
-  /**
-   * The drawable node's `transform.worldVersion` at generation time — the
-   * stamp §65's idle batch cache keys on. Absent on a hand-built item, which
-   * is what tells the cache "versions unavailable, re-upload".
-   */
-  transformVersion?: number;
 
   /**
    * §66 sort key 4, in view space — written by `sortRenderListByDepth` and
@@ -671,18 +642,6 @@ export interface ParticleRenderItem extends RenderItemBase {
 
   /** Live trail vertices to draw; `0` means skip the trail pass. */
   trailVertexCount?: number;
-
-  /**
-   * Instance stride in floats. Absent / `8` is the default stream; `10` is
-   * the R-32 wide stream (rotation + softness).
-   */
-  instanceFloats?: number;
-
-  /**
-   * Texture-like handle or `true` when the emitter opted into textured
-   * particles. Backends sample `map` like an unlit sprite.
-   */
-  particleTexture?: object | true;
 }
 
 /**
@@ -768,10 +727,6 @@ interface MutableRenderItem extends RenderItemBase {
   /** §36 trail ribbon; meaningful only on particle items. */
   trailVertices?: Float32Array;
   trailVertexCount: number;
-  instanceFloats: number;
-  particleTexture?: object | true;
-  worldBounds: BoundingSphere | null;
-  transformVersion: number;
 }
 
 /**
@@ -984,9 +939,6 @@ function itemAt(
       jointCount: 0,
       morphWeights: null,
       trailVertexCount: 0,
-      instanceFloats: PARTICLE_INSTANCE_FLOATS,
-      worldBounds: null,
-      transformVersion: 0,
     };
     pool.items[index] = item;
   }
@@ -1012,7 +964,7 @@ function matrixAt(pool: ListPool, index: number): Matrix4 {
  * O(n log n) pass that dominated list construction at 100 000 nodes.
  */
 interface SortTracker {
-  /** Set when any item would compare unequal under {@link compareDefaultRenderItems}. */
+  /** Set when any item would compare unequal under {@link compareRenderItems}. */
   permute: boolean;
   /** False until the first sortable item is written. */
   seen: boolean;
@@ -1058,9 +1010,6 @@ const ancestorChain: Node[] = [];
 const scratchLocal = new Matrix4();
 const scratchPosition = new Vector3();
 const scratchRotation = new Quaternion();
-/** Local AABB scratch for a particle system's structural `computeBounds`. */
-const particleBoundMin = new Vector3();
-const particleBoundMax = new Vector3();
 
 /**
  * Writes `node`'s **interpolated** world matrix into `out` (§43).
@@ -1161,45 +1110,6 @@ function writeWorldMatrix(
 }
 
 /**
- * Copies a particle system's live AABB onto the item as a world sphere so
- * §87 can cull it (R-8 follow-up b).
- *
- * `@four/particles`' `ParticleRenderable.computeBounds` writes a **local**
- * box; this package cannot import that class, so the method is probed
- * structurally. No method, a `false` return (empty / GPU-simulated), or a
- * non-finite box leaves `frustumCulled = false` — the pre-follow-up
- * behaviour, so a double that never published bounds still draws.
- */
-function writeParticleWorldBounds(
-  item: MutableRenderItem,
-  node: { computeBounds?: (outMin: Vector3, outMax: Vector3) => boolean },
-): void {
-  if (typeof node.computeBounds !== "function") {
-    return;
-  }
-  if (!node.computeBounds(particleBoundMin, particleBoundMax)) {
-    return;
-  }
-  let sphere = item.worldBounds;
-  if (sphere === null) {
-    sphere = { center: new Vector3(), radius: 0 };
-    item.worldBounds = sphere;
-  }
-  if (
-    computeWorldBoundingSphereFromBox(
-      particleBoundMin,
-      particleBoundMax,
-      item.worldMatrix,
-      sphere,
-    )
-  ) {
-    item.frustumCulled = true;
-  } else {
-    item.worldBounds = null;
-  }
-}
-
-/**
  * Narrows `node` to a drawable renderable, whatever material it carries.
  *
  * `node instanceof Renderable` on its own narrows to `Renderable<any>`, because
@@ -1247,8 +1157,6 @@ function collectSpriteItem(
   item.viewDepth = 0;
   item.clip = clip;
   item.scissor = scissorOf(node);
-  item.worldBounds = null;
-  item.transformVersion = node.transform.worldVersion;
   if (poses === null) {
     item.worldMatrix = node.transform.worldMatrix;
   } else {
@@ -1450,8 +1358,6 @@ function collect(
       // §67 scissor, snapshotted like every other field and written on every
       // drawable so a pooled slot cannot hand a stale rectangle forward.
       item.scissor = scissorOf(node);
-      item.worldBounds = null;
-      item.transformVersion = node.transform.worldVersion;
       writeWorldMatrix(item, node, pool, next, poses, alpha);
       // §54's morph weights (RFC 0003), snapshotted like every other field and
       // written on **every** drawable for `clip`'s reason: the item is pooled,
@@ -1507,12 +1413,6 @@ function collect(
     item.id = node.id;
     item.count = node.particleCount;
     item.instances = node.particleInstances;
-    item.instanceFloats =
-      node.particleInstanceFloats ?? PARTICLE_INSTANCE_FLOATS;
-    item.particleTexture = node.particleTexture;
-    item.trailVertices = node.hasTrail === true ? node.trailVertices : undefined;
-    item.trailVertexCount =
-      node.hasTrail === true ? (node.trailVertexCount ?? 0) : 0;
     item.renderLayer = node.renderLayer;
     item.renderOrder = node.renderOrder;
     item.layers = nodeLayers;
@@ -1542,21 +1442,14 @@ function collect(
     // about where the particles actually are — culling by them would hide a
     // wide system whose emitter left the screen. Written rather than left, for
     // the reason the `material`, `frame` and shadow resets above are.
-    // §87 (R-8 follow-up b): culled only when the emitter publishes a live
-    // AABB via structural `computeBounds`. Without that, the shared instance
-    // quad's bounds are a square at the emitter and would hide a wide system
-    // whose origin left the frustum. Written rather than left.
     item.frustumCulled = false;
     item.viewDepth = 0;
-    item.worldBounds = null;
-    item.transformVersion = node.transform.worldVersion;
     // §67 (R-23): a particle system inside a clipped subtree is clipped like
     // everything else — the test is per draw, and §36's batched item is one
     // draw. Written rather than left, for the reason the resets above are.
     item.clip = clip;
     item.scissor = scissorOf(node);
     writeWorldMatrix(item, node, pool, next, poses, alpha);
-    writeParticleWorldBounds(item, node);
     out[next] = item as RenderItem;
     noteSortKeys(sortTracker, item);
     next += 1;
@@ -1607,8 +1500,6 @@ function collect(
         item.receiveShadow = false;
         item.frustumCulled = false;
         item.viewDepth = 0;
-        item.worldBounds = null;
-        item.transformVersion = node.transform.worldVersion;
         item.clip = scope.write;
         item.scissor = scissorOf(node);
         writeWorldMatrix(item, node, pool, next, poses, alpha);
@@ -1668,12 +1559,8 @@ function collect(
  * An author who needs a blended draw *underneath* an opaque one — a rare but
  * real case, e.g. a glow behind a mask — reaches for `renderLayer`, which is
  * key 1 and outranks this.
- *
- * Used by the builders. {@link compareRenderItems} is the full §66 order and
- * is applied only when a caller asks for depth sort — a default-on key 3
- * would permute co-planar 2D draws (see the module header).
  */
-function compareDefaultRenderItems(a: RenderItem, b: RenderItem): number {
+function compareRenderItems(a: RenderItem, b: RenderItem): number {
   // §67's mask draws first, ahead of every other key (R-23): the stencil
   // buffer must be complete before the first clipped fragment is tested, and
   // nothing else in §66's order can be allowed to interleave content between a
@@ -1691,37 +1578,6 @@ function compareDefaultRenderItems(a: RenderItem, b: RenderItem): number {
     return a.transparent ? 1 : -1;
   }
   return a.renderOrder - b.renderOrder;
-}
-
-/**
- * §66's comparator with **every key in place**: layer, opaque before
- * transparent, pipeline and material, depth, explicit render order (R-8
- * follow-up a).
- *
- * Key 3 outranks key 4, so a depth sort is *within* a pipeline/material
- * group: transparent items still go back-to-front, but only against siblings
- * that share a pipeline and a material. `viewDepth` is 0 until
- * {@link sortRenderListByDepth} writes it, so calling this before a depth
- * pass is equivalent to {@link groupRenderListByPipeline}.
- *
- * Exported so a backend, a test, or a custom list can apply the same order
- * the verbs do.
- */
-export function compareRenderItems(a: RenderItem, b: RenderItem): number {
-  const byDefault = compareDefaultRenderItems(a, b);
-  if (byDefault !== 0) {
-    return byDefault;
-  }
-  if (a.kind !== b.kind) {
-    return a.kind < b.kind ? -1 : 1;
-  }
-  if (a.materialId !== b.materialId) {
-    return a.materialId < b.materialId ? -1 : 1;
-  }
-  if (a.viewDepth !== b.viewDepth) {
-    return a.transparent ? b.viewDepth - a.viewDepth : a.viewDepth - b.viewDepth;
-  }
-  return 0;
 }
 
 /**
@@ -1817,7 +1673,7 @@ function comparePipelineGroupedItems(a: RenderItem, b: RenderItem): number {
  * pooled items and the caller's array are the same objects afterwards.
  */
 export function groupRenderListByPipeline(list: RenderItem[]): RenderItem[] {
-  list.sort(compareRenderItems);
+  list.sort(comparePipelineGroupedItems);
   return list;
 }
 
@@ -1914,7 +1770,7 @@ export function buildRenderList(
   );
   out.length = count;
   if (sortTracker.permute && count > 1) {
-    out.sort(compareDefaultRenderItems);
+    out.sort(compareRenderItems);
   }
   return out;
 }
@@ -1983,7 +1839,7 @@ export function buildInterpolatedRenderList(
   );
   out.length = count;
   if (sortTracker.permute && count > 1) {
-    out.sort(compareDefaultRenderItems);
+    out.sort(compareRenderItems);
   }
   return out;
 }

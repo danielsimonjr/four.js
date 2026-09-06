@@ -18,7 +18,6 @@ import { describe, expect, it } from "vitest";
 import {
   ParticleEmitter,
   ParticleRenderable,
-  radialField,
   type ParticleEmitterOptions,
   type ParticleGpuSimulation,
   type ParticleSimulationMode,
@@ -27,7 +26,7 @@ import {
 /** One recorded driver call. */
 interface DriverCall {
   readonly kind: "integrate" | "writeSpawn" | "moveSlot";
-  readonly args: readonly unknown[];
+  readonly args: readonly number[];
 }
 
 /** A recording implementor of the structural driver contract. */
@@ -46,13 +45,10 @@ class FakeGpuSimulation implements ParticleGpuSimulation {
     gravityX: number,
     gravityY: number,
     gravityZ: number,
-    extras?: import("../src/types.js").ParticleGpuIntegrateExtras,
   ): void {
     this.calls.push({
       kind: "integrate",
-      args: extras
-        ? [count, deltaSeconds, gravityX, gravityY, gravityZ, extras]
-        : [count, deltaSeconds, gravityX, gravityY, gravityZ],
+      args: [count, deltaSeconds, gravityX, gravityY, gravityZ],
     });
   }
 
@@ -141,7 +137,7 @@ describe("ParticleEmitter simulation option (§36)", () => {
     ).toThrowError(/simulation must be "cpu" or "gpu"/);
   });
 
-  it("refuses non-radial fields in GPU mode — constant gravity + optional radial", () => {
+  it("refuses fields in GPU mode — constant gravity only", () => {
     const field = {
       sample: (_p: Vector3, _v: Vector3, _t: number, out?: Vector3): Vector3 =>
         (out ?? new Vector3()).set(0, 0, 0),
@@ -153,7 +149,7 @@ describe("ParticleEmitter simulation option (§36)", () => {
           simulation: "gpu",
           fields: [field],
         }),
-    ).toThrowError(/does not accept `fields` other than radialField/);
+    ).toThrowError(/does not accept `fields`/);
     // An empty array names no field and is not refused.
     expect(
       () =>
@@ -165,7 +161,7 @@ describe("ParticleEmitter simulation option (§36)", () => {
     ).not.toThrow();
   });
 
-  it("refuses bounce-only collisionPlaneY in GPU mode", () => {
+  it("refuses collisionPlaneY in GPU mode", () => {
     expect(
       () =>
         new ParticleEmitter({
@@ -281,29 +277,6 @@ describe("the per-step driver call sequence (types.ts contract)", () => {
         velocities[base + 2],
       ]);
     }
-  });
-
-  it("passes radial extras on integrate when a gpu radial is configured", () => {
-    const { emitter, driver } = gpuEmitter({
-      maxParticles: 4,
-      bursts: [{ time: 0, count: 1 }],
-      lifetime: { min: 10, max: 10 },
-      gravity: new Vector3(0, -1, 0),
-      fields: [radialField(new Vector3(0, 1, 0), -2, { minDistance: 0.25 })],
-    });
-    emitter.step(DT, 0);
-    driver.calls.length = 0;
-    emitter.step(DT, DT);
-    expect(driver.of("integrate")[0]?.args[5]).toEqual({
-      radial: {
-        kind: "radial",
-        originX: 0,
-        originY: 1,
-        originZ: 0,
-        strength: -2,
-        minDistance: 0.25,
-      },
-    });
   });
 
   it("integrates the pre-spawn live count with the constructed gravity", () => {

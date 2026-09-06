@@ -30,14 +30,11 @@ export type {
 } from "./gl-particles.js";
 export {
   PARTICLE_ATTRIBUTE_LOCATIONS,
-  PARTICLE_DEPTH_TEXTURE_UNIT,
   PARTICLE_GL,
-  ParticleAppearanceProgram,
   ParticleBatchCache,
   ParticleProgram,
   ParticleTrailBatchCache,
   ParticleTrailProgram,
-  particleItemFloats,
 } from "./gl-particles.js";
 export type {
   GlBuffer,

@@ -35,16 +35,21 @@
  * | velocity distributions      | **ships** — seeded cone, speed range           |
  * | forces                      | **ships** — gravity + §27 fields (WP-9.2 implements the fields) |
  * | colour and size over lifetime | **ships** — two-stop linear ramp            |
- * | collision                   | **MVP tier** — `collisionPlaneY` bounce, plus `collisions: "depth-buffer"` kill-below-ground |
- * | GPU compute simulation      | **integrator tier ships** (R-31 wiring, 2026-08-29): `simulation: "gpu"` + a bound {@link ParticleGpuSimulation} — CPU spawn, GPU semi-implicit Euler under constant gravity plus an optional radial field. `collisions: "depth-buffer"` is accepted; the device rests particles on `y = ground` (a documented stub — true depth-texture collide-and-kill is staged). |
+ * | collision                   | **MVP tier** — `collisionPlaneY` only         |
+ * | GPU compute simulation      | **integrator tier ships** (R-31 wiring, 2026-08-29): `simulation: "gpu"` + a bound {@link ParticleGpuSimulation} — CPU spawn, GPU semi-implicit Euler under constant gravity. §27 fields on the GPU and `collisions: "depth-buffer"` stay their own follow-up packets, and a GPU emitter **refuses** both options rather than pretending (see the constructor). |
  * | trails, attractors, custom data channels | staged (2026-08-02, P9-1): trails need a per-particle position-history channel (a ring buffer per slot) plus a ribbon render path — neither the SoA pool nor the "particles" render item carries history, and shipping a one-sample "trail" would be a lie; attractors are expressible today as a negative-strength {@link ../fields.js radialField}; custom data channels want a pool-layout extension API |
  *
- * `collisions: "depth-buffer"` is now an accepted option (R-31 residue /
- * R-32): the CPU path kills particles whose `y` falls below the ground
- * (`collisionPlaneY`, or `0` when omitted). A GPU emitter accepts the same
- * spelling; the device kernel rests those particles on the plane rather than
- * sampling a scene depth texture — documented, not silent. Rendering is
- * WP-9.3; nothing in this module draws, owns a node, or reads a clock.
+ * `collisions: "depth-buffer"` remains a **not-accepted option** — its
+ * ABSENCE from `ParticleEmitterOptions` is the intended "loud" rejection tier
+ * (a TS caller gets an excess-property error; JSON-driven configuration
+ * arrives with Phase 11 serialization, which owns runtime validation).
+ * Recorded 2026-08-02 (WP-9.1-fix3): type-level absence is deliberate, not an
+ * oversight — an option that silently does nothing is worse than one that
+ * does not exist yet. That same rule is why `simulation: "gpu"` was absent
+ * until 2026-08-29 and why it widened **in the very change** that wired
+ * `@four/render-webgpu`'s §36 integrator kernel to this class (R-31's
+ * residue; the type and the function arrived together). Rendering is WP-9.3;
+ * nothing in this module draws, owns a node, or reads a clock.
  *
  * ## GPU mode (§36 "GPU compute simulation" — the R-31 wiring, 2026-08-29)
  *
@@ -66,10 +71,9 @@
  *   again). Binding is once: a driver's device dying takes the particle
  *   state with it (§34 posture in `types.ts`), so recovery is a new
  *   emitter, not a rebind.
- * - **Non-radial `fields` and bounce-only `collisionPlaneY` are refused**
- *   in GPU mode. A `radialField` (the `gpuField` brand) is applied on the
- *   device with the same inverse-square law as the CPU path. `collisions:
- *   "depth-buffer"` is accepted as the ground-rest stub above.
+ * - **`fields` and `collisionPlaneY` are refused** in GPU mode — the §36
+ *   integrator kernel simulates constant gravity only; accepting a field
+ *   the device never samples would be the silent no-op WP-9.1 forbids.
  * - The step order is the CPU order with integration hoisted: one
  *   `integrate()` over the pre-expiry live count (every live particle
  *   integrates exactly once, as on the CPU, where the swap-remove re-process
@@ -189,17 +193,13 @@ import {
 } from "./trail.js";
 import type {
   ParticleBurst,
-  ParticleCollisionMode,
   ParticleColor,
   ParticleForceField,
-  ParticleGpuIntegrateExtras,
-  ParticleGpuRadialField,
   ParticleGpuSimulation,
   ParticleLifetimeRamp,
   ParticleLifetimeStop,
   ParticleRange,
   ParticleSimulationMode,
-  ParticleTexture,
 } from "./types.js";
 import {
   evaluateLifetimeRampColor,
@@ -258,11 +258,10 @@ export interface ParticleEmitterOptions {
   /**
    * Who integrates (§36's `simulation` option). Default `"cpu"`. `"gpu"`
    * requires a subsequent {@link ParticleEmitter.bindGpuSimulation} before
-   * the first `step()`/`emit()`, refuses non-radial `fields` and bounce-only
-   * `collisionPlaneY` (module header, "GPU mode"), and requires
-   * `maxParticles > 0` (a zero-capacity device buffer cannot exist, so a
-   * zero-capacity GPU emitter could never bind — refused where it was
-   * written).
+   * the first `step()`/`emit()`, refuses `fields` and `collisionPlaneY`
+   * (module header, "GPU mode"), and requires `maxParticles > 0` (a
+   * zero-capacity device buffer cannot exist, so a zero-capacity GPU
+   * emitter could never bind — refused where it was written).
    */
   readonly simulation?: ParticleSimulationMode;
 
@@ -362,34 +361,6 @@ export interface ParticleEmitterOptions {
    * `simulation: "gpu"`. Omit for no trail.
    */
   readonly trail?: ParticleTrailOptions;
-
-  /**
-   * Texture-like handle or `true` (R-32). Truthy opts into the wide instance
-   * stream and tells the backend to sample `map` like an unlit sprite.
-   */
-  readonly texture?: ParticleTexture;
-
-  /**
-   * Rotate each billboard by `atan2(vy, vx)` of the particle's velocity
-   * (R-32). Default `false`. Opts into the wide instance stream.
-   */
-  readonly alignToVelocity?: boolean;
-
-  /**
-   * Soft-particle fade in `[0, 1]` (R-32). `0` / omitted keeps the default
-   * 8-float stream. Backends fade by depth difference vs a bound scene
-   * depth texture; when none is bound, the honest fallback is
-   * `saturate(1 − |viewZ| · softness)`.
-   */
-  readonly softness?: number;
-
-  /**
-   * §36 collision mode. `"depth-buffer"` kills (CPU) or rests (GPU stub)
-   * particles below the ground `y` — {@link collisionPlaneY}, or `0`.
-   * Default `"none"` (the existing `collisionPlaneY` bounce still applies
-   * on CPU when that field is set and this is omitted).
-   */
-  readonly collisions?: ParticleCollisionMode;
 }
 
 /**
@@ -465,12 +436,6 @@ export class ParticleEmitter {
   readonly #hasPlane: boolean;
   readonly #planeY: number;
   readonly #restitution: number;
-  readonly #collisions: ParticleCollisionMode;
-  readonly #texture: ParticleTexture | undefined;
-  readonly #alignToVelocity: boolean;
-  readonly #softness: number;
-  readonly #instanceFloats: number;
-  readonly #gpuRadial: ParticleGpuRadialField | undefined;
 
   /** §36's `simulation` option, frozen at construction. */
   readonly #simulation: ParticleSimulationMode;
@@ -518,46 +483,20 @@ export class ParticleEmitter {
       );
     }
     this.#simulation = simulation;
-    const collisions = options.collisions ?? "none";
-    if (collisions !== "none" && collisions !== "depth-buffer") {
-      throw new RangeError(
-        `ParticleEmitter: collisions must be "none" or "depth-buffer" (§36); received ${String(collisions)}`,
-      );
-    }
-    this.#collisions = collisions;
-    this.#texture = options.texture === true || typeof options.texture === "object"
-      ? options.texture
-      : undefined;
-    this.#alignToVelocity = options.alignToVelocity === true;
-    this.#softness =
-      options.softness === undefined
-        ? 0
-        : assertFiniteAtLeast(options.softness, 0, "softness");
-    if (this.#softness > 1) {
-      throw new RangeError(
-        `ParticleEmitter: softness must be in [0, 1]; received ${String(this.#softness)}`,
-      );
-    }
-    this.#instanceFloats =
-      this.#texture !== undefined ||
-      this.#alignToVelocity ||
-      this.#softness > 0
-        ? 10
-        : 8;
-
-    const authoredFields =
-      options.fields === undefined ? [] : [...options.fields];
-    let gpuRadial: ParticleGpuRadialField | undefined;
     if (simulation === "gpu") {
-      if (authoredFields.length > 0) {
-        gpuRadial = resolveGpuRadial(authoredFields);
-      }
-      if (
-        options.collisionPlaneY !== undefined &&
-        collisions !== "depth-buffer"
-      ) {
+      // Refuse, never pretend (the WP-9.1 rule): the §36 GPU integrator
+      // simulates constant gravity only — §27 fields on the device and the
+      // depth-buffer collision tier are their own recorded follow-ups
+      // (R-31). The messages are terse by measurement: every particle
+      // bundle carries them, and this doc comment carries the argument.
+      if (options.fields !== undefined && options.fields.length > 0) {
         throw new RangeError(
-          'ParticleEmitter: simulation "gpu" does not accept `collisionPlaneY` (§36 bounce plane is CPU-only; use collisions: "depth-buffer" for the ground stub)',
+          'ParticleEmitter: simulation "gpu" does not accept `fields` (§27 GPU fields are a follow-up; R-31)',
+        );
+      }
+      if (options.collisionPlaneY !== undefined) {
+        throw new RangeError(
+          'ParticleEmitter: simulation "gpu" does not accept `collisionPlaneY` (§36 depth-buffer collision is a follow-up; R-31)',
         );
       }
       if (options.trail !== undefined && options.trail.enabled !== false) {
@@ -571,7 +510,6 @@ export class ParticleEmitter {
         );
       }
     }
-    this.#gpuRadial = gpuRadial;
 
     this.#emissionRate = assertFiniteAtLeast(
       options.emissionRate ?? 0,
@@ -749,39 +687,6 @@ export class ParticleEmitter {
   /** Plane height for §36 MVP collision, or `undefined` when collision is off. */
   get collisionPlaneY(): number | undefined {
     return this.#hasPlane ? this.#planeY : undefined;
-  }
-
-  /** §36 `collisions` option, as constructed. */
-  get collisions(): ParticleCollisionMode {
-    return this.#collisions;
-  }
-
-  /** Texture handle or `true`, or `undefined` when untextured. */
-  get texture(): ParticleTexture | undefined {
-    return this.#texture;
-  }
-
-  /** Whether billboards rotate from velocity (`atan2(vy, vx)`). */
-  get alignToVelocity(): boolean {
-    return this.#alignToVelocity;
-  }
-
-  /** Softness in `[0, 1]`. `0` keeps the default 8-float stream. */
-  get softness(): number {
-    return this.#softness;
-  }
-
-  /**
-   * Instance-stream stride this emitter's renderable must allocate —
-   * `8` by default, `10` when R-32 appearance is opted in.
-   */
-  get instanceFloats(): number {
-    return this.#instanceFloats;
-  }
-
-  /** The GPU-applied radial field, or `undefined`. */
-  get gpuRadial(): ParticleGpuRadialField | undefined {
-    return this.#gpuRadial;
   }
 
   /** §36's `simulation` option, as constructed. */
@@ -1102,28 +1007,7 @@ export class ParticleEmitter {
       let py = positions[base + 1] + vy * deltaSeconds;
       const pz = positions[base + 2] + vz * deltaSeconds;
 
-      if (this.#collisions === "depth-buffer") {
-        // CPU fallback for §36 `collisions: "depth-buffer"`: kill below the
-        // ground plane (`collisionPlaneY`, or `y = 0`). True depth-texture
-        // collide-and-kill is a backend concern; this is the honest CPU
-        // contract so the option is never a silent no-op.
-        if (py < this.#planeY) {
-          if (accumulator !== undefined) {
-            const last = (pool.aliveCount - 1) * 3;
-            accumulator[base] = accumulator[last];
-            accumulator[base + 1] = accumulator[last + 1];
-            accumulator[base + 2] = accumulator[last + 2];
-          }
-          if (this.#trail !== undefined) {
-            const last = pool.aliveCount - 1;
-            if (index !== last) {
-              this.#trail.copySlot(last, index);
-            }
-          }
-          pool.kill(index);
-          continue;
-        }
-      } else if (this.#hasPlane && py < this.#planeY) {
+      if (this.#hasPlane && py < this.#planeY) {
         // §36 collision, MVP tier: a position projection plus a normal-velocity
         // reflection, evaluated after the step. There is no time-of-impact
         // split, so the particle loses the sub-step distance it would have
@@ -1208,25 +1092,13 @@ export class ParticleEmitter {
     const pool = this.pool;
     const live = pool.aliveCount;
     if (live > 0 && deltaSeconds > 0) {
-      const extras = this.#gpuIntegrateExtras();
-      if (extras === undefined) {
-        gpu.integrate(
-          live,
-          deltaSeconds,
-          this.#gravityX,
-          this.#gravityY,
-          this.#gravityZ,
-        );
-      } else {
-        gpu.integrate(
-          live,
-          deltaSeconds,
-          this.#gravityX,
-          this.#gravityY,
-          this.#gravityZ,
-          extras,
-        );
-      }
+      gpu.integrate(
+        live,
+        deltaSeconds,
+        this.#gravityX,
+        this.#gravityY,
+        this.#gravityZ,
+      );
     }
 
     const ages = pool.ages;
@@ -1377,51 +1249,6 @@ export class ParticleEmitter {
       this.#endColor.a,
     );
   }
-
-  /**
-   * GPU integrate extras, or `undefined` on the gravity-only path so a
-   * 5-argument driver recording stays identical.
-   */
-  #gpuIntegrateExtras(): ParticleGpuIntegrateExtras | undefined {
-    if (this.#gpuRadial === undefined && this.#collisions !== "depth-buffer") {
-      return undefined;
-    }
-    const extras: {
-      radial?: ParticleGpuRadialField;
-      collisionGroundY?: number;
-      collisions?: ParticleCollisionMode;
-    } = {};
-    if (this.#gpuRadial !== undefined) {
-      extras.radial = this.#gpuRadial;
-    }
-    if (this.#collisions === "depth-buffer") {
-      extras.collisions = "depth-buffer";
-      extras.collisionGroundY = this.#planeY;
-    }
-    return extras;
-  }
-}
-
-/** Extracts the single GPU-capable radial field, or refuses the rest. */
-function resolveGpuRadial(
-  fields: readonly ParticleForceField[],
-): ParticleGpuRadialField | undefined {
-  let radial: ParticleGpuRadialField | undefined;
-  for (let i = 0; i < fields.length; i += 1) {
-    const gpuField = fields[i]?.gpuField;
-    if (gpuField === undefined || gpuField.kind !== "radial") {
-      throw new RangeError(
-        'ParticleEmitter: simulation "gpu" does not accept `fields` other than radialField (§27 GPU fields; R-31)',
-      );
-    }
-    if (radial !== undefined) {
-      throw new RangeError(
-        'ParticleEmitter: simulation "gpu" accepts at most one radialField',
-      );
-    }
-    radial = gpuField;
-  }
-  return radial;
 }
 
 /** Rejects a non-finite option. */

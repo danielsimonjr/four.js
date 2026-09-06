@@ -79,7 +79,6 @@ import {
   PARTICLE_ATTRIBUTE_LOCATIONS,
   PARTICLE_GL,
   POSITION_ATTRIBUTE_LOCATION,
-  ParticleAppearanceProgram,
   ParticleBatchCache,
   ParticleProgram,
   ParticleTrailBatchCache,
@@ -4072,38 +4071,6 @@ describe("ParticleProgram — compilation and linking (§36, §61, §89)", () =>
 
     expect(gl.countOf("deleteProgram")).toBe(1);
     expect(program.disposed).toBe(true);
-  });
-});
-
-describe("ParticleAppearanceProgram — R-32 textured/rotated/soft (opt-in)", () => {
-  it("compiles the appearance stages and names the extra uniforms", () => {
-    const gl = createFakeGl();
-    const program = ParticleAppearanceProgram.create(gl);
-
-    const [vertex, fragment] = gl
-      .callsOf("shaderSource")
-      .map((call) => call.args[1] as string);
-    expect(vertex).toContain("instanceRotation");
-    expect(vertex).toContain("instanceSoftness");
-    expect(vertex).toContain("cos(instanceRotation)");
-    expect(fragment).toContain("texture(map, vUv)");
-    expect(fragment).toContain("abs(vViewZ) * vSoftness");
-    expect(fragment).toContain("hasSceneDepth");
-    expect(
-      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
-    ).toEqual(
-      expect.arrayContaining([
-        "projection",
-        "view",
-        "model",
-        "useMap",
-        "hasSceneDepth",
-        "depthWidth",
-        "depthHeight",
-      ]),
-    );
-    expect(program.disposed).toBe(false);
-    program.dispose();
   });
 });
 
