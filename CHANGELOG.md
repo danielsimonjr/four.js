@@ -17,6 +17,8 @@ specification; until then, entries are grouped by date under **Unreleased**.
   `PhysicsWorld.forEachSleepingDynamicBody` is the complementary walk.
   A waking field that samples zero leaves the body asleep; a non-zero
   contribution calls `RigidBody.wake()` because `applyForce` does not.
+  The batched `#bodies` scratch is truncated and cleared after each
+  gather so a removed `RigidBody` is not retained (§83).
 - **§42.** `warnAuthorityConflict` emits through `devWarnOnce` (A-4
   remainder step 4). Production builds print nothing.
 
