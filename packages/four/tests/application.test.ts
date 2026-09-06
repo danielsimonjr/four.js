@@ -1918,6 +1918,9 @@ class FakeWorld {
 
   colliders = 0;
 
+  /** Contact points `countContacts` will report when implemented on the adapter. */
+  contacts = Number.NaN;
+
   constructor(private readonly clock?: TestClock) {}
 
   /** The §113 `DebugBodyAccess` `solverStatistics` walks (`world.adapter`). */
@@ -1930,6 +1933,9 @@ class FakeWorld {
         for (let i = 0; i < this.colliders; i += 1) visit(i, i);
       },
       isBodySleeping: (handle: number): boolean => handle >= this.awake,
+      ...(Number.isNaN(this.contacts)
+        ? {}
+        : { countContacts: (): number => this.contacts }),
     };
   }
 
@@ -2157,16 +2163,25 @@ describe("Application — §84 physics counters (A-6)", () => {
     expect(app.stats?.activeBodies).toBeNaN();
   });
 
-  it("leaves contacts staged (§84)", async () => {
+  it("leaves contacts unmeasured when the adapter omits countContacts (§84)", async () => {
     const world = new FakeWorld();
     const app = await startedApplication({
       stats: true,
       physics: asWorld(world),
     });
     app.step(FIXED);
-    // No live manifold count exists to read; a confident zero would be worse
-    // than "not measured" (A-1's rule).
     expect(app.stats?.contacts).toBeNaN();
+  });
+
+  it("measures contacts when the adapter reports a manifold count (§84)", async () => {
+    const world = new FakeWorld();
+    world.contacts = 12;
+    const app = await startedApplication({
+      stats: true,
+      physics: asWorld(world),
+    });
+    app.step(FIXED);
+    expect(app.stats?.contacts).toBe(12);
   });
 });
 

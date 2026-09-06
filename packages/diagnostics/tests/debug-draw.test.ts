@@ -1362,6 +1362,7 @@ describe("solverStatistics", () => {
       awakeCount: 1,
       colliderCount: 4,
       maxBodyId: 9,
+      contactCount: Number.NaN,
     });
   });
 
@@ -1372,6 +1373,7 @@ describe("solverStatistics", () => {
       awakeCount: 0,
       colliderCount: 0,
       maxBodyId: -1,
+      contactCount: Number.NaN,
     });
   });
 
@@ -1382,6 +1384,7 @@ describe("solverStatistics", () => {
       awakeCount: 99,
       colliderCount: 99,
       maxBodyId: 99,
+      contactCount: 99,
     };
     const result = solverStatistics(
       new FakeBodyAccess([scriptBody(2, [0, 0, 0], [0, 0, 0])], [7]),
@@ -1395,6 +1398,7 @@ describe("solverStatistics", () => {
       awakeCount: 1,
       colliderCount: 1,
       maxBodyId: 2,
+      contactCount: Number.NaN,
     });
   });
 });
@@ -1448,6 +1452,7 @@ describe("allocation (§7b, plan D7)", () => {
       awakeCount: 0,
       colliderCount: 0,
       maxBodyId: -1,
+      contactCount: Number.NaN,
     };
 
     // Warm-up frame: grows nothing (capacity 256) but exercises every path.

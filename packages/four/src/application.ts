@@ -134,7 +134,9 @@ import { RENDERER_REGISTRY, SIMULATION_SYSTEMS } from "./plugins.js";
 // cannot tree-shake". Adding an unguarded use of any of them undoes the packet;
 // `tests/integration/dev-build-mode.test.ts` fails when it does.
 import {
+  beginFrameAllocationCheck,
   createFrameStats,
+  endFrameAllocationCheck,
   monotonicNowSeconds,
   recordRenderStatistics,
   recordResourceMemory,
@@ -162,6 +164,7 @@ import {
   type SimulationSystem,
 } from "@four/motion";
 import type { DepthRange } from "@four/math";
+import { constructionCount } from "@four/math";
 // Type-only, for the reason the `Renderer` import below is type-only, and with
 // more at stake: `@four/physics` is a solver-facing package, and a program that
 // draws a user interface must not carry a rigid-body world because the
@@ -1789,6 +1792,7 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       frameStarted = (this.#now ?? monotonicNowSeconds)();
     }
     const droppedBefore = DEV ? this.scheduler.time.droppedTime : 0;
+    const allocBaseline = DEV ? beginFrameAllocationCheck(constructionCount) : 0;
     this.#stepping = true;
     try {
       this.scheduler.step(elapsedSeconds);
@@ -1816,6 +1820,9 @@ export class Application extends EventEmitter<ApplicationEventMap> {
             `TimeState.droppedTime is now ${dropped.toFixed(4)}s and is not recovered.`,
         );
       }
+      endFrameAllocationCheck(allocBaseline, constructionCount, {
+        label: "application.step",
+      });
     }
     if (stats !== null) {
       if (this.#renderStatistics !== null) {
@@ -1842,6 +1849,7 @@ export class Application extends EventEmitter<ApplicationEventMap> {
           awakeCount: 0,
           colliderCount: 0,
           maxBodyId: -1,
+          contactCount: Number.NaN,
         };
         recordSolverStatistics(
           stats,
