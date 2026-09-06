@@ -8,6 +8,32 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — reverted the `new Node()` guard: §33 forbids the flag in `@four/scene`
+
+- **The DEV-gated `new Node()` warning is withdrawn.** It put `if (DEV && …)` in
+  `packages/scene/src/node.ts`, and `tests/integration/dev-build-mode.test.ts` refuses
+  that outright: `scene` is on its simulation list — `math`, `motion`, `scene`,
+  `physics`, `animation`, `particles` — and *"none of them may branch on the build mode
+  at all"*, because those are the packages a replay's numbers come out of (§33).
+  Registering it in `GATED` was not an option either; that is the same test's other half.
+
+  Nor could it simply drop the flag and run unconditionally: the message costs ~100 B
+  gzip in every bundle that carries `@four/scene`, and `examples/ui-demo` currently sits
+  **at** its 45 kB §86 budget with no headroom.
+
+  The underlying finding stands and is back open in `TODO.md`: `abstract` is erased at
+  runtime, so a JavaScript consumer who writes `new Node()` still gets a working-looking
+  object and no signal. What is now known is that the fix cannot be a DEV-gated warning
+  inside `scene`, which makes it an owner decision rather than an oversight.
+
+- **`packages/input/src/keyboard-input.ts` is now registered in `GATED`** with its §33
+  argument. `@four/input` is not a simulation package, and the refusal is unreachable
+  from any well-formed call: the constructor requires `(surface, { focusTarget })` in
+  both builds, and only the diagnostic prose moves with the flag.
+
+  Caught by CI, correctly. The gate is a good one — a DEV-only branch inside a
+  simulation package is exactly how a replay stops reproducing.
+
 ### 2026-09-06 — `bun run test` and `bun run coverage` were dead on Windows
 
 - **`tools/run-in-packages.mjs` never reached a single package on Windows.** It built its

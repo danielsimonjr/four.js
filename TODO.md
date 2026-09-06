@@ -6,6 +6,16 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [ ] **No `.gitattributes`, so digest-pinned fixtures break on any Windows checkout.**
+      `tests/fixtures/gltf/quad.gltf` arrives with **104 CRLF and 0 LF** here, because
+      nothing tells git to leave it alone. Three suites fail locally as a result and pass
+      in CI: `determinism/gltf-load` (both "agree byte-for-byte" and "the fixture digests
+      are pinned"), `integration/gltf-scene`, and `determinism/path`.
+      A §33 determinism test that hashes file bytes cannot survive a line-ending rewrite,
+      so the fixtures need `-text` (or the repo needs `* text=auto` with fixtures pinned).
+      Same class as the two Windows-only defects already fixed today: invisible on CI
+      because no gate runs there.
+
 - [ ] **Five tests time out under `bun run test` on Windows; none is a code defect.**
       Surfaced the moment the runner above started working. All are 5 s `testTimeout`
       expiries, not wrong answers:
@@ -180,7 +190,16 @@ changes in `CHANGELOG.md`.
       SAME solver be idempotent (or take an `{ override }` flag) instead of throwing? Filed, not
       changed — registry semantics are a §37 call.
 
-- [x] **`new Node()` is unguarded at runtime — a JS consumer can instantiate an abstract class.** DONE 2026-09-06 — DEV-gated `devWarnOnce`, not a throw.
+- [ ] **`new Node()` is unguarded at runtime — a JS consumer can instantiate an abstract class.**
+      **REOPENED 2026-09-06.** A DEV-gated `devWarnOnce` was implemented and then reverted:
+      `tests/integration/dev-build-mode.test.ts` forbids *any* build-flag branch in a
+      simulation package (`math`, `motion`, `scene`, `physics`, `animation`, `particles`),
+      because those are the packages a replay's numbers come from (§33). Registering it in
+      `GATED` fails the same test's other half. Running it unconditionally is not free
+      either: ~100 B gzip in every bundle carrying `@four/scene`, and `examples/ui-demo`
+      sits **at** its 45 kB §86 budget. So the fix is an owner call — accept the bytes and
+      raise that budget, put the check somewhere outside the simulation envelope, or leave
+      the mistake to TypeScript.
       `Node` is `export abstract class Node`; `Group extends Node {}` is the concrete one, and the
       guides use `Group` correctly. But TypeScript's `abstract` is erased at compile time, so a
       JavaScript user who guesses `new Node()` gets a working-looking object with no signal — mine

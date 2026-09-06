@@ -210,6 +210,10 @@ const GATED: ReadonlyMap<string, string> = new Map([
     "§84's statistics wiring (A-1). Measurement only: `stats` is read by nobody inside the engine, and the frame's event order, transforms and draw calls are identical either way",
   ],
   [
+    join("packages", "input", "src", "keyboard-input.ts"),
+    "KeyboardInput's malformed-options refusal (2026-09-06). Refusal only, and it is unreachable from any well-formed call: the constructor requires (surface, { focusTarget }) in both builds, and every caller that passes a function keeps running identically whatever the flag says. What the guard drops is the *diagnostic* for a call that could not have worked anyway — a production build answers it with the same TypeError the field access always raised. Gated because the message names the call shape, `@four/ui`'s keyboardFocusTarget and the DOM-listener alternative, and shipping that prose put examples/ui-demo 245 B over its §86 budget. `@four/input` is not a simulation package: no number a replay reproduces passes through it (§33)",
+  ],
+  [
     join("packages", "render", "src", "render-list.ts"),
     "§85's layer-mask refusal (R-38). Refusal only: a well-formed mask — the only kind `layerMask()` can build — passes the check untouched, so the list, its order, and every item in it are identical either way. What the guard drops is the *diagnostic* for a `NaN` or fractional mask, which a production build answers with the empty view it would have drawn anyway. `@four/scene`'s `assertLayerMask` is unconditional, because §33 forbids that package from branching on the build mode at all; this is the render tier's copy of the call, gated because it costs ~115 B gzip in every shipped bundle. R-23 (2026-08-28) added §67's clip-on-a-non-drawable warning under the same rule: the clip is inert in both builds — the subtree is not narrowed either way — and only the message moves with the flag",
   ],

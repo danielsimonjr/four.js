@@ -32,10 +32,8 @@
 
 import {
   ComponentRegistry,
-  DEV,
   EventEmitter,
   FourError,
-  devWarnOnce,
   type Component,
   type ComponentHost,
   type ComponentType,
@@ -432,33 +430,6 @@ export abstract class Node
    */
   constructor(options: NodeOptions = {}) {
     super();
-    /*
-     * `abstract` is erased at compile time, so it protects TypeScript callers and nobody
-     * else. A JavaScript consumer who guesses `new Node()` gets an object that looks
-     * like it works — it has an id, a transform, children, and an event emitter — and is
-     * missing everything that makes a node do anything. Found by dogfooding: a bouncing
-     * ball simulated for a full run before a typecheck said the base class was wrong.
-     *
-     * Warned, not thrown. Throwing would break callers whose code runs today, and §42
-     * already sets warn-rather-than-overwrite as the house answer to an authoring
-     * mistake. `devWarnOnce` because this is one wrong line executed many times, the
-     * opposite of §6a's duplicate-component case where every call is its own mistake.
-     *
-     * Free in a shipped build: `DEV` is a literal `false` under §85's build mode, so the
-     * branch and its message are deleted by the tree-shaker (A-4). It defaults to `true`
-     * for anyone who has not configured `__FOUR_DEV__`, which is precisely the audience
-     * that reaches for `new Node()`.
-     */
-    if (DEV && new.target === Node) {
-      devWarnOnce(
-        "node:abstract-base",
-        "`Node` is abstract and was constructed directly. TypeScript rejects " +
-          "`new Node()`, but `abstract` is erased at runtime, so this object is " +
-          "missing everything a concrete node supplies. Use `Group` for a plain " +
-          "container (§6), or `Renderable`, `Scene`, a camera, or a light for the " +
-          "kind of node you meant.",
-      );
-    }
     this.id = assignNodeId(options.id);
   }
 
