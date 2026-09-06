@@ -254,7 +254,7 @@ changes in `CHANGELOG.md`.
       also named `@four/*` to consumers who would have `@danielsimonjr/fourjs-*`. Both fixed;
       the tool now exits 0 (24 packages staged, 724 specifiers rewritten).
 
-- [ ] **Dogfooding session 1 finding: `transformAuthority` defaults to `"manual"`, so a physics
+- [x] **Dogfooding session 1 finding: `transformAuthority` defaults to `"manual"`, so a physics
       body silently does not move if you forget one line.** Following
       `docs/guides/collision-filtering.md` I skipped `node.transformAuthority = "physics"` and got
       a body that never fell and never bounced — the sim ran, stepped, and produced a frozen
@@ -266,6 +266,21 @@ changes in `CHANGELOG.md`.
       silent no-op. (The guide itself is CORRECT — I misread it; this is about the default, not the
       docs.)
 
+      **DECIDED 2026-09-06: no change. The design is right and I was wrong about it.**
+      I implemented "`addBody` claims an unclaimed node" and two existing tests refused it:
+      `world.test.ts` → "refuses the write and warns once for a node it does not own (§42)"
+      sets `transformAuthority = "manual"` on a *dynamic* body **on purpose** and asserts the
+      write is refused and warned. So `"manual"` is not a blank — it is an explicit claim
+      meaning *the author writes this transform*. `DEFAULT_TRANSFORM_AUTHORITY` being
+      `"manual"` makes the default "the app owns it", which is the safe default: claiming it
+      for physics would take the transform away from code that legitimately owns it, and my
+      own control test said never to overrule a chosen authority.
+      The diagnostic is also better than my note implied. It names the writer, the node, the
+      current owner, that the write was **refused**, §42, and the exact line to add
+      (`Set node.transformAuthority = "physics"`), then suppresses repeats. That is a good
+      error, not a silent failure — my complaint was that a `console.warn` is easy to miss on
+      a busy page, which is a property of console warnings, not a defect in §42.
+      Reverted cleanly; physics is 25/25.
 - [x] **`main` was RED on CI, Docs and Release; reverted #62 and #63 to restore it.** Both had been
       merged over documented failures. Full evidence in CHANGELOG; the short version is that
       vitest 4 and typedoc 0.28.20 have no TypeScript version in common.
