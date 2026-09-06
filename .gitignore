@@ -7,3 +7,6 @@ examples/**/dist
 .claude/worktrees
 *.tsbuildinfo
 .bun
+
+# Local dogfooding probes (ZBOOK_Github); not part of the product
+.dogfood/

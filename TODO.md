@@ -6,6 +6,18 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [ ] **Dogfooding session 1 finding: `transformAuthority` defaults to `"manual"`, so a physics
+      body silently does not move if you forget one line.** Following
+      `docs/guides/collision-filtering.md` I skipped `node.transformAuthority = "physics"` and got
+      a body that never fell and never bounced — the sim ran, stepped, and produced a frozen
+      position. The §42 warning is excellent (it names the exact fix and the spec section), but it
+      is a `console.warn` on a run that otherwise looks healthy.
+      Worth a decision, NOT a unilateral change: should `world.addBody(node)` default an
+      unclaimed node to `"physics"` authority, or throw rather than warn? Defaulting is friendlier;
+      throwing is truer to §42's "exactly one system owns a node's transform". Either beats a
+      silent no-op. (The guide itself is CORRECT — I misread it; this is about the default, not the
+      docs.)
+
 - [x] **`main` was RED on CI, Docs and Release; reverted #62 and #63 to restore it.** Both had been
       merged over documented failures. Full evidence in CHANGELOG; the short version is that
       vitest 4 and typedoc 0.28.20 have no TypeScript version in common.
