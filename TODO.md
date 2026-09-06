@@ -6,6 +6,33 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [x] **De-flake the browser gate: sample counts no longer measure the runner.** DONE
+      2026-09-06 — both watches now require a sample floor as well as the window; 1 of 4
+      passing → 3 of 4 on Windows. Details in the CHANGELOG.
+- [ ] **`blending.spec.ts` "RECOVER" still fails on a slow machine, and the reason is now
+      measured.** Its span assertion needs a full `WAVE_PERIOD` (**3.6 s**) to see both
+      extremes, but the watch runs 4 s of *wall clock* and §10 drops simulation time — so a
+      slow machine samples a fraction of the wave and a running chain measures 0.156
+      against 0.2.
+      Bounding by `data-step` (the fixed-step counter the page publishes) is the right fix
+      and **was tried and reverted**: 216 steps exceeds the 60 s test timeout here, and
+      raising it to 180 s made things worse (3 of 4 failing vs 1 of 4). The screenshots the
+      loop takes are part of what starves the simulation, so watching harder slows the
+      thing being watched.
+      A real fix probably has to sample *without* screenshotting — read the centroid from
+      the page (it already publishes `chain-y`) instead of from a framebuffer grab — which
+      removes the observer's cost from the measurement entirely.
+      `blending.spec.ts` watches for a fixed `WATCH_SECONDS = 4`, taking a screenshot every
+      `FRAME_GAP_MS = 200`, then asserts it collected `>= 8` samples. Each iteration costs
+      200 ms plus one screenshot, so a fast runner gets ~10 and a 19%-slower one gets 7 —
+      the assertion is on the RUNNER'S THROUGHPUT, not on §110.
+      The file's own comment already states the intent: *"a machine slower than that must
+      weaken the sample count rather than fail"*. A fixed count delivers exactly that — the
+      window simply grows in wall-clock on a slow machine, which only strengthens the
+      "did the chain actually move" assertions it wraps.
+      Not widening the threshold: that moves the cliff instead of removing it.
+      Failed CI twice today (blending x2, then smoothness x1) and fails locally on Windows.
+
 - [x] **Three cross-package suites failed on Windows — a test handed a native path where
       a URL belongs.** `bun run test:suites` is now **90/90 green here**, for the first time.
 

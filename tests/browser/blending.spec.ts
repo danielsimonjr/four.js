@@ -332,6 +332,14 @@ const FRAME_GAP_MS = 200;
 const WATCH_SECONDS = 4;
 
 /**
+ * The sample floor for the §16 wave watch, matching the `>= 8` its assertion wants.
+ *
+ * Same reason as {@link RAGDOLL_MINIMUM_SAMPLES}: a 4 s window yields ~10 on a normal
+ * runner and 7 on one 19% slower — a number about the machine, not about the wave.
+ */
+const WAVE_MINIMUM_SAMPLES = 8;
+
+/**
  * Least mean per-pixel channel-sum difference, between two frames
  * {@link FRAME_GAP_MS} apart, for the chain's band to count as moving.
  *
@@ -387,6 +395,14 @@ const RAGDOLL_FLOOR_Y = 0.6;
  * 4 s covers all of it at ~7 screenshots per second.
  */
 const RAGDOLL_WATCH_SECONDS = 4;
+
+/**
+ * The sample floor for {@link watchCentroid}, above the `> 10` its assertions want.
+ *
+ * A 4 s window at a normal screenshot cost yields comfortably more; this only binds when
+ * the runner is slow enough that the clock alone would not.
+ */
+const RAGDOLL_MINIMUM_SAMPLES = 12;
 
 /**
  * The fastest the chain's bright centroid may travel between two consecutive
@@ -702,15 +718,24 @@ interface CentroidSample {
 }
 
 /**
- * Samples the chain's centroid as fast as the machine can screenshot, for
- * `milliseconds` of wall clock.
+ * Samples the chain's centroid as fast as the machine can screenshot, until **both**
+ * `milliseconds` of wall clock have passed and `minimumSamples` have been taken.
  *
  * No fixed cadence: a screenshot costs what it costs, and every consecutive-pair
  * assertion below divides by the measured gap rather than an assumed one.
+ *
+ * The floor is why this is not bounded by the clock alone. An iteration costs one
+ * screenshot, so a duration-only bound makes the sample count a measure of the runner's
+ * throughput — and the caller then asserts on that count. A 19%-slower CI runner turned
+ * a comfortable margin into 8 samples and failed a `> 10` floor twice on 2026-09-06,
+ * with nothing about the chain's motion wrong. On a normal machine the duration still
+ * dominates and behaviour is unchanged; on a slow one the window simply grows, which only
+ * strengthens the "did the centroid actually move" assertions these samples feed.
  */
 async function watchCentroid(
   canvas: Locator,
   milliseconds: number,
+  minimumSamples: number,
 ): Promise<readonly CentroidSample[]> {
   const samples: CentroidSample[] = [];
   const startedAt = Date.now();
@@ -720,7 +745,10 @@ async function watchCentroid(
       centroid: brightCentroid(frame, SCENE_REGION),
       at: Date.now() - startedAt,
     });
-  } while (Date.now() - startedAt < milliseconds);
+  } while (
+    Date.now() - startedAt < milliseconds ||
+    samples.length < minimumSamples
+  );
   return samples;
 }
 
@@ -844,8 +872,10 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
     let previous = await grab(canvas);
     const bandDeltas: number[] = [];
     const centroids: number[] = [];
+    // Both bounds: the clock alone made `bandDeltas.length` a measure of how fast the
+    // runner can screenshot, and the floor below then asserted on it.
     const deadline = Date.now() + WATCH_SECONDS * 1000;
-    while (Date.now() < deadline) {
+    while (Date.now() < deadline || bandDeltas.length < WAVE_MINIMUM_SAMPLES) {
       await page.waitForTimeout(FRAME_GAP_MS);
       const frame = await grab(canvas);
 
@@ -925,7 +955,11 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
     // §19's weights went the other way with it.
     await expect(status).toHaveAttribute("data-weight", "0.000");
 
-    const samples = await watchCentroid(canvas, RAGDOLL_WATCH_SECONDS * 1000);
+    const samples = await watchCentroid(
+      canvas,
+      RAGDOLL_WATCH_SECONDS * 1000,
+      RAGDOLL_MINIMUM_SAMPLES,
+    );
     expect(samples.length).toBeGreaterThan(10);
 
     // The chain is still on screen the whole time, so "the centroid dropped"

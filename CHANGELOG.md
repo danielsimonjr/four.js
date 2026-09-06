@@ -8,6 +8,37 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — `blending.spec.ts` asserted on the runner's throughput
+
+- **Two of its watches were bounded by wall clock and then asserted on how many samples
+  they managed to take.** Each iteration costs a screenshot, so the count measured the
+  runner: ~10–12 on a normal machine, 7–8 on one 19% slower, against floors of `>= 8` and
+  `> 10`. It failed CI twice on 2026-09-06 with nothing about the chain's motion wrong.
+
+  Both now sample until **both** the window has elapsed and a floor is met. On a normal
+  runner the duration still dominates and behaviour is unchanged; on a slow one the window
+  grows, which only strengthens the "did the centroid actually move" assertions the counts
+  wrap. No threshold was widened — widening moves the cliff instead of removing it.
+
+  Measured on Windows/SwiftShader: **1 of 4 passing → 3 of 4**.
+
+- **The remaining failure is understood but not fixed, and the attempted fix was rolled
+  back.** "RECOVER" asserts the centroid's *span* exceeds 0.2, and a span needs a full
+  wave period to reach both extremes. `WAVE_PERIOD` is **3.6 s**, and the watch runs for
+  4 s of *wall clock* — but §10 **drops simulation time** on a frame that cannot keep up,
+  so on a slow machine 4 s of clock is less than 3.6 s of simulation and the chain is
+  sampled across a fraction of its wave. A running wave then measures 0.156.
+
+  Bounding the loop by `data-step` — the fixed-step counter the page already publishes —
+  is the correct fix in principle and was implemented. It was **reverted** because it is
+  not viable here: waiting for 216 simulation steps exceeded the 60 s test timeout, and
+  raising the timeout to 180 s made the results worse still (3 of 4 failing, versus 1 of 4
+  with the floors alone). The screenshots these loops take are themselves part of what
+  starves the simulation, so watching harder makes the thing being watched slower.
+
+  Recorded rather than shipped: the analysis is the useful part, and the change that
+  measured worse did not land.
+
 ### 2026-09-06 — the glTF tests could not open their own fixture on Windows
 
 - **`tests/determinism/gltf-load.test.ts` and `tests/integration/gltf-scene.test.ts`**
