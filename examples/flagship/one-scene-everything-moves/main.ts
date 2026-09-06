@@ -74,15 +74,17 @@
  * diagnostics event, delivered as a callback because §3.1 gives `render` and
  * `physics` no diagnostics edge).
  *
- * **What the solver registry costs, measured.** `registerRapierSolver()` names
- * *both* Rapier adapters — one registration serves both §21 dimensions, and the
- * dimension is only known when a world asks — so this bundle carries **both**
- * wasm images even though only the 3D one is ever decoded: 4.20 MB raw /
- * 1.54 MB gzip, against `examples/mechanism`'s 1.85 MB / 0.69 MB for a single
- * `new Rapier2dAdapter()`. Constructing `new Rapier3dAdapter()` here would
- * roughly halve the download; exercising the registry is the point of this
- * page, so the cost is recorded rather than avoided. A future packet that wants
- * both could split the registration per dimension.
+ * **What the solver registry costs, measured.** `registerRapierSolver()` is
+ * **one name** (`"rapier"`) for both §21 dimensions: `create` reads
+ * `options.dimension` and builds the 2d or 3d adapter. A second call is
+ * idempotent (same `isSupported` / `create`). The dimension is only known
+ * when a world asks, so this bundle carries **both** wasm images even though
+ * only the 3D one is ever decoded: 4.20 MB raw / 1.54 MB gzip, against
+ * `examples/mechanism`'s 1.85 MB / 0.69 MB for a single `new Rapier2dAdapter()`.
+ * Constructing `new Rapier3dAdapter()` here would roughly halve the download;
+ * exercising the registry is the point of this page, so the cost is recorded
+ * rather than avoided. Splitting into `"rapier-2d"` / `"rapier-3d"` is the
+ * rejected alternative — §37 selects a solver, not a wasm image.
  *
  * ## Screen space, the standard way (§46, §47, §48)
  *
@@ -195,6 +197,7 @@ import {
   PerspectiveCamera,
   ScreenCamera,
   createFullscreenViewport,
+  applyLayers,
   defineLayer,
   layerMask,
   resolveWorldTransform,
@@ -988,10 +991,11 @@ function collectOverlaySegments(): void {
   // `world.adapter` is a `SolverBodyAccess`, which satisfies the diagnostics
   // package's structural `DebugBodyAccess` without either package importing the
   // other — so an application can assemble the overlay while §3.1 stays frozen.
-  // The arms are 0.55 m long — deliberately **longer than the bodies they mark**
-  // (the ball's radius is 0.42, the bob's 0.34), because a cross drawn inside an
-  // opaque mesh is hidden by the depth test and an overlay nobody can see is not
-  // a diagnostic. Measured: at 0.18 the crosses contributed exactly zero pixels.
+  // The documented default (`CollectBodyOriginsOptions.size`, 0.1 world units)
+  // is shorter than these bodies (ball radius 0.42, bob 0.34), so a default
+  // cross is hidden by the depth test. The arms here are 0.55 m — longer than
+  // the meshes they mark. Measured: at 0.18 the crosses contributed exactly
+  // zero pixels.
   collectBodyOrigins(world.adapter, overlayBuffer, {
     size: 0.55,
     color: OVERLAY_ORIGIN_COLOR,
@@ -1462,6 +1466,11 @@ uiRoot.skin = panelSkin(PANEL_COLOR, PANEL_QUAD_Z);
 panelTitle.skin = labelSkin();
 statusLabel.skin = labelSkin();
 uiRoot.layout();
+// §46 is self, not subtree: skins already stamp `UI_LAYER` on their quads,
+// but the panel widgets themselves stayed on the default layer. One walk
+// after the tree (and its skins) exists puts the whole panel on the UI
+// pass the viewport already masks to (`uiView.layerMask`).
+applyLayers(uiRoot, UI_LAYER);
 
 // --- picking, pointer and keyboard (§71, §72, §75) ---------------------------
 

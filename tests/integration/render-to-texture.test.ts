@@ -26,12 +26,7 @@
 import { planeGeometry } from "@four/geometry";
 import { SpriteMaterial, UnlitMaterial } from "@four/materials";
 import { RenderTarget, Renderable, Sprite, Texture } from "@four/render";
-import {
-  GL,
-  WebglRenderer,
-  type ParticleGlContext,
-  type WebglCanvas,
-} from "@four/render-webgl";
+import { GL, WebglRenderer } from "@four/render-webgl";
 import {
   OrthographicCamera,
   Scene,
@@ -41,169 +36,11 @@ import {
 } from "@four/scene";
 import { describe, expect, it } from "vitest";
 
-// ---------------------------------------------------------------------------
-// A recording GL context.
-// ---------------------------------------------------------------------------
-
-interface RecordedCall {
-  readonly name: string;
-  readonly args: readonly unknown[];
-}
-
-/**
- * Every entry point `WebglContext` and its particle extension declare.
- *
- * Written out rather than derived, because a *type* cannot be enumerated at
- * runtime — and because the list failing to compile against
- * `ParticleGlContext` (the cast at the bottom of `createRecordingGl` is
- * checked, not `any`) is what keeps this double honest as the backend's GL
- * budget grows.
- */
-const CONTEXT_METHODS = [
-  "createShader",
-  "shaderSource",
-  "compileShader",
-  "getShaderParameter",
-  "getShaderInfoLog",
-  "deleteShader",
-  "createProgram",
-  "attachShader",
-  "linkProgram",
-  "getProgramParameter",
-  "getProgramInfoLog",
-  "deleteProgram",
-  "getUniformLocation",
-  "useProgram",
-  "uniformMatrix4fv",
-  "uniform4fv",
-  "uniform3fv",
-  "uniform1f",
-  "uniform1i",
-  "createTexture",
-  "bindTexture",
-  "texImage2D",
-  "texParameteri",
-  "deleteTexture",
-  "activeTexture",
-  "createFramebuffer",
-  "bindFramebuffer",
-  "framebufferTexture2D",
-  "checkFramebufferStatus",
-  "deleteFramebuffer",
-  "createRenderbuffer",
-  "bindRenderbuffer",
-  "renderbufferStorage",
-  "framebufferRenderbuffer",
-  "deleteRenderbuffer",
-  "createBuffer",
-  "bindBuffer",
-  "bufferData",
-  "bufferSubData",
-  "deleteBuffer",
-  "createVertexArray",
-  "bindVertexArray",
-  "deleteVertexArray",
-  "enableVertexAttribArray",
-  "vertexAttribDivisor",
-  "vertexAttribPointer",
-  "getParameter",
-  "enable",
-  "disable",
-  "depthFunc",
-  "frontFace",
-  "viewport",
-  "scissor",
-  "clearColor",
-  "clearDepth",
-  "clear",
-  "blendFunc",
-  "depthMask",
-  "colorMask",
-  "drawArrays",
-  "drawArraysInstanced",
-  "drawElements",
-  "isContextLost",
-] as const;
-
-interface RecordingGl {
-  readonly gl: ParticleGlContext;
-  readonly calls: RecordedCall[];
-  callsOf(name: string): RecordedCall[];
-  countOf(name: string): number;
-  reset(): void;
-}
-
-function createRecordingGl(): RecordingGl {
-  const calls: RecordedCall[] = [];
-  let serial = 0;
-  const context: Record<string, (...args: unknown[]) => unknown> = {};
-
-  for (const name of CONTEXT_METHODS) {
-    context[name] = (...args: unknown[]): unknown => {
-      calls.push({ name, args });
-      if (name.startsWith("create") || name === "getUniformLocation") {
-        serial += 1;
-        return { kind: name, serial };
-      }
-      if (name === "getShaderParameter" || name === "getProgramParameter") {
-        return true;
-      }
-      if (name === "getShaderInfoLog" || name === "getProgramInfoLog") {
-        return "";
-      }
-      if (name === "getParameter") {
-        return 4096;
-      }
-      if (name === "checkFramebufferStatus") {
-        return GL.FRAMEBUFFER_COMPLETE;
-      }
-      if (name === "isContextLost") {
-        return false;
-      }
-      return undefined;
-    };
-  }
-
-  return {
-    // The one cast in the file. A dynamically assembled object cannot be
-    // checked member-by-member by the compiler; what *is* checked is that the
-    // result is used everywhere `ParticleGlContext` is required, so a missing
-    // entry point surfaces as a runtime "not a function" in the very first
-    // test rather than as a silent skip.
-    gl: context as unknown as ParticleGlContext,
-    calls,
-    callsOf: (name) => calls.filter((call) => call.name === name),
-    countOf: (name) => calls.filter((call) => call.name === name).length,
-    reset: () => {
-      calls.length = 0;
-    },
-  };
-}
-
-/** A canvas reduced to what the backend touches. */
-class RecordingCanvas implements WebglCanvas {
-  width = 256;
-
-  height = 256;
-
-  readonly #context: unknown;
-
-  constructor(context: unknown) {
-    this.#context = context;
-  }
-
-  getContext(): unknown {
-    return this.#context;
-  }
-
-  addEventListener(): void {
-    // The loss/restore path is `packages/render-webgl/tests`' business.
-  }
-
-  removeEventListener(): void {
-    // Ditto.
-  }
-}
+import {
+  RecordingCanvas,
+  createRecordingGl,
+  type RecordingGl,
+} from "./helpers/recording-gl.js";
 
 interface Harness {
   readonly recorder: RecordingGl;

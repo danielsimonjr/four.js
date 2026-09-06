@@ -32,6 +32,60 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — A-4 FinalizationRegistry lives in `@four/core`.**
+  `trackDisposable` / `disposeTracked` / `auditFinalizedLeaks` moved out of
+  `@four/diagnostics` so Texture, CanvasTexture, RenderTarget,
+  BufferGeometry, and Material can register at construction without a
+  forbidden diagnostics edge. Package `resource-memory` helpers wrap the
+  calls in `if (DEV)` so production DCE drops the registry from
+  Texture-carrying bundles. `auditFinalizedLeaks` stays opt-in (same
+  shape as `auditResourceLeaks`); constructors capture the stack as the
+  creation site. `trackedDisposableId` is the test hook because
+  constructors do not return the registry id.
+
+- **2026-09-06 — A-1 `gpuFrameTime` is last-completed-frame seconds.**
+  `Renderer.lastGpuFrameTimeSeconds` is optional; reading the getter arms
+  measurement (R-30b: unread → no extra GPU commands). WebGL 2 uses
+  `EXT_disjoint_timer_query_webgl2` (discard on `GPU_DISJOINT_EXT`).
+  WebGPU requests `timestamp-query` when the adapter has it and times the
+  views pass with a resolve/copy/mapAsync ping-pong. `Application` copies
+  a finite number into `stats.gpuFrameTime` and leaves `NaN` otherwise.
+
+- **2026-09-06 — PH-22f live joint anchors are body-local.** `setAnchors`
+  and the field setters take the same local frames `addJoint` stores after
+  converting world-space constructor options. They are not re-measured
+  against current or authoring world poses. The world drains them through
+  `SolverJointAccess.setJointAnchors` (Rapier `setAnchor1`/`setAnchor2`).
+  Axis / rope length / spring terms / swing cone stay frozen.
+
+- **2026-09-06 — A-5 materials / solver-handle counts.** Process-wide
+  `liveMaterialCount` and `liveSolver{Body,Collider,Joint,Handle}Count` are
+  always-on numbers (no `DEV` in those packages). `auditResourceLeaks` still
+  gates the *message*. No new `FrameStats` fields.
+
+- **2026-09-06 — RFCs 0007–0009 proposed (owner pending).** Path-planning
+  adapters (`0007`: waypoint polyline + `followWaypoints`, grid/navmesh later);
+  §56 shaping (`0008`: optional HarfBuzz-compatible WASM, identity default);
+  GPU readback as a raster source (`0009`: between-frames `refresh()` snapshot,
+  display-only, no feedback). Implementation waits on acceptance.
+
+- **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
+  (the exception each golden's `_warning` names). Values came from the
+  scenario helpers, not from editing hashes by hand. 0.20 contact persistence
+  and first-contact timing (step 35) are accepted behaviour. Simulation
+  packages (`scene`, `physics`) must not import `DEV`/`devWarnOnce` — the
+  detached-listener and stale-handle warns are unconditional `console.warn`
+  with a WeakSet/Set once-suppress.
+
+- **2026-09-06 — open-TODO subagent pass (fourth landing).** Decisions
+  executed rather than re-parked: Rapier 0.20 adopted (measured goldens);
+  PH-11c push is reduced-mass + wake; CameraShake uses interpolated
+  value-noise at `simulationTime`; local-plane default is XY; NodeSpace
+  ships with its serializer; A-25 stubs are published as real 0.x
+  packages; A-13 mirror is opt-in `DocumentLike`; A-18 worker/watch are
+  injected seams. TypeDoc still has no TS 7 support (typedoc#3098);
+  `NPM_TOKEN` remains an owner secret.
+
 - **2026-09-06 — open-TODO subagent pass (third landing).** Six parallel
   agents landed: Windows animation gate (simulation-bound `#status` sampling,
   not screenshot throughput); `buildRenderList` sort skip + sprite fast path;

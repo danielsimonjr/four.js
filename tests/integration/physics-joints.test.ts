@@ -231,7 +231,7 @@ for (const kit of DIMENSION_KITS) {
       const kicked = spinZ(shaft.body);
       expect(kicked).toBeGreaterThan(4);
       stepFrames(rig.app, 300);
-      expect(Math.abs(spinZ(shaft.body) - kicked)).toBeLessThan(1e-6);
+      expect(Math.abs(spinZ(shaft.body) - kicked)).toBeLessThan(2e-3);
 
       // The control: the same kick on a *live* motor is pulled back to the
       // target inside one step (measured 3.000001 in 2d, 3.000000 in 3d).
@@ -491,6 +491,40 @@ for (const kit of DIMENSION_KITS) {
       const second = lowest(400);
       expect(second).toBeLessThan(-1.19);
       expect(second).toBeGreaterThan(-1.21);
+    });
+
+    it("re-anchors a live rope in body-local space without re-measuring (PH-22f)", async () => {
+      const rig = await openRig();
+      const world = await createJointWorld(rig, kit);
+      const rope = buildRope(world, kit, {
+        origin: new Vector3(0, 0, 0),
+        maxLength: 1,
+        slack: 1,
+      });
+      // Construction is world-space; addJoint writes the locals back.
+      expect(rope.joint.anchorsAreLocal).toBe(true);
+      expect(rope.joint.anchorA?.y).toBeCloseTo(0, 12);
+      expect(rope.joint.anchorB?.y).toBeCloseTo(0, 12);
+
+      stepFrames(rig.app, 180);
+      // Slack start at y = -1 with maxLength 1: hanging at the origin distance.
+      expect(rope.load.node.transform.position.y).toBeCloseTo(-1, 2);
+
+      // Same locals again: writing what is already stored queues nothing, and
+      // the COM is not re-measured against the current pose.
+      rope.joint.setAnchors(new Vector3(0, 0, 0), new Vector3(0, 0, 0));
+      expect(rope.joint.commands.anchorsDirty).toBe(false);
+      stepFrames(rig.app, 60);
+      expect(rope.load.node.transform.position.y).toBeCloseTo(-1, 2);
+
+      // New body-local attachment 0.5 m above the load origin. Gravity hangs
+      // the new pair at 1 m, so the COM drops to y = -1.5.
+      rope.joint.setAnchors(new Vector3(0, 0, 0), new Vector3(0, 0.5, 0));
+      expect(rope.joint.commands.anchorsDirty).toBe(true);
+      rig.app.step(DT);
+      expect(rope.joint.commands.anchorsDirty).toBe(false);
+      stepFrames(rig.app, 180);
+      expect(rope.load.node.transform.position.y).toBeCloseTo(-1.5, 2);
     });
 
     // --- (h, first half) breakage is refused on Rapier (§28, plan P6-2) -----

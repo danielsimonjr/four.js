@@ -34,9 +34,11 @@
  *   is a cube map and a per-light shadow index that the single-map tier has
  *   nowhere to put. See {@link DirectionalLightShadow} for the whole staged
  *   list (cascades, point and spot shadows, atlas, contact shadows);
- * - §68's **CSS color strings** denote sRGB values (§60a); §101's shipped-name
- *   mapping pins colours as linear tuples for this tier (R-15, 2026-08-08), so
- *   an author with a string decodes it first — see {@link ColorRGB};
+ * - §68's **CSS color strings** denote sRGB values (§60a). A light option
+ *   now accepts either a linear {@link ColorRGB} tuple or a CSS string
+ *   (`#rgb`/`#rrggbb`, `rgb()`/`rgba()`); a string is parsed and decoded to
+ *   linear-light before it is stored, so the uploaded uniforms stay the
+ *   same numbers they have always been;
  * - physically coherent units, light layers, environment/image-based
  *   lighting, tone mapping, and exposure (§68's requirements list) are all
  *   staged with their owning designs.
@@ -82,8 +84,13 @@
  * can only catch it by test.
  */
 
-import { Matrix4 } from "@four/math";
-import type { ColorRGB, Vector3 } from "@four/math";
+import {
+  Matrix4,
+  parseColorRGB,
+  srgbToLinearRGB,
+  type ColorRGB,
+  type Vector3,
+} from "@four/math";
 
 import { Node } from "./node.js";
 import { resolveWorldTransform } from "./world-transforms.js";
@@ -95,13 +102,17 @@ import { resolveWorldTransform } from "./world-transforms.js";
  *
  * The declaration moved; the type did not. A light colour is a **linear-light**
  * value: §60a makes the GPU pipeline linear-light, and `@four/render` uploads
- * these numbers to the shader as they stand. An author who has a CSS string
- * decodes it first — §60a says a string denotes *sRGB* — with `@four/math`'s
- * `srgbToLinearRGB(parseColorRGB("#ffcc00"), light.color)`. The option is not
- * widened to accept the string itself: §101's shipped-name mapping says colours
- * are "linear RGBA arrays in 0..1 (§60a), not CSS strings" for this tier, and
- * changing that is an owner decision, recorded 2026-08-08.
+ * these numbers to the shader as they stand. A constructor option may also be
+ * a CSS string (§60a: strings denote *sRGB*); it is parsed and decoded with
+ * `@four/math`'s `srgbToLinearRGB(parseColorRGB(css), out)` and stored as the
+ * same linear tuple, so existing uniform uploads do not change.
  */
+
+/**
+ * A light colour as an author may write it: a linear {@link ColorRGB} tuple,
+ * or a CSS string that is decoded to linear-light on construction (§60a).
+ */
+export type LightColorInput = ColorRGB | string;
 export type { ColorRGB } from "@four/math";
 
 /**
@@ -389,10 +400,11 @@ const shadowViewScratch = new Matrix4();
 /** Construction arguments of {@link DirectionalLight} (§68). */
 export interface DirectionalLightOptions {
   /**
-   * Initial color, copied into the light's own array. Defaults to white
-   * `[1, 1, 1]`, §68's own example value.
+   * Initial color, copied into the light's own array as linear-light RGB.
+   * A CSS string is parsed as sRGB and decoded first (§60a). Defaults to
+   * white `[1, 1, 1]`, §68's own example value.
    */
-  color?: readonly [number, number, number];
+  color?: LightColorInput;
   /**
    * Initial {@link DirectionalLight.intensity}. Defaults to `1`, so an
    * unconfigured light contributes exactly its color (decision, 2026-08-04:
@@ -412,6 +424,31 @@ export interface DirectionalLightOptions {
    * before switching it on is a plain assignment rather than an allocation.
    */
   shadow?: DirectionalLightShadowOptions;
+}
+
+/**
+ * Resolves a light colour option to a stored linear-light {@link ColorRGB}.
+ * Numeric tuples are copied as-is (already linear); CSS strings are parsed
+ * as sRGB and decoded (§60a) so the GPU still sees the same uniform type.
+ */
+function resolveLightColor(
+  color: LightColorInput | undefined,
+): ColorRGB {
+  if (typeof color === "string") {
+    const linear: ColorRGB = [0, 0, 0];
+    srgbToLinearRGB(parseColorRGB(color), linear);
+    return [
+      requireFinite("color red", linear[0]),
+      requireFinite("color green", linear[1]),
+      requireFinite("color blue", linear[2]),
+    ];
+  }
+  const rgb = color ?? [1, 1, 1];
+  return [
+    requireFinite("color red", rgb[0]),
+    requireFinite("color green", rgb[1]),
+    requireFinite("color blue", rgb[2]),
+  ];
 }
 
 /** Rejects non-finite light parameters (§85). */
@@ -518,12 +555,7 @@ export class DirectionalLight extends Node {
 
   constructor(options: DirectionalLightOptions = {}) {
     super();
-    const color = options.color ?? [1, 1, 1];
-    this.color = [
-      requireFinite("color red", color[0]),
-      requireFinite("color green", color[1]),
-      requireFinite("color blue", color[2]),
-    ];
+    this.color = resolveLightColor(options.color);
     this.intensity = requireFinite("intensity", options.intensity ?? 1);
     this.castShadow = options.castShadow ?? false;
     this.shadow = new DirectionalLightShadow(options.shadow);
@@ -592,10 +624,11 @@ function requireNonNegative(name: string, value: number): number {
 /** Construction arguments shared by {@link PointLight} and {@link SpotLight}. */
 export interface PunctualLightOptions {
   /**
-   * Initial color, copied into the light's own array. Defaults to white
-   * `[1, 1, 1]`, §68's own example value.
+   * Initial color, copied into the light's own array as linear-light RGB.
+   * A CSS string is parsed as sRGB and decoded first (§60a). Defaults to
+   * white `[1, 1, 1]`, §68's own example value.
    */
-  color?: readonly [number, number, number];
+  color?: LightColorInput;
   /**
    * Initial {@link PunctualLight.intensity}. Defaults to `1` — the
    * multiplicative identity, exactly as {@link DirectionalLightOptions}
@@ -676,12 +709,7 @@ export abstract class PunctualLight extends Node {
 
   constructor(options: PunctualLightOptions = {}) {
     super();
-    const color = options.color ?? [1, 1, 1];
-    this.color = [
-      requireFinite("color red", color[0]),
-      requireFinite("color green", color[1]),
-      requireFinite("color blue", color[2]),
-    ];
+    this.color = resolveLightColor(options.color);
     this.intensity = requireFinite("intensity", options.intensity ?? 1);
     this.range = requireNonNegative("range", options.range ?? 0);
   }

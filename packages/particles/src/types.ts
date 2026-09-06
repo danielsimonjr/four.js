@@ -157,6 +157,12 @@ export interface ParticleForceField {
     out: Float64Array,
   ): void;
   // --- R-34: §27 batched field sampling (end) ---
+
+  /**
+   * When present, a `simulation: "gpu"` emitter may apply this field on
+   * the device. Absent on every built-in except `radialField`.
+   */
+  readonly gpuField?: ParticleGpuRadialField;
 }
 
 /**
@@ -176,6 +182,49 @@ export interface ParticleForceField {
  * together.
  */
 export type ParticleSimulationMode = "cpu" | "gpu";
+
+/**
+ * §36's `collisions` option. `"none"` is the default (or the existing
+ * `collisionPlaneY` bounce when that field is set). `"depth-buffer"` kills
+ * particles that fall below a ground `y` on the CPU; on a GPU emitter the
+ * device kernel rests them on that plane (a documented stub — true
+ * depth-texture collide-and-kill needs a bound scene depth and is staged).
+ */
+export type ParticleCollisionMode = "none" | "depth-buffer";
+
+/**
+ * Texture-like handle or a boolean flag. A truthy value opts the emitter
+ * into the wide instance stream and tells a backend to sample `map` the
+ * way unlit sprites do. This package never binds a GPU texture — it only
+ * carries the handle through the structural `ParticleDrawable` contract.
+ */
+export type ParticleTexture = object | true;
+
+/**
+ * A §27 field the GPU integrator kernel can apply. Only inverse-square
+ * radial gravity ships on the device (uniform gravity is the emitter's
+ * `gravity` option). CPU emitters keep {@link ParticleForceField.sample}
+ * as the source of truth for every field, including radial.
+ */
+export interface ParticleGpuRadialField {
+  readonly kind: "radial";
+  readonly originX: number;
+  readonly originY: number;
+  readonly originZ: number;
+  readonly strength: number;
+  readonly minDistance: number;
+}
+
+/**
+ * Optional extras a `simulation: "gpu"` integrate may carry — radial field
+ * plus the depth-buffer collision stub. Omitted on the default gravity-only
+ * path so existing 5-argument driver recordings stay byte-identical.
+ */
+export interface ParticleGpuIntegrateExtras {
+  readonly radial?: ParticleGpuRadialField;
+  readonly collisionGroundY?: number;
+  readonly collisions?: ParticleCollisionMode;
+}
 
 /**
  * The GPU integration driver a `simulation: "gpu"` emitter steps through
@@ -253,6 +302,7 @@ export interface ParticleGpuSimulation {
     gravityX: number,
     gravityY: number,
     gravityZ: number,
+    extras?: ParticleGpuIntegrateExtras,
   ): void;
 
   /**

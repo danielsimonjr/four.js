@@ -48,20 +48,13 @@
  * | closest-point query               | {@link Path.closestPoint}                                     |
  * | fill rules (nonzero, even-odd)    | {@link Path.fillRule}, honoured by {@link Path.fillRings}     |
  *
- * The remaining four are **not** here, and each names its owner rather than
- * pretending to be almost done:
- *
- * - **offset path** needs §58's join and cap model — an offset curve is a
- *   stroke outline on one side, and its behaviour at a concave corner *is* the
- *   join rule. Building it before §58 would mean inventing that rule twice. It
- *   lands with the paint packet (gap `R-16`).
- * - **union, intersection, subtraction, xor** need a planar subdivision of the
- *   arrangement of the input segments, plus the fill rule applied to the faces
- *   of that arrangement. It is the same machinery §52 needs for
- *   *"self-intersections where well-defined"*, and the two should be built
- *   once, together — a Bentley–Ottmann sweep whose tie-breaking is exactly
- *   where a determinism claim is won or lost (the `R-25` lesson). Until then
- *   the boolean operations are absent rather than approximate.
+ * The remaining four: **offset path** still needs §58's join and cap model
+ * (gap `R-16`). **union / intersection / subtraction / xor** ship here as
+ * flatten-then-clip — see {@link booleanOp}. That is not a planar subdivision
+ * of the curve arrangement (the packet §52 still wants for self-intersections);
+ * it is an honest polygon Boolean on flattened closed contours, exact for
+ * crossing convex operands and documented-approximate for concave rings and
+ * holes.
  *
  * ## Flattening feeds §52 directly (the `R-25` handoff)
  *
@@ -172,8 +165,14 @@
 
 import type { Matrix3 } from "@four/math";
 
+import {
+  booleanPolygons,
+  type BooleanOp,
+} from "./path-boolean.js";
 import { requirePositive } from "./primitive-support.js";
 import type { Point2D, Polyline2D } from "./tessellation.js";
+
+export type { BooleanOp } from "./path-boolean.js";
 
 /** A full turn in radians — the period every arc sweep is normalized into. */
 const TAU = Math.PI * 2;
@@ -412,6 +411,7 @@ export interface PathClosestPoint {
  * path.length();                 // world units along the path
  * path.flatten(0.05);            // one polyline per subpath
  * path.fillRings(0.05);          // outline/hole groups, per the fill rule
+ * path.union(other);             // §51 Boolean, flatten-then-clip
  * ```
  *
  * ## Mutation, and what returns what
@@ -419,7 +419,8 @@ export interface PathClosestPoint {
  * The **builder** methods mutate the path and return `this`, so they chain.
  * Every **operation** that produces a different shape —
  * {@link Path.transform}, {@link Path.reverse}, {@link Path.subdivide},
- * {@link Path.simplify}, {@link Path.clone} — returns a **new** `Path` and
+ * {@link Path.simplify}, {@link Path.clone}, {@link Path.union} and the other
+ * §51 Booleans — returns a **new** `Path` and
  * leaves the receiver untouched. That split is deliberate: a path is source
  * data that other objects hold references to, and an in-place `transform` would
  * be the kind of silent shared-state rewrite §85 exists to prevent.
@@ -789,9 +790,8 @@ export class Path {
    * Under `nonzero`, a ring nested inside another with the *same* winding is
    * filled in its own right, so the inner region is covered by two groups. For
    * an opaque fill that is invisible; for a translucent one it double-blends.
-   * The exact answer is a boolean union, which is staged with §51's boolean
-   * operations (see this module's header) — reporting the overlap honestly beats
-   * dropping a ring the caller drew.
+   * The exact answer is a boolean union ({@link booleanOp}); reporting the
+   * overlap honestly beats dropping a ring the caller drew.
    *
    * @param tolerance Flattening tolerance, as {@link Path.flatten}.
    */
@@ -892,6 +892,40 @@ export class Path {
       }
     }
     return groups;
+  }
+
+  /**
+   * §51 Boolean combination of this path with `other`. See {@link booleanOp}.
+   */
+  booleanOp(
+    other: Path,
+    op: BooleanOp,
+    tolerance = DEFAULT_FLATTEN_TOLERANCE,
+  ): Path {
+    return booleanOp(this, other, op, tolerance);
+  }
+
+  /** §51 union of the filled regions. See {@link booleanOp}. */
+  union(other: Path, tolerance = DEFAULT_FLATTEN_TOLERANCE): Path {
+    return booleanOp(this, other, "union", tolerance);
+  }
+
+  /** §51 intersection of the filled regions. See {@link booleanOp}. */
+  intersect(other: Path, tolerance = DEFAULT_FLATTEN_TOLERANCE): Path {
+    return booleanOp(this, other, "intersect", tolerance);
+  }
+
+  /**
+   * §51 subtraction: this path's fill minus `other`'s.
+   * See {@link booleanOp}.
+   */
+  subtract(other: Path, tolerance = DEFAULT_FLATTEN_TOLERANCE): Path {
+    return booleanOp(this, other, "subtract", tolerance);
+  }
+
+  /** §51 exclusive-or of the filled regions. See {@link booleanOp}. */
+  xor(other: Path, tolerance = DEFAULT_FLATTEN_TOLERANCE): Path {
+    return booleanOp(this, other, "xor", tolerance);
   }
 
   /**
@@ -1357,6 +1391,78 @@ export class Path {
     const edge = edges[low];
     return { edge, local: (target - edge.start) / edge.length };
   }
+}
+
+/**
+ * §51 Boolean combination of two paths: `union`, `intersect`, `subtract`,
+ * `xor`.
+ *
+ * Each path is flattened to closed contours (open subpaths fill as if closed,
+ * the SVG/Canvas rule) and the clip runs on those polygons. Intersection uses
+ * Sutherland–Hodgman when `b` flattens to a single convex ring; every other
+ * case classifies split edge fragments by the other operand's fill rule and
+ * stitches the survivors. Vertex order is deterministic (each contour starts
+ * at its lexicographically smallest vertex; contours are sorted by that
+ * vertex).
+ *
+ * This is **not** a curve-arrangement Boolean. Concave operands and holes are
+ * best-effort — see the header of `path-boolean.ts` for what is exact and
+ * what can drop a sliver. The result is a new path of straight segments;
+ * `a` and `b` are untouched. The result carries `a`'s {@link Path.fillRule}.
+ *
+ * @param a Subject path.
+ * @param b Clip path.
+ * @param op One of `"union" | "intersect" | "subtract" | "xor"`.
+ * @param tolerance Flattening tolerance, as {@link Path.flatten}.
+ */
+export function booleanOp(
+  a: Path,
+  b: Path,
+  op: BooleanOp,
+  tolerance = DEFAULT_FLATTEN_TOLERANCE,
+): Path {
+  requirePositive("tolerance", tolerance);
+  const rings = booleanPolygons(
+    closedFillRings(a, tolerance),
+    closedFillRings(b, tolerance),
+    op,
+    a.fillRule,
+    b.fillRule,
+  );
+  const path = new Path({ fillRule: a.fillRule });
+  for (const ring of rings) {
+    if (ring.length < 3) {
+      continue;
+    }
+    path.moveTo(ring[0].x, ring[0].y);
+    for (let i = 1; i < ring.length; i += 1) {
+      path.lineTo(ring[i].x, ring[i].y);
+    }
+    path.close();
+  }
+  return path;
+}
+
+/**
+ * Flattened closed rings of a path, open subpaths treated as closed.
+ * Degenerate rings are left in; {@link booleanPolygons} drops them.
+ */
+function closedFillRings(path: Path, tolerance: number): Point2D[][] {
+  const rings: Point2D[][] = [];
+  for (const points of path.flatten(tolerance)) {
+    const ring = points.slice();
+    if (
+      ring.length > 1 &&
+      ring[0].x === ring[ring.length - 1].x &&
+      ring[0].y === ring[ring.length - 1].y
+    ) {
+      ring.pop();
+    }
+    if (ring.length >= 3) {
+      rings.push(ring);
+    }
+  }
+  return rings;
 }
 
 // ---------------------------------------------------------------------------

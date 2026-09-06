@@ -8,8 +8,8 @@ colocated in each package (`packages/<name>/tests/`); performance measurements l
 
 | directory                      | runner                                      | what is committed                        |
 | ------------------------------ | ------------------------------------------- | ---------------------------------------- |
-| [`determinism/`](determinism/) | `bun run test:suites`                       | **25** suites + **22** committed goldens |
-| [`integration/`](integration/) | `bun run test:suites`                       | **65** suites                            |
+| [`determinism/`](determinism/) | `bun run test:suites`                       | **26** suites + **23** committed goldens |
+| [`integration/`](integration/) | `bun run test:suites`                       | **67** suites                            |
 | [`browser/`](browser/)         | `bun run test:browser` (project `chromium`) | **30** Playwright specs                  |
 | [`visual/`](visual/)           | `bun run test:browser` (project `visual`)   | **2** specs, **3** committed PNG goldens |
 
@@ -20,7 +20,7 @@ file without updating this table fails that gate.
 
 ## `determinism/` — §33, §92
 
-**25** suites. Eight of them are the original phase goldens (one per phase that
+**26** suites. Eight of them are the original phase goldens (one per phase that
 produced a determinism obligation), each pinned to a committed checksum in
 `determinism/golden/phase<N>.json`. The rest pin later packets (path, stroke,
 camera rigs, glTF, …) against their own goldens under `determinism/golden/`:
@@ -43,7 +43,7 @@ and is not claimed.
 
 ## `integration/` — §92
 
-**65** suites. Seven of them are the original scenario set plus the repository-hygiene
+**67** suites. Seven of them are the original scenario set plus the repository-hygiene
 suite; the rest landed with later packets. Scenario builders shared between them live
 in `integration/helpers/`.
 

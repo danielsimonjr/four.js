@@ -2,10 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { isFourError, resetDevWarnings } from "@four/core";
 
-import { rejectStalePhysicsHandle } from "../src/stale-handle.js";
+import {
+  rejectStalePhysicsHandle,
+  resetStaleHandleWarnings,
+} from "../src/stale-handle.js";
 
 afterEach(() => {
   resetDevWarnings();
+  resetStaleHandleWarnings();
   vi.restoreAllMocks();
 });
 

@@ -717,6 +717,28 @@ describe("RenderGraph — §70 effect passes (R-6)", () => {
     expect(graph.passes).toEqual([]);
   });
 
+  it("validates a graph whose effect pass names a destination rectangle", () => {
+    const source = target();
+    const graph = new RenderGraph();
+    graph.addPass("world", {
+      root: plainScene(),
+      views: [view()],
+      target: source,
+    });
+    graph.addPass(
+      "present",
+      {
+        kind: "effect",
+        source: source.colorTexture,
+        effect: COPY_EFFECT,
+        rect: { x: 0, y: 0, width: 4, height: 4 },
+      },
+      { inputs: ["world"] },
+    );
+
+    expect(graph.validate()).toEqual([]);
+  });
+
   it("refuses to execute an effect pass on a renderer that cannot draw one", () => {
     // A deliberate exception to "a frame never throws": the mismatch is a
     // permanent property of the backend §62 selected, so it can only fail on

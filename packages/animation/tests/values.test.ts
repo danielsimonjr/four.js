@@ -49,6 +49,11 @@ describe("numberAdapter", () => {
     // the result, and the caller must use what comes back.
     expect(numberAdapter.lerp(2, 4, 0.5, 999)).toBe(3);
   });
+
+  it("adds a weighted delta (PH-9 additive)", () => {
+    expect(numberAdapter.add(2, 4, 0.5, 0)).toBe(4);
+    expect(numberAdapter.add(10, -2, 2, 0)).toBe(6);
+  });
 });
 
 describe("vector adapters", () => {
@@ -111,6 +116,17 @@ describe("vector adapters", () => {
     const target = new Vector3();
     expect(vector3Adapter.copy(source, target)).toBe(target);
     expect(target.equalsApprox(source)).toBe(true);
+  });
+
+  it("adds a weighted vector without aliasing the start", () => {
+    const a = new Vector3(1, 2, 3);
+    const b = new Vector3(10, 0, -4);
+    const out = new Vector3();
+    expect(
+      vector3Adapter.add(a, b, 0.5, out).equalsApprox(new Vector3(6, 2, 1)),
+    ).toBe(true);
+    vector3Adapter.add(a, b, 1, a);
+    expect(a.equalsApprox(new Vector3(11, 2, -1))).toBe(true);
   });
 
   it("extrapolates without clamping, like @four/math", () => {
@@ -186,6 +202,20 @@ describe("quaternionAdapter", () => {
     expect(out.w).toBeCloseTo(b.w, 12);
   });
 
+  it("adds by multiplying an identity-lerped delta (PH-9)", () => {
+    const a = new Quaternion();
+    const b = new Quaternion().setFromAxisAngle(yAxis, Math.PI / 2);
+    const out = new Quaternion();
+    quaternionAdapter.add(a, b, 0.5, out);
+    const half = new Quaternion().setFromAxisAngle(yAxis, Math.PI / 4);
+    expect(out.y).toBeCloseTo(half.y, 12);
+    expect(out.w).toBeCloseTo(half.w, 12);
+
+    quaternionAdapter.add(a, b, 0, out);
+    expect(out.w).toBeCloseTo(1, 12);
+    expect(out.y).toBeCloseTo(0, 12);
+  });
+
   it("clones independently and copies into the target", () => {
     const source = new Quaternion().setFromAxisAngle(yAxis, 1);
     const copy = quaternionAdapter.clone(source);
@@ -237,6 +267,14 @@ describe("colorAdapter", () => {
     expect(target).toEqual([1, 2, 3, 4]);
   });
 
+  it("adds a weighted colour (PH-9 additive)", () => {
+    const a: ColorRGBA = [1, 0, 0, 1];
+    const b: ColorRGBA = [0, 2, 0, 0];
+    const out: ColorRGBA = [0, 0, 0, 0];
+    colorAdapter.add(a, b, 0.5, out);
+    expect(out).toEqual([1, 1, 0, 1]);
+  });
+
   it("is safe when `out` aliases either endpoint", () => {
     const a: ColorRGBA = [0, 0, 0, 0];
     const b: ColorRGBA = [1, 1, 1, 1];
@@ -254,6 +292,11 @@ describe("step adapters", () => {
     expect(booleanAdapter.lerp(false, true, 1, false)).toBe(true);
     expect(booleanAdapter.lerp(false, true, 1.5, false)).toBe(true);
     expect(booleanAdapter.lerp(false, true, -1, false)).toBe(false);
+  });
+
+  it("boolean add ignores the overlay and returns the base", () => {
+    expect(booleanAdapter.add(true, false, 1, false)).toBe(true);
+    expect(discreteAdapter.add("idle", "run", 1, "idle")).toBe("idle");
   });
 
   it("boolean clones and copies by value", () => {
@@ -360,7 +403,15 @@ describe("allocation discipline (§7b)", () => {
       quaternionAdapter.lerp(qa, qb, t, qOut);
       quaternionAdapter.copy(qb, qOut);
       colorAdapter.lerp(ca, cb, t, cOut);
-      accumulator += numberAdapter.lerp(0, 1, t, 0) + out.x + qOut.w + cOut[0];
+      vector3Adapter.add(a, b, t, out);
+      quaternionAdapter.add(qa, qb, t, qOut);
+      colorAdapter.add(ca, cb, t, cOut);
+      accumulator +=
+        numberAdapter.add(0, 1, t, 0) +
+        numberAdapter.lerp(0, 1, t, 0) +
+        out.x +
+        qOut.w +
+        cOut[0];
     }
 
     expect(constructionCount()).toBe(0);

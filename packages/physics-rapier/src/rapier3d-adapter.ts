@@ -2,7 +2,7 @@
  * The Rapier 3D solver adapter (§37, §102, plan WP-5.5).
  *
  * `Rapier3dAdapter` is a `PhysicsSolverAdapter` backed by
- * `@dimforge/rapier3d-compat` (pinned at `0.19.3` by plan P5-1). It is the 3D
+ * `@dimforge/rapier3d-compat` (pinned at `0.20.0`). It is the 3D
  * sibling of {@link Rapier2dAdapter} and obeys the same rule: it may import
  * *nothing* from scene, motion, or render, because §37's seam exists so a solver
  * knows about bodies and colliders and not about nodes.
@@ -387,6 +387,8 @@ type RapierJointData3d = object;
 interface RapierImpulseJoint3d {
   readonly handle: number;
   setContactsEnabled(enabled: boolean): void;
+  setAnchor1(newPos: { x: number; y: number; z: number }): void;
+  setAnchor2(newPos: { x: number; y: number; z: number }): void;
 }
 
 /**
@@ -2192,9 +2194,14 @@ export class Rapier3dAdapter
       const handle = record.rapierHandle;
       narrowPhase.contactPairsWith(handle, (otherHandle) => {
         if (handle < otherHandle) {
-          narrowPhase.contactPair(handle, otherHandle, (manifold) => {
-            total += manifold.numContacts();
-          });
+          narrowPhase.contactPair(
+            handle,
+            otherHandle,
+            world.bodies,
+            (manifold) => {
+              total += manifold.numContacts();
+            },
+          );
         }
       });
     }
@@ -2461,6 +2468,28 @@ export class Rapier3dAdapter
    */
   setJointCollisionEnabled(handle: PhysicsJointHandle, enabled: boolean): void {
     this.#requireJoint(handle).joint.setContactsEnabled(enabled);
+  }
+
+  /**
+   * Replaces both body-local anchors, live (§28, PH-22f).
+   *
+   * `ImpulseJoint.setAnchor1` / `setAnchor2` are on Rapier's **base** joint
+   * class, so unlike `setLimits` this works for every §28 type this adapter
+   * builds. The vectors are already body-local — the same space `createJoint`
+   * received — and are not re-measured against any pose.
+   */
+  setJointAnchors(
+    handle: PhysicsJointHandle,
+    anchorA: Vector3,
+    anchorB: Vector3,
+  ): void {
+    const record = this.#requireJoint(handle);
+    record.joint.setAnchor1(
+      toRapierVector3("anchorA", anchorA, createRapierVector3()),
+    );
+    record.joint.setAnchor2(
+      toRapierVector3("anchorB", anchorB, createRapierVector3()),
+    );
   }
 
   /** @inheritDoc */
@@ -2980,6 +3009,7 @@ export class Rapier3dAdapter
     world.narrowPhase.contactPair(
       a.rapierHandle,
       b.rapierHandle,
+      world.bodies,
       (manifold, flipped) => {
         const manifoldNormal = manifold.normal();
         normalX = flipped ? -manifoldNormal.x : manifoldNormal.x;
@@ -3208,6 +3238,7 @@ export class Rapier3dAdapter
         narrowPhase.contactPair(
           record.rapierHandle,
           otherHandle,
+          world.bodies,
           (manifold) => {
             touching ||= manifold.numContacts() > 0;
           },

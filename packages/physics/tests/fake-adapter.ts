@@ -647,10 +647,17 @@ export class FakeSolverAdapter
     worldPoint: Vector3Input,
   ): void {
     const body = this.#requireBody(handle);
+    const value = widenToVector3(impulse);
+    const inverseMass = body.mass > 0 ? 1 / body.mass : 0;
+    body.linearVelocity.set(
+      body.linearVelocity.x + value.x * inverseMass,
+      body.linearVelocity.y + value.y * inverseMass,
+      body.linearVelocity.z + value.z * inverseMass,
+    );
     this.#record(
       "applyImpulseAtPoint",
       body.id,
-      widenToVector3(impulse),
+      value,
       widenToVector3(worldPoint),
     );
   }
@@ -840,6 +847,8 @@ export interface FakeJoint {
   motor: SolverJointMotor | null;
   /** Whether the joined bodies still collide (§28); PH-22f. */
   collisionEnabled: boolean;
+  /** The last body-local anchors `setJointAnchors` received, or `null`. */
+  anchors: { anchorA: Vector3; anchorB: Vector3 } | null;
   alive: boolean;
 }
 
@@ -916,6 +925,7 @@ export class FakeJointSolverAdapter
       limits: null,
       motor: null,
       collisionEnabled: desc.collisionEnabled ?? false,
+      anchors: null,
       alive: true,
     });
     this.#recordJoint("createJoint", id, desc.type);
@@ -958,6 +968,22 @@ export class FakeJointSolverAdapter
     const joint = this.#requireJoint(handle);
     joint.collisionEnabled = enabled;
     this.#recordJoint("setJointCollisionEnabled", joint.id, enabled);
+  }
+
+  setJointAnchors(
+    handle: PhysicsJointHandle,
+    anchorA: Vector3,
+    anchorB: Vector3,
+  ): void {
+    const joint = this.#requireJoint(handle);
+    joint.anchors = {
+      anchorA: anchorA.clone(),
+      anchorB: anchorB.clone(),
+    };
+    this.#recordJoint("setJointAnchors", joint.id, {
+      anchorA: { x: anchorA.x, y: anchorA.y, z: anchorA.z },
+      anchorB: { x: anchorB.x, y: anchorB.y, z: anchorB.z },
+    });
   }
 
   getJointId(handle: PhysicsJointHandle): number {

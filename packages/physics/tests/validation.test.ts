@@ -677,4 +677,73 @@ describe("validatePhysicsWorldOptions (§21, §32, §33, §85)", () => {
       });
     }).not.toThrow();
   });
+
+  it("accepts §40 scale factors and a §21 plane", () => {
+    expect(() => {
+      validatePhysicsWorldOptions({
+        dimension: "3d",
+        units: { scale: { lengthToMeters: 0.01, massToKilograms: 1 } },
+        localPlane: {
+          origin: new Vector3(0, 0, 0),
+          normal: new Vector3(0, 0, 1),
+          xAxis: new Vector3(1, 0, 0),
+        },
+      });
+    }).not.toThrow();
+  });
+
+  it("rejects a non-positive length scale", () => {
+    expect(
+      expectFourError(() => {
+        validatePhysicsWorldOptions({
+          dimension: "2d",
+          units: { scale: { lengthToMeters: 0, massToKilograms: 1 } },
+        });
+      }).message,
+    ).toContain("lengthToMeters");
+  });
+
+  it("rejects a zero localPlane.normal", () => {
+    expect(
+      expectFourError(() => {
+        validatePhysicsWorldOptions({
+          dimension: "3d",
+          localPlane: {
+            origin: new Vector3(),
+            normal: new Vector3(0, 0, 0),
+          },
+        });
+      }).message,
+    ).toContain("localPlane.normal");
+  });
+
+  it("rejects a zero localPlane.xAxis", () => {
+    expect(
+      expectFourError(() => {
+        validatePhysicsWorldOptions({
+          dimension: "3d",
+          localPlane: {
+            origin: new Vector3(),
+            normal: new Vector3(0, 0, 1),
+            xAxis: new Vector3(0, 0, 0),
+          },
+        });
+      }).message,
+    ).toContain("localPlane.xAxis");
+  });
+
+  it("rejects an xAxis parallel to the normal", () => {
+    expect(
+      expectFourError(() => {
+        validatePhysicsWorldOptions({
+          dimension: "3d",
+          localPlane: {
+            origin: new Vector3(),
+            normal: new Vector3(0, 0, 1),
+            xAxis: new Vector3(0, 0, 2),
+          },
+        });
+      }).message,
+    ).toContain("parallel");
+  });
 });

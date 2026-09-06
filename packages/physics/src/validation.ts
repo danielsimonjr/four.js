@@ -667,4 +667,62 @@ export function validatePhysicsWorldOptions(
       requireNonNegative("sleeping.timeThreshold", sleeping.timeThreshold);
     }
   }
+
+  const units = options.units;
+  if (units !== undefined) {
+    requirePositive("units.scale.lengthToMeters", units.scale.lengthToMeters);
+    requirePositive("units.scale.massToKilograms", units.scale.massToKilograms);
+  }
+
+  const plane = options.localPlane;
+  if (plane !== undefined) {
+    requireFinite("localPlane.origin.x", plane.origin.x);
+    requireFinite("localPlane.origin.y", plane.origin.y);
+    if ("z" in plane.origin) {
+      requireFinite("localPlane.origin.z", plane.origin.z);
+    }
+    requireFinite("localPlane.normal.x", plane.normal.x);
+    requireFinite("localPlane.normal.y", plane.normal.y);
+    if ("z" in plane.normal) {
+      requireFinite("localPlane.normal.z", plane.normal.z);
+    }
+    const nx = plane.normal.x;
+    const ny = plane.normal.y;
+    const nz = "z" in plane.normal ? plane.normal.z : 0;
+    if (nx === 0 && ny === 0 && nz === 0) {
+      fail(
+        "localPlane.normal must be a non-zero vector (§21, §85).",
+        { field: "localPlane.normal", x: nx, y: ny, z: nz },
+      );
+    }
+    if (plane.xAxis !== undefined) {
+      requireFinite("localPlane.xAxis.x", plane.xAxis.x);
+      requireFinite("localPlane.xAxis.y", plane.xAxis.y);
+      if ("z" in plane.xAxis) {
+        requireFinite("localPlane.xAxis.z", plane.xAxis.z);
+      }
+      const xx = plane.xAxis.x;
+      const xy = plane.xAxis.y;
+      const xz = "z" in plane.xAxis ? plane.xAxis.z : 0;
+      if (xx === 0 && xy === 0 && xz === 0) {
+        fail("localPlane.xAxis must be a non-zero vector (§21, §85).", {
+          field: "localPlane.xAxis",
+          x: xx,
+          y: xy,
+          z: xz,
+        });
+      }
+      // Same parallel test `resolveLocalPlane` uses after Gram-Schmidt:
+      // xAxis × normal == 0 means no in-plane +X.
+      const cx = xy * nz - xz * ny;
+      const cy = xz * nx - xx * nz;
+      const cz = xx * ny - xy * nx;
+      if (cx === 0 && cy === 0 && cz === 0) {
+        fail(
+          "localPlane.xAxis is parallel to normal, so the plane has no in-plane +X (§21, §85).",
+          { field: "localPlane.xAxis", x: xx, y: xy, z: xz },
+        );
+      }
+    }
+  }
 }

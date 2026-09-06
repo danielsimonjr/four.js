@@ -3,14 +3,14 @@
 Runnable examples planned by the documentation plan (§93) and the flagship demonstrations
 (§118–119). Every major feature should have a runnable example (§93).
 
-**Ten examples are implemented** (six until 2026-08-07, when `first-3d-scene` and then
+**Thirteen examples are implemented** (six until 2026-08-07, when `first-3d-scene` and then
 the §118 flagship were written; nine on 2026-08-08, when §119's motor digital twin was
-written; ten on 2026-08-29, when the §12 character-controller example was written). The other three entries below are **not yet written; the
-directory is a placeholder** — each holds a `.gitkeep` and nothing else. Until 2026-08-05
-they were described only as "scaffold only" in this paragraph while reading like a catalogue
-of demos in the list; each such row now carries the marker on its own line. The absence is
-dated in `docs/AUDIT-120.md` as **S-8**, and `tools/check-docs.mjs` fails if this file or a
-guide points at one of them without the marker.
+written; ten on 2026-08-29, when the §12 character-controller example was written; thirteen
+on 2026-09-06, when the three remaining §93 names gained a thin `main.ts` that re-exports
+an existing scene). Until 2026-08-05 the missing rows were described only as "scaffold
+only" in this paragraph while reading like a catalogue of demos in the list. **S-8** in
+`docs/AUDIT-120.md` is now closed: the directories are real sites, not independently
+authored ones.
 
 ## Running one
 
@@ -51,8 +51,8 @@ gates in `playwright.config.ts` do).
   to `PhysicsEventSystem` at 900 (PH-21), with a `ZoneTallySystem` at
   `PRIORITY_SENSOR_UPDATE` (800) re-measuring each zone through a §30 overlap query that
   the step-9 listeners consume for the repaint.
-  Fulfils the role sketched for `first-physics-scene/` (placeholder entry kept until the
-  owner retires it).
+  Fulfils the role sketched for `first-physics-scene/` (that directory is now a thin
+  re-export of this page, 2026-09-06).
 - [`ui-demo/`](ui-demo/) — **Implemented.** §73–§75's retained-mode UI: a `@four/ui` panel of
   buttons and labels laid out by the package and skinned by the application, driven by real
   pointer and keyboard input, with a drawn focus ring (`bun run ui-demo:build`). Listed
@@ -74,15 +74,17 @@ gates in `playwright.config.ts` do).
   physics body at all, all under the §39 input → kinematics → solve ordering. Build it
   with `bun run character:build`; it carries **one** Rapier wasm image (a
   directly-constructed `Rapier3dAdapter`) and is ~0.90 MB gzip.
-- [`first-animated-scene/`](first-animated-scene/) — **Not yet written; directory is a
-  placeholder.** Planned as §93's first animated scene: tweens and a timeline. Animation
-  ships inside `first-2d-scene/`.
-- [`first-physics-scene/`](first-physics-scene/) — **Not yet written; directory is a
-  placeholder.** Planned as §93's first physics scene: gravity, collisions, impulses.
-  `physics-playground/` fulfils the role (kept until the owner retires the entry).
-- [`mixed-scene/`](mixed-scene/) — **Not yet written; directory is a placeholder.** Planned
-  as the mixed 2D/3D/physics/UI example (§93, §97). `physics-playground/` steps a 2D and a
-  3D world side by side.
+- [`first-animated-scene/`](first-animated-scene/) — **Implemented (2026-09-06) as a thin
+  entry.** §93's first animated scene: `main.ts` imports `first-2d-scene/`, which already
+  runs the tweens, clip and timeline. No dedicated Playwright project — it shares
+  `first-2d-scene`'s browser gate. Built on Pages by `docs.yml`.
+- [`first-physics-scene/`](first-physics-scene/) — **Implemented (2026-09-06) as a thin
+  entry.** §93's first physics scene: `main.ts` imports `physics-playground/`. Shares that
+  page's browser gate. Built on Pages by `docs.yml`.
+- [`mixed-scene/`](mixed-scene/) — **Implemented (2026-09-06) as a thin entry.** §93's
+  mixed 2D/3D/physics example: `main.ts` imports `physics-playground/`, which steps a 2D
+  and a 3D world side by side. Shares that page's browser gate. Built on Pages by
+  `docs.yml`.
 - [`flagship/one-scene-everything-moves/`](flagship/one-scene-everything-moves/) —
   **Implemented (2026-08-07).** §118's flagship, "One Scene, Everything Moves": every item
   on §118's list in one scene, one fixed-step loop and one frame — a textured lit cube spun

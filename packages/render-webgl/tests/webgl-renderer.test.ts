@@ -79,6 +79,7 @@ import {
   PARTICLE_ATTRIBUTE_LOCATIONS,
   PARTICLE_GL,
   POSITION_ATTRIBUTE_LOCATION,
+  ParticleAppearanceProgram,
   ParticleBatchCache,
   ParticleProgram,
   ParticleTrailBatchCache,
@@ -183,6 +184,21 @@ interface FakeGlOptions {
    */
   anisotropyExtension?: boolean | null;
   /**
+   * When true, `getExtension("EXT_disjoint_timer_query_webgl2")` returns
+   * an object and the query entry points exist (A-1). Default false — a
+   * device without the timer extension, which is the CI/SwiftShader case.
+   */
+  timerExtension?: boolean;
+  /**
+   * What `getQueryParameter(..., QUERY_RESULT)` reports in nanoseconds
+   * once `QUERY_RESULT_AVAILABLE` is true. Default 2_000_000 (2 ms).
+   */
+  timerResultNanoseconds?: number;
+  /** When false, a completed query reports as still in flight. Default true. */
+  timerResultAvailable?: boolean;
+  /** When true, `getParameter(GPU_DISJOINT_EXT)` is true. Default false. */
+  timerDisjoint?: boolean;
+  /**
    * What `getParameter(MAX_TEXTURE_MAX_ANISOTROPY_EXT)` reports (R-30b).
    * Default 16; `unknown` so a test can hand back what a hostile driver would.
    */
@@ -277,6 +293,10 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     allocateTextures = true,
     canGenerateMipmaps = true,
     anisotropyExtension = true,
+    timerExtension = false,
+    timerResultNanoseconds = 2_000_000,
+    timerResultAvailable = true,
+    timerDisjoint = false,
     maxAnisotropy = 16,
     allocateBuffers = true,
     allocateFramebuffers = true,
@@ -568,9 +588,13 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
 
     getParameter(pname) {
       record("getParameter", pname);
-      return pname === GL.MAX_TEXTURE_MAX_ANISOTROPY_EXT
-        ? maxAnisotropy
-        : maxTextureSize;
+      if (pname === GL.MAX_TEXTURE_MAX_ANISOTROPY_EXT) {
+        return maxAnisotropy;
+      }
+      if (pname === GL.GPU_DISJOINT_EXT) {
+        return timerDisjoint;
+      }
+      return maxTextureSize;
     },
     enable(capability) {
       record("enable", capability);
@@ -640,10 +664,41 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
       record("generateMipmap", target);
     };
   }
-  if (anisotropyExtension !== null) {
+  if (anisotropyExtension !== null || timerExtension) {
     gl.getExtension = (name: string): unknown => {
       record("getExtension", name);
-      return anisotropyExtension ? { name } : null;
+      if (name === "EXT_texture_filter_anisotropic") {
+        return anisotropyExtension ? { name } : null;
+      }
+      if (name === "EXT_disjoint_timer_query_webgl2") {
+        return timerExtension ? { name } : null;
+      }
+      return null;
+    };
+  }
+  if (timerExtension) {
+    gl.createQuery = (): object => {
+      record("createQuery");
+      return handle("query");
+    };
+    gl.deleteQuery = (query: object): void => {
+      record("deleteQuery", query);
+    };
+    gl.beginQuery = (target: number, query: object): void => {
+      record("beginQuery", target, query);
+    };
+    gl.endQuery = (target: number): void => {
+      record("endQuery", target);
+    };
+    gl.getQueryParameter = (query: object, pname: number): unknown => {
+      record("getQueryParameter", query, pname);
+      if (pname === GL.QUERY_RESULT_AVAILABLE) {
+        return timerResultAvailable;
+      }
+      if (pname === GL.QUERY_RESULT) {
+        return timerResultNanoseconds;
+      }
+      return 0;
     };
   }
 
@@ -1412,18 +1467,23 @@ describe("WebglRenderer — initialization (§61, §62)", () => {
 
     // Every member is a statement about *this backend on WebGL 2*, and each is
     // true by construction (see `WEBGL_STATIC_CAPABILITIES`): WebGL 2 has no
-    // compute stage, no storage buffers and no indirect draw at all, this tier
-    // requests no timer extension and no float target, and GLSL ES 3.00
-    // requires fragment-stage `highp`.
+    // compute stage, no storage buffers and no indirect draw at all, this
+    // default fake has no timer extension and no float target, and GLSL ES
+    // 3.00 requires fragment-stage `highp`.
     expect(capabilities.computeShaders).toBe(false);
     expect(capabilities.storageBuffers).toBe(false);
     expect(capabilities.indirectDraw).toBe(false);
-    expect(capabilities.timestampQueries).toBe(false);
     expect(capabilities.floatRenderTargets).toBe(false);
+    // timestampQueries is a getter: unread here so initialize's transcript
+    // is still one getParameter (MAX_TEXTURE_SIZE). See the dedicated test.
+    expect(Object.hasOwn(capabilities, "timestampQueries")).toBe(true);
     expect(capabilities.multisampling).toBe(true);
     expect(capabilities.shaderPrecision).toBe("highp");
     expect(capabilities.textureFormats).toEqual(["rgba8"]);
     expect(capabilities.compressedTextureFormats).toEqual([]);
+    // maxAnisotropy is a getter: unread, so initialize's transcript is
+    // still one getParameter (MAX_TEXTURE_SIZE). See the dedicated test.
+    expect(Object.hasOwn(capabilities, "maxAnisotropy")).toBe(true);
 
     // §62's "maximum uniforms and bindings" is deliberately **not** reported:
     // two more `getParameter` calls at initialization would move every landed
@@ -1433,6 +1493,90 @@ describe("WebglRenderer — initialization (§61, §62)", () => {
     expect(capabilities.maxUniformBufferBytes).toBeUndefined();
     expect(capabilities.maxBindings).toBeUndefined();
     expect(gl.countOf("getParameter")).toBe(1);
+  });
+
+  it("reports maxAnisotropy from the extension after init, not during it (R-30c)", async () => {
+    const { renderer, gl } = await initialized({ maxAnisotropy: 8 });
+
+    expect(gl.countOf("getExtension")).toBe(0);
+    expect(gl.countOf("getParameter")).toBe(1);
+    expect(renderer.capabilities.maxAnisotropy).toBe(8);
+    expect(gl.callsOf("getExtension").map((call) => call.args[0])).toEqual([
+      "EXT_texture_filter_anisotropic",
+    ]);
+    expect(renderer.capabilities.maxAnisotropy).toBe(8);
+    expect(gl.countOf("getExtension")).toBe(1);
+  });
+
+  it("reports maxAnisotropy 1 when the extension is absent (R-30c)", async () => {
+    const { renderer } = await initialized({ anisotropyExtension: false });
+
+    expect(renderer.capabilities.maxAnisotropy).toBe(1);
+  });
+
+  it("reports timestampQueries from the extension after init, not during it (A-1)", async () => {
+    const { renderer, gl } = await initialized({ timerExtension: true });
+
+    expect(gl.countOf("getExtension")).toBe(0);
+    expect(gl.countOf("getParameter")).toBe(1);
+    expect(renderer.capabilities.timestampQueries).toBe(true);
+    expect(gl.callsOf("getExtension").map((call) => call.args[0])).toEqual([
+      "EXT_disjoint_timer_query_webgl2",
+    ]);
+    expect(renderer.capabilities.timestampQueries).toBe(true);
+    expect(gl.countOf("getExtension")).toBe(1);
+  });
+
+  it("reports timestampQueries false when the timer extension is absent (A-1)", async () => {
+    const { renderer } = await initialized();
+
+    expect(renderer.capabilities.timestampQueries).toBe(false);
+  });
+
+  it("does not issue timer queries until lastGpuFrameTimeSeconds is read (A-1)", async () => {
+    const { renderer, gl, camera } = await initialized({ timerExtension: true });
+    gl.reset();
+    renderer.render(createRoot(), [createView(camera)]);
+    expect(gl.countOf("beginQuery")).toBe(0);
+    expect(gl.countOf("createQuery")).toBe(0);
+  });
+
+  it("publishes a completed elapsed-time query as lastGpuFrameTimeSeconds (A-1)", async () => {
+    const { renderer, gl, camera } = await initialized({
+      timerExtension: true,
+      timerResultNanoseconds: 4_000_000,
+    });
+
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    gl.reset();
+    renderer.render(createRoot(), [createView(camera)]);
+    expect(gl.countOf("beginQuery")).toBe(1);
+    expect(gl.countOf("endQuery")).toBe(1);
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+
+    renderer.render(createRoot(), [createView(camera)]);
+    expect(renderer.lastGpuFrameTimeSeconds).toBeCloseTo(0.004, 12);
+  });
+
+  it("discards a disjoint elapsed-time sample (A-1)", async () => {
+    const { renderer, camera } = await initialized({
+      timerExtension: true,
+      timerDisjoint: true,
+    });
+
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    renderer.render(createRoot(), [createView(camera)]);
+    renderer.render(createRoot(), [createView(camera)]);
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+  });
+
+  it("stays NaN when the timer extension is missing, even after the getter is read (A-1)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    renderer.render(createRoot(), [createView(camera)]);
+    renderer.render(createRoot(), [createView(camera)]);
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    expect(gl.countOf("beginQuery")).toBe(0);
   });
 
   it("requests a webgl2 context with depth, no stencil, and the antialias hint", async () => {
@@ -4071,6 +4215,38 @@ describe("ParticleProgram — compilation and linking (§36, §61, §89)", () =>
 
     expect(gl.countOf("deleteProgram")).toBe(1);
     expect(program.disposed).toBe(true);
+  });
+});
+
+describe("ParticleAppearanceProgram — R-32 textured/rotated/soft (opt-in)", () => {
+  it("compiles the appearance stages and names the extra uniforms", () => {
+    const gl = createFakeGl();
+    const program = ParticleAppearanceProgram.create(gl);
+
+    const [vertex, fragment] = gl
+      .callsOf("shaderSource")
+      .map((call) => call.args[1] as string);
+    expect(vertex).toContain("instanceRotation");
+    expect(vertex).toContain("instanceSoftness");
+    expect(vertex).toContain("cos(instanceRotation)");
+    expect(fragment).toContain("texture(map, vUv)");
+    expect(fragment).toContain("abs(vViewZ) * vSoftness");
+    expect(fragment).toContain("hasSceneDepth");
+    expect(
+      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
+    ).toEqual(
+      expect.arrayContaining([
+        "projection",
+        "view",
+        "model",
+        "useMap",
+        "hasSceneDepth",
+        "depthWidth",
+        "depthHeight",
+      ]),
+    );
+    expect(program.disposed).toBe(false);
+    program.dispose();
   });
 });
 
@@ -9362,17 +9538,37 @@ describe("WebglRenderer — §65 batching, opt-in (R-9)", () => {
       12,
       0,
     ]);
-    // The first frame allocates the stores; the second only writes into them.
+    // The first frame allocates the stores. An idle second frame whose
+    // geometry versions and transforms have not moved skips the re-upload
+    // (§65 / §86 change-detecting batch cache).
     gl.reset();
     renderer.render(root, [createView(camera)]);
     expect(gl.countOf("bufferData")).toBe(0);
     expect(gl.countOf("createVertexArray")).toBe(0);
-    const uploads = gl.callsOf("bufferSubData");
-    expect(uploads).toHaveLength(2);
-    expect(uploads[0].args[0]).toBe(GL.ARRAY_BUFFER);
-    expect(uploads[0].args[4]).toBe(24);
-    expect(uploads[1].args[0]).toBe(GL.ELEMENT_ARRAY_BUFFER);
-    expect(uploads[1].args[4]).toBe(12);
+    expect(gl.countOf("bufferSubData")).toBe(0);
+  });
+
+  it("skips batch re-upload while the source is idle, and uploads after a move", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const root = createRoot();
+    const material = new TestMaterial();
+    const a = new Renderable(quadGeometry().asGeometry, material.asMaterial);
+    const b = new Renderable(quadGeometry().asGeometry, material.asMaterial);
+    root.add(a, b);
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("bufferSubData")).toBe(0);
+    expect(gl.countOf("drawElements")).toBe(1);
+
+    b.transform.worldMatrix.fromArray([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0, 0, 1,
+    ]);
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("bufferSubData")).toBe(2);
   });
 
   it("uploads the identity model matrix, because positions arrive in world space", async () => {

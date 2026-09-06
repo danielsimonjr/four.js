@@ -23,22 +23,39 @@
  * §76's cancellation landed on 2026-08-09: `load(url, loader, { signal })`
  * rejects and gives back its reference, and — when the manager was built with an
  * {@link AssetManagerOptions.abortController} — the last waiter's abort cancels
- * the request itself. The rules are in `asset-manager.ts`'s module comment.
+ * the request itself. The A-18 remainder (2026-09-06) adds progress
+ * (`onProgress`), `stream()`, dependency graphs (`registerDependency` /
+ * `loadGraph`), worker decoding (`decodeInWorker` + `workerFactory`), and
+ * hot reload (`watch`). The rules are in `asset-manager.ts`'s module comment.
  */
 
 export const PACKAGE_NAME = "@four/assets";
 
+// §81's asset-format token (RFC 0002): declared here; `@four/four`'s
+// `plugins.ts` re-exports the same object.
+export { ASSET_LOADERS } from "./capabilities.js";
+export type { RegisteredAssetLoader } from "./loader-registry.js";
+export { AssetLoaderRegistry } from "./loader-registry.js";
+
 export type {
   AbortHandle,
   AbortSignalLike,
+  AssetGraph,
+  AssetGraphLoadOptions,
   AssetLoadOptions,
   AssetLoader,
   AssetManagerOptions,
+  AssetProgressEvent,
+  AssetWatchLike,
+  AssetWithDependencies,
+  ByteReaderLike,
   FetchInit,
   FetchLike,
   FetchResponse,
+  ReadableBodyLike,
   ResponseHeadersLike,
   TimerLike,
+  WorkerLike,
 } from "./asset-manager.js";
 export {
   AssetManager,

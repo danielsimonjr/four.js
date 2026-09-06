@@ -13,6 +13,17 @@ export type {
 export { ComponentRegistry } from "./component.js";
 export type { Disposable } from "./disposable.js";
 export { disposeAll } from "./disposable.js";
+// §83 FinalizationRegistry leak bookkeeping (A-4 remainder, 2026-09-06).
+// Lives here so geometry / render / materials can register at construction
+// without importing `@four/diagnostics`. Production: every function is a no-op.
+export {
+  auditFinalizedLeaks,
+  disposeTracked,
+  reportFinalized,
+  resetLeakRegistry,
+  trackDisposable,
+  trackedDisposableId,
+} from "./leak-registry.js";
 // §85 build mode (A-4, 2026-08-07). `DEV` is the flag every other package
 // gates author-facing work behind; see `dev.ts` for the §33 rule that keeps it
 // out of anything the simulation computes.

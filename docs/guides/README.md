@@ -9,16 +9,16 @@ scenes — are carried by the root `README.md` and the example apps:
 | installation and quick start | root `README.md`                                                                                                                                            |
 | first 2D scene               | `examples/first-2d-scene`                                                                                                                                   |
 | first 3D scene               | `examples/first-3d-scene` — a `PerspectiveCamera` over `LitMaterial` meshes under one `DirectionalLight` plus scene ambient, written 2026-08-07 (see below) |
-| first animated scene         | `examples/first-animated-scene` — **not yet written; directory is a placeholder**. Animation is demonstrated inside `examples/first-2d-scene`               |
-| first physics scene          | `examples/first-physics-scene` — **not yet written; directory is a placeholder**. Use `examples/physics-playground`                                         |
-| mixed 2D/3D/physics example  | `examples/mixed-scene` — **not yet written; directory is a placeholder**. Use `examples/physics-playground`, which steps a 2D and a 3D world side by side   |
+| first animated scene         | `examples/first-animated-scene` — thin §93 entry (2026-09-06) that re-exports `examples/first-2d-scene` (tweens, a clip, a timeline)                         |
+| first physics scene          | `examples/first-physics-scene` — thin §93 entry (2026-09-06) that re-exports `examples/physics-playground`                                                  |
+| mixed 2D/3D/physics example  | `examples/mixed-scene` — thin §93 entry (2026-09-06) that re-exports `examples/physics-playground`, which steps a 2D and a 3D world side by side            |
 
 This table listed the four placeholder rows as though they were written until 2026-08-05.
-The first 3D scene's row itself read "**not yet written; directory is a placeholder**
-(`.gitkeep` only). Nearest shipped equivalent: none — no example uses a perspective camera"
-until 2026-08-07, when that example was written; three placeholder rows remain. The
-absence is dated in `docs/AUDIT-120.md` as **S-8**; `tools/check-docs.mjs` fails if a
-doc points at one of these directories without the placeholder marker.
+The first 3D scene's row itself read as an empty directory until 2026-08-07, when that
+example was written. The remaining three §93 names were `.gitkeep` until 2026-09-06,
+when each gained a real `main.ts` that imports its stand-in — dated in
+`docs/AUDIT-120.md` as **S-8**, now closed. They are not independently authored
+scenes; they exist so the §93 names resolve to a buildable site.
 
 The remaining thirteen items are these guides. Read them in this order — each
 assumes the ones above it:
@@ -105,6 +105,23 @@ code sample in these guides is written against the implemented API surface
 (`docs/Architecture/package-export-surfaces.json`) and modeled on the example
 apps; where a §93 topic covers something not yet implemented, the guide says
 so and cites the staging note instead of pretending.
+
+## Verified from outside
+
+A short dogfooding checklist. These surfaces already ship; the job is to
+drive them as a reader would, not to re-implement them. Hosted demos live
+under `/examples/<name>/` on Pages; browser gates live in `tests/browser/`.
+
+| Surface | Where to look |
+| ------- | ------------- |
+| WebGL 2 | `examples/first-2d-scene`, `examples/first-3d-scene` (every Pages demo) |
+| WebGPU | shipped backend; no Pages demo calls `registerWebgpuRenderer()` (the flagship registers WebGL only). `tests/integration/backend-selection.test.ts` and `@four/render-webgpu` |
+| Tweens / clips / timelines | `examples/first-2d-scene` / `examples/first-animated-scene`; `tests/browser/animation.spec.ts` |
+| glTF | no example site; `tests/browser/gltf.spec.ts` loads the committed fixture through the real loader |
+| UI | `examples/ui-demo`; `tests/browser/ui.spec.ts` |
+| Input / picking / dragging | `examples/first-2d-scene`; `tests/browser/interaction.spec.ts`. First-person: `examples/character-controller` |
+| Particles | `examples/particles-demo`; `tests/browser/particles.spec.ts` |
+| Mixed 2D / 3D / physics | `examples/mixed-scene` / `examples/physics-playground`; the §118 flagship |
 
 ## Beside the guides
 

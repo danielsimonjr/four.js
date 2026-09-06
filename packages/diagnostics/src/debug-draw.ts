@@ -1398,8 +1398,9 @@ export interface SolverJointStatistics {
  * This is **all** the joint seam gives a visualizer: `SolverJointAccess` is
  * `reportsJointReactions`, `getJointReaction`, `setJointLimits`,
  * `setJointMotor`, `setJointCollisionEnabled` (PH-22f, 2026-08-08),
- * `getJointId`, `forEachJoint` — no anchors, no connected
- * bodies, no joint type. Constraint *geometry* is therefore staged; see
+ * `setJointAnchors` (PH-22f, 2026-09-06), `getJointId`, `forEachJoint` —
+ * writers for anchors, but no *read* of them, and no connected bodies or
+ * joint type. Constraint *geometry* is therefore staged; see
  * {@link DEBUG_DRAW_STAGED}.
  *
  * `out` follows the same convention as
@@ -1461,11 +1462,12 @@ export const DEBUG_DRAW_STAGED: readonly StagedVisualization[] = Object.freeze([
     reason:
       "SolverJointAccess (packages/physics/src/body-access.ts) is " +
       "reportsJointReactions, getJointReaction, setJointLimits, " +
-      "setJointMotor, setJointCollisionEnabled, getJointId, forEachJoint " +
-      "(the sixth setter landed 2026-08-08, PH-22f). A joint's anchors, its " +
-      "connected bodies and its type are held by @four/physics's Joint " +
-      "descriptors, which @four/diagnostics may not import, and are not " +
-      "readable through the seam — so there is no point in space to draw. " +
+      "setJointMotor, setJointCollisionEnabled, setJointAnchors, " +
+      "getJointId, forEachJoint (setJointAnchors landed 2026-09-06, " +
+      "PH-22f). A joint's anchors can be written through the seam but " +
+      "are not readable from it, and its connected bodies and type are " +
+      "held by @four/physics's Joint descriptors, which @four/diagnostics " +
+      "may not import — so there is no point in space to draw. " +
       "getJointReaction is additionally unusable on both Rapier adapters, " +
       "which declare reportsJointReactions false (Rapier 0.19.3 exposes no " +
       "joint reaction to JS).",

@@ -193,15 +193,14 @@
  *
  * ## What is staged, and the seam for each
  *
- * - **Pushing dynamic bodies.** A sweep that hits a `"dynamic"` collider stops
- *   or slides the character against it and applies **nothing**. Pushing is a
- *   *force* question (§26), and the honest version needs a policy this packet
- *   has no basis to choose: how much impulse, split how against the body's mass
- *   (§23), and whether it may wake a sleeping body (§32) — the same
- *   "alarm clock" question `ForceFieldSystem` declined. **Seam:** a
- *   `pushImpulse` option plus `RigidBody.applyImpulseAtPoint` at
- *   `ShapeCastHit.point`, which is already world-space and already carried by
- *   every hit.
+ * - **Pushing dynamic bodies (PH-11c).** A horizontal slide hit against a
+ *   `"dynamic"` `RigidBody` imparts an impulse at `ShapeCastHit.point` via
+ *   `body.applyImpulseAtPoint`. The character is kinematic, so
+ *   {@link SweptCharacterController.pushMass} (default 80 kg) is the mass used
+ *   for the reduced-mass split only. Sleepers are woken (`body.wake()` before
+ *   the impulse — `applyImpulse` does not wake). Static and kinematic hits
+ *   receive nothing. Opt out with `pushDynamics: false` to restore the
+ *   pre-PH-11c no-push behaviour.
  * - **Moving-platform carry.** A character *stands on* a dynamic or kinematic
  *   body perfectly well — grounding is a geometric fact and the probe reports
  *   it — but it is **not carried** when that body moves. Carry needs the
@@ -318,6 +317,23 @@ export const DEFAULT_GROUND_SNAP_DISTANCE = 0.1;
 export const DEFAULT_MAX_SLIDES = 4;
 
 /**
+ * Default {@link SweptCharacterController.pushMass}, in kilograms: `80`.
+ *
+ * The controller is kinematic and is not a solver body; this is the mass used
+ * only for the PH-11c reduced-mass push against a dynamic hit.
+ */
+export const DEFAULT_PUSH_MASS = 80;
+
+/**
+ * Default {@link SweptCharacterController.pushImpulseScale}: `1`.
+ *
+ * A dimensionless gain on the PH-11c push impulse. `0` disables the impulse
+ * while still allowing the character to slide; prefer `pushDynamics: false`
+ * when the whole interaction should be off.
+ */
+export const DEFAULT_PUSH_IMPULSE_SCALE = 1;
+
+/**
  * Horizontal or vertical motion at or below this many metres in one step is
  * treated as none at all, in metres.
  *
@@ -424,6 +440,25 @@ export interface SweptCharacterControllerOptions {
 
   /** §30 bit set the character's casts may hit. Defaults to every bit. */
   collisionMask?: number;
+
+  /**
+   * Mass, in kilograms, used only for the PH-11c reduced-mass push against a
+   * dynamic hit. The controller is kinematic and is not a solver body.
+   * Finite and `> 0`. Default {@link DEFAULT_PUSH_MASS}.
+   */
+  pushMass?: number;
+
+  /**
+   * Dimensionless gain on the push impulse. Finite and `>= 0`.
+   * Default {@link DEFAULT_PUSH_IMPULSE_SCALE}.
+   */
+  pushImpulseScale?: number;
+
+  /**
+   * Whether a horizontal slide against a `"dynamic"` body imparts an impulse.
+   * Default `true`. `false` restores the pre-PH-11c no-push behaviour.
+   */
+  pushDynamics?: boolean;
 }
 
 /**
@@ -496,6 +531,21 @@ export class SweptCharacterController implements Component {
   readonly collisionMask: number;
 
   /**
+   * Mass, in kilograms, used only for the PH-11c reduced-mass push.
+   * The controller is kinematic and is not a solver body.
+   */
+  readonly pushMass: number;
+
+  /** Dimensionless gain on the PH-11c push impulse. */
+  readonly pushImpulseScale: number;
+
+  /**
+   * Whether a horizontal slide against a `"dynamic"` body imparts an impulse.
+   * `false` preserves the pre-PH-11c no-push behaviour.
+   */
+  readonly pushDynamics: boolean;
+
+  /**
    * Steps on which the controller declined to write because the pose it
    * computed was not finite — `CharacterController.skippedSteps`' contract, for
    * the same reason: §85's refusals govern *authoring*, and a value that goes
@@ -543,6 +593,9 @@ export class SweptCharacterController implements Component {
   /** Sweep direction scratch. */
   readonly #direction = new Vector3();
 
+  /** PH-11c impulse scratch — one Vector3 for the life of the controller. */
+  readonly #pushImpulse = new Vector3();
+
   /** One-entry ignore list: the character's own body (§30 "ignored bodies"). */
   readonly #ignored: PhysicsBodyHandle[] = [];
 
@@ -579,6 +632,9 @@ export class SweptCharacterController implements Component {
     const skinWidth = options.skinWidth ?? DEFAULT_SKIN_WIDTH;
     const snap = options.groundSnapDistance ?? DEFAULT_GROUND_SNAP_DISTANCE;
     const maxSlides = options.maxSlides ?? DEFAULT_MAX_SLIDES;
+    const pushMass = options.pushMass ?? DEFAULT_PUSH_MASS;
+    const pushImpulseScale =
+      options.pushImpulseScale ?? DEFAULT_PUSH_IMPULSE_SCALE;
 
     assertPositive(radius, "SweptCharacterControllerOptions.radius");
     assertPositive(halfHeight, "SweptCharacterControllerOptions.halfHeight");
@@ -614,6 +670,11 @@ export class SweptCharacterController implements Component {
         `SweptCharacterControllerOptions.maxSlides must be an integer >= 1 (§85); received ${String(maxSlides)}`,
       );
     }
+    assertPositive(pushMass, "SweptCharacterControllerOptions.pushMass");
+    assertNonNegative(
+      pushImpulseScale,
+      "SweptCharacterControllerOptions.pushImpulseScale",
+    );
     if (options.world !== undefined && options.world.dimension !== "3d") {
       throw new RangeError(
         "SweptCharacterControllerOptions.world must be a \"3d\" PhysicsWorld (§21, §85): this controller's planar model is a heading about +Y, which a 2D character does not have. Drive a 2D character with @four/motion's CharacterController.",
@@ -640,6 +701,9 @@ export class SweptCharacterController implements Component {
     this.maxSlides = maxSlides;
     this.collisionGroups = options.collisionGroups ?? ALL_COLLISION_GROUPS;
     this.collisionMask = options.collisionMask ?? ALL_COLLISION_GROUPS;
+    this.pushMass = pushMass;
+    this.pushImpulseScale = pushImpulseScale;
+    this.pushDynamics = options.pushDynamics ?? true;
     this.#cosSlopeLimit = Math.cos(slopeLimit);
     this.#shape = { type: "capsule", halfHeight, radius };
 
@@ -907,6 +971,7 @@ export class SweptCharacterController implements Component {
         break;
       }
       this.slideCount += 1;
+      this.#pushDynamic(hit, rx / deltaSeconds, rz / deltaSeconds);
       const advance = hit.distance - this.skinWidth;
       if (advance > 0) {
         const consumed = advance / length;
@@ -1060,6 +1125,48 @@ export class SweptCharacterController implements Component {
       }
     }
     return nearest;
+  }
+
+  /**
+   * PH-11c: when a horizontal slide hits a `"dynamic"` body, impart
+   * `J = μ · closingSpeed · (−n) · pushImpulseScale` at the witness point.
+   *
+   * μ is the reduced mass of {@link SweptCharacterController.pushMass} and
+   * the hit body. Static / kinematic / massless / infinite-mass hits are
+   * skipped. Sleepers are woken first — `applyImpulseAtPoint` does not wake.
+   */
+  #pushDynamic(
+    hit: WorldShapeCastHit,
+    velocityX: number,
+    velocityZ: number,
+  ): void {
+    if (!this.pushDynamics) {
+      return;
+    }
+    const body = hit.body;
+    if (body.type !== "dynamic") {
+      return;
+    }
+    const mass = body.mass;
+    if (mass === undefined || !Number.isFinite(mass) || mass <= 0) {
+      return;
+    }
+    const closing = Math.max(
+      0,
+      -(velocityX * hit.normal.x + velocityZ * hit.normal.z),
+    );
+    if (closing === 0 || this.pushImpulseScale === 0) {
+      return;
+    }
+    const mu = (this.pushMass * mass) / (this.pushMass + mass);
+    const scale = mu * closing * this.pushImpulseScale;
+    this.#pushImpulse.set(
+      -hit.normal.x * scale,
+      -hit.normal.y * scale,
+      -hit.normal.z * scale,
+    );
+    body.wake();
+    body.applyImpulseAtPoint(this.#pushImpulse, hit.point);
   }
 
   /**

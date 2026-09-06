@@ -28,6 +28,9 @@ function counts(
     textureBytes: 0,
     materials: 0,
     solverBodies: 0,
+    solverColliders: 0,
+    solverJoints: 0,
+    solverHandles: 0,
     ...overrides,
   };
 }
@@ -138,6 +141,32 @@ describe("auditResourceLeaks", () => {
     expect(report.materials).toBe(2);
     expect(report.solverBodies).toBe(1);
     expect(report.message).toContain("2 materials");
+  });
+
+  it("mentions solver handles when that count regresses", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const report = auditResourceLeaks(
+      counts(),
+      counts({ materials: 1, solverHandles: 4 }),
+      { label: "solver teardown" },
+    );
+    expect(report.materials).toBe(1);
+    expect(report.solverHandles).toBe(4);
+    expect(report.message).toContain("1 materials");
+    expect(report.message).toContain("4 solver handles");
+  });
+
+  it("names collider and joint handle leaks separately", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const report = auditResourceLeaks(
+      counts(),
+      counts({ solverColliders: 2, solverJoints: 1 }),
+      { label: "constraint teardown" },
+    );
+    expect(report.solverColliders).toBe(2);
+    expect(report.solverJoints).toBe(1);
+    expect(report.message).toContain("2 solver colliders");
+    expect(report.message).toContain("1 solver joints");
   });
 
   it("computes the report without printing when warn is false", () => {

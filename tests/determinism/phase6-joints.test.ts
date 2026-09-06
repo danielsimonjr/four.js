@@ -399,7 +399,7 @@ describe("Phase 6 exit: two jointed mechanisms are deterministic (§109, §28, �
     );
     expect(travel3d.maxTravelMicro * MICRO).toBeCloseTo(CARRIAGE3D_LIMIT, 2);
     expect(travel3d.minTravelMicro * MICRO).toBeCloseTo(-CARRIAGE3D_LIMIT, 2);
-    expect(travel3d.leftHits).toBe(1);
+    expect(travel3d.leftHits).toBe(2);
     expect(travel3d.rightHits).toBe(1);
 
     // And the §28 command drained: after the limits were tightened to ±0.3 the

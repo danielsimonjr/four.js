@@ -347,6 +347,8 @@ describe("A-1 — §84 statistics through the whole stack", () => {
 
     app.step(FIXED);
 
+    // No physics world, and the recording GL context has no timer extension,
+    // so these four stay `NaN` — "not measured", not a confident zero.
     for (const staged of [
       app.stats?.gpuFrameTime,
       app.stats?.physicsStepTime,

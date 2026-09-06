@@ -506,6 +506,81 @@ describe("WebgpuRenderer.initialize", () => {
     expect(capabilities.textureFormats).toEqual(["rgba8"]);
     // The backend cannot make one yet, whatever the device could (WP-R1.6).
     expect(capabilities.floatRenderTargets).toBe(false);
+    // WebGPU has no standard anisotropy limit; 16 is the clamp the
+    // texture cache already uses when `limits.maxAnisotropy` is absent.
+    expect(capabilities.maxAnisotropy).toBe(16);
+  });
+
+  it("requests timestamp-query when the adapter has it (A-1)", async () => {
+    const gpu = createRecordingGpu();
+    const renderer = new WebgpuRenderer();
+    await withHostGpu(gpu.gpu, async () => {
+      await renderer.initialize({ canvas: gpu.canvas });
+    });
+
+    expect(gpu.callsOf("adapter.requestDevice")[0]?.args[0]).toEqual({
+      requiredFeatures: ["timestamp-query"],
+    });
+    renderer.dispose();
+  });
+
+  it("does not request timestamp-query when the adapter lacks it (A-1)", async () => {
+    const gpu = createRecordingGpu({ features: [] });
+    const renderer = new WebgpuRenderer();
+    await withHostGpu(gpu.gpu, async () => {
+      await renderer.initialize({ canvas: gpu.canvas });
+    });
+
+    expect(gpu.callsOf("adapter.requestDevice")[0]?.args[0]).toBeUndefined();
+    expect(renderer.capabilities.timestampQueries).toBe(false);
+    renderer.dispose();
+  });
+
+  it("does not issue timestamp writes until lastGpuFrameTimeSeconds is read (A-1)", async () => {
+    const { gpu, renderer } = await initialized();
+    renderer.render(createRoot(), [createView()]);
+
+    expect(gpu.countOf("device.createQuerySet")).toBe(0);
+    const viewsPass = gpu
+      .callsOf("encoder.beginRenderPass")
+      .find(
+        (call) => (call.args[0] as { label?: string } | undefined)?.label === "four:views",
+      );
+    expect(
+      (viewsPass?.args[0] as { timestampWrites?: unknown } | undefined)
+        ?.timestampWrites,
+    ).toBeUndefined();
+  });
+
+  it("writes views-pass timestamps after lastGpuFrameTimeSeconds is read (A-1)", async () => {
+    const { gpu, renderer } = await initialized();
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    gpu.reset();
+    renderer.render(createRoot(), [createView()]);
+
+    expect(gpu.countOf("device.createQuerySet")).toBe(1);
+    expect(gpu.countOf("encoder.resolveQuerySet")).toBe(1);
+    expect(gpu.countOf("buffer.mapAsync")).toBe(1);
+    await Promise.resolve();
+    // The recording double's mapped range is the i % 251 pattern, which
+    // yields a finite positive u64 difference — not a wall-clock sample.
+    expect(renderer.lastGpuFrameTimeSeconds).toBeGreaterThan(0);
+    expect(Number.isFinite(renderer.lastGpuFrameTimeSeconds)).toBe(true);
+  });
+
+  it("leaves lastGpuFrameTimeSeconds NaN when timestamp-query is absent (A-1)", async () => {
+    const gpu = createRecordingGpu({ features: [] });
+    const renderer = new WebgpuRenderer();
+    await withHostGpu(gpu.gpu, async () => {
+      await renderer.initialize({ canvas: gpu.canvas });
+    });
+    renderer.resize(256, 256, 1);
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    renderer.render(createRoot(), [createView()]);
+    await Promise.resolve();
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    expect(gpu.countOf("device.createQuerySet")).toBe(0);
+    renderer.dispose();
   });
 
   it("reports the floor for a device that will not state its limits", async () => {
@@ -520,6 +595,16 @@ describe("WebgpuRenderer.initialize", () => {
     expect(renderer.capabilities.storageBuffers).toBe(false);
     expect(renderer.capabilities.timestampQueries).toBe(false);
     expect(renderer.capabilities.compressedTextureFormats).toEqual([]);
+    expect(renderer.capabilities.maxAnisotropy).toBe(16);
+  });
+
+  it("reports maxAnisotropy from device.limits when the host names one", async () => {
+    const gpu = createRecordingGpu({ limits: { maxAnisotropy: 4 } });
+    const renderer = new WebgpuRenderer();
+    await withHostGpu(gpu.gpu, async () => {
+      await renderer.initialize({ canvas: gpu.canvas });
+    });
+    expect(renderer.capabilities.maxAnisotropy).toBe(4);
   });
 
   it("reports the compressed formats the device has", async () => {

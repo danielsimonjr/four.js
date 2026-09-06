@@ -151,7 +151,9 @@ import type {
   UnlitMaterial,
 } from "@four/materials";
 import {
+  CAMERA_SHAKE_SERIALIZER,
   CHARACTER_CONTROLLER_SERIALIZER,
+  CameraShake,
   CharacterController,
   FIRST_PERSON_LOOK_SERIALIZER,
   FOLLOW_RIG_SERIALIZER,
@@ -207,6 +209,8 @@ import {
   DirectionalLight,
   MORPH_WEIGHTS_SERIALIZER,
   MorphWeights,
+  NODE_SPACE_SERIALIZER,
+  NodeSpace,
   OrthographicCamera,
   PerspectiveCamera,
   PointLight,
@@ -3354,12 +3358,20 @@ export function registerSceneNodeTypes(
   // intent — see the serializers in `@four/motion`.
   components.register(CharacterController, CHARACTER_CONTROLLER_SERIALIZER);
   components.register(FirstPersonLook, FIRST_PERSON_LOOK_SERIALIZER);
+  // §44's camera shake (R-36/R-37 residue): trauma is scene state and must
+  // survive a save, the way `CHARACTER_CONTROLLER_SERIALIZER` keeps
+  // `verticalVelocity`. The serializer lives in `@four/motion` beside the
+  // class.
+  components.register(CameraShake, CAMERA_SHAKE_SERIALIZER);
   // §54's morph weights (RFC 0003, 2026-08-28), registered in the same packet
   // that shipped the component — the one-packet rule the enumerating test
   // below this module enforces. The serializer lives in `@four/scene` beside
   // the class, declared against the same structural shape the motion
   // serializers use.
   components.register(MorphWeights, MORPH_WEIGHTS_SERIALIZER);
+  // §8's node-level space declaration (PH-12 remainder). Class and
+  // serializer land together so a scene carrying one can be saved (A-15).
+  components.register(NodeSpace, NODE_SPACE_SERIALIZER);
   registerPhysicsSerializers(components);
   return {
     components,

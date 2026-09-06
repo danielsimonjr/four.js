@@ -68,7 +68,7 @@
  * | outlines and selection highlighting | **staged** — needs a §71 GPU identifier buffer, a depth/normal edge pass, or §67's stencil (R-7). Named in the gap analysis as R-6's most-wanted consumer, and honestly still blocked on one of those three                                |
  * | distortion                          | **staged** — a screen-space displacement samples a second input (a flow map or a normal buffer); a pass here carries exactly one {@link EffectRenderPass.source}                                                                           |
  * | custom full-screen passes           | **shipped** (RFC 0001, 2026-08-28) — {@link GraphEffect}: a §60 shader graph in the `"screen"` domain, as data. The union stays closed; it gained one member whose payload is itself a closed structure, so `{ kind: "bloom" }` is still a compile error. No user shader *source* exists at any tier — that is the RFC's decision, made binding by spec revision 1.11 |
- * | "composable per viewport"           | **partial** — composition is per *pass*: a chain of effect passes ping-ponging between two targets composes freely, and a per-viewport chain is expressible by giving each viewport its own target. A per-viewport *rectangle* inside one effect pass is not: an effect covers its whole destination surface (see {@link EffectRenderPass}) |
+ * | "composable per viewport"           | **shipped** — composition is per *pass*: a chain of effect passes ping-ponging between two targets composes freely, a per-viewport chain is expressible by giving each viewport its own target, and {@link EffectRenderPass.rect} confines one effect to a destination-pixel rectangle (omitted = full surface, today's default) |
  *
  * ## The closed union is the point, not a placeholder
  *
@@ -372,6 +372,21 @@ export const COPY_EFFECT: CopyEffect = Object.freeze({ kind: "copy" });
  * the supported form. A disposed source or destination is skipped for the same
  * reason a disposed texture is (§83).
  */
+/**
+ * Destination-pixel rectangle for an {@link EffectRenderPass} (R-6 follow-up).
+ *
+ * Origin is the destination surface's bottom-left, +Y up (§7a), in the
+ * surface's own pixels — a render target's width/height, or the drawing
+ * buffer when the pass has no `target`. Omitted on the pass means the
+ * whole destination, which is the pre-follow-up behaviour.
+ */
+export interface EffectDestinationRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface EffectRenderPass {
   /** Required, and the only value — this is the discriminant. */
   readonly kind: "effect";
@@ -397,6 +412,14 @@ export interface EffectRenderPass {
    * post-processed frame on screen.
    */
   readonly target?: RenderTarget | null;
+
+  /**
+   * Optional destination-pixel rectangle (R-6 follow-up). Omitted or
+   * `undefined` covers the whole destination — today's default, so a graph
+   * that never names a rectangle stays transcript-identical. See
+   * {@link EffectDestinationRect}.
+   */
+  readonly rect?: EffectDestinationRect;
 }
 
 /**
@@ -441,6 +464,30 @@ export function supportsScreenEffects<TRenderer extends object>(
     typeof (renderer as Partial<ScreenEffectRenderer>).renderEffect ===
     "function"
   );
+}
+
+/** §85 check for {@link EffectRenderPass.rect}. Throws on a bad value. */
+function validateDestinationRect(rect: EffectDestinationRect | undefined): void {
+  if (rect === undefined) {
+    return;
+  }
+  validateRectComponent("rect.x", rect.x);
+  validateRectComponent("rect.y", rect.y);
+  validateRectComponent("rect.width", rect.width);
+  validateRectComponent("rect.height", rect.height);
+  if (rect.width < 0 || rect.height < 0) {
+    throw new RangeError(
+      "EffectRenderPass rect width and height must be >= 0 (§70, §85).",
+    );
+  }
+}
+
+function validateRectComponent(name: string, value: number): void {
+  if (!Number.isFinite(value)) {
+    throw new RangeError(
+      `EffectRenderPass ${name} must be a finite number; got ${value} (§70, §85).`,
+    );
+  }
 }
 
 /** Runs the §85 check for one grading coefficient. Throws on a bad value. */
@@ -600,7 +647,7 @@ function validateGraphEffect(effect: GraphEffect): void {
  * an application normally meets it; exported because an application that hand
  * -writes `renderer.renderEffect` has no graph to do it (module header).
  *
- * Four things are checked, and deliberately nothing else:
+ * Five things are checked, and deliberately nothing else:
  *
  * 1. **`source` really is a render-target texture** — the marker guard, not the
  *    type, because a JavaScript caller can hand over anything and a backend
@@ -612,7 +659,10 @@ function validateGraphEffect(effect: GraphEffect): void {
  *    error anywhere, which is the failure this function exists to prevent;
  * 4. **an output-transform pass reads linear and writes sRGB** — §60a's
  *    colour-space metadata, checked where a double encode is still a wiring
- *    mistake rather than a washed-out frame.
+ *    mistake rather than a washed-out frame;
+ * 5. **`rect`, when named, is finite and non-negative in width/height** — a
+ *    `NaN` scissor is a GL error and a negative extent is clamped-to-empty
+ *    at draw time; refusing here keeps the mistake at setup.
  *
  * Not checked: whether the source is disposed, and whether it is the same
  * surface as `target`. Both are *frame*-time facts (a target may be disposed
@@ -627,6 +677,7 @@ export function validateEffectRenderPass(pass: EffectRenderPass): void {
         `${typeof pass.source} (§70, §85).`,
     );
   }
+  validateDestinationRect(pass.rect);
   const effect = pass.effect;
   switch (effect.kind) {
     case "copy":

@@ -204,6 +204,19 @@ describe("analyzeShaderGraph — §85 refusals", () => {
       "length needs a vector",
     ],
     [
+      "angle of a float",
+      colorOnly([FLOAT, { kind: "unary", op: "angle", source: 0 }]),
+      "angle needs a vec2",
+    ],
+    [
+      "angle of a vec3",
+      colorOnly([
+        { kind: "constant", type: "vec3", value: [1, 0, 0] },
+        { kind: "unary", op: "angle", source: 0 },
+      ]),
+      "angle needs a vec2",
+    ],
+    [
       "sin of a matrix",
       colorOnly([
         { kind: "uniform", type: "mat4", name: "m" },

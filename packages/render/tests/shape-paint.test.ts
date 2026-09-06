@@ -21,6 +21,7 @@ import {
   clearRegisteredShapePaints,
   registerShapePaints,
   resolveShapePaintSupport,
+  type ConicGradientPaint,
   type LinearGradientPaint,
   type Paint,
   type PatternPaint,
@@ -68,6 +69,16 @@ function radial(
 
 function pattern(overrides: Partial<PatternPaint> = {}): PatternPaint {
   return { kind: "pattern", texture: fakeTexture(), ...overrides };
+}
+
+function conic(overrides: Partial<ConicGradientPaint> = {}): ConicGradientPaint {
+  return {
+    kind: "conic-gradient",
+    center: { x: 0, y: 0 },
+    startAngle: 0,
+    stops: RED_TO_BLUE,
+    ...overrides,
+  };
 }
 
 /**
@@ -141,6 +152,10 @@ function evaluateNode(
           return source.map((v) => Math.min(1, Math.max(0, v)));
         case "length":
           return [Math.hypot(...source)];
+        case "angle":
+          return [Math.atan2(source[1], source[0])];
+        case "fract":
+          return source.map((v) => v - Math.floor(v));
         default:
           throw new Error(`unexpected unary ${node.op} in a lowered graph`);
       }
@@ -330,6 +345,16 @@ describe("§58 object paints — §85 validation, refuse never clamp", () => {
       /finite/,
     ],
     ["an out-of-range opacity", radial({ opacity: 2 }), /opacity/],
+    [
+      "a non-finite conic centre",
+      conic({ center: { x: Number.NaN, y: 0 } }),
+      /finite/,
+    ],
+    [
+      "a non-finite conic startAngle",
+      conic({ startAngle: Number.POSITIVE_INFINITY }),
+      /finite/,
+    ],
     ["a zero pattern repeat", pattern({ repeat: { x: 0, y: 1 } }), /repeat/],
     [
       "a missing pattern texture",
@@ -341,13 +366,13 @@ describe("§58 object paints — §85 validation, refuse never clamp", () => {
     expect(() => new Circle({ fill: paint })).toThrow(message);
   });
 
-  it("refuses a conic gradient naming §60's missing angle operator", () => {
+  it("refuses a conic gradient missing its centre and stops (§85)", () => {
     expect(
       () =>
         new Circle({
           fill: { kind: "conic-gradient" } as unknown as Paint,
         }),
-    ).toThrow(/angle operator|atan/);
+    ).toThrow(/finite|stops/);
   });
 
   it("refuses an unknown paint kind naming what this tier draws", () => {
@@ -415,6 +440,41 @@ describe("§58 lowering — the graph means what the paint says", () => {
     expect(paintedColor(rect, { position: [0.5, 0, 0] })).toEqual([1, 0, 0, 1]);
     expect(paintedColor(rect, { position: [0.75, 0, 0] })).toEqual([
       0.5, 0.5, 0, 1,
+    ]);
+  });
+
+  it("evaluates a conic gradient from +X, counter-clockwise", () => {
+    const circle = new Circle({ radius: 2, fill: conic() });
+    // t = 0 on +X, 0.25 on +Y, 0.5 on −X — red → blue.
+    expect(paintedColor(circle, { position: [1, 0, 0] })).toEqual([
+      1, 0, 0, 1,
+    ]);
+    expect(paintedColor(circle, { position: [0, 1, 0] })).toEqual([
+      0.75, 0, 0.25, 1,
+    ]);
+    expect(paintedColor(circle, { position: [-1, 0, 0] })).toEqual([
+      0.5, 0, 0.5, 1,
+    ]);
+    expect(paintedColor(circle, { position: [0, -1, 0] })).toEqual([
+      0.25, 0, 0.75, 1,
+    ]);
+  });
+
+  it("rotates a conic gradient by startAngle and wraps past 2π", () => {
+    const circle = new Circle({
+      radius: 2,
+      fill: conic({ startAngle: Math.PI / 2 }),
+    });
+    // Offset 0 now sits on +Y.
+    expect(paintedColor(circle, { position: [0, 1, 0] })).toEqual([
+      1, 0, 0, 1,
+    ]);
+    expect(paintedColor(circle, { position: [-1, 0, 0] })).toEqual([
+      0.75, 0, 0.25, 1,
+    ]);
+    // +X is a quarter-turn clockwise of +Y → t = 0.75 after wrap.
+    expect(paintedColor(circle, { position: [1, 0, 0] })).toEqual([
+      0.25, 0, 0.75, 1,
     ]);
   });
 

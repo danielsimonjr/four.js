@@ -57,8 +57,9 @@
  * - Right-handed, **Y-up in both 2D and 3D** (§7a). 2D agents live in the XY
  *   plane at `z = 0` (§21) and the behaviours preserve that: every one of them
  *   is a linear combination of the inputs' components, so a scenario whose
- *   inputs all have `z = 0` produces `z = 0` out. The single exception is
- *   {@link wander}, whose circle is *defined* on the XY plane — see there.
+ *   inputs all have `z = 0` produces `z = 0` out. {@link wander} is the
+ *   planar exception — its circle is *defined* on the XY plane.
+ *   {@link wanderSpherical} is the 3D form and leaves that plane.
  * - Angles are radians, times seconds (§7a).
  * - `maxSpeed` and `maxAcceleration` are per-agent limits in units/s and
  *   units/s². They are **not validated** on this hot path: negative values
@@ -454,6 +455,12 @@ export interface WanderStateOptions {
   jitter: number;
   /** Initial angle on the circle in radians. Default `0` (straight ahead). */
   angle?: number;
+  /**
+   * Initial elevation of the wander target, in radians. Used by
+   * {@link wanderSpherical} only; {@link wander} ignores it. Default `0`
+   * (on the heading-aligned equator).
+   */
+  elevation?: number;
 }
 
 /**
@@ -478,9 +485,17 @@ export class WanderState {
 
   /**
    * Current angle of the wander target on the circle, in radians, measured in
-   * the world XY plane from +X. Kept wrapped to `[−π, π)` by {@link wander}.
+   * the world XY plane from +X. Kept wrapped to `[−π, π)` by {@link wander}
+   * and {@link wanderSpherical}.
    */
   angle: number;
+
+  /**
+   * Current elevation of the wander target, in radians, measured from the
+   * heading-aligned equator toward the frame's up. Kept in `[−π/2, π/2]`
+   * by {@link wanderSpherical}. {@link wander} does not read or write it.
+   */
+  elevation: number;
 
   constructor(options: WanderStateOptions) {
     assertFinite(options.radius, "WanderState radius");
@@ -505,11 +520,21 @@ export class WanderState {
         `WanderState angle must be a finite number of radians (§7a); received ${String(this.angle)}`,
       );
     }
+    this.elevation = options.elevation ?? 0;
+    if (!Number.isFinite(this.elevation)) {
+      throw new RangeError(
+        `WanderState elevation must be a finite number of radians (§7a); received ${String(this.elevation)}`,
+      );
+    }
   }
 
-  /** Puts the wander target back at `angle` radians (default `0`). */
-  reset(angle = 0): this {
+  /**
+   * Puts the wander target back at `angle` / `elevation` radians (default
+   * `0` / `0`).
+   */
+  reset(angle = 0, elevation = 0): this {
     this.angle = angle;
+    this.elevation = elevation;
     return this;
   }
 }
@@ -553,9 +578,9 @@ function assertFinite(value: number, what: string): void {
  * — the ones §111 has in mind — get exactly the classic behaviour and never
  * leave `z = 0`. A 3D agent still wanders, but only in heading, not in pitch:
  * the circle stays XY-aligned while its centre follows the 3D heading.
- * **Staged (2026-08-02, WP-8.2):** spherical wander (a jittered point on a
- * sphere, or a heading-aligned circle frame), which needs a basis convention for
- * the circle's orientation that no §111 consumer has asked for yet.
+ * {@link wanderSpherical} is the 3D form: a jittered point on a sphere in a
+ * heading-aligned frame. Planar {@link wander} stays **one**
+ * {@link SeededRandom} draw per call; the spherical form takes **two**.
  *
  * The angle is held in the **world** frame, not the agent's local frame as
  * Buckland's variant does; the two differ by whether the wander target rotates
@@ -601,6 +626,148 @@ export function wander(
     cx + Math.cos(angle) * state.radius,
     cy + Math.sin(angle) * state.radius,
     cz,
+    out,
+  );
+}
+
+/** Half-π, the elevation clamp so the spherical target stays off the poles. */
+const HALF_PI = Math.PI / 2;
+
+/**
+ * Below this length a heading is treated as undefined and the fallback
+ * frame is used (same order as the coincident-point floor the trajectories
+ * use).
+ */
+const HEADING_DEGENERATE = 1e-12;
+
+/**
+ * **Spherical wander** (WP-8.2): steer toward a target that jitters on a
+ * sphere in a heading-aligned frame.
+ *
+ * ```text
+ * angle     += uniform(−jitter · dt, +jitter · dt)   (draw 1 of 2)
+ * elevation += uniform(−jitter · dt, +jitter · dt)   (draw 2 of 2)
+ * elevation  = clamp(elevation, −π/2, +π/2)
+ * frame      = orthonormal(forward = velocity, up ≈ +Y)   // Gram-Schmidt
+ * centre     = position + forward · distance
+ * target     = centre + radius · (
+ *                cos(el)·cos(az) · forward +
+ *                sin(el)         · up +
+ *                cos(el)·sin(az) · right
+ *              )
+ * result     = seek(target)
+ * ```
+ *
+ * The frame is built from the agent's velocity: `forward` is the unit
+ * velocity, `up` is world `+Y` with its `forward` component removed
+ * (Gram-Schmidt), and `right = forward × up`. A zero (or degenerate)
+ * velocity falls back to **`+X` forward, `+Y` up**; a velocity parallel to
+ * `+Y` retries the hint with `+Z`, then `+X`.
+ *
+ * ## Determinism — two draws (WP-8.2)
+ *
+ * Exactly **two** draws from `random` per call, always, in that order:
+ * azimuth then elevation. Planar {@link wander} stays one draw, so a stream
+ * that used to feed `wander` cannot be replayed through this function and
+ * expected to match. Two agents seeded alike still trace identical 3D
+ * paths. `tests/steering.test.ts` asserts both the draw count and the
+ * bit-identity.
+ *
+ * Elevation is clamped to `[−π/2, π/2]` rather than wrapped: wrapping
+ * through a pole would flip the azimuth's meaning and produce a
+ * discontinuous jump. Azimuth wraps to `[−π, π)` like {@link wander}.
+ */
+export function wanderSpherical(
+  context: SteeringContext,
+  state: WanderState,
+  random: SeededRandom,
+  deltaTime: number,
+  out: Vector3,
+): Vector3 {
+  const spread = state.jitter * deltaTime;
+  let angle = state.angle + random.nextRange(-spread, spread);
+  angle -= TWO_PI * Math.floor((angle + Math.PI) / TWO_PI);
+  state.angle = angle;
+
+  let elevation = state.elevation + random.nextRange(-spread, spread);
+  elevation =
+    elevation < -HALF_PI ? -HALF_PI : elevation > HALF_PI ? HALF_PI : elevation;
+  state.elevation = elevation;
+
+  const { position, velocity } = context;
+  const speedSquared =
+    velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z;
+
+  // Heading-aligned orthonormal frame. All locals: this module has no
+  // scratch state (see the module note on allocation).
+  let fx: number;
+  let fy: number;
+  let fz: number;
+  if (speedSquared > HEADING_DEGENERATE * HEADING_DEGENERATE) {
+    const inverse = 1 / Math.sqrt(speedSquared);
+    fx = velocity.x * inverse;
+    fy = velocity.y * inverse;
+    fz = velocity.z * inverse;
+  } else {
+    fx = 1;
+    fy = 0;
+    fz = 0;
+  }
+
+  // Gram-Schmidt: world +Y, then +Z, then +X, against `forward`.
+  let ux = 0;
+  let uy = 1;
+  let uz = 0;
+  let along = fx * ux + fy * uy + fz * uz;
+  ux -= fx * along;
+  uy -= fy * along;
+  uz -= fz * along;
+  let upLength = Math.sqrt(ux * ux + uy * uy + uz * uz);
+  if (upLength <= HEADING_DEGENERATE) {
+    ux = 0;
+    uy = 0;
+    uz = 1;
+    along = fx * ux + fy * uy + fz * uz;
+    ux -= fx * along;
+    uy -= fy * along;
+    uz -= fz * along;
+    upLength = Math.sqrt(ux * ux + uy * uy + uz * uz);
+    if (upLength <= HEADING_DEGENERATE) {
+      ux = 1;
+      uy = 0;
+      uz = 0;
+      along = fx * ux + fy * uy + fz * uz;
+      ux -= fx * along;
+      uy -= fy * along;
+      uz -= fz * along;
+      upLength = Math.sqrt(ux * ux + uy * uy + uz * uz);
+    }
+  }
+  if (upLength > 0) {
+    const inverse = 1 / upLength;
+    ux *= inverse;
+    uy *= inverse;
+    uz *= inverse;
+  }
+
+  const rx = fy * uz - fz * uy;
+  const ry = fz * ux - fx * uz;
+  const rz = fx * uy - fy * ux;
+
+  const ca = Math.cos(angle);
+  const sa = Math.sin(angle);
+  const ce = Math.cos(elevation);
+  const se = Math.sin(elevation);
+  const lx = ce * ca;
+  const ly = se;
+  const lz = ce * sa;
+  const radius = state.radius;
+  const distance = state.distance;
+  return seekPoint(
+    context,
+    position.x + fx * distance + (fx * lx + ux * ly + rx * lz) * radius,
+    position.y + fy * distance + (fy * lx + uy * ly + ry * lz) * radius,
+    position.z + fz * distance + (fz * lx + uz * ly + rz * lz) * radius,
     out,
   );
 }

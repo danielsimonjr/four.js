@@ -2,10 +2,10 @@
   "_warning": "IMMUTABLE. These numbers were recorded on 2026-08-09 by the PH-8 packet from an actual run of tests/determinism/helpers/force-field-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means engine or solver behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics, or a Rapier version bump) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that §26/§27 force generation is deterministic.",
   "_scenario": "One \"2d\" PhysicsWorld on Rapier2dAdapter with Appendix A gravity, holding a static rectangle floor (top y = -3.5) and twelve dynamic 0.5 m boxes of mass 0.5 … 6 kg fanned across x = -5.5 … 5.5. A ForceFieldSystem at PRIORITY_FORCES (500) and a PhysicsSystem at PRIORITY_PHYSICS_SOLVE (600) share one SystemRegistry, driven 300 clean fixed steps of 1/60 s with an injected TimeState whose simulationTime is exactly step / 60. Four §27 fields, in registration order — dragField(0.35) as \"acceleration\", a time-only sin gust as \"force\", vortexField as \"acceleration\", radialField as \"force\" — each wrapped in one volumeField box centred (0, 2, 0) with half-extents (14, 5, 1), whose floor at y = -3 sits above the bodies' resting height of y = -3.25 so a settled body receives exactly (0, 0, 0) and §32 can put it to sleep. The per-step value is world.checksum() (§33's own checksum, not a re-derivation); summaryDigest is the D6 FNV-1a hasher over all 300 of them in step order.",
   "_tier": "same-runtime (§33), the same tier and the same reasons as golden/phase5.json: Rapier is compiled WebAssembly, state crosses the JS/wasm boundary as f64 → f32, and the wasm image is pinned per platform by the package manager. The field arithmetic adds its own runtime-bound inputs — vortexField and radialField call Math.sqrt, the gust calls Math.sin — so cross-platform determinism is NOT claimed. The checksum algorithm itself is exact and cross-platform; only its inputs are runtime-bound.",
-  "summaryDigest": 1578314920,
+  "summaryDigest": 3111742934,
   "firstStepChecksum": 1833601093,
-  "lastStepChecksum": 1185087700,
-  "stepsWithSleepers": 107,
-  "sleepingAtEnd": 6,
-  "sampleCount": 12004
+  "lastStepChecksum": 1247496026,
+  "stepsWithSleepers": 198,
+  "sleepingAtEnd": 7,
+  "sampleCount": 9116
 }

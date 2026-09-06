@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>four.js — First Physics Scene</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0d0f14;
+        font:
+          14px/1.5 system-ui,
+          sans-serif;
+        color: #9aa3b2;
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      p {
+        margin: 0;
+        max-width: 960px;
+      }
+
+      #status[data-state="loading"] {
+        color: #6c7486;
+        font-style: italic;
+      }
+
+      #status[data-state="error"] {
+        color: #d97070;
+      }
+
+      #scene {
+        width: 960px;
+        height: 540px;
+        max-width: 100%;
+        display: block;
+        border-radius: 6px;
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <canvas id="scene" width="960" height="540"></canvas>
+      <p id="status" data-state="loading">loading physics…</p>
+      <p>
+        §93 first-physics-scene — the same page as
+        <code>examples/physics-playground</code>: gravity, collisions, click
+        impulses and sensors, 2D and 3D through one API.
+      </p>
+    </main>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

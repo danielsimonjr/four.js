@@ -58,8 +58,9 @@
  * | `limits` (hinge, slider)          | {@link HingeJoint.setLimits}, queued            |
  * | `motor` (hinge, slider)           | {@link HingeJoint.setMotor}, queued             |
  * | `collisionEnabled`                | plain setter, queued (PH-22f, 2026-08-08)       |
+ * | `anchorA` / `anchorB`             | {@link Joint.setAnchors}, queued (PH-22f)       |
  * | `breakForce` / `breakTorque`      | free — the engine enforces them                 |
- * | anchors, axis, rope, spring, cone | **frozen**; remove and re-add                   |
+ * | axis, rope, spring, cone          | **frozen**; remove and re-add                   |
  *
  * Limits and motors are the two things §28's own example makes live ("limit
  * switches", a motor commanded to a new speed), and both are reconfigurable in
@@ -68,33 +69,30 @@
  * commands-not-mutations rule §26 imposes on forces, and for the same reason:
  * the solver may be mid-step and §6b forbids physics work during dispatch.
  * `collisionEnabled` joined them once the seam was checked property by property
- * rather than in bulk.
+ * rather than in bulk. **Anchors joined them once the which-pose decision
+ * landed (PH-22f, 2026-09-06):** §28's public API after registration is
+ * **body-local**. {@link Joint.setAnchors} (and the field setters) take the
+ * same local frames `addJoint` stores after it converts the world-space
+ * constructor options. They are *not* re-measured against the current world
+ * poses, and they are *not* re-measured against the authoring poses — the
+ * caller supplies local-space points. The world drains them into
+ * `SolverJointAccess.setJointAnchors`, which Rapier implements as
+ * `ImpulseJoint.setAnchor1` / `setAnchor2`.
  *
  * ## Why the rest stays frozen — measured, 2026-08-08 (PH-22f)
  *
  * The 2026-08-01 staging note said "no adapter here can re-anchor or re-axis a
  * live constraint" and asked for a revisit. The revisit happened, against the
- * installed Rapier 0.19.3 typings and prototypes:
+ * installed Rapier typings and prototypes (re-checked at 0.20.0):
  *
- * | §28 property         | Rapier 0.19.3                                          | Verdict     |
- * | -------------------- | ------------------------------------------------------ | ----------- |
+ * | §28 property         | Rapier                                             | Verdict     |
+ * | -------------------- | -------------------------------------------------- | ----------- |
  * | `collisionEnabled`   | `ImpulseJoint.setContactsEnabled` — every type, both 2D/3D | **live**    |
- * | anchors              | `ImpulseJoint.setAnchor1` / `setAnchor2` exist          | staged (see below) |
- * | axis                 | no setter on any `ImpulseJoint` subclass                | frozen      |
- * | rope `maxLength`     | `RopeImpulseJoint` declares no members at all           | frozen      |
+ * | anchors              | `ImpulseJoint.setAnchor1` / `setAnchor2` — every type | **live** (body-local) |
+ * | axis                 | no setter on any `ImpulseJoint` subclass           | frozen      |
+ * | rope `maxLength`     | `RopeImpulseJoint` declares no members at all      | frozen      |
  * | spring rest/stiffness/damping | `SpringImpulseJoint` declares no members at all | frozen      |
- * | spherical swing cone | `SphericalImpulseJoint` declares no members at all      | frozen      |
- *
- * So the blanket statement was wrong for exactly two rows.
- * `collisionEnabled` is closed above. **Anchors are staged deliberately, not
- * for lack of a setter**: this module converts world-space anchors to
- * body-local frames *once, against the poses at `addJoint`* (see the section
- * above), and a live `setAnchors` has to answer which poses a re-anchor is
- * measured against — the poses now, or the poses the joint was built with.
- * That is a semantic decision, not a binding, and the two answers give
- * different mechanisms. It belongs to whichever packet also decides whether
- * §28 wants a body-local anchor API; until then `anchorA`/`anchorB` stay
- * `readonly`, and remove-and-re-add is the route.
+ * | spherical swing cone | `SphericalImpulseJoint` declares no members at all | frozen      |
  *
  * The frozen rows are frozen because changing them is not reconfiguration but a
  * different joint, and a setter that silently did nothing would be worse than
@@ -102,7 +100,8 @@
  * error rather than a runtime rejection — a failure at the earliest moment it
  * can be had. (Until PH-22f, `collisionEnabled` was the sole exception: a
  * mutable property with a runtime throw. Making it live retired both the throw
- * and the `#requireUnregistered` guard that existed only for it.)
+ * and the `#requireUnregistered` guard that existed only for it. Anchors
+ * followed as writable fields plus {@link Joint.setAnchors}.)
  *
  * ## Breakage (plan P6-2)
  *
@@ -203,10 +202,11 @@ export interface JointBinding {
  * (§28; the §26 command pattern applied to constraints).
  *
  * A live read-only view of joint-owned storage. `PhysicsWorld` consumes it once
- * per fixed step, pushes the current {@link HingeJoint.limits} and
- * {@link HingeJoint.motor} into `SolverJointAccess`, and clears it — so a joint
- * reconfigured three times between steps costs one solver call, with the last
- * value winning.
+ * per fixed step, pushes the current {@link HingeJoint.limits},
+ * {@link HingeJoint.motor}, {@link Joint.collisionEnabled}, and
+ * {@link Joint.anchorA} / {@link Joint.anchorB} into `SolverJointAccess`, and
+ * clears it — so a joint reconfigured three times between steps costs one
+ * solver call, with the last value winning.
  */
 export interface JointCommands {
   /** Whether the limits changed and have not reached the solver yet. */
@@ -218,6 +218,11 @@ export interface JointCommands {
    * (PH-22f, 2026-08-08).
    */
   readonly collisionDirty: boolean;
+  /**
+   * Whether the body-local anchors changed and have not reached the solver yet
+   * (PH-22f, 2026-09-06).
+   */
+  readonly anchorsDirty: boolean;
 }
 
 /** The writable face of {@link JointCommands}; module-private by design. */
@@ -225,6 +230,7 @@ interface MutableJointCommands {
   limitsDirty: boolean;
   motorDirty: boolean;
   collisionDirty: boolean;
+  anchorsDirty: boolean;
 }
 
 /**
@@ -291,14 +297,25 @@ export abstract class Joint extends EventEmitter<JointEventMap> {
   readonly bodyB: RigidBody;
 
   /**
-   * World-space attachment point on {@link Joint.bodyA} at construction, or
-   * `undefined` for the body's own origin. Owned by the joint; converted to
-   * `bodyA`'s local frame when the world registers it.
+   * Attachment point on {@link Joint.bodyA}.
+   *
+   * **World space at construction**, because that is where §28's example puts
+   * the pin. **Body-local after {@link Joint.setAnchors} or `world.addJoint`**
+   * — registration converts the authored world point into `bodyA`'s local
+   * frame once, and every later write is that same local frame (PH-22f).
+   * `undefined` means the body's own origin.
    */
-  readonly anchorA: Vector3 | undefined;
+  #anchorA: Vector3 | undefined;
 
-  /** World-space attachment point on {@link Joint.bodyB}. See `anchorA`. */
-  readonly anchorB: Vector3 | undefined;
+  /** Attachment point on {@link Joint.bodyB}. See `anchorA`. */
+  #anchorB: Vector3 | undefined;
+
+  /**
+   * Whether {@link Joint.anchorA} / {@link Joint.anchorB} are already
+   * body-local. `false` after construction (world-space options); `true` after
+   * `addJoint` writes the converted frames back, or after {@link Joint.setAnchors}.
+   */
+  #anchorsAreLocal = false;
 
   /** Backing store for {@link Joint.collisionEnabled}. */
   #collisionEnabled: boolean;
@@ -320,6 +337,7 @@ export abstract class Joint extends EventEmitter<JointEventMap> {
     limitsDirty: false,
     motorDirty: false,
     collisionDirty: false,
+    anchorsDirty: false,
   };
 
   /**
@@ -340,8 +358,8 @@ export abstract class Joint extends EventEmitter<JointEventMap> {
     }
     this.bodyA = options.bodyA;
     this.bodyB = options.bodyB;
-    this.anchorA = copyAnchor("anchorA", options.anchorA ?? options.anchor);
-    this.anchorB = copyAnchor("anchorB", options.anchorB ?? options.anchor);
+    this.#anchorA = copyAnchor("anchorA", options.anchorA ?? options.anchor);
+    this.#anchorB = copyAnchor("anchorB", options.anchorB ?? options.anchor);
     this.#collisionEnabled = options.collisionEnabled ?? false;
     if (options.breakForce !== undefined) {
       validateJointBreakThreshold("breakForce", options.breakForce);
@@ -356,6 +374,79 @@ export abstract class Joint extends EventEmitter<JointEventMap> {
   // --- shared state ---------------------------------------------------------
 
   /**
+   * Attachment point on {@link Joint.bodyA}.
+   *
+   * World space until {@link Joint.setAnchors} or `world.addJoint` converts it
+   * to `bodyA`'s local frame. After that, reads and writes are body-local
+   * (PH-22f). `undefined` means the body's own origin.
+   */
+  get anchorA(): Vector3 | undefined {
+    return this.#anchorA;
+  }
+
+  /**
+   * Sets the attachment point on {@link Joint.bodyA} in **body-local** space
+   * and queues it when the joint is registered. See {@link Joint.setAnchors}.
+   */
+  set anchorA(value: Vector3Input | undefined) {
+    this.setAnchors(value, this.#anchorB);
+  }
+
+  /**
+   * Attachment point on {@link Joint.bodyB}. See {@link Joint.anchorA}.
+   */
+  get anchorB(): Vector3 | undefined {
+    return this.#anchorB;
+  }
+
+  /**
+   * Sets the attachment point on {@link Joint.bodyB} in **body-local** space
+   * and queues it when the joint is registered. See {@link Joint.setAnchors}.
+   */
+  set anchorB(value: Vector3Input | undefined) {
+    this.setAnchors(this.#anchorA, value);
+  }
+
+  /**
+   * Replaces both attachment points with **body-local** vectors and queues
+   * them for the solver (§28, PH-22f).
+   *
+   * The frames are the same ones stored after `world.addJoint` converts the
+   * world-space constructor options. They are not re-measured against the
+   * current world poses and not re-measured against the authoring poses — the
+   * caller supplies local-space points. `undefined` means that body's origin.
+   *
+   * Takes effect at the next fixed step, like {@link HingeJoint.setLimits}.
+   * Writing the values already stored queues nothing. Unregistered, the write
+   * is immediate and the next `addJoint` uses these locals as-is (it does not
+   * convert them as world-space).
+   */
+  setAnchors(
+    anchorA: Vector3Input | undefined,
+    anchorB: Vector3Input | undefined,
+  ): void {
+    const nextA = copyAnchor("anchorA", anchorA);
+    const nextB = copyAnchor("anchorB", anchorB);
+    const unchanged =
+      sameAnchor(this.#anchorA, nextA) && sameAnchor(this.#anchorB, nextB);
+    this.#anchorA = nextA;
+    this.#anchorB = nextB;
+    this.#anchorsAreLocal = true;
+    if (!unchanged && this.registered) {
+      this.#commands.anchorsDirty = true;
+    }
+  }
+
+  /**
+   * Whether {@link Joint.anchorA} / {@link Joint.anchorB} are body-local
+   * (PH-22f). `false` after construction (world-space options); `true` after
+   * `addJoint` writes the converted frames back, or after {@link Joint.setAnchors}.
+   */
+  get anchorsAreLocal(): boolean {
+    return this.#anchorsAreLocal;
+  }
+
+  /**
    * Whether the two bodies still collide with each other (§28).
    *
    * **Live since PH-22f (2026-08-08).** Setting it on a registered joint
@@ -365,11 +456,9 @@ export abstract class Joint extends EventEmitter<JointEventMap> {
    * may be mid-step, and §6b forbids physics work during dispatch). Writing
    * the value it already holds queues nothing.
    *
-   * It is the *only* one of §28's frozen properties that became live, because
-   * it is the only one every shipped solver can change: Rapier's base
-   * `ImpulseJoint.setContactsEnabled` exists for every joint type in both
-   * dimensions, where the anchors, axis, rope length, spring terms and swing
-   * cone have no setter at all — see the module header's table.
+   * Anchors joined it as the other live §28 property every shipped solver can
+   * change — see {@link Joint.setAnchors}. Axis, rope length, spring terms and
+   * the spherical swing cone stay frozen; see the module header's table.
    */
   get collisionEnabled(): boolean {
     return this.#collisionEnabled;
@@ -1045,6 +1134,29 @@ export function clearJointCommands(joint: Joint): void {
   commands.limitsDirty = false;
   commands.motorDirty = false;
   commands.collisionDirty = false;
+  commands.anchorsDirty = false;
+}
+
+/**
+ * Copies `joint`'s stored anchors into `outA` / `outB`, using the origin when
+ * a side was omitted. Package-internal — the values the world pushes into
+ * `SolverJointAccess.setJointAnchors`.
+ */
+export function readJointAnchors(
+  joint: Joint,
+  outA: Vector3,
+  outB: Vector3,
+): void {
+  if (joint.anchorA !== undefined) {
+    outA.copy(joint.anchorA);
+  } else {
+    outA.set(0, 0, 0);
+  }
+  if (joint.anchorB !== undefined) {
+    outB.copy(joint.anchorB);
+  } else {
+    outB.set(0, 0, 0);
+  }
 }
 
 /**
@@ -1086,6 +1198,20 @@ export function readJointMotor(joint: Joint): SolverJointMotor | undefined {
         };
   }
   return undefined;
+}
+
+/** True when both sides name the same point, treating omitted as the origin. */
+function sameAnchor(
+  left: Vector3 | undefined,
+  right: Vector3 | undefined,
+): boolean {
+  const lx = left?.x ?? 0;
+  const ly = left?.y ?? 0;
+  const lz = left?.z ?? 0;
+  const rx = right?.x ?? 0;
+  const ry = right?.y ?? 0;
+  const rz = right?.z ?? 0;
+  return lx === rx && ly === ry && lz === rz;
 }
 
 /** Copies an optional world-space vector argument, rejecting a non-finite one. */

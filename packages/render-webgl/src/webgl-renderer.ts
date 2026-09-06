@@ -83,11 +83,14 @@ import {
   EffectProgram,
 } from "./gl-effect.js";
 import { GeometryCache } from "./gl-geometry.js";
+import { GlGpuTimer, hasDisjointTimerQuery } from "./gl-gpu-timer.js";
 import {
+  ParticleAppearanceProgram,
   ParticleBatchCache,
   ParticleProgram,
   ParticleTrailBatchCache,
   ParticleTrailProgram,
+  particleItemFloats,
   type ParticleGlContext,
 } from "./gl-particles.js";
 import {
@@ -993,11 +996,14 @@ function asContext(value: unknown): ParticleGlContext | null {
  * Every value is a statement about *this backend on WebGL 2*, and every one of
  * them is true by construction rather than by query:
  *
- * - `computeShaders`, `storageBuffers`, `indirectDraw`, `timestampQueries` —
- *   WebGL 2 has no compute stage, no storage buffers and no indirect draw at
- *   all, and this tier requests no timer extension. §62's tiers exist so that
- *   an application can read a `false` here and take the CPU path, rather than
- *   discover the absence at dispatch time.
+ * - `computeShaders`, `storageBuffers`, `indirectDraw` — WebGL 2 has no
+ *   compute stage, no storage buffers and no indirect draw at all. §62's
+ *   tiers exist so that an application can read a `false` here and take
+ *   the CPU path, rather than discover the absence at dispatch time.
+ * - `timestampQueries` is **not** in this table: it is a lazy
+ *   `getExtension("EXT_disjoint_timer_query_webgl2")` on first read of
+ *   the field, the same law `maxAnisotropy` follows, so `initialize`
+ *   and any test that never reads it issue the identical transcript.
  * - `floatRenderTargets` — `render-target.ts`'s `RenderTargetFormat` is the
  *   single-member union `"rgba8"`, and this backend requests no
  *   `EXT_color_buffer_float`; it cannot allocate a float target, whatever the
@@ -1021,12 +1027,18 @@ function asContext(value: unknown): ParticleGlContext | null {
  * — which is the third state the widened record exists to keep available
  * (`renderer.ts`). They join the §62 report the day something needs them, with
  * the query where the need is.
+ *
+ * `maxAnisotropy` follows the same law, with a tighter reading: the
+ * `EXT_texture_filter_anisotropic` query lives on a **getter**, so
+ * `initialize` and any test that never reads the field issue the identical
+ * GL transcript they did before R-30c. `textureFormats` is the short
+ * internal-format list this backend actually uploads (`rgba8`) — a constant,
+ * not a `getParameter`.
  */
 const WEBGL_STATIC_CAPABILITIES = Object.freeze({
   textureFormats: Object.freeze(["rgba8"]),
   multisampling: true,
   floatRenderTargets: false,
-  timestampQueries: false,
   storageBuffers: false,
   computeShaders: false,
   indirectDraw: false,
@@ -1040,13 +1052,37 @@ const WEBGL_STATIC_CAPABILITIES = Object.freeze({
   maximumSkinningJoints: MAX_SKINNING_JOINTS,
 } satisfies Partial<RendererCapabilities>);
 
+/**
+ * Device anisotropy ceiling (§62 / §77). Lazy on purpose: see
+ * {@link readCapabilities}. `1` is the isotropic floor — no extension, or
+ * a driver that will not name a number.
+ */
+function queryMaxAnisotropy(gl: ParticleGlContext): number {
+  const extension = gl.getExtension?.("EXT_texture_filter_anisotropic");
+  if (extension === undefined || extension === null) {
+    return 1;
+  }
+  const limit = gl.getParameter(GL.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+  return typeof limit === "number" && limit >= 1 ? Math.floor(limit) : 1;
+}
+
 /** Reads the §62 limits this tier can honestly report. */
 function readCapabilities(gl: ParticleGlContext): RendererCapabilities {
   const maxTextureSize = gl.getParameter(GL.MAX_TEXTURE_SIZE);
+  let maxAnisotropy: number | undefined;
+  let timestampQueries: boolean | undefined;
   return Object.freeze({
     backend: "webgl2",
     maxTextureSize: typeof maxTextureSize === "number" ? maxTextureSize : 0,
     ...WEBGL_STATIC_CAPABILITIES,
+    get maxAnisotropy(): number {
+      maxAnisotropy ??= queryMaxAnisotropy(gl);
+      return maxAnisotropy;
+    },
+    get timestampQueries(): boolean {
+      timestampQueries ??= hasDisjointTimerQuery(gl);
+      return timestampQueries;
+    },
   } satisfies RendererCapabilities);
 }
 
@@ -1069,6 +1105,40 @@ function readCapabilities(gl: ParticleGlContext): RendererCapabilities {
  * Values are rounded (GL takes integers) and extents are clamped at zero, since
  * a negative width or height is a GL error rather than an empty rectangle.
  */
+/**
+ * Viewport and scissor for a §70 effect pass (R-6 follow-up).
+ *
+ * Omitted `pass.rect` covers the whole destination — the pre-follow-up
+ * sequence, so a graph that never names a rectangle stays
+ * transcript-identical. A named rectangle is destination pixels, origin
+ * bottom-left (§7a). `SCISSOR_TEST` is on for this renderer's lifetime, so
+ * both rectangles are always written: leaving them would clip the blit to
+ * the previous view.
+ */
+function applyEffectDestination(
+  gl: {
+    viewport(x: number, y: number, width: number, height: number): void;
+    scissor(x: number, y: number, width: number, height: number): void;
+  },
+  pass: EffectRenderPass,
+  width: number,
+  height: number,
+): void {
+  const dest = pass.rect;
+  if (dest === undefined) {
+    // Same order as every other path in this file: scissor, then viewport.
+    gl.scissor(0, 0, width, height);
+    gl.viewport(0, 0, width, height);
+    return;
+  }
+  const x = Math.round(dest.x);
+  const y = Math.round(dest.y);
+  const w = Math.max(0, Math.round(dest.width));
+  const h = Math.max(0, Math.round(dest.height));
+  gl.scissor(x, y, w, h);
+  gl.viewport(x, y, w, h);
+}
+
 function resolveRect(
   view: RenderView,
   bufferWidth: number,
@@ -1281,6 +1351,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   #capabilities: RendererCapabilities = Object.freeze({
     backend: "webgl2",
     maxTextureSize: 0,
+    timestampQueries: false,
     ...WEBGL_STATIC_CAPABILITIES,
   } satisfies RendererCapabilities);
 
@@ -1293,6 +1364,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   #spriteProgram: SpriteProgram | null = null;
 
   #particleProgram: ParticleProgram | null = null;
+
+  /** R-32 appearance program — compiled on first opt-in draw (§61-safe). */
+  #particleAppearanceProgram: ParticleAppearanceProgram | null = null;
 
   #particleTrailProgram: ParticleTrailProgram | null = null;
 
@@ -1432,6 +1506,19 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   statistics: RenderStatistics | null = null;
 
   /**
+   * Last completed GPU-frame duration in seconds (A-1). Reading this
+   * getter is what arms `EXT_disjoint_timer_query_webgl2`; a renderer
+   * that never reads it issues not one extra GL call (R-30b).
+   */
+  get lastGpuFrameTimeSeconds(): number {
+    this.#gpuTimer ??= new GlGpuTimer();
+    this.#gpuTimer.arm();
+    return this.#gpuTimer.lastGpuFrameTimeSeconds;
+  }
+
+  #gpuTimer: GlGpuTimer | null = null;
+
+  /**
    * §65 batching, or `null` (the default) to batch nothing — the opt-in
    * capability (R-9, 2026-08-09; see `gl-batch.ts`).
    *
@@ -1515,6 +1602,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#program = null;
     this.#spriteProgram = null;
     this.#particleProgram = null;
+    this.#particleAppearanceProgram = null;
     this.#particleTrailProgram = null;
     this.#litProgram = null;
     this.#standardProgram = null;
@@ -1536,6 +1624,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // and its vertex array died with the context like every other handle; the
     // next batched draw recreates them.
     this.batching?.forget();
+    // Query objects died with the context; the next armed frame reallocates.
+    this.#gpuTimer?.forget();
     this.events.emit("contextlost", { renderer: this });
   };
 
@@ -1574,7 +1664,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   /**
    * §62 capability report. `maxTextureSize` is `0` until
    * {@link WebglRenderer.initialize} has queried the context, and is re-read on
-   * context restore.
+   * context restore. `maxAnisotropy` is omitted until that same moment, then
+   * resolved on first read (not during `initialize`) so landed GL transcripts
+   * stay byte-identical.
    */
   get capabilities(): RendererCapabilities {
     return this.#capabilities;
@@ -1801,6 +1893,10 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // per item to its draw loop and not a single GL call — the same
     // byte-identity contract A-1's counters make.
     const batching = this.batching;
+    const gpuTimer = this.#gpuTimer !== null && this.#gpuTimer.armed
+      ? this.#gpuTimer
+      : null;
+    gpuTimer?.begin(gl);
     // Whether a texture is bound to unit 0 — the sprite path binds one, and
     // since R-19 so does an unlit or lit draw whose material carries a `map`,
     // so a frame of particles and untextured geometry still has nothing to
@@ -1959,7 +2055,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       // The unlit pipeline is the frame's starting state, so a scene with no
       // sprites issues exactly the GL sequence it issued before sprites existed.
       program.use();
-      let activeKind: RenderItemKind | "particle-trail" = "unlit";
+      let activeKind: RenderItemKind | "particle-trail" | "particle-appearance" =
+        "unlit";
       let particleTrailActive = false;
       // The GL state mirror starts where `#applyFixedState` and GL's own defaults
       // left it; every draw below moves it only where its material asks.
@@ -2410,9 +2507,50 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             if (batch === null) {
               continue;
             }
-            if (activeKind !== "particles") {
+            const needsAppearance =
+              particleItemFloats(item) >= 10 ||
+              item.particleTexture !== undefined;
+            let appearanceProgram: ParticleAppearanceProgram | null = null;
+            if (needsAppearance) {
+              appearanceProgram = this.#particleAppearanceProgram;
+              if (appearanceProgram === null) {
+                try {
+                  appearanceProgram = ParticleAppearanceProgram.create(gl);
+                  this.#particleAppearanceProgram = appearanceProgram;
+                } catch {
+                  // §61: a compile refusal costs the appearance draw, not the frame.
+                  appearanceProgram = null;
+                }
+              }
+            }
+            if (appearanceProgram !== null) {
+              if (activeKind !== "particle-appearance") {
+                appearanceProgram.use();
+                appearanceProgram.setSceneDepth(false);
+                activeKind = "particle-appearance";
+                particleViewUploaded = false;
+              }
+              appearanceProgram.setUseMap(item.particleTexture !== undefined);
+              if (
+                item.particleTexture !== undefined &&
+                item.particleTexture !== true
+              ) {
+                const map = resolveTexture(
+                  textures,
+                  renderTargets,
+                  activeTarget,
+                  item.particleTexture as CacheableTexture,
+                );
+                if (map !== null) {
+                  gl.activeTexture(GL.TEXTURE0);
+                  gl.bindTexture(GL.TEXTURE_2D, map);
+                  textureBound = true;
+                }
+              }
+            } else if (activeKind !== "particles") {
               particleProgram.use();
               activeKind = "particles";
+              particleViewUploaded = false;
             }
             // Particles are transparent by construction (§36's colour ramp) and
             // carry no material to say otherwise, so they blend with the straight
@@ -2427,11 +2565,20 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               // The billboard offset happens between the view and the projection,
               // so this pipeline takes the two matrices separately rather than
               // the premultiplied `viewProjection` the other two use.
-              particleProgram.setProjection(camera.projectionMatrix);
-              particleProgram.setView(camera.viewMatrix);
+              if (appearanceProgram !== null) {
+                appearanceProgram.setProjection(camera.projectionMatrix);
+                appearanceProgram.setView(camera.viewMatrix);
+              } else {
+                particleProgram.setProjection(camera.projectionMatrix);
+                particleProgram.setView(camera.viewMatrix);
+              }
               particleViewUploaded = true;
             }
-            particleProgram.setModel(item.worldMatrix);
+            if (appearanceProgram !== null) {
+              appearanceProgram.setModel(item.worldMatrix);
+            } else {
+              particleProgram.setModel(item.worldMatrix);
+            }
             particleBatches.upload(batch, item);
             gl.bindVertexArray(batch.vertexArray);
             gl.drawArraysInstanced(record.mode, 0, record.count, item.count);
@@ -2750,6 +2897,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         }
       }
     } finally {
+      gpuTimer?.end(gl);
       // Restore the fixed state the frame borrowed, and leave nothing bound:
       // the next thing to touch this context may not be this renderer (§61
       // allows several renderers over one application).
@@ -2918,6 +3066,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     if (effect.kind === "graph") {
       this.#renderGraphEffect(
         gl,
+        pass,
         effect,
         sourceRecord,
         destinationRecord,
@@ -2949,13 +3098,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       if (destinationRecord !== null) {
         gl.bindFramebuffer(GL.FRAMEBUFFER, destinationRecord.framebuffer);
       }
-      // The whole destination surface: §70's effects are full-screen, and a
-      // per-viewport rectangle is staged (`@four/render`'s `effect-pass.ts`
-      // says what it would take). `SCISSOR_TEST` is on for this renderer's
-      // lifetime, so the rectangle has to be written or the previous view's
-      // would clip the blit.
-      gl.scissor(0, 0, width, height);
-      gl.viewport(0, 0, width, height);
+      // Full destination, or `pass.rect` when the pass names a rectangle
+      // (R-6 follow-up). `SCISSOR_TEST` is on for this renderer's lifetime,
+      // so the rectangle has to be written or the previous view's would clip
+      // the blit.
+      applyEffectDestination(gl, pass, width, height);
 
       // An effect *replaces* its destination: no blending, so a chain is
       // predictable, and no depth test, so the triangle is never rejected by
@@ -3237,6 +3384,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       this.#program?.dispose();
       this.#spriteProgram?.dispose();
       this.#particleProgram?.dispose();
+      this.#particleAppearanceProgram?.dispose();
       this.#particleTrailProgram?.dispose();
       this.#litProgram?.dispose();
       this.#standardProgram?.dispose();
@@ -3250,11 +3398,15 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       this.#particleBatches?.dispose();
       this.#particleTrailBatches?.dispose();
       this.batching?.dispose();
+      if (this.#gl !== null) {
+        this.#gpuTimer?.dispose(this.#gl);
+      }
     }
 
     this.#program = null;
     this.#spriteProgram = null;
     this.#particleProgram = null;
+    this.#particleAppearanceProgram = null;
     this.#particleTrailProgram = null;
     this.#litProgram = null;
     this.#standardProgram = null;
@@ -3276,6 +3428,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#particleTrailBatches = null;
     this.#gl = null;
     this.#canvas = null;
+    this.#gpuTimer = null;
     this.events.removeAllListeners();
   }
 
@@ -3529,6 +3682,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    */
   #renderGraphEffect(
     gl: ParticleGlContext,
+    pass: EffectRenderPass,
     effect: GraphEffect,
     sourceRecord: RenderTargetRecord,
     destinationRecord: RenderTargetRecord | null,
@@ -3574,11 +3728,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       if (destinationRecord !== null) {
         gl.bindFramebuffer(GL.FRAMEBUFFER, destinationRecord.framebuffer);
       }
-      // The whole destination surface, no blend, no depth test — an effect
-      // replaces what the destination held; `renderEffect`'s fixed path
-      // documents each choice and this arm repeats them exactly.
-      gl.scissor(0, 0, width, height);
-      gl.viewport(0, 0, width, height);
+      // Full destination, or `pass.rect` — same helper as the fixed path.
+      applyEffectDestination(gl, pass, width, height);
       applyBlendState(gl, state, false, "normal");
       applyDepthColorState(gl, state, false, true, true);
 

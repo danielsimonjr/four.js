@@ -57,9 +57,11 @@ const ALLOWED = new Set(["core", "four"]);
 
 /**
  * The packages that may additionally *declare* capability tokens
- * ({@link TOKEN_NAMES}): the four registry owners RFC 0002 §2 names, joined
- * 2026-08-29 when the tokens moved home from `four/plugins.ts` (the recorded
- * reversible spelling difference, reversed). Declaring a token is naming a
+ * ({@link TOKEN_NAMES}): the registry owners RFC 0002 §2 names, joined
+ * 2026-08-29 when the tokens moved home from `four/plugins.ts` and extended
+ * 2026-09-06 for the five remaining §81 points (assets, materials, ui,
+ * plus `four` for host-side editor tools and `render` for compute).
+ * Declaring a token is naming a
  * `{ name, revocable }` key — it confers no ability to install a plugin or
  * to acquire a capability, so `serialization` declaring
  * `COMPONENT_SERIALIZERS` does not weaken the §96 claim: the *host* names
@@ -73,6 +75,12 @@ const TOKEN_DECLARERS = new Set([
   "physics",
   "render",
   "serialization",
+  // The five remaining §81 points (2026-09-06): each token lives in the
+  // package that owns its (new, minimal) registry. Declaring a token is
+  // still not hosting a plugin — HOST_NAMES stay banned here.
+  "assets",
+  "materials",
+  "ui",
 ]);
 
 /**
@@ -152,7 +160,7 @@ describe("§96: untrusted content can never become a plugin", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("keeps token declaration to the registry owners RFC 0002 §2 names", () => {
+  it("keeps token declaration to the registry owners", () => {
     const offenders = packageNames()
       .filter((name) => !TOKEN_DECLARERS.has(name))
       .flatMap((name) => mentionsOf(name, TOKEN_NAMES));

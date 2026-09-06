@@ -15,6 +15,7 @@ import {
   separation,
   truncate,
   wander,
+  wanderSpherical,
   type SteeringContext,
   type SteeringNeighbor,
 } from "../src/steering.js";
@@ -743,6 +744,153 @@ describe("WanderState", () => {
     state.reset(Math.PI / 4);
     expect(state.angle).toBe(Math.PI / 4);
   });
+
+  it("defaults elevation to zero and resets it without breaking angle", () => {
+    const state = new WanderState({
+      radius: 1,
+      distance: 2,
+      jitter: 3,
+      elevation: 0.4,
+    });
+    expect(state.elevation).toBe(0.4);
+    state.reset(1.1, 0.2);
+    expect(state.angle).toBe(1.1);
+    expect(state.elevation).toBe(0.2);
+    state.reset();
+    expect(state.angle).toBe(0);
+    expect(state.elevation).toBe(0);
+  });
+
+  it("rejects a non-finite elevation", () => {
+    expect(
+      () =>
+        new WanderState({
+          radius: 1,
+          distance: 1,
+          jitter: 1,
+          elevation: Number.NaN,
+        }),
+    ).toThrow(/elevation/);
+  });
+});
+
+/** Runs `steps` of spherical wander and returns the path. */
+function runWanderSpherical(seed: number, steps: number): number[] {
+  const agent = new SteeringAgent({
+    velocity: new Vector3(3, 0, 0),
+    maxSpeed: 6,
+    maxAcceleration: 12,
+  });
+  const state = new WanderState({
+    radius: 2,
+    distance: 3,
+    jitter: 8,
+  });
+  const random = new SeededRandom(seed);
+  const acceleration = new Vector3();
+  const path: number[] = [];
+  for (let step = 0; step < steps; step += 1) {
+    wanderSpherical(agent, state, random, DT, acceleration);
+    agent.integrate(DT, acceleration);
+    path.push(agent.position.x, agent.position.y, agent.position.z);
+  }
+  return path;
+}
+
+describe("wanderSpherical (WP-8.2) — heading-aligned sphere", () => {
+  it("traces bit-identical 3D paths from identical streams", () => {
+    const first = runWanderSpherical(2468, 300);
+    const second = runWanderSpherical(2468, 300);
+    expect(first.length).toBe(900);
+    for (let i = 0; i < first.length; i += 1) {
+      expect(Object.is(first[i], second[i]), `sample ${i}`).toBe(true);
+    }
+  });
+
+  it("leaves the XY plane", () => {
+    const path = runWanderSpherical(4321, 200);
+    let maxAbsZ = 0;
+    for (let i = 2; i < path.length; i += 3) {
+      maxAbsZ = Math.max(maxAbsZ, Math.abs(path[i] ?? 0));
+    }
+    expect(maxAbsZ).toBeGreaterThan(0.05);
+  });
+
+  it("draws exactly two numbers per call (azimuth then elevation)", () => {
+    const agent = new SteeringAgent({ maxSpeed: 4, maxAcceleration: 8 });
+    const state = new WanderState({ radius: 1, distance: 2, jitter: 5 });
+    const random = new SeededRandom(31);
+    const oracle = new SeededRandom(31);
+    const out = new Vector3();
+    let expectedAngle = 0;
+    let expectedElevation = 0;
+    for (let step = 0; step < 200; step += 1) {
+      wanderSpherical(agent, state, random, DT, out);
+      expectedAngle += oracle.nextRange(-5 * DT, 5 * DT);
+      expectedAngle -=
+        2 * Math.PI * Math.floor((expectedAngle + Math.PI) / (2 * Math.PI));
+      expectedElevation += oracle.nextRange(-5 * DT, 5 * DT);
+      expectedElevation = Math.min(
+        Math.PI / 2,
+        Math.max(-Math.PI / 2, expectedElevation),
+      );
+      expect(state.angle).toBeCloseTo(expectedAngle, 12);
+      expect(state.elevation).toBeCloseTo(expectedElevation, 12);
+    }
+  });
+
+  it("clamps elevation to [−π/2, π/2] even for absurd jitter", () => {
+    const agent = new SteeringAgent({ maxSpeed: 4, maxAcceleration: 8 });
+    const state = new WanderState({ radius: 1, distance: 2, jitter: 1000 });
+    const random = new SeededRandom(9);
+    const out = new Vector3();
+    for (let step = 0; step < 200; step += 1) {
+      wanderSpherical(agent, state, random, 1, out);
+      expect(state.elevation).toBeGreaterThanOrEqual(-Math.PI / 2);
+      expect(state.elevation).toBeLessThanOrEqual(Math.PI / 2);
+    }
+  });
+
+  it("uses a +X / +Y fallback frame when the agent has no heading", () => {
+    const context = makeContext({
+      position: [0, 0, 0],
+      velocity: [0, 0, 0],
+      maxSpeed: 5,
+      maxAcceleration: 100,
+    });
+    const state = new WanderState({
+      radius: 2,
+      distance: 10,
+      jitter: 0,
+      angle: 0,
+      elevation: 0,
+    });
+    const out = new Vector3();
+    wanderSpherical(context, state, new SeededRandom(1), DT, out);
+    // Forward +X, up +Y, right +Z. az=0, el=0 → target = (10, 0, 0) + (2, 0, 0).
+    expectVector(out, 5, 0, 0);
+  });
+
+  it("builds a Gram-Schmidt frame when velocity is along +Y", () => {
+    const context = makeContext({
+      position: [0, 0, 0],
+      velocity: [0, 4, 0],
+      maxSpeed: 4,
+      maxAcceleration: 100,
+    });
+    const state = new WanderState({
+      radius: 2,
+      distance: 3,
+      jitter: 0,
+      angle: Math.PI / 2,
+      elevation: 0,
+    });
+    const out = new Vector3();
+    wanderSpherical(context, state, new SeededRandom(1), DT, out);
+    expect(Number.isFinite(out.x + out.y + out.z)).toBe(true);
+    // Heading +Y, fallback up +Z, right = +Y × +Z = +X. az=π/2 → +right.
+    expect(Math.abs(out.z)).toBeLessThan(1e-12);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1137,6 +1285,10 @@ describe("allocation and write discipline (§7b, plan D3/D7)", () => {
       ["pursue", () => void pursue(context, target, targetVelocity, out)],
       ["evade", () => void evade(context, target, targetVelocity, out)],
       ["wander", () => void wander(context, state, random, DT, out)],
+      [
+        "wanderSpherical",
+        () => void wanderSpherical(context, state, random, DT, out),
+      ],
       ["separation", () => void separation(context, neighbors, out)],
       ["cohesion", () => void cohesion(context, neighbors, out)],
       ["alignment", () => void alignment(context, neighbors, out)],
@@ -1182,6 +1334,7 @@ describe("allocation and write discipline (§7b, plan D3/D7)", () => {
         () => void pursue(scenario, target, targetVelocity, out),
         () => void evade(scenario, target, targetVelocity, out),
         () => void wander(scenario, state, random, DT, out),
+        () => void wanderSpherical(scenario, state, random, DT, out),
         () => void separation(scenario, neighbors, out),
         () => void cohesion(scenario, neighbors, out),
         () => void alignment(scenario, neighbors, out),

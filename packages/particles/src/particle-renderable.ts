@@ -72,6 +72,7 @@ import { Vector3, Vector4 } from "@four/math";
 import { Node } from "@four/scene";
 
 import type { ParticleEmitter } from "./emitter.js";
+import type { ParticleTexture } from "./types.js";
 import {
   TRAIL_VERTEX_FLOATS,
   buildTrailRibbonMesh,
@@ -88,6 +89,27 @@ import {
  * sides.
  */
 export const PARTICLE_INSTANCE_FLOATS = 8;
+
+/**
+ * Opt-in stride when the emitter sets `texture`, `alignToVelocity`, or
+ * `softness` (R-32). Default emitters stay on {@link PARTICLE_INSTANCE_FLOATS}
+ * so goldens and size budgets do not move.
+ *
+ * | Offset | Components | Meaning                         |
+ * | -----: | ---------: | ------------------------------- |
+ * | 0      | 3          | centre `x, y, z`                |
+ * | 3      | 1          | current size                    |
+ * | 4      | 4          | current straight-alpha RGBA     |
+ * | 8      | 1          | billboard rotation, radians     |
+ * | 9      | 1          | softness in `[0, 1]`            |
+ */
+export const PARTICLE_WIDE_INSTANCE_FLOATS = 10;
+
+/** Offset of the per-particle billboard rotation in the wide stream. */
+export const PARTICLE_ROTATION_OFFSET = 8;
+
+/** Offset of the per-particle softness in the wide stream. */
+export const PARTICLE_SOFTNESS_OFFSET = 9;
 
 /** Floats per trail ribbon vertex — duplicate of `@four/render`'s `TRAIL_VERTEX_FLOATS`. */
 export const PARTICLE_TRAIL_VERTEX_FLOATS = TRAIL_VERTEX_FLOATS;
@@ -200,7 +222,7 @@ export class ParticleRenderable extends Node {
     this.renderLayer = options.renderLayer ?? 0;
     this.renderOrder = options.renderOrder ?? 0;
     this.#instances = new Float32Array(
-      emitter.pool.capacity * PARTICLE_INSTANCE_FLOATS,
+      emitter.pool.capacity * emitter.instanceFloats,
     );
     if (emitter.hasTrail && emitter.trailStore !== undefined) {
       const trailLength = emitter.trailStore.length;
@@ -234,6 +256,20 @@ export class ParticleRenderable extends Node {
    */
   get particleInstances(): Float32Array {
     return this.#instances;
+  }
+
+  /**
+   * Stride of {@link particleInstances} — `8` by default, `10` when the
+   * emitter opted into R-32 appearance. Duplicated on `@four/render`'s
+   * `ParticleDrawable.particleInstanceFloats`.
+   */
+  get particleInstanceFloats(): number {
+    return this.emitter.instanceFloats;
+  }
+
+  /** Texture handle or `true`, forwarded from the emitter. */
+  get particleTexture(): ParticleTexture | undefined {
+    return this.emitter.texture;
   }
 
   /** Whether this node produces a trail ribbon mesh. */
@@ -283,15 +319,19 @@ export class ParticleRenderable extends Node {
     const pool = this.emitter.pool;
     const count = pool.aliveCount;
     const positions = pool.positions;
+    const velocities = pool.velocities;
     const ages = pool.ages;
     const lifetimes = pool.lifetimes;
     const sizes = pool.sizes;
     const colors = pool.colors;
     const out = this.#instances;
+    const stride = this.emitter.instanceFloats;
+    const alignToVelocity = this.emitter.alignToVelocity;
+    const softness = this.emitter.softness;
 
     for (let i = 0; i < count; i += 1) {
       const source = i * VECTOR_STRIDE;
-      const target = i * PARTICLE_INSTANCE_FLOATS;
+      const target = i * stride;
 
       out[target] = positions[source];
       out[target + 1] = positions[source + 1];
@@ -303,6 +343,14 @@ export class ParticleRenderable extends Node {
       out[target + 5] = this.#colorScratch.y;
       out[target + 6] = this.#colorScratch.z;
       out[target + 7] = this.#colorScratch.w;
+
+      if (stride === PARTICLE_WIDE_INSTANCE_FLOATS) {
+        const rotation = alignToVelocity
+          ? Math.atan2(velocities[source + 1], velocities[source])
+          : 0;
+        out[target + PARTICLE_ROTATION_OFFSET] = rotation;
+        out[target + PARTICLE_SOFTNESS_OFFSET] = softness;
+      }
     }
 
     this.#count = count;

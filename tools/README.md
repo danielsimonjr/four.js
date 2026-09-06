@@ -42,6 +42,24 @@ ESLint, Prettier, TypeDoc, Vite, Changesets (choices recorded in `MEMORY.md`).
   node tools/generate-compatibility.mjs   # regenerate in place after an adapter change
   ```
 
+- `render-guides.mjs` — Pages HTML for `docs/guides/*.md` (added 2026-09-06). Pages
+  serves files and does not render Markdown, so the docs workflow runs this at
+  assemble time into `_site/guides/`. Same CSS as `website/index.html`. Does not
+  write into `docs/guides/`.
+
+  ```sh
+  bun tools/render-guides.mjs --out=_site/guides
+  ```
+
+- `render-spec-pdf.mjs` — optional derived PDF of `docs/SPECIFICATION.md` (added
+  2026-09-06). Writes `docs/SPECIFICATION.generated.pdf` when `pandoc` is on
+  PATH; no-ops with a message when it is not. Never touches
+  `docs/archive/four-js-specification.pdf`.
+
+  ```sh
+  bun tools/render-spec-pdf.mjs
+  ```
+
 - `apply-publish-names.mjs` — §98 publish-name mapping (added 2026-08-07, gap A-25).
   Rewrites `@four/x` → `@danielsimonjr/fourjs-x` (and `four` → `@danielsimonjr/fourjs`)
   into a **staging copy**, never in place: package manifests, `workspace:*` ranges

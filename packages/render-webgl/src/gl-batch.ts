@@ -237,6 +237,20 @@ export class GlBatching implements RenderBatching {
 
   #indexCapacity = 0;
 
+  /**
+   * Last upload into the shared buffers — the idle-cache key (§65 / §86).
+   * `contentVersion === 0` is "always re-upload" and is never treated as a
+   * hit, so a run whose items have no transform versions keeps today's
+   * `bufferSubData` every frame.
+   */
+  #lastUploadSlot = -1;
+
+  #lastContentVersion = 0;
+
+  #lastVertexCount = -1;
+
+  #lastIndexCount = -1;
+
   constructor(options: RenderBatchOptions = {}) {
     this.#batcher = new RenderBatcher(options);
   }
@@ -271,12 +285,18 @@ export class GlBatching implements RenderBatching {
     }
     const slot = layoutSlot(batch);
     const existing = this.#vertexArrays[slot];
+    const skipUpload = this.#canSkipUpload(batch, slot);
     if (existing !== null) {
       gl.bindVertexArray(existing);
-      this.#uploadVertices(gl, batch);
-      this.#uploadIndices(gl, batch);
+      if (!skipUpload) {
+        this.#uploadVertices(gl, batch);
+        this.#uploadIndices(gl, batch);
+        this.#rememberUpload(batch, slot);
+      }
     } else if (!this.#createVertexArray(gl, batch, slot)) {
       return;
+    } else {
+      this.#rememberUpload(batch, slot);
     }
 
     // Positions arrive in world space (see `batch.ts`), so the model matrix is
@@ -320,6 +340,32 @@ export class GlBatching implements RenderBatching {
     this.#vertexArrays[3] = null;
     this.#vertexCapacity = 0;
     this.#indexCapacity = 0;
+    this.#lastUploadSlot = -1;
+    this.#lastContentVersion = 0;
+    this.#lastVertexCount = -1;
+    this.#lastIndexCount = -1;
+  }
+
+  /**
+   * Whether the shared buffers already hold this batch. `contentVersion === 0`
+   * is the planner's "versions unavailable" signal and always misses.
+   */
+  #canSkipUpload(batch: RenderBatch, slot: number): boolean {
+    const version = batch.contentVersion ?? 0;
+    return (
+      version !== 0 &&
+      this.#lastUploadSlot === slot &&
+      this.#lastContentVersion === version &&
+      this.#lastVertexCount === batch.vertexCount &&
+      this.#lastIndexCount === batch.indexCount
+    );
+  }
+
+  #rememberUpload(batch: RenderBatch, slot: number): void {
+    this.#lastUploadSlot = slot;
+    this.#lastContentVersion = batch.contentVersion ?? 0;
+    this.#lastVertexCount = batch.vertexCount;
+    this.#lastIndexCount = batch.indexCount;
   }
 
   /**

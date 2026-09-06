@@ -15,14 +15,13 @@
  *    any body in the repository and no descriptor or document changes a byte.
  *    That is what makes this a safe addition rather than a breaking one, and it
  *    is asserted rather than assumed.
- * 2. **`"local-plane"` is refused for a different reason than `"screen"` is**,
- *    and the message says which. §8 *permits* local-plane simulation; §21's
- *    mapping onto the `"2d"` world's XY frame is simply unbuilt. A packet
- *    implementing that mapping deletes one arm of this check and must not be
- *    able to mistake it for the §8 prohibition.
+ * 2. **`"local-plane"` is accepted** and mapped through the world's plane
+ *    (default XY, identity). Presentation frames stay refused because §8
+ *    says so.
  */
 
 import { DEFAULT_SPACE_MODE, isFourError, type SpaceMode } from "@four/core";
+import { Vector3 } from "@four/math";
 import { Group } from "@four/scene";
 import { describe, expect, it } from "vitest";
 
@@ -128,15 +127,16 @@ describe("§8 — which space a body may be simulated in", () => {
     expect(adapter.bodies.size).toBe(0);
   });
 
-  it('refuses "local-plane" for the unbuilt §21 mapping, not for §8', async () => {
-    const { world } = await readyWorld();
-    const error = refusal(world, node("local-plane"));
-
-    expect(isFourError(error)).toBe(true);
-    expect(error.message).toContain("§8 permits it for physics");
-    expect(error.message).toContain("XY frame is not implemented");
-    // The distinguishing assertion: this arm must NOT claim §8 forbids it.
-    expect(error.message).not.toContain("automatically participate");
+  it('accepts "local-plane" against the default XY plane (§21)', async () => {
+    const { world, adapter } = await readyWorld();
+    const target = node("local-plane");
+    target.transform.position.set(2, 3, 0);
+    expect(() => world.addBody(target)).not.toThrow();
+    expect(world.size).toBe(1);
+    // Default plane is world XY, so the solver pose equals the authored pose.
+    expect(adapter.body(1).position.x).toBe(2);
+    expect(adapter.body(1).position.y).toBe(3);
+    expect(world.localPlane.normal.z).toBe(1);
   });
 
   it("names the node and the mode in the error context", async () => {
@@ -149,6 +149,45 @@ describe("§8 — which space a body may be simulated in", () => {
       node: screen.id,
       spaceMode: "screen",
     });
+  });
+
+  it("maps a local-plane pose through a tilted plane and back", async () => {
+    const adapter = new FakeSolverAdapter();
+    const normal = new Vector3(0, Math.SQRT1_2, Math.SQRT1_2);
+    const world = new PhysicsWorld({
+      dimension: "3d",
+      gravity: new Vector3(0, 0, 0),
+      adapter,
+      localPlane: {
+        origin: new Vector3(0, 0, 0),
+        normal,
+        xAxis: new Vector3(1, 0, 0),
+      },
+    });
+    await world.initialize();
+
+    const target = new Group();
+    target.transformAuthority = "physics";
+    target.transform.position.set(2, 4, 0);
+    target.addComponent(new RigidBody({ type: "dynamic", space: "local-plane", mass: 1 }));
+    target.addComponent(
+      new Collider({ shape: { type: "sphere", radius: 0.5 } }),
+    );
+    world.addBody(target);
+
+    const solver = adapter.body(1).position;
+    // u=2 along +X, v=4 along yAxis = normal × xAxis.
+    const yAxis = new Vector3(normal.x, normal.y, normal.z)
+      .cross(new Vector3(1, 0, 0))
+      .normalize();
+    expect(solver.x).toBeCloseTo(2, 12);
+    expect(solver.y).toBeCloseTo(4 * yAxis.y, 12);
+    expect(solver.z).toBeCloseTo(4 * yAxis.z, 12);
+
+    world.step(1 / 60);
+    expect(target.transform.position.x).toBeCloseTo(2, 10);
+    expect(target.transform.position.y).toBeCloseTo(4, 10);
+    world.dispose();
   });
 
   it("is read at registration, so a later write changes nothing", async () => {

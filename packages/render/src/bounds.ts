@@ -132,9 +132,25 @@ export function computeWorldBoundingSphere(
     return false;
   }
   const bounds = geometry.computeBounds();
-  const min = bounds.min;
-  const max = bounds.max;
+  return computeWorldBoundingSphereFromBox(
+    bounds.min,
+    bounds.max,
+    worldMatrix,
+    out,
+  );
+}
 
+/**
+ * The box half of {@link computeWorldBoundingSphere}: local AABB + world
+ * matrix → world sphere. Used by particle drawables that publish a box
+ * without a {@link BufferGeometry}.
+ */
+export function computeWorldBoundingSphereFromBox(
+  min: Vector3,
+  max: Vector3,
+  worldMatrix: Matrix4,
+  out: BoundingSphere,
+): boolean {
   const halfX = (max.x - min.x) * 0.5;
   const halfY = (max.y - min.y) * 0.5;
   const halfZ = (max.z - min.z) * 0.5;

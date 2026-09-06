@@ -589,9 +589,10 @@ export interface ApplicationOptions {
    * `cpuFrameTime` and `simulationTime` itself, and — when the renderer reports
    * them (§61's optional `statistics` member) — reads `drawCalls`, `triangles`,
    * and `instances` back off the backend, and reads §83's live-resource totals
-   * for `textureMemory`/`bufferMemory` (A-5). The counters §84 lists that
-   * nothing in this repository can yet measure stay `NaN`; `FrameStats` says
-   * which and why.
+   * for `textureMemory`/`bufferMemory` (A-5), and copies
+   * `Renderer.lastGpuFrameTimeSeconds` into `gpuFrameTime` when that number
+   * is finite. Counters a given frame cannot measure stay `NaN`;
+   * `FrameStats` says which and why.
    *
    * **A production build ignores this option** (A-4, 2026-08-07). §84 is a
    * development tool and §85 lets a production build drop expensive
@@ -989,17 +990,13 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * measured set with A-6's {@link Application.physics} (2026-08-08) and are
    * filled **only when a world is attached** — the first is seconds inside
    * `world.step` summed over the frame's fixed steps, the second §32's awake
-   * count after the frame. Two of §84's eleven counters still have no producer
-   * anywhere in this repository:
-   *
-   * - `gpuFrameTime` needs the GPU timestamp queries §62's capabilities do not
-   *   report yet;
-   * - `contacts` has no reader at all. `PhysicsWorld` publishes contact
-   *   *events* (§29's `collisionstart`/`collisionend`) and no live manifold
-   *   count, and counting the events of a step — or differencing begin against
-   *   end to keep a running pair total — would report something other than the
-   *   number §84 asks for, which is the accept-and-ignore this file refuses. It
-   *   arrives when the solver seam reports it (§37), from `@four/physics`.
+   * count after the frame. `contacts` is the solver's live manifold count
+   * (`SolverStatistics.contactCount`) after the same walk. `gpuFrameTime`
+   * copies {@link Renderer.lastGpuFrameTimeSeconds} when the backend publishes
+   * a finite number — WebGL 2 via `EXT_disjoint_timer_query_webgl2`, WebGPU
+   * via `timestamp-query` — and stays `NaN` when the member is absent, still
+   * in flight, or disjoint. Reading that getter is what arms measurement;
+   * a renderer that never exposes it is left unmeasured.
    *
    * `textureMemory` and `bufferMemory` joined the measured set with A-5's §83
    * resource accounting (2026-08-07); they are **levels** — the bytes every
@@ -1858,6 +1855,14 @@ export class Application extends EventEmitter<ApplicationEventMap> {
         );
       }
       stats.cpuFrameTime = (this.#now ?? monotonicNowSeconds)() - frameStarted;
+      const renderer = this.#renderer;
+      const gpuSeconds: unknown =
+        renderer === null
+          ? undefined
+          : Reflect.get(renderer, "lastGpuFrameTimeSeconds");
+      if (typeof gpuSeconds === "number" && Number.isFinite(gpuSeconds)) {
+        stats.gpuFrameTime = gpuSeconds;
+      }
     }
   }
 

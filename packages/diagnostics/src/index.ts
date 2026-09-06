@@ -102,6 +102,16 @@ export type {
 } from "./resource-audit.js";
 export { NO_RESOURCE_LEAKS, auditResourceLeaks } from "./resource-audit.js";
 
+// §83 FinalizationRegistry leak warning (A-5, 2026-09-06).
+export {
+  auditFinalizedLeaks,
+  disposeTracked,
+  reportFinalized,
+  resetLeakRegistry,
+  trackDisposable,
+  trackedDisposableId,
+} from "./leak-registry.js";
+
 export type {
   ValidationCatalogueOptions,
   ValidationCheckOptions,
@@ -113,12 +123,16 @@ export {
   NEAR_ZERO_SCALE,
   UNSTABLE_SCALE_RATIO,
   assertFinite,
+  assertFiniteVec3,
   assertNoSceneGraphCycle,
   validateSceneNode,
   validateSceneSubtree,
   warnCoordinateEnvelope,
+  warnImpossibleInertia,
+  warnImpossibleMass,
   warnSingularScale,
   warnUnstableScale,
+  warnVersionMismatch,
 } from "./validation.js";
 
 // §83's per-frame allocation development warning (A-4/A-5, 2026-09-06).

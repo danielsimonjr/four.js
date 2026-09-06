@@ -210,6 +210,34 @@ const GATED: ReadonlyMap<string, string> = new Map([
     "§83's disposed-in-use, detached-listener, stale-handle, and per-frame allocation warnings — message only",
   ],
   [
+    join("packages", "diagnostics", "src", "allocation-audit.ts"),
+    "§83's per-frame allocation audit — a function the author calls. Production returns the frozen empty report without reading the counters; the only output is a console message. No simulation number moves with the flag",
+  ],
+  [
+    join("packages", "core", "src", "leak-registry.ts"),
+    "§83's FinalizationRegistry leak bookkeeping — every public function is a no-op when DEV is false; the only output is a warning text. Core, not simulation: geometry / render / materials call it at construction so they never import @four/diagnostics",
+  ],
+  [
+    join("packages", "geometry", "src", "resource-memory.ts"),
+    "§83 FinalizationRegistry helpers beside the always-on live-geometry counters. The counts do not branch on DEV; only trackGeometryDisposable / releaseGeometryDisposable do, and their only output is a later warning text. Geometry is not a simulation package",
+  ],
+  [
+    join("packages", "render", "src", "resource-memory.ts"),
+    "§83 FinalizationRegistry helpers beside the always-on texture / render-target counters. The counts do not branch on DEV; only trackRenderDisposable / releaseRenderDisposable do. Rendering is outside the §33 envelope",
+  ],
+  [
+    join("packages", "materials", "src", "resource-memory.ts"),
+    "§83 FinalizationRegistry helpers beside the always-on live-material counter. The count does not branch on DEV; only trackMaterialDisposable / releaseMaterialDisposable do. Materials are render state, not simulation",
+  ],
+  [
+    join("packages", "render", "src", "lights.ts"),
+    "§68's punctual-light overflow notice (2026-09-06). Message only: the walk still takes the first MAX_PUNCTUAL_LIGHTS in scene-graph order and skips the rest in both builds — the skip is unconditional, and only which console path names it moves with the flag. Rendering is outside the §33 envelope; nothing a frame shades re-enters simulation state (§42/§43)",
+  ],
+  [
+    join("packages", "render", "src", "resource-warnings.ts"),
+    "§83's disposed-in-use helper for render resources — a no-op in production; the draw is skipped identically either way and only the message moves with the flag",
+  ],
+  [
     join("packages", "diagnostics", "src", "validation.ts"),
     "§85's validation catalogue — named checks and devAssert scans; no simulation numbers",
   ],

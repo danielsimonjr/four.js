@@ -166,12 +166,12 @@ describe("the node pipeline, end to end (§60, §62)", () => {
     expect(rig.recording.countOf("drawElements")).toBe(3);
   });
 
-  it("initialize compiles seven programs, registered or not (lazy proof)", async () => {
+  it("initialize compiles eight programs, registered or not (lazy proof)", async () => {
     registerNodeMaterialPipeline();
     const recording = createRecordingGl();
     const renderer = new WebglRenderer();
     await renderer.initialize({ canvas: new RecordingCanvas(recording.gl) });
-    expect(recording.countOf("createProgram")).toBe(7);
+    expect(recording.countOf("createProgram")).toBe(8);
     renderer.dispose();
   });
 

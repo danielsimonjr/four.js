@@ -643,3 +643,69 @@ describe("RenderBatcher — what a merged draw is worth", () => {
     expect(batch?.indexCount).toBe(unbatched);
   });
 });
+
+describe("RenderBatcher — idle content version (§65, §86)", () => {
+  it("stamps a non-zero contentVersion from geometry and transform versions", () => {
+    const scene = new Scene();
+    const material = new UnlitMaterial();
+    scene.add(
+      new Renderable(quad(), material),
+      new Renderable(quad(), material),
+    );
+    const items = listOf(scene);
+
+    const batch = new RenderBatcher().next(items, 0);
+
+    expect(batch?.contentVersion).toBeGreaterThan(0);
+  });
+
+  it("keeps contentVersion stable when the source is unchanged", () => {
+    const scene = new Scene();
+    const material = new UnlitMaterial();
+    scene.add(
+      new Renderable(quad(), material),
+      new Renderable(quad(), material),
+    );
+    const items = listOf(scene);
+    const batcher = new RenderBatcher();
+
+    const first = batcher.next(items, 0)?.contentVersion;
+    const second = batcher.next(items, 0)?.contentVersion;
+
+    expect(first).toBe(second);
+    expect(first).toBeGreaterThan(0);
+  });
+
+  it("changes contentVersion when a node's world matrix moves", () => {
+    const scene = new Scene();
+    const material = new UnlitMaterial();
+    const moving = new Renderable(quad(), material);
+    scene.add(moving, new Renderable(quad(), material));
+    const items = listOf(scene);
+    const batcher = new RenderBatcher();
+    const before = batcher.next(items, 0)?.contentVersion;
+
+    moving.transform.worldMatrix.elements[12] = 4;
+    const after = batcher.next(items, 0)?.contentVersion;
+
+    expect(before).toBeGreaterThan(0);
+    expect(after).not.toBe(before);
+  });
+
+  it("reports 0 — always re-upload — when transform versions are missing", () => {
+    // A hand-built item predating the field: the cache's "versions
+    // unavailable" signal, so today's re-upload stays the default.
+    const scene = new Scene();
+    const material = new UnlitMaterial();
+    scene.add(
+      new Renderable(quad(), material),
+      new Renderable(quad(), material),
+    );
+    const items = listOf(scene);
+    delete (items[0] as { transformVersion?: number }).transformVersion;
+
+    const batch = new RenderBatcher().next(items, 0);
+
+    expect(batch?.contentVersion).toBe(0);
+  });
+});

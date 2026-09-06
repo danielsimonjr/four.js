@@ -34,6 +34,7 @@ export {
   tubeGeometry,
 } from "./primitives-3d.js";
 export type {
+  BooleanOp,
   FillRule,
   PathArcCommand,
   PathClosestPoint,
@@ -51,8 +52,22 @@ export {
   DEFAULT_FLATTEN_TOLERANCE,
   MAX_SUBDIVISION_DEPTH,
   Path,
+  booleanOp,
 } from "./path.js";
-export type { SvgPathParseOptions } from "./svg-path.js";
+export type {
+  SvgDocument,
+  SvgDocumentParseOptions,
+  SvgDocumentPath,
+  SvgViewBox,
+} from "./svg-document.js";
+export {
+  DEFAULT_MAXIMUM_SVG_DOCUMENT_LENGTH,
+  parseSvgDocument,
+} from "./svg-document.js";
+export type {
+  SvgPathFormatOptions,
+  SvgPathParseOptions,
+} from "./svg-path.js";
 export {
   DEFAULT_MAXIMUM_PATH_DATA_LENGTH,
   formatSvgPathData,

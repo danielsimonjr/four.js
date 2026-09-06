@@ -177,6 +177,19 @@ export interface RendererCapabilities {
   readonly maxTextureSize: number;
 
   /**
+   * §62 / §77 anisotropy ceiling: the largest `TextureSource.anisotropy`
+   * this backend will honour, or `1` where anisotropic filtering is absent.
+   *
+   * Optional with the same tri-state as the other WP-R1.1 members —
+   * `undefined` means "not queried yet", which is the construction-time
+   * answer on the GPU backends. Reading the WebGL extension at
+   * `initialize` would move landed GL transcripts (R-30b's lazy-query
+   * law), so {@link @four/render-webgl!WebglRenderer} resolves this on
+   * the first read of the field, after init, not during it.
+   */
+  readonly maxAnisotropy?: number;
+
+  /**
    * §62 "texture formats": the {@link @four/render!RenderTarget | render-target}
    * and texture formats this backend accepts, by their engine-side names.
    *
@@ -519,6 +532,31 @@ export interface Renderer extends Disposable {
    * ```
    */
   statistics?: RenderStatistics | null;
+
+  /**
+   * Seconds the GPU spent on the most recently **completed** frame
+   * (§84 `gpuFrameTime`, A-1), or `undefined` when this backend does not
+   * measure GPU time.
+   *
+   * **Optional, and its presence is the capability** — the same stance
+   * {@link Renderer.statistics} takes. A backend that can time GPU work
+   * declares the member (the WebGL 2 and WebGPU backends do); one that
+   * cannot omits it, and `Application` then leaves `stats.gpuFrameTime`
+   * as `NaN` rather than inventing a zero.
+   *
+   * The value is seconds (§7a). `NaN` means "measuring, but no completed
+   * sample yet" — timestamp queries are asynchronous on both GPU APIs, so
+   * the first armed frame (and any frame whose query was disjoint or still
+   * in flight) honestly reports unmeasured. A finite number is the last
+   * query that landed, never the frame still on the GPU.
+   *
+   * **Reading the getter is what arms measurement.** A renderer whose
+   * `lastGpuFrameTimeSeconds` is never read issues not one extra GPU
+   * command (R-30b): landed transcripts stay byte-identical. That is why
+   * this is not gated on {@link Renderer.statistics} — A-1's draw counters
+   * must not add, remove, or reorder a GPU call, and a timer query would.
+   */
+  readonly lastGpuFrameTimeSeconds?: number;
 
   /**
    * Acquires the backend's context or device (§61, §45).
@@ -879,6 +917,7 @@ export class NullRenderer implements Renderer {
   readonly capabilities: RendererCapabilities = Object.freeze({
     backend: "null",
     maxTextureSize: 0,
+    maxAnisotropy: 1,
     textureFormats: Object.freeze([]),
     multisampling: false,
     floatRenderTargets: false,

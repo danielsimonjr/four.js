@@ -160,6 +160,14 @@ export class ShaderExpression {
     return this.#unary("length");
   }
 
+  /**
+   * Polar angle of a `vec2`, in radians: `atan2(this.y, this.x)` (§7a,
+   * RFC 0001's angle operator). Other types are refused at build (§85).
+   */
+  angle(): ShaderExpression {
+    return this.#unary("angle");
+  }
+
   #unary(op: ShaderUnaryOp): ShaderExpression {
     return this.#builder.unary(op, this);
   }
@@ -370,6 +378,11 @@ export class ShaderGraphBuilder {
   /** `cos(x)`. */
   cos(x: ShaderOperand): ShaderExpression {
     return this.expression(x).cos();
+  }
+
+  /** Polar angle of a `vec2`, in radians — see {@link ShaderExpression.angle}. */
+  angle(x: ShaderOperand): ShaderExpression {
+    return this.expression(x).angle();
   }
 
   /** Blends `a` toward `b` by `t` — GLSL `mix`. */

@@ -234,6 +234,7 @@ describe("Joint construction (§28)", () => {
       limitsDirty: false,
       motorDirty: false,
       collisionDirty: false,
+      anchorsDirty: false,
     });
     expect(joint.breakable).toBe(false);
   });
@@ -491,6 +492,68 @@ describe("HingeJoint (§28's example)", () => {
     hinge.collisionEnabled = true;
     expect(hinge.commands.collisionDirty).toBe(false);
   });
+
+  it("treats setAnchors as body-local and queues once registered (PH-22f)", () => {
+    const { a, b } = bodies();
+    const hinge = new HingeJoint({
+      bodyA: a,
+      bodyB: b,
+      anchor: new Vector3(1, 2, 0),
+    });
+    expect(hinge.anchorsAreLocal).toBe(false);
+    hinge.setAnchors(new Vector3(0.5, 0, 0), new Vector2(0, 0.25));
+    // Unregistered: the write is immediate and queues nothing.
+    expect(hinge.anchorsAreLocal).toBe(true);
+    expect(hinge.commands.anchorsDirty).toBe(false);
+    expect([hinge.anchorA?.x, hinge.anchorA?.y, hinge.anchorA?.z]).toEqual([
+      0.5, 0, 0,
+    ]);
+    expect([hinge.anchorB?.x, hinge.anchorB?.y, hinge.anchorB?.z]).toEqual([
+      0, 0.25, 0,
+    ]);
+
+    pretendRegistered(hinge);
+    hinge.setAnchors(new Vector3(1, 0, 0), new Vector3(0, 1, 0));
+    expect(hinge.commands.anchorsDirty).toBe(true);
+    expect(hinge.anchorA?.x).toBe(1);
+    expect(hinge.anchorB?.y).toBe(1);
+  });
+
+  it("queues nothing when setAnchors repeats the stored local frames", () => {
+    const { a, b } = bodies();
+    const joint = new FixedJoint({ bodyA: a, bodyB: b });
+    pretendRegistered(joint);
+    joint.setAnchors(new Vector3(1, 0, 0), undefined);
+    expect(joint.commands.anchorsDirty).toBe(true);
+    (joint.commands as { anchorsDirty: boolean }).anchorsDirty = false;
+    joint.setAnchors(new Vector3(1, 0, 0), undefined);
+    expect(joint.commands.anchorsDirty).toBe(false);
+    // Omitted and the origin are the same frame.
+    joint.setAnchors(new Vector3(1, 0, 0), new Vector3(0, 0, 0));
+    expect(joint.commands.anchorsDirty).toBe(false);
+  });
+
+  it("field-sets anchors through setAnchors (PH-22f)", () => {
+    const { a, b } = bodies();
+    const joint = new FixedJoint({ bodyA: a, bodyB: b });
+    pretendRegistered(joint);
+    joint.anchorA = new Vector3(2, 0, 0);
+    joint.anchorB = new Vector3(0, 3, 0);
+    expect(joint.anchorsAreLocal).toBe(true);
+    expect(joint.commands.anchorsDirty).toBe(true);
+    expect(joint.anchorA?.x).toBe(2);
+    expect(joint.anchorB?.y).toBe(3);
+  });
+
+  it("rejects a non-finite live anchor (§85)", () => {
+    const { a, b } = bodies();
+    const joint = new FixedJoint({ bodyA: a, bodyB: b });
+    expect(
+      expectFourError(() =>
+        joint.setAnchors(new Vector3(Number.POSITIVE_INFINITY, 0, 0), undefined),
+      ).message,
+    ).toContain("anchorA must be finite");
+  });
 });
 
 describe("SliderJoint (§28)", () => {
@@ -548,6 +611,7 @@ describe("SliderJoint (§28)", () => {
       limitsDirty: true,
       motorDirty: true,
       collisionDirty: false,
+      anchorsDirty: false,
     });
     slider.enableMotor(false);
     expect(slider.motor?.enabled).toBe(false);

@@ -557,12 +557,26 @@ export class WgpuComputeCache {
 export const PARTICLE_INTEGRATOR_WORKGROUP_SIZE = 64;
 
 /**
- * Floats in the integrator's params block: `deltaSeconds`, `count`, two pad
- * lanes, then `gravity` as a vec4 (its `w` lane unread) — 32 bytes, every
- * lane written by {@link writeParticleSimulationParams} so no uploaded byte
- * is history (§33).
+ * Floats in the integrator's params block (R-31 residue): `deltaSeconds`,
+ * `count`, radial strength / min-distance, gravity as a vec4 (`w` is the
+ * collision mode), then radial origin + ground `y` — 64 bytes. Every lane
+ * is written by {@link writeParticleSimulationParams} so no uploaded byte
+ * is history (§33). The first eight lanes stay the gravity-only layout
+ * when extras are omitted (`[dt, count, 0, 0, gx, gy, gz, 0]`).
  */
-export const PARTICLE_SIMULATION_PARAMS_FLOATS = 8;
+export const PARTICLE_SIMULATION_PARAMS_FLOATS = 16;
+
+/** Optional §27 GPU field / collision extras for {@link writeParticleSimulationParams}. */
+export interface ParticleSimulationFieldParams {
+  readonly radialOriginX?: number;
+  readonly radialOriginY?: number;
+  readonly radialOriginZ?: number;
+  readonly radialStrength?: number;
+  readonly radialMinDistance?: number;
+  readonly collisionGroundY?: number;
+  /** `0` off, `1` rest-on-ground stub for `collisions: "depth-buffer"`. */
+  readonly collisionMode?: number;
+}
 
 /**
  * Packs the integrator's params block into `out` at index 0 and returns it —
@@ -576,15 +590,26 @@ export function writeParticleSimulationParams(
   gravityX: number,
   gravityY: number,
   gravityZ: number,
+  fields?: ParticleSimulationFieldParams,
 ): Float32Array {
   out[0] = deltaSeconds;
   out[1] = count;
-  out[2] = 0;
-  out[3] = 0;
+  out[2] = fields?.radialStrength ?? 0;
+  out[3] = fields?.radialMinDistance ?? 0;
   out[4] = gravityX;
   out[5] = gravityY;
   out[6] = gravityZ;
-  out[7] = 0;
+  out[7] = fields?.collisionMode ?? 0;
+  if (out.length >= 16) {
+    out[8] = fields?.radialOriginX ?? 0;
+    out[9] = fields?.radialOriginY ?? 0;
+    out[10] = fields?.radialOriginZ ?? 0;
+    out[11] = fields?.collisionGroundY ?? 0;
+    out[12] = 0;
+    out[13] = 0;
+    out[14] = 0;
+    out[15] = 0;
+  }
   return out;
 }
 
@@ -619,9 +644,11 @@ export function particleIntegratorWorkgroups(
 export const PARTICLE_INTEGRATOR_SHADER_SOURCE = `struct ParticleSimulationParams {
   deltaSeconds : f32,
   count : f32,
-  pad0 : f32,
-  pad1 : f32,
+  radialStrength : f32,
+  radialMinDistance : f32,
   gravity : vec4<f32>,
+  radialOrigin : vec4<f32>,
+  pad : vec4<f32>,
 };
 
 @group(0) @binding(0) var<storage, read> params : ParticleSimulationParams;
@@ -636,14 +663,41 @@ fn ${COMPUTE_ENTRY_POINT}(@builtin(global_invocation_id) id : vec3<u32>) {
   }
   let base = index * 3u;
   let dt = params.deltaSeconds;
-  let vx = velocities[base] + params.gravity.x * dt;
-  let vy = velocities[base + 1u] + params.gravity.y * dt;
-  let vz = velocities[base + 2u] + params.gravity.z * dt;
+  var ax = params.gravity.x;
+  var ay = params.gravity.y;
+  var az = params.gravity.z;
+  if (params.radialStrength != 0.0) {
+    let rx = positions[base] - params.radialOrigin.x;
+    let ry = positions[base + 1u] - params.radialOrigin.y;
+    let rz = positions[base + 2u] - params.radialOrigin.z;
+    let distance = sqrt(rx * rx + ry * ry + rz * rz);
+    if (distance != 0.0) {
+      let clamped = select(distance, params.radialMinDistance, distance < params.radialMinDistance);
+      let scale = params.radialStrength / (clamped * clamped * distance);
+      ax = ax + rx * scale;
+      ay = ay + ry * scale;
+      az = az + rz * scale;
+    }
+  }
+  var vx = velocities[base] + ax * dt;
+  var vy = velocities[base + 1u] + ay * dt;
+  var vz = velocities[base + 2u] + az * dt;
+  var px = positions[base] + vx * dt;
+  var py = positions[base + 1u] + vy * dt;
+  var pz = positions[base + 2u] + vz * dt;
+  // collisions: "depth-buffer" stub — rest on y = ground. True depth-texture
+  // collide-and-kill is staged; the CPU path kills below this plane.
+  if (params.gravity.w > 0.5 && py < params.radialOrigin.w) {
+    py = params.radialOrigin.w;
+    vx = 0.0;
+    vy = 0.0;
+    vz = 0.0;
+  }
   velocities[base] = vx;
   velocities[base + 1u] = vy;
   velocities[base + 2u] = vz;
-  positions[base] = positions[base] + vx * dt;
-  positions[base + 1u] = positions[base + 1u] + vy * dt;
-  positions[base + 2u] = positions[base + 2u] + vz * dt;
+  positions[base] = px;
+  positions[base + 1u] = py;
+  positions[base + 2u] = pz;
 }
 `;

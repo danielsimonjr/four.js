@@ -73,7 +73,7 @@
  * to anything and never runs on a draw path.
  */
 
-import type { Disposable } from "@four/core";
+import { FourError, type Disposable } from "@four/core";
 import type {
   MaterialTextureFilter,
   MaterialTextureMinFilter,
@@ -83,7 +83,11 @@ import type {
 import type { ColorSpace } from "@four/math";
 
 import { validateColorSpace } from "./render-target.js";
-import { noteTexture } from "./resource-memory.js";
+import {
+  noteTexture,
+  releaseRenderDisposable,
+  trackRenderDisposable,
+} from "./resource-memory.js";
 
 /**
  * How a texture is sampled between texel centres (§77's "filter modes"; R-30,
@@ -141,6 +145,16 @@ export type TextureMinFilter = MaterialTextureMinFilter;
  */
 export type TextureWrap = MaterialTextureWrap;
 
+/**
+ * §77 texture target kinds. This tier uploads **2D** only; the other three
+ * are named so a source can be refused honestly rather than silently
+ * sampled as a 2D image (R-30c).
+ */
+export type TextureDimension = "2d" | "cube" | "array" | "3d";
+
+/** The legal {@link TextureDimension} values, in the §85 message's order. */
+const DIMENSIONS: readonly TextureDimension[] = ["2d", "cube", "array", "3d"];
+
 /** The legal {@link TextureFilter} values, in the §85 message's order. */
 const FILTERS: readonly TextureFilter[] = ["nearest", "linear"];
 
@@ -196,6 +210,19 @@ export interface TextureSource {
 
   /** Height in texels. A finite integer ≥ 1. */
   readonly height: number;
+
+  /**
+   * §77 target kind. Defaults to `"2d"`, the only kind this tier uploads.
+   *
+   * `"cube"`, `"array"`, and `"3d"` are **named and refused** at
+   * construction / source assignment (the upload contract) with
+   * `FourError` `NOT_IMPLEMENTED`. Each of those changes the sampler
+   * type in every shader that reads the texture; pretending a cube
+   * uploaded as a 2D image is the silent failure R-30c exists to
+   * stop. When a later packet lands those targets it flips this
+   * refusal, not the field name.
+   */
+  readonly dimension?: TextureDimension;
 
   /**
    * Tightly packed RGBA8 texels — four bytes per texel, exactly
@@ -431,6 +458,19 @@ function validateEnum<T extends string>(
 
 /** Runs the §85 checks for one source. Throws on the first violation. */
 function validate(source: TextureSource): void {
+  if (source.dimension !== undefined) {
+    validateEnum(source.dimension, DIMENSIONS, "dimension");
+    if (source.dimension !== "2d") {
+      throw new FourError(
+        "NOT_IMPLEMENTED",
+        `TextureSource.dimension ${JSON.stringify(source.dimension)} is staged ` +
+          "(§77, R-30c): this tier uploads 2D textures only. Cube, array, and " +
+          "3D targets change every sampler type and are refused rather than " +
+          "silently uploaded as 2D.",
+        { context: { dimension: source.dimension } },
+      );
+    }
+  }
   if (source.colorSpace !== undefined) {
     validateColorSpace(source.colorSpace, "Texture");
   }
@@ -510,7 +550,9 @@ function validate(source: TextureSource): void {
  *
  * ## Deferred from §77 (named, not dropped)
  *
- * Cube/array/3D targets, the §77 *map roles* that
+ * Cube/array/3D *uploads* (the field is named — {@link TextureSource.dimension}
+ * — and non-`"2d"` is refused with `NOT_IMPLEMENTED` rather than sampled as
+ * 2D), the §77 *map roles* that
  * would let colour-space metadata carry §60a's own defaults (colour maps sRGB,
  * data maps linear — the tag itself ships, see
  * {@link TextureSource.colorSpace}), compressed containers, render-target textures (§63), video textures,
@@ -553,6 +595,7 @@ export class Texture implements Disposable, SpriteTexture {
     validate(source);
     this.#source = source;
     noteTexture(1, this.byteLength);
+    trackRenderDisposable(this, this.id);
   }
 
   /**
@@ -584,6 +627,14 @@ export class Texture implements Disposable, SpriteTexture {
   /** Height in texels. */
   get height(): number {
     return this.#source.height;
+  }
+
+  /**
+   * §77 target kind. `"2d"` when the source names none — the only
+   * kind this tier uploads. See {@link TextureSource.dimension}.
+   */
+  get dimension(): TextureDimension {
+    return this.#source.dimension ?? "2d";
   }
 
   /**
@@ -792,6 +843,7 @@ export class Texture implements Disposable, SpriteTexture {
     this.#disposed = true;
     this.#source = EMPTY_SOURCE;
     noteTexture(-1, -before);
+    releaseRenderDisposable(this);
     this.markDirty();
   }
 }

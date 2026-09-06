@@ -18,6 +18,7 @@ import {
   RopeJoint,
   SliderJoint,
   SphericalJoint,
+  SpringJoint,
   resolveTuningCapabilities,
   supportsSolverJointAccess,
 } from "../src/index.js";
@@ -190,6 +191,44 @@ describe("PhysicsWorld.addJoint (§28, plan P6-3)", () => {
     expect(anchorB.y).toBeCloseTo(1, 12);
     // The axis is normalized and unchanged by a rotation about itself.
     expect([axis.x, axis.y, axis.z]).toEqual([0, 0, 1]);
+    // PH-22f: the converted locals are written back onto the joint so later
+    // reads and setAnchors share one space.
+    expect(hinge.anchorsAreLocal).toBe(true);
+    expect([hinge.anchorA?.x, hinge.anchorA?.y, hinge.anchorA?.z]).toEqual([
+      1, 0, 0,
+    ]);
+    expect(hinge.anchorB?.x).toBeCloseTo(0, 12);
+    expect(hinge.anchorB?.y).toBeCloseTo(1, 12);
+  });
+
+  it("uses setAnchors locals as-is at addJoint, without re-measuring (PH-22f)", async () => {
+    const { adapter, world } = await jointWorld();
+    const nodeA = dynamicNode();
+    const nodeB = dynamicNode();
+    nodeA.transform.position.set(5, 0, 0);
+    nodeB.transform.position.set(8, 0, 0);
+    const bodyA = world.addBody(nodeA);
+    const bodyB = world.addBody(nodeB);
+    const joint = new FixedJoint({
+      bodyA,
+      bodyB,
+      anchor: new Vector3(5, 0, 0),
+    });
+    // Body-local on purpose: if addJoint still converted these as world-space
+    // against the current poses, bodyA's local would become (1−5, 0) = (−4, 0).
+    joint.setAnchors(new Vector3(1, 0, 0), new Vector3(0, 0, 0));
+    world.addJoint(joint);
+    const descriptor = adapter.joint(1).descriptor;
+    expect([
+      (descriptor.anchorA as Vector3).x,
+      (descriptor.anchorA as Vector3).y,
+      (descriptor.anchorA as Vector3).z,
+    ]).toEqual([1, 0, 0]);
+    expect([
+      (descriptor.anchorB as Vector3).x,
+      (descriptor.anchorB as Vector3).y,
+      (descriptor.anchorB as Vector3).z,
+    ]).toEqual([0, 0, 0]);
   });
 
   it("keeps each joint's anchors to itself", async () => {
@@ -377,6 +416,7 @@ describe("joint reconfiguration in the fixed step (§28)", () => {
       limitsDirty: false,
       motorDirty: false,
       collisionDirty: false,
+      anchorsDirty: false,
     });
     world.step(1 / 60);
     expect(adapter.callsOf("setJointLimits")).toHaveLength(0);
@@ -401,6 +441,7 @@ describe("joint reconfiguration in the fixed step (§28)", () => {
       limitsDirty: false,
       motorDirty: false,
       collisionDirty: false,
+      anchorsDirty: false,
     });
 
     // Nothing queued, nothing pushed.
@@ -465,6 +506,7 @@ describe("joint reconfiguration in the fixed step (§28)", () => {
       limitsDirty: false,
       motorDirty: false,
       collisionDirty: false,
+      anchorsDirty: false,
     });
   });
 });
@@ -862,18 +904,92 @@ describe("live collisionEnabled (§28, PH-22f)", () => {
 
   it("leaves the properties with no live setter frozen at compile time", async () => {
     const { world, bodyA, bodyB } = await jointWorld();
-    const joint = world.addJoint(new RopeJoint({ bodyA, bodyB, maxLength: 2 }));
+    const rope = world.addJoint(new RopeJoint({ bodyA, bodyB, maxLength: 2 }));
+    const hinge = world.addJoint(
+      new HingeJoint({ bodyA, bodyB, axis: new Vector3(0, 0, 1) }),
+    ) as HingeJoint;
+    const spring = world.addJoint(
+      new SpringJoint({
+        bodyA,
+        bodyB,
+        restLength: 1,
+        stiffness: 10,
+      }),
+    );
 
-    // The remaining frozen §28 properties are `readonly` fields, so writing
-    // one cannot compile — a stronger guarantee than the runtime throw
-    // `collisionEnabled` used to carry, and the reason PH-22f could retire
-    // that throw outright rather than replace it.
+    // Axis / rope / spring / cone stay frozen: they are `readonly` fields, so
+    // writing one cannot compile. Anchors are live (PH-22f) and are not in
+    // this list.
     // @ts-expect-error - `maxLength` is readonly (§28; see the module header).
-    joint.maxLength = 5;
-    // @ts-expect-error - `anchorA` is readonly.
-    joint.anchorA = new Vector3(1, 0, 0);
+    rope.maxLength = 5;
+    // @ts-expect-error - `axis` is readonly.
+    hinge.axis = new Vector3(0, 1, 0);
+    // @ts-expect-error - `restLength` is readonly.
+    spring.restLength = 2;
+    // @ts-expect-error - `stiffness` is readonly.
+    spring.stiffness = 4;
 
-    expect(world.hasJoint(joint)).toBe(true);
+    expect(world.hasJoint(rope)).toBe(true);
+  });
+});
+
+describe("live anchors (§28, PH-22f)", () => {
+  it("pushes a queued setAnchors once, in the scene→solver phase", async () => {
+    const { adapter, world, bodyA, bodyB } = await jointWorld();
+    const joint = world.addJoint(
+      new FixedJoint({ bodyA, bodyB, anchor: new Vector3(1, 0, 0) }),
+    );
+    world.step(1 / 60);
+    expect(adapter.callsOf("setJointAnchors")).toHaveLength(0);
+
+    joint.setAnchors(new Vector3(0.5, 0, 0), new Vector3(0, 0.25, 0));
+    adapter.clearCalls();
+    world.step(1 / 60);
+
+    expect(adapter.callsOf("setJointAnchors")).toHaveLength(1);
+    expect(adapter.joint(1).anchors).toEqual({
+      anchorA: new Vector3(0.5, 0, 0),
+      anchorB: new Vector3(0, 0.25, 0),
+    });
+    const order = adapter.callOrder;
+    expect(order.indexOf("setJointAnchors")).toBeLessThan(
+      order.indexOf("syncSceneToSolver"),
+    );
+    expect(joint.commands.anchorsDirty).toBe(false);
+
+    adapter.clearCalls();
+    world.step(1 / 60);
+    expect(adapter.callsOf("setJointAnchors")).toHaveLength(0);
+  });
+
+  it("works for every §28 type, like collisionEnabled", async () => {
+    const { adapter, world, bodyA, bodyB } = await jointWorld();
+    const fixed = world.addJoint(new FixedJoint({ bodyA, bodyB }));
+    const rope = world.addJoint(new RopeJoint({ bodyA, bodyB, maxLength: 2 }));
+    adapter.clearCalls();
+
+    fixed.setAnchors(new Vector3(1, 0, 0), new Vector3(0, 0, 0));
+    rope.setAnchors(new Vector3(0, 1, 0), new Vector3(0, 0, 0));
+    world.step(1 / 60);
+
+    expect(adapter.callsOf("setJointAnchors")).toHaveLength(2);
+    expect(adapter.joint(1).anchors?.anchorA.x).toBe(1);
+    expect(adapter.joint(2).anchors?.anchorA.y).toBe(1);
+  });
+
+  it("drains joints in ascending registration order (§33)", async () => {
+    const { adapter, world, bodyA, bodyB } = await jointWorld();
+    const first = world.addJoint(new FixedJoint({ bodyA, bodyB }));
+    const second = world.addJoint(new FixedJoint({ bodyA, bodyB }));
+    adapter.clearCalls();
+
+    second.setAnchors(new Vector3(2, 0, 0), undefined);
+    first.setAnchors(new Vector3(1, 0, 0), undefined);
+    world.step(1 / 60);
+
+    expect(adapter.callsOf("setJointAnchors").map((call) => call.id)).toEqual([
+      1, 2,
+    ]);
   });
 });
 

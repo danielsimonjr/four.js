@@ -587,6 +587,36 @@ describe("formatSvgPathData", { timeout: 30_000 }, () => {
       "M 0 0 L 0 1",
     );
   });
+
+  it("keeps the default output identical when options are omitted", () => {
+    const path = new Path()
+      .moveTo(0, 0)
+      .lineTo(10, 0)
+      .quadraticCurveTo(15, 5, 10, 10)
+      .cubicCurveTo(7.5, 12.5, 2.5, 12.5, 0, 10)
+      .close();
+    expect(formatSvgPathData(path, {})).toBe(formatSvgPathData(path));
+    expect(formatSvgPathData(path)).toBe(
+      "M 0 0 L 10 0 Q 15 5 10 10 C 7.5 12.5 2.5 12.5 0 10 Z",
+    );
+  });
+
+  it("rounds to a supplied precision without changing the default path", () => {
+    const path = new Path().moveTo(1.23456, 7.891).lineTo(0.001, -2.6);
+    expect(formatSvgPathData(path, { precision: 2 })).toBe("M 1.23 7.89 L 0 -2.6");
+    expect(formatSvgPathData(path, { precision: 0 })).toBe("M 1 8 L 0 -3");
+    const arc = new Path().arc(0, 0, 4, 0, Math.PI / 2);
+    expect(formatSvgPathData(arc, { precision: 3 })).toContain("A 4 4");
+  });
+
+  it("refuses a precision that is not an integer in 0…20", () => {
+    const path = new Path().moveTo(0, 0);
+    expect(() => formatSvgPathData(path, { precision: 1.5 })).toThrow(
+      /precision/,
+    );
+    expect(() => formatSvgPathData(path, { precision: -1 })).toThrow(RangeError);
+    expect(() => formatSvgPathData(path, { precision: 21 })).toThrow(RangeError);
+  });
 });
 
 describe("round trips", { timeout: 30_000 }, () => {

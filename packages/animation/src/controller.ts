@@ -66,16 +66,18 @@
  * | transition duration      | `duration` seconds of cross-fade (§7a: seconds, never a normalized fraction) |
  * | exit time                | `exitTime` seconds of source-state time that must have elapsed |
  * | transition interruption  | `interruptible` (default `true`) — see below |
- * | blend trees              | **staged 2026-08-07** — see "Staged" |
- * | layered animation        | **staged 2026-08-07** — see "Staged" |
+ * | blend trees              | a state may be a {@link ./blend-tree.js#BlendTree} |
+ * | layered animation        | {@link ./layer-stack.js#AnimationLayerStack} |
+ * | "any state" transitions  | `from: "*"` (see below) |
+ * | clip events              | {@link AnimationController.onClipEvent} |
+ * | `when` string sugar      | compiles to the typed records below |
  *
- * **Conditions are typed predicates, not a string DSL.** §18's sketch writes
- * `when: "speed > 0.1"`. A string needs an expression parser, and a parser needs
- * its own §33 determinism argument (operator precedence, numeric literal
- * parsing, and coercion all become engine behaviour). The structured form says
- * exactly the same thing, is validated at construction — an undeclared parameter
- * or a Boolean compared with `>` throws *there*, not never — and leaves the
- * string form available later as sugar that compiles to these records.
+ * **Conditions are typed predicates.** §18's sketch writes `when: "speed > 0.1"`.
+ * The structured form is the evaluation target — an undeclared parameter or a
+ * Boolean compared with `>` throws at construction, not never. The optional
+ * string form is sugar with a *restricted* grammar (parameter, operator, number
+ * or `true`/`false`; a bare identifier is a Boolean/`trigger` test) that
+ * compiles to the same records and throws on parse failure.
  *
  * **A transition is taken when all of its conditions hold.** `when` is an AND;
  * an absent or empty `when` is vacuously true, which is what makes
@@ -89,15 +91,22 @@
  * played that long. §7a forbids the normalized 0–1 fraction other engines use;
  * write `exitTime: clip.duration * 0.8` if a fraction is what you mean.
  *
- * **Interruption freezes the outgoing pose.** While a transition runs, the
- * machine evaluates the transitions leaving its *destination* state — that state
- * is what the controller reports as {@link AnimationController.currentState} —
- * unless the running transition declared `interruptible: false`, in which case
- * nothing is evaluated until it completes. When a transition *is* interrupted,
- * the blended pose at that instant is captured per channel and becomes the
- * frozen source of the new transition. Chasing the outgoing blend as a live
- * three-clip mix is the alternative; it costs a third sample per channel and an
- * unbounded chain of "what was fading into what", and it is staged.
+ * **Interruption freezes the outgoing pose by default.** While a transition
+ * runs, the machine evaluates the transitions leaving its *destination* state —
+ * that state is what the controller reports as
+ * {@link AnimationController.currentState} — unless the running transition
+ * declared `interruptible: false`, in which case nothing is evaluated until it
+ * completes. When a transition *is* interrupted, the blended pose at that
+ * instant is captured per channel and becomes the frozen source of the new
+ * transition. {@link AnimationControllerOptions.liveInterrupt} keeps sampling
+ * the previous source and destination plus the new destination (three clips)
+ * for a *single* interruption depth; a second interrupt falls back to freeze
+ * so the chain stays bounded.
+ *
+ * **`from: "*"` is any state.** Wildcard transitions are scanned in declaration
+ * order with the rest. A wildcard is eligible from every state except when
+ * `from`/`to` would be a self-transition, unless the edge declared
+ * `allowSelf: true`.
  *
  * ## Determinism (§33, §16)
  *
@@ -120,33 +129,25 @@
  * ## Allocation (§7b)
  *
  * {@link AnimationController.play} allocates: per channel one binding, one
- * claim, and four values (baseline, frozen source, two sample scratches, one
- * blend scratch). After that the advance path allocates nothing — sampling
- * writes through the scratches and blending writes through the blend scratch.
+ * claim, and the scratches a pose evaluation needs (baselines, frozen source,
+ * per-state samples, blend-tree clip samples, live-interrupt mid, blend). After
+ * that the advance path allocates nothing — sampling writes through the
+ * scratches and blending writes through the blend scratch.
  *
- * ## Staged (2026-08-07, gap PH-9)
+ * ## Staged remainder (PH-9, 2026-09-06)
  *
- * Shipped here is the state-machine tier of §18. Explicitly **not** shipped, so
- * that nothing silently pretends to work:
+ * Shipped here: blend trees (1D lerp + 2D inverse-distance of ≤3 neighbours),
+ * `from: "*"` any-state transitions, clip-event dispatch with mixer `(from, to]`
+ * semantics, `when` string sugar, and `liveInterrupt` at one interruption depth.
+ * Layered / additive animation lives on {@link ./layer-stack.js#AnimationLayerStack}.
  *
- * - **Blend trees.** A state is one clip; a state whose pose is a parameter-driven
- *   mix of several clips is the natural next tier and reuses this file's channel
- *   model unchanged (a blend tree is an N-way weighted sample where a transition
- *   is a 2-way one).
- * - **Layered and additive animation** (§18, §100). One controller writes one
- *   pose; a weighted layer stack over several controllers needs an additive
- *   value operation on {@link ./values.js#ValueAdapter}, which does not exist
- *   yet, and a policy for how layers interact with the §16 claim registry.
- * - **Clip events (§17) are not dispatched.** §16's marker semantics are a
- *   statement about a *player's* history — fire once per forward crossing,
- *   suppress on seek, restore without re-firing — and a controller has no seek
- *   and no single history. Use an `AnimationMixer` where markers matter.
- * - **"Any state" transitions.** `from` names exactly one state; a wildcard
- *   source is a scheduling convenience, not a §18 requirement.
+ * Still **not** shipped:
+ *
  * - **Serialization.** §18 constructs a controller directly and §97a lists
  *   `Node.animation` among the names with no shipped equivalent, so a controller
  *   is not a §6a component and has no §79 node-data serializer. Making it one is
  *   a separate decision with its own registry entry.
+ * - **Unbounded live-interrupt chains.** A second interrupt still freezes.
  */
 
 import { FourError } from "@four/core";
@@ -154,8 +155,16 @@ import { Node, warnAuthorityConflict } from "@four/scene";
 import type { TransformAuthority } from "@four/scene";
 
 import type { Advanceable } from "./animation-system.js";
+import {
+  isBlendTree,
+  locateBlend1D,
+  locateBlend2D,
+  type Blend2DRank,
+  type BlendTree,
+} from "./blend-tree.js";
 import { createBinding, type PropertyBinding } from "./binding.js";
-import type { AnimationClip } from "./clip.js";
+import { AnimationClip } from "./clip.js";
+import type { AnimationEventListener } from "./mixer.js";
 import type { AnimationTrackLike } from "./track.js";
 import {
   claimProperty,
@@ -165,6 +174,13 @@ import {
   type PropertyClaim,
 } from "./tween.js";
 import { detectAdapter, type ValueAdapter } from "./values.js";
+import { compileWhenExpression } from "./when.js";
+
+/** Wildcard `from` — eligible from every state (see {@link AnimationTransition}). */
+export const ANY_STATE = "*";
+
+/** Exclusive event-cursor value below clip time 0, matching `AnimationMixer`. */
+const CURSOR_BEFORE_START = -1;
 
 /**
  * The §42 authority a controller writes transforms under — `"animation"`, the
@@ -188,10 +204,16 @@ const CONTROLLER_WRITER_KIND = "state-machine controller";
  */
 export type ControllerPlaybackState = "idle" | "running" | "paused" | "stopped";
 
-/** How one state's clip is played (§18 states). */
+/** How one state's clip or blend tree is played (§18 states). */
 export interface AnimationStateOptions {
-  /** The clip this state poses. */
-  readonly clip: AnimationClip;
+  /** The clip this state poses. Mutually exclusive with {@link AnimationStateOptions.blendTree}. */
+  readonly clip?: AnimationClip;
+
+  /**
+   * A parameter-driven mix of clips (PH-9). Mutually exclusive with
+   * {@link AnimationStateOptions.clip}.
+   */
+  readonly blendTree?: BlendTree;
 
   /**
    * Multiplier on this state's own clock, finite and `> 0`. Default `1`.
@@ -209,8 +231,20 @@ export interface AnimationStateOptions {
   readonly loop?: number;
 }
 
-/** A state's definition: a clip, or a clip plus playback options. */
-export type AnimationStateInput = AnimationClip | AnimationStateOptions;
+/**
+ * A state's definition: a clip, a clip plus playback options, or a
+ * {@link BlendTree}.
+ */
+export type AnimationStateInput =
+  AnimationClip | AnimationStateOptions | BlendTree;
+
+export type {
+  BlendTree,
+  BlendTree1D,
+  BlendTree2D,
+  BlendTree1DPoint,
+  BlendTree2DPoint,
+} from "./blend-tree.js";
 
 /** The comparisons a numeric parameter condition can make (§18). */
 export type NumericComparison =
@@ -260,20 +294,39 @@ export interface TriggerCondition {
 export type TransitionCondition =
   NumericCondition | BooleanCondition | TriggerCondition;
 
+/**
+ * One `when` clause: a typed predicate, a restricted string that compiles to
+ * one, or an AND-list of either.
+ */
+export type TransitionWhen = string | readonly (string | TransitionCondition)[];
+
 /** One authored edge of the state machine (§18 transitions). */
 export interface AnimationTransition {
-  /** Source state name; must be declared in `states`. */
+  /**
+   * Source state name, or {@link ANY_STATE} (`"*"`) for an any-state edge.
+   * A named source must be declared in `states`.
+   */
   readonly from: string;
 
   /** Destination state name; must be declared in `states`. */
   readonly to: string;
 
   /**
+   * Whether a wildcard (`from: "*"`) may fire as a self-transition. Named
+   * `from`/`to` pairs that name the same state are always allowed (they are
+   * authored self-transitions). Default `false`.
+   */
+  readonly allowSelf?: boolean;
+
+  /**
    * Predicates that must **all** hold for the transition to be eligible.
    * Absent or empty is vacuously true — pair it with {@link
    * AnimationTransition.exitTime} to sequence states automatically.
+   *
+   * A string is sugar for one predicate (`"speed > 0.1"`, `"grounded"`);
+   * an array ANDs its entries. See `./when.js` for the grammar.
    */
-  readonly when?: readonly TransitionCondition[];
+  readonly when?: TransitionWhen;
 
   /**
    * Cross-fade length in **seconds** (§7a). Default `0`, which switches the
@@ -359,6 +412,24 @@ export interface AnimationControllerOptions {
    * Never called for entering the initial state, which is not a change.
    */
   readonly onStateChange?: StateChangeListener;
+
+  /**
+   * When true, interrupting a running cross-fade keeps sampling the previous
+   * source and destination plus the new destination (three live clips) instead
+   * of freezing the outgoing pose. A *second* interrupt still freezes, so the
+   * mix stays bounded at one interruption depth. Default `false`.
+   */
+  readonly liveInterrupt?: boolean;
+}
+
+/** Second argument of {@link AnimationController.advance}. */
+export interface ControllerAdvanceOptions {
+  /**
+   * When true, clocks and pose still update but clip events are suppressed
+   * and their cursors move — §16 seek/scrub semantics, matching
+   * `AnimationMixer.seek`. Default `false` (events fire).
+   */
+  readonly seek?: boolean;
 }
 
 /** One animated property, shared by every state that writes it. */
@@ -381,12 +452,20 @@ interface Channel {
   readonly fromScratch: unknown;
   /** `out` storage for the destination state's sample. */
   readonly toScratch: unknown;
+  /** `out` storage for a live-interrupt source state. */
+  readonly liveScratch: unknown;
+  /** `out` storage for the live A–B mix; must not alias either endpoint. */
+  readonly midScratch: unknown;
+  /** Per-clip samples inside a blend tree (up to 3). */
+  readonly treeScratch: [unknown, unknown, unknown];
   /** `out` storage for the mix of the two; never aliases either endpoint. */
   readonly blendScratch: unknown;
   /** What a state with no track for this channel contributes (see the header). */
   baseline: unknown;
   /** The pose captured when a cross-fade was interrupted. */
   frozen: unknown;
+  /** Last evaluated pose; read by {@link AnimationLayerStack}. */
+  evaluated: unknown;
   /** Whether this property sits inside the authority node's transform. */
   readonly isTransform: boolean;
   /** Whether a write here bypasses a plan-D3 change hook and must re-fire it. */
@@ -395,15 +474,38 @@ interface Channel {
   readonly claim: PropertyClaim;
 }
 
-/** A validated state: its clip, its clock policy, and its per-channel tracks. */
+/** One compiled clip contribution inside a state (clip or blend-tree point). */
+interface CompiledClip {
+  readonly clip: AnimationClip;
+  readonly tracks: readonly (AnimationTrackLike | undefined)[];
+}
+
+/** Compiled 1D blend: points sorted by value, then declaration index. */
+interface CompiledBlend1D {
+  readonly kind: "blend1d";
+  readonly parameter: string;
+  readonly values: readonly number[];
+  readonly clips: readonly CompiledClip[];
+}
+
+/** Compiled 2D blend: points in declaration order. */
+interface CompiledBlend2D {
+  readonly kind: "blend2d";
+  readonly parameterX: string;
+  readonly parameterY: string;
+  readonly points: readonly { readonly x: number; readonly y: number }[];
+  readonly clips: readonly CompiledClip[];
+}
+
+type CompiledBlend = CompiledBlend1D | CompiledBlend2D;
+
+/** A validated state: its clip or tree, its clock policy, and its tracks. */
 interface StateDefinition {
   /** The state's name, as declared. */
   readonly name: string;
-  /** The clip this state poses. */
-  readonly clip: AnimationClip;
   /** See {@link AnimationStateOptions.speed}. */
   readonly speed: number;
-  /** One iteration's length in seconds — the clip's duration. */
+  /** One iteration's length in seconds — max child-clip duration. */
   readonly duration: number;
   /** Total iterations: `1` plays once, `Infinity` loops forever. */
   readonly iterations: number;
@@ -411,15 +513,21 @@ interface StateDefinition {
   readonly totalDuration: number;
   /**
    * The track this state uses for each channel index, or `undefined` where the
-   * state does not animate that channel. Index-parallel with the controller's
-   * channels, so posing is an indexed walk with no lookup.
+   * state does not animate that channel. For a blend tree this is the first
+   * point's tracks (introspection only); posing reads {@link StateDefinition.blend}.
    */
   readonly tracks: readonly (AnimationTrackLike | undefined)[];
+  /** `undefined` for a single-clip state. */
+  readonly blend: CompiledBlend | undefined;
+  /** The single clip, or the first tree point's clip. */
+  readonly clip: AnimationClip;
+  /** Prebuilt contribution for a single-clip state (no per-pose allocation). */
+  readonly primary: CompiledClip;
 }
 
 /** A validated transition, with its destination resolved once. */
 interface CompiledTransition {
-  /** Source state name. */
+  /** Source state name, or {@link ANY_STATE}. */
   readonly from: string;
   /** Destination state, resolved at construction. */
   readonly target: StateDefinition;
@@ -431,6 +539,22 @@ interface CompiledTransition {
   readonly exitTime: number;
   /** See {@link AnimationTransition.interruptible}. */
   readonly interruptible: boolean;
+  /** See {@link AnimationTransition.allowSelf}. */
+  readonly allowSelf: boolean;
+}
+
+/**
+ * Up to three weighted clip contributions that make one state's pose.
+ * Reused every evaluation; `count === 0` means the slot is empty.
+ */
+interface StateMix {
+  count: number;
+  clips: [
+    CompiledClip | undefined,
+    CompiledClip | undefined,
+    CompiledClip | undefined,
+  ];
+  weights: [number, number, number];
 }
 
 /**
@@ -445,6 +569,8 @@ interface StateSlot {
   definition: StateDefinition | undefined;
   /** Seconds played in this slot, clamped to the state's total duration. */
   elapsed: number;
+  /** Exclusive lower bound of the next clip-event range, in elapsed seconds. */
+  cursor: number;
 }
 
 /** Throws the §89 error used for every malformed controller configuration. */
@@ -455,9 +581,52 @@ function invalidController(
   throw new FourError("INVALID_APPLICATION_STATE", message, { context });
 }
 
-/** Normalizes the two accepted state forms to the options record. */
+/** Normalizes the accepted state forms to a clip-or-tree options record. */
 function stateOptionsOf(input: AnimationStateInput): AnimationStateOptions {
-  return "clip" in input ? input : { clip: input };
+  if (input instanceof AnimationClip) {
+    return { clip: input };
+  }
+  if (isBlendTree(input)) {
+    return { blendTree: input };
+  }
+  return input;
+}
+
+function emptyMix(): StateMix {
+  return {
+    count: 0,
+    clips: [undefined, undefined, undefined],
+    weights: [0, 0, 0],
+  };
+}
+
+function emptySlot(): StateSlot {
+  return { definition: undefined, elapsed: 0, cursor: CURSOR_BEFORE_START };
+}
+
+function padTracks(
+  tracks: (AnimationTrackLike | undefined)[],
+  length: number,
+): void {
+  while (tracks.length < length) {
+    tracks.push(undefined);
+  }
+}
+
+function blendDuration(
+  blend: CompiledBlend | undefined,
+  fallback: AnimationClip,
+): number {
+  if (blend === undefined) {
+    return fallback.duration;
+  }
+  let max = 0;
+  for (const clip of blend.clips) {
+    if (clip.clip.duration > max) {
+      max = clip.clip.duration;
+    }
+  }
+  return max;
 }
 
 /**
@@ -511,6 +680,9 @@ export class AnimationController implements Advanceable {
   /** The union of every state's track paths, in construction order. */
   readonly #channelSpecs: readonly ChannelSpec[];
 
+  /** Path → channel index; looked up only. */
+  readonly #channelIndex: ReadonlyMap<string, number>;
+
   /** Bound channels; empty until {@link AnimationController.play}. */
   #channels: readonly Channel[] = [];
 
@@ -526,14 +698,45 @@ export class AnimationController implements Advanceable {
   /** See {@link AnimationControllerOptions.onStateChange}. */
   readonly #onStateChange: StateChangeListener | undefined;
 
+  /** Clip-event listeners registered through {@link AnimationController.onClipEvent}. */
+  readonly #clipListeners: AnimationEventListener[] = [];
+
+  /** See {@link AnimationControllerOptions.liveInterrupt}. */
+  readonly #liveInterrupt: boolean;
+
+  /**
+   * When true, {@link AnimationController.play} skips §16 claims and
+   * {@link AnimationController.advance} evaluates the pose without writing.
+   * Set by {@link AnimationLayerStack} before play.
+   */
+  #parented = false;
+
   /** The active state — the destination while a transition runs. */
-  readonly #current: StateSlot = { definition: undefined, elapsed: 0 };
+  readonly #current: StateSlot = emptySlot();
 
   /** The state fading out; `definition` is `undefined` at rest and when frozen. */
-  readonly #outgoing: StateSlot = { definition: undefined, elapsed: 0 };
+  readonly #outgoing: StateSlot = emptySlot();
+
+  /** Previous source kept live during a single-depth `liveInterrupt`. */
+  readonly #liveSource: StateSlot = emptySlot();
 
   /** Whether the fading source is {@link Channel.frozen} rather than a clip. */
   #frozenSource = false;
+
+  /** Whether {@link AnimationController.#liveSource} is contributing. */
+  #liveActive = false;
+
+  /** Frozen A–B weight at the moment a live interrupt armed. */
+  #liveMidWeight = 0;
+
+  readonly #currentMix: StateMix = emptyMix();
+  readonly #outgoingMix: StateMix = emptyMix();
+  readonly #liveMix: StateMix = emptyMix();
+
+  /** Reused 2D ranking buffer; sized at construction to the largest tree. */
+  readonly #rankScratch: Blend2DRank[] = [];
+  readonly #rankIndices: number[] = [0, 0, 0];
+  readonly #rankWeights: number[] = [0, 0, 0];
 
   /** Length of the running cross-fade in seconds; `0` when none runs. */
   #transitionDuration = 0;
@@ -553,6 +756,14 @@ export class AnimationController implements Advanceable {
   /** Destination weight of the pose being written, in `[0, 1]`. */
   #weight = 1;
 
+  /** Hoisted clip-event visitor — one closure, reused every advance. */
+  readonly #visitClipEvent: AnimationEventListener = (event, index) => {
+    const listeners = this.#clipListeners;
+    for (let listener = 0; listener < listeners.length; listener += 1) {
+      listeners[listener](event, index);
+    }
+  };
+
   /** Clip-local time of {@link AnimationController.#current}, per pose. */
   #currentLocal = 0;
 
@@ -570,6 +781,7 @@ export class AnimationController implements Advanceable {
     this.#target = options.target;
     this.#declaredNode = options.authority;
     this.#onStateChange = options.onStateChange;
+    this.#liveInterrupt = options.liveInterrupt ?? false;
     if (options.speed !== undefined) {
       this.speed(options.speed);
     }
@@ -582,15 +794,25 @@ export class AnimationController implements Advanceable {
       channelSpecs,
       channelIndex,
     );
-    // Every state's track list is padded to the final channel count so that an
+    // Every clip's track list is padded to the final channel count so that an
     // indexed walk over channels reads a real `undefined` rather than running
     // off the end of an array a later state extended.
     for (const tracks of trackLists) {
-      while (tracks.length < channelSpecs.length) {
-        tracks.push(undefined);
+      padTracks(tracks, channelSpecs.length);
+    }
+    for (const definition of this.#states.values()) {
+      if (definition.blend === undefined) {
+        continue;
+      }
+      for (const clip of definition.blend.clips) {
+        padTracks(
+          clip.tracks as (AnimationTrackLike | undefined)[],
+          channelSpecs.length,
+        );
       }
     }
     this.#channelSpecs = channelSpecs;
+    this.#channelIndex = channelIndex;
     this.#transitions = this.#compileTransitions(options.transitions ?? []);
 
     const initialName = options.initialState ?? Object.keys(options.states)[0];
@@ -673,6 +895,75 @@ export class AnimationController implements Advanceable {
   /** The {@link AnimationController.speed} multiplier. */
   get playbackSpeed(): number {
     return this.#speed;
+  }
+
+  /**
+   * Number of animated channels (the union of every state's tracks). Valid
+   * before play — the specs are known at construction.
+   */
+  get channelCount(): number {
+    return this.#channelSpecs.length;
+  }
+
+  /** Authored path of channel `index`. */
+  channelPath(index: number): string {
+    return this.#channelSpecs[index].path;
+  }
+
+  /** Value adapter of channel `index`. */
+  channelAdapter(index: number): ValueAdapter<unknown> {
+    return this.#channelSpecs[index].adapter;
+  }
+
+  /**
+   * Index of the channel on `path`, or `-1` when this controller does not
+   * animate it. Used by {@link ./layer-stack.js#AnimationLayerStack}.
+   */
+  channelIndexOf(path: string): number {
+    const index = this.#channelIndex.get(path);
+    return index === undefined ? -1 : index;
+  }
+
+  /**
+   * Last evaluated pose of channel `index`. Valid after
+   * {@link AnimationController.play} / {@link AnimationController.advance}.
+   */
+  evaluatedChannel(index: number): unknown {
+    return this.#channels[index].evaluated;
+  }
+
+  /**
+   * Registers a clip-event listener (§16 `(from, to]` crossing). Returns an
+   * unsubscriber. Events fire while a state or a contributing blend-tree child
+   * plays forward; {@link AnimationController.advance} with `{ seek: true }`
+   * suppresses them.
+   */
+  onClipEvent(handler: AnimationEventListener): () => void {
+    this.#clipListeners.push(handler);
+    return () => {
+      const index = this.#clipListeners.indexOf(handler);
+      if (index >= 0) {
+        this.#clipListeners.splice(index, 1);
+      }
+    };
+  }
+
+  /**
+   * Detaches this controller from the §16 claim registry and from writing
+   * properties. {@link ./layer-stack.js#AnimationLayerStack} calls this before
+   * {@link AnimationController.play} so the stack is the sole writer.
+   *
+   * @throws FourError `INVALID_APPLICATION_STATE` — already played.
+   */
+  adoptByStack(): this {
+    if (this.#state !== "idle") {
+      invalidController(
+        "AnimationController.adoptByStack() must be called before play(); a running machine has already claimed its channels.",
+        { state: this.#state },
+      );
+    }
+    this.#parented = true;
+    return this;
   }
 
   // --- parameters (§18) ---------------------------------------------------
@@ -820,9 +1111,17 @@ export class AnimationController implements Advanceable {
         // aliasing a key would corrupt the clip.
         fromScratch: adapter.clone(current),
         toScratch: adapter.clone(current),
+        liveScratch: adapter.clone(current),
+        midScratch: adapter.clone(current),
+        treeScratch: [
+          adapter.clone(current),
+          adapter.clone(current),
+          adapter.clone(current),
+        ] as [unknown, unknown, unknown],
         blendScratch: adapter.clone(current),
         baseline: adapter.clone(current),
         frozen: adapter.clone(current),
+        evaluated: adapter.clone(current),
         isTransform,
         notifyChange: !adapter.mutatesInPlace,
         claim: { writerKind: CONTROLLER_WRITER_KIND, held: false },
@@ -832,19 +1131,27 @@ export class AnimationController implements Advanceable {
     this.#channels = channels;
     this.#hasTransformChannels = hasTransformChannels;
     this.#authorityNode = hasTransformChannels ? node : undefined;
-    for (const channel of channels) {
-      claimProperty(
-        channel.binding.owner,
-        channel.binding.key,
-        channel.path,
-        channel.claim,
-      );
+    if (!this.#parented) {
+      for (const channel of channels) {
+        claimProperty(
+          channel.binding.owner,
+          channel.binding.key,
+          channel.path,
+          channel.claim,
+        );
+      }
     }
 
     this.#current.elapsed = 0;
+    this.#current.cursor = CURSOR_BEFORE_START;
     this.#outgoing.definition = undefined;
     this.#outgoing.elapsed = 0;
+    this.#outgoing.cursor = CURSOR_BEFORE_START;
+    this.#liveSource.definition = undefined;
+    this.#liveSource.elapsed = 0;
+    this.#liveSource.cursor = CURSOR_BEFORE_START;
     this.#frozenSource = false;
+    this.#liveActive = false;
     this.#transitionDuration = 0;
     this.#transitionTime = 0;
     this.#state = "running";
@@ -926,7 +1233,7 @@ export class AnimationController implements Advanceable {
    * @throws FourError `INVALID_APPLICATION_STATE` — the delta is negative or
    * non-finite.
    */
-  advance(deltaSeconds: number): this {
+  advance(deltaSeconds: number, options?: ControllerAdvanceOptions): this {
     requireNonNegativeSeconds(
       deltaSeconds,
       "AnimationController advance delta",
@@ -937,11 +1244,16 @@ export class AnimationController implements Advanceable {
     const step = deltaSeconds * this.#speed;
     this.#advanceSlot(this.#current, step);
     this.#advanceSlot(this.#outgoing, step);
+    this.#advanceSlot(this.#liveSource, step);
+    const completing =
+      this.#transitionDuration > 0 &&
+      this.#transitionTime + step >= this.#transitionDuration;
     if (this.#transitionDuration > 0) {
       this.#transitionTime += step;
-      if (this.#transitionTime >= this.#transitionDuration) {
-        this.#completeTransition();
-      }
+    }
+    this.#dispatchClipEvents(options?.seek === true);
+    if (completing) {
+      this.#completeTransition();
     }
     this.#evaluateTransitions();
     this.#writePose();
@@ -1006,6 +1318,12 @@ export class AnimationController implements Advanceable {
     }
     const trackLists: (AnimationTrackLike | undefined)[][] = [];
     for (const name of names) {
+      if (name === ANY_STATE) {
+        invalidController(
+          `AnimationController state name "${ANY_STATE}" is reserved for any-state transitions.`,
+          { state: name },
+        );
+      }
       const options = stateOptionsOf(states[name]);
       const speed = options.speed ?? 1;
       if (!Number.isFinite(speed) || speed <= 0) {
@@ -1021,44 +1339,178 @@ export class AnimationController implements Advanceable {
           { state: name, loop },
         );
       }
-      const clip = options.clip;
-      const tracks: (AnimationTrackLike | undefined)[] = [];
-      for (const track of clip.tracks) {
-        let index = channelIndex.get(track.path);
-        if (index === undefined) {
-          index = channelSpecs.length;
-          channelIndex.set(track.path, index);
-          channelSpecs.push({ path: track.path, adapter: track.adapter });
-        } else if (channelSpecs[index].adapter.kind !== track.adapter.kind) {
-          invalidController(
-            `AnimationController state "${name}" animates "${track.path}" with a ${track.adapter.kind} track, but another state animates it with a ${channelSpecs[index].adapter.kind} track. Blending needs one value kind per property.`,
-            {
-              state: name,
-              path: track.path,
-              expected: channelSpecs[index].adapter.kind,
-              received: track.adapter.kind,
-            },
-          );
-        }
-        while (tracks.length <= index) {
-          tracks.push(undefined);
-        }
-        // Later wins within one clip, matching `AnimationClip.sampleAll`, which
-        // applies tracks in order and lets the last write stand.
-        tracks[index] = track;
+      if (options.clip !== undefined && options.blendTree !== undefined) {
+        invalidController(
+          `AnimationController state "${name}" cannot declare both a clip and a blendTree.`,
+          { state: name },
+        );
       }
+      if (options.clip === undefined && options.blendTree === undefined) {
+        invalidController(
+          `AnimationController state "${name}" needs a clip or a blendTree.`,
+          { state: name },
+        );
+      }
+
+      let blend: CompiledBlend | undefined;
+      let primary: CompiledClip;
+      if (options.blendTree !== undefined) {
+        blend = this.#compileBlend(
+          name,
+          options.blendTree,
+          channelSpecs,
+          channelIndex,
+        );
+        primary = blend.clips[0];
+      } else {
+        const tracks = this.#ingestClip(
+          name,
+          options.clip as AnimationClip,
+          channelSpecs,
+          channelIndex,
+        );
+        primary = { clip: options.clip as AnimationClip, tracks };
+      }
+
+      const duration = blendDuration(blend, primary.clip);
       this.#states.set(name, {
         name,
-        clip,
+        clip: primary.clip,
         speed,
-        duration: clip.duration,
+        duration,
         iterations: loop,
-        totalDuration: clip.duration <= 0 ? 0 : clip.duration * loop,
-        tracks,
+        totalDuration: duration <= 0 ? 0 : duration * loop,
+        tracks: primary.tracks,
+        blend,
+        primary,
       });
-      trackLists.push(tracks);
+      trackLists.push(primary.tracks as (AnimationTrackLike | undefined)[]);
     }
     return trackLists;
+  }
+
+  /** Registers one clip's tracks against the shared channel list. */
+  #ingestClip(
+    state: string,
+    clip: AnimationClip,
+    channelSpecs: ChannelSpec[],
+    channelIndex: Map<string, number>,
+  ): (AnimationTrackLike | undefined)[] {
+    const tracks: (AnimationTrackLike | undefined)[] = [];
+    for (const track of clip.tracks) {
+      let index = channelIndex.get(track.path);
+      if (index === undefined) {
+        index = channelSpecs.length;
+        channelIndex.set(track.path, index);
+        channelSpecs.push({ path: track.path, adapter: track.adapter });
+      } else if (channelSpecs[index].adapter.kind !== track.adapter.kind) {
+        invalidController(
+          `AnimationController state "${state}" animates "${track.path}" with a ${track.adapter.kind} track, but another state animates it with a ${channelSpecs[index].adapter.kind} track. Blending needs one value kind per property.`,
+          {
+            state,
+            path: track.path,
+            expected: channelSpecs[index].adapter.kind,
+            received: track.adapter.kind,
+          },
+        );
+      }
+      while (tracks.length <= index) {
+        tracks.push(undefined);
+      }
+      // Later wins within one clip, matching `AnimationClip.sampleAll`, which
+      // applies tracks in order and lets the last write stand.
+      tracks[index] = track;
+    }
+    return tracks;
+  }
+
+  /** Validates a blend tree and compiles its clips in declaration order. */
+  #compileBlend(
+    state: string,
+    tree: BlendTree,
+    channelSpecs: ChannelSpec[],
+    channelIndex: Map<string, number>,
+  ): CompiledBlend {
+    if (tree.kind === "blend1d") {
+      if (!this.#numbers.has(tree.parameter)) {
+        invalidController(
+          `AnimationController state "${state}" blend1d parameter "${tree.parameter}" is not a declared number parameter.`,
+          { state, parameter: tree.parameter },
+        );
+      }
+      if (tree.points.length === 0) {
+        invalidController(
+          `AnimationController state "${state}" blend1d needs at least one point.`,
+          { state },
+        );
+      }
+      const indexed = tree.points.map((point, order) => {
+        if (!Number.isFinite(point.value)) {
+          invalidController(
+            `AnimationController state "${state}" blend1d point ${String(order)} value must be finite.`,
+            { state, order, value: point.value },
+          );
+        }
+        return {
+          value: point.value,
+          order,
+          clip: this.#ingestClip(state, point.clip, channelSpecs, channelIndex),
+          source: point.clip,
+        };
+      });
+      indexed.sort((a, b) => a.value - b.value || a.order - b.order);
+      return {
+        kind: "blend1d",
+        parameter: tree.parameter,
+        values: indexed.map((point) => point.value),
+        clips: indexed.map((point) => ({
+          clip: point.source,
+          tracks: point.clip,
+        })),
+      };
+    }
+
+    if (
+      !this.#numbers.has(tree.parameterX) ||
+      !this.#numbers.has(tree.parameterY)
+    ) {
+      invalidController(
+        `AnimationController state "${state}" blend2d parameters "${tree.parameterX}" / "${tree.parameterY}" must both be declared number parameters.`,
+        { state, parameterX: tree.parameterX, parameterY: tree.parameterY },
+      );
+    }
+    if (tree.points.length === 0) {
+      invalidController(
+        `AnimationController state "${state}" blend2d needs at least one point.`,
+        { state },
+      );
+    }
+    const clips: CompiledClip[] = [];
+    const points: { x: number; y: number }[] = [];
+    for (let order = 0; order < tree.points.length; order += 1) {
+      const point = tree.points[order];
+      if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+        invalidController(
+          `AnimationController state "${state}" blend2d point ${String(order)} x/y must be finite.`,
+          { state, order, x: point.x, y: point.y },
+        );
+      }
+      points.push({ x: point.x, y: point.y });
+      clips.push({
+        clip: point.clip,
+        tracks: this.#ingestClip(state, point.clip, channelSpecs, channelIndex),
+      });
+    }
+    while (this.#rankScratch.length < points.length) {
+      this.#rankScratch.push({ index: 0, distance: 0 });
+    }
+    return {
+      kind: "blend2d",
+      parameterX: tree.parameterX,
+      parameterY: tree.parameterY,
+      points,
+      clips,
+    };
   }
 
   /** Validates every transition and resolves its destination once. */
@@ -1068,7 +1520,7 @@ export class AnimationController implements Advanceable {
     const compiled: CompiledTransition[] = [];
     for (let index = 0; index < transitions.length; index += 1) {
       const transition = transitions[index];
-      if (!this.#states.has(transition.from)) {
+      if (transition.from !== ANY_STATE && !this.#states.has(transition.from)) {
         invalidController(
           `AnimationController transition ${String(index)} leaves undeclared state "${transition.from}".`,
           { index, from: transition.from },
@@ -1091,10 +1543,7 @@ export class AnimationController implements Advanceable {
         exitTime,
         `AnimationController transition ${String(index)} exit time`,
       );
-      const when = transition.when ?? [];
-      for (const condition of when) {
-        this.#validateCondition(condition, index);
-      }
+      const when = this.#compileWhen(transition.when, index);
       compiled.push({
         from: transition.from,
         target,
@@ -1102,7 +1551,34 @@ export class AnimationController implements Advanceable {
         duration,
         exitTime,
         interruptible: transition.interruptible ?? true,
+        allowSelf: transition.allowSelf ?? false,
       });
+    }
+    return compiled;
+  }
+
+  /** Compiles string sugar and validates every predicate. */
+  #compileWhen(
+    when: TransitionWhen | undefined,
+    index: number,
+  ): readonly TransitionCondition[] {
+    if (when === undefined) {
+      return [];
+    }
+    const entries = typeof when === "string" ? [when] : when;
+    const compiled: TransitionCondition[] = [];
+    const lookup = {
+      hasNumber: (name: string): boolean => this.#numbers.has(name),
+      hasBoolean: (name: string): boolean => this.#booleans.has(name),
+      hasTrigger: (name: string): boolean => this.#triggers.has(name),
+    };
+    for (const entry of entries) {
+      const condition =
+        typeof entry === "string"
+          ? compileWhenExpression(entry, lookup, { index })
+          : entry;
+      this.#validateCondition(condition, index);
+      compiled.push(condition);
     }
     return compiled;
   }
@@ -1184,7 +1660,13 @@ export class AnimationController implements Advanceable {
     this.#transitionDuration = 0;
     this.#transitionTime = 0;
     this.#outgoing.definition = undefined;
+    this.#outgoing.elapsed = 0;
+    this.#outgoing.cursor = CURSOR_BEFORE_START;
     this.#frozenSource = false;
+    this.#liveActive = false;
+    this.#liveSource.definition = undefined;
+    this.#liveSource.elapsed = 0;
+    this.#liveSource.cursor = CURSOR_BEFORE_START;
   }
 
   /**
@@ -1201,7 +1683,10 @@ export class AnimationController implements Advanceable {
     const from = (this.#current.definition as StateDefinition).name;
     const elapsed = this.#current.elapsed;
     for (const transition of this.#transitions) {
-      if (transition.from !== from || elapsed < transition.exitTime) {
+      if (
+        elapsed < transition.exitTime ||
+        !this.#matchesFrom(transition, from)
+      ) {
         continue;
       }
       if (!this.#conditionsHold(transition.when)) {
@@ -1210,6 +1695,20 @@ export class AnimationController implements Advanceable {
       this.#fire(transition, from);
       return;
     }
+  }
+
+  /**
+   * Named edges match exactly; `from: "*"` matches every state except a
+   * self-transition, unless `allowSelf` is set.
+   */
+  #matchesFrom(transition: CompiledTransition, from: string): boolean {
+    if (transition.from === from) {
+      return true;
+    }
+    if (transition.from !== ANY_STATE) {
+      return false;
+    }
+    return transition.target.name !== from || transition.allowSelf;
   }
 
   /** Whether every condition holds right now. An empty list is vacuously true. */
@@ -1266,21 +1765,45 @@ export class AnimationController implements Advanceable {
     if (transition.duration <= 0) {
       this.#completeTransition();
     } else if (this.#transitionDuration > 0) {
-      this.#capturePose();
-      this.#frozenSource = true;
-      this.#outgoing.definition = undefined;
-      this.#transitionTime = 0;
-      this.#transitionDuration = transition.duration;
+      const canLive =
+        this.#liveInterrupt && !this.#liveActive && !this.#frozenSource;
+      if (canLive) {
+        this.#liveSource.definition = this.#outgoing.definition;
+        this.#liveSource.elapsed = this.#outgoing.elapsed;
+        this.#liveSource.cursor = this.#outgoing.cursor;
+        this.#liveMidWeight =
+          this.#transitionDuration > 0
+            ? Math.min(1, this.#transitionTime / this.#transitionDuration)
+            : 1;
+        this.#liveActive = true;
+        this.#frozenSource = false;
+        this.#outgoing.definition = this.#current.definition;
+        this.#outgoing.elapsed = this.#current.elapsed;
+        this.#outgoing.cursor = this.#current.cursor;
+        this.#transitionTime = 0;
+        this.#transitionDuration = transition.duration;
+      } else {
+        this.#capturePose();
+        this.#frozenSource = true;
+        this.#liveActive = false;
+        this.#outgoing.definition = undefined;
+        this.#liveSource.definition = undefined;
+        this.#transitionTime = 0;
+        this.#transitionDuration = transition.duration;
+      }
     } else {
       this.#frozenSource = false;
+      this.#liveActive = false;
       this.#outgoing.definition = this.#current.definition;
       this.#outgoing.elapsed = this.#current.elapsed;
+      this.#outgoing.cursor = this.#current.cursor;
       this.#transitionTime = 0;
       this.#transitionDuration = transition.duration;
     }
     this.#interruptible = transition.interruptible;
     this.#current.definition = transition.target;
     this.#current.elapsed = 0;
+    this.#current.cursor = CURSOR_BEFORE_START;
     this.#onStateChange?.(transition.target.name, from);
   }
 
@@ -1300,6 +1823,9 @@ export class AnimationController implements Advanceable {
       outgoing === undefined
         ? 0
         : localTimeOf(outgoing, this.#outgoing.elapsed);
+    this.#resolveMix(this.#current, this.#currentMix);
+    this.#resolveMix(this.#outgoing, this.#outgoingMix);
+    this.#resolveMix(this.#liveSource, this.#liveMix);
   }
 
   /**
@@ -1312,28 +1838,182 @@ export class AnimationController implements Advanceable {
    * Allocates nothing.
    */
   #blend(channel: Channel, index: number): unknown {
-    const current = this.#current.definition as StateDefinition;
-    const toTrack = current.tracks[index];
-    const to =
-      toTrack === undefined
-        ? channel.baseline
-        : toTrack.sample(this.#currentLocal, channel.toScratch);
+    const to = this.#sampleMix(
+      this.#currentMix,
+      this.#currentLocal,
+      channel,
+      index,
+      channel.toScratch,
+    );
     if (this.#transitionDuration <= 0) {
       return to;
     }
     let from: unknown;
     if (this.#frozenSource) {
       from = channel.frozen;
+    } else if (this.#liveActive) {
+      const liveLocal = localTimeOf(
+        this.#liveSource.definition as StateDefinition,
+        this.#liveSource.elapsed,
+      );
+      const a = this.#sampleMix(
+        this.#liveMix,
+        liveLocal,
+        channel,
+        index,
+        channel.liveScratch,
+      );
+      const outgoingLocal = this.#outgoingLocal;
+      const b = this.#sampleMix(
+        this.#outgoingMix,
+        outgoingLocal,
+        channel,
+        index,
+        channel.fromScratch,
+      );
+      from = channel.adapter.lerp(
+        a,
+        b,
+        this.#liveMidWeight,
+        channel.midScratch,
+      );
     } else {
-      const fromTrack = (this.#outgoing.definition as StateDefinition).tracks[
-        index
-      ];
-      from =
-        fromTrack === undefined
-          ? channel.baseline
-          : fromTrack.sample(this.#outgoingLocal, channel.fromScratch);
+      from = this.#sampleMix(
+        this.#outgoingMix,
+        this.#outgoingLocal,
+        channel,
+        index,
+        channel.fromScratch,
+      );
     }
     return channel.adapter.lerp(from, to, this.#weight, channel.blendScratch);
+  }
+
+  /** Resolves the weighted clips that currently make `slot`'s pose. */
+  #resolveMix(slot: StateSlot, mix: StateMix): void {
+    const definition = slot.definition;
+    if (definition === undefined) {
+      mix.count = 0;
+      return;
+    }
+    const blend = definition.blend;
+    if (blend === undefined) {
+      mix.count = 1;
+      mix.clips[0] = definition.primary;
+      mix.weights[0] = 1;
+      return;
+    }
+    if (blend.kind === "blend1d") {
+      const located = locateBlend1D(
+        blend.values,
+        this.#numbers.get(blend.parameter) as number,
+      );
+      if (located.i0 === located.i1) {
+        mix.count = 1;
+        mix.clips[0] = blend.clips[located.i0];
+        mix.weights[0] = 1;
+        return;
+      }
+      mix.count = 2;
+      mix.clips[0] = blend.clips[located.i0];
+      mix.clips[1] = blend.clips[located.i1];
+      mix.weights[0] = 1 - located.t;
+      mix.weights[1] = located.t;
+      return;
+    }
+    const count = locateBlend2D(
+      blend.points,
+      this.#numbers.get(blend.parameterX) as number,
+      this.#numbers.get(blend.parameterY) as number,
+      this.#rankScratch,
+      this.#rankIndices,
+      this.#rankWeights,
+    );
+    mix.count = count;
+    for (let index = 0; index < count; index += 1) {
+      mix.clips[index] = blend.clips[this.#rankIndices[index]];
+      mix.weights[index] = this.#rankWeights[index];
+    }
+  }
+
+  /**
+   * Samples one resolved mix into `out`. Blend-tree children write through
+   * `channel.treeScratch` first so `out` never aliases a clip sample.
+   */
+  #sampleMix(
+    mix: StateMix,
+    local: number,
+    channel: Channel,
+    index: number,
+    out: unknown,
+  ): unknown {
+    if (mix.count <= 0) {
+      return channel.baseline;
+    }
+    if (mix.count === 1) {
+      const track = (mix.clips[0] as CompiledClip).tracks[index];
+      return track === undefined ? channel.baseline : track.sample(local, out);
+    }
+    const samples = channel.treeScratch;
+    for (let entry = 0; entry < mix.count; entry += 1) {
+      const track = (mix.clips[entry] as CompiledClip).tracks[index];
+      const sampled =
+        track === undefined
+          ? channel.baseline
+          : track.sample(local, samples[entry]);
+      // Primitive adapters ignore `out` and return a new number; store it so
+      // the weighted walk reads the effective sample.
+      samples[entry] = sampled;
+    }
+    let accWeight = mix.weights[0];
+    let acc = samples[0];
+    for (let entry = 1; entry < mix.count; entry += 1) {
+      accWeight += mix.weights[entry];
+      const t = accWeight === 0 ? 0 : mix.weights[entry] / accWeight;
+      acc = channel.adapter.lerp(acc, samples[entry], t, out);
+    }
+    return acc;
+  }
+
+  /**
+   * Fires clip events for every slot that advanced this step, using mixer's
+   * `(from, to]` half-open crossing. `seek` suppresses the visitor but still
+   * moves the cursors.
+   */
+  #dispatchClipEvents(seek: boolean): void {
+    this.#resolveMix(this.#current, this.#currentMix);
+    this.#resolveMix(this.#outgoing, this.#outgoingMix);
+    this.#resolveMix(this.#liveSource, this.#liveMix);
+    this.#fireSlotEvents(this.#current, this.#currentMix, seek);
+    this.#fireSlotEvents(this.#outgoing, this.#outgoingMix, seek);
+    this.#fireSlotEvents(this.#liveSource, this.#liveMix, seek);
+  }
+
+  #fireSlotEvents(slot: StateSlot, mix: StateMix, seek: boolean): void {
+    const definition = slot.definition;
+    if (definition === undefined || mix.count <= 0) {
+      return;
+    }
+    const from = slot.cursor;
+    const to = slot.elapsed;
+    slot.cursor = to;
+    if (seek || this.#clipListeners.length === 0 || !(to > from)) {
+      return;
+    }
+    for (let entry = 0; entry < mix.count; entry += 1) {
+      if (mix.weights[entry] <= 0) {
+        continue;
+      }
+      const clip = (mix.clips[entry] as CompiledClip).clip;
+      fireClipEvents(
+        clip,
+        definition.duration,
+        definition.iterations,
+        from,
+        to,
+        this.#visitClipEvent,
+      );
+    }
   }
 
   /**
@@ -1350,7 +2030,7 @@ export class AnimationController implements Advanceable {
    */
   #writePose(): void {
     let allowTransform = true;
-    if (this.#hasTransformChannels) {
+    if (!this.#parented && this.#hasTransformChannels) {
       // `#authorityNode` is defined whenever `#hasTransformChannels` is true: a
       // channel can only be a transform channel if a node was resolved.
       const node = this.#authorityNode as Node;
@@ -1364,7 +2044,12 @@ export class AnimationController implements Advanceable {
     for (let index = 0; index < channels.length; index += 1) {
       const channel = channels[index];
       const value = this.#blend(channel, index);
-      if (!channel.claim.held || (channel.isTransform && !allowTransform)) {
+      channel.evaluated = channel.adapter.copy(value, channel.evaluated);
+      if (
+        this.#parented ||
+        !channel.claim.held ||
+        (channel.isTransform && !allowTransform)
+      ) {
         continue;
       }
       channel.binding.set(value);
@@ -1416,4 +2101,64 @@ function compareNumeric(
     default:
       return parameter !== value;
   }
+}
+
+/**
+ * Fires `clip` events across the elapsed range `(fromElapsed, toElapsed]`,
+ * walking loop iterations the way `AnimationMixer` does so markers re-arm
+ * on every wrap.
+ */
+function fireClipEvents(
+  clip: AnimationClip,
+  duration: number,
+  iterations: number,
+  fromElapsed: number,
+  toElapsed: number,
+  visit: AnimationEventListener,
+): void {
+  if (clip.events.length === 0 || !(toElapsed > fromElapsed)) {
+    return;
+  }
+  if (duration <= 0) {
+    clip.eventsInRange(fromElapsed, toElapsed, visit);
+    return;
+  }
+  const lastIteration = iterationAt(toElapsed, duration, iterations);
+  const firstIteration =
+    fromElapsed <= 0 ? 0 : iterationAt(fromElapsed, duration, iterations);
+  for (
+    let iteration = firstIteration;
+    iteration <= lastIteration;
+    iteration += 1
+  ) {
+    const localTo =
+      iteration === lastIteration
+        ? localAt(toElapsed, duration, iterations)
+        : duration;
+    const localFrom =
+      iteration === 0 ? fromElapsed : fromElapsed - iteration * duration;
+    clip.eventsInRange(localFrom, localTo, visit);
+  }
+}
+
+function iterationAt(
+  elapsed: number,
+  duration: number,
+  iterations: number,
+): number {
+  if (duration <= 0) {
+    return 0;
+  }
+  const last = iterations - 1;
+  const index = Math.floor(elapsed / duration);
+  return index > last ? last : index;
+}
+
+function localAt(
+  elapsed: number,
+  duration: number,
+  iterations: number,
+): number {
+  const iteration = iterationAt(elapsed, duration, iterations);
+  return iteration === 0 ? elapsed : elapsed - iteration * duration;
 }

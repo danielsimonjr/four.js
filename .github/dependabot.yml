@@ -50,21 +50,10 @@ updates:
         versions: ['>=6']
       - dependency-name: 'vitest'
         versions: ['>=4']
-      # BLOCKED on an adoption decision, not on a rebase. #63 merged this and was reverted
-      # 2026-09-05; #65 re-proposed it and was closed 2026-09-06 with CI red for the same
-      # cause. rapier 0.20 changes four measured behaviours rather than an API:
-      #   - a bullet no longer tunnels at a small CCD prediction distance
-      #   - a contact distance of 0.005 where <= 0 was expected
-      #   - a snapshot-restored joint at -0.75 where > -0.22 was expected
-      # It also needs an adapter change: 0.20 inserted a `bodies: RigidBodySet` parameter,
-      # so `contactPair(c1, c2, f)` became `contactPair(c1, c2, bodies, f)`.
-      # Adopting it is a deliberate call (the CCD change looks like an improvement; the
-      # joint one may be a regression) -- see TODO.md, "rapier 0.20 adoption is a real
-      # decision, not a bump". Lift this once that decision is made.
-      - dependency-name: '@dimforge/rapier2d-compat'
-        versions: ['>=0.20']
-      - dependency-name: '@dimforge/rapier3d-compat'
-        versions: ['>=0.20']
+      # @dimforge/rapier{2,3}d-compat 0.20.0 adopted 2026-09-06 (contactPair now
+      # takes bodies; CCD / contact-distance / snapshot-joint goldens updated).
+      # Further 0.20.x / 0.21+ patches may propose themselves; do not re-ignore
+      # 0.20 on the old behavioural notes — those tests now track 0.20.
       # BLOCKED behind the pre-existing test-isolation defect. #66 carried eslint 9 -> 10
       # inside a group of eight and went red on `warn`-count assertions -- the §42
       # authority warning firing an extra time under a full run, where the affected tests

@@ -114,7 +114,7 @@ describe("WgpuParticleSimulation creation (§36, §83)", () => {
         GPU_BUFFER_USAGE.COPY_SRC,
     );
     expect(creates[2]?.label).toBe("four:particle-sim:node-1:params");
-    expect(creates[2]?.size).toBe(32);
+    expect(creates[2]?.size).toBe(64);
     expect(creates[3]).toEqual({
       label: "four:particle-sim:node-1:scratch",
       size: PARTICLE_SIMULATION_SCRATCH_BYTES,
@@ -184,8 +184,8 @@ describe("integrate — the WP-R1.8 kernel, dispatched (§36, §82)", () => {
     gpu.reset();
     simulation.integrate(130, 1 / 60, 0, -9.81, 0);
 
-    // Params: dt, count-as-f32, two written pads, gravity xyz, written pad —
-    // as float32, since the staging array narrowed them at write time.
+    // First 8 floats stay [dt, count, 0, 0, gx, gy, gz, 0]; the extra 8 are
+    // reserved for optional radial / collision extras (R-32 / §27 GPU fields).
     const write = gpu.callsOf("queue.writeBuffer")[0];
     expect(write?.args[2]).toEqual([
       Math.fround(1 / 60),
@@ -194,6 +194,14 @@ describe("integrate — the WP-R1.8 kernel, dispatched (§36, §82)", () => {
       0,
       0,
       Math.fround(-9.81),
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
       0,
       0,
     ]);

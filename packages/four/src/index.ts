@@ -40,13 +40,20 @@ export { readLiveResourceCounts } from "./live-resource-counts.js";
 // same objects, so every import that predates the move keeps working —
 // `plugins.ts` records the history and the identity argument.
 export {
+  ASSET_LOADERS,
   COMPONENT_SERIALIZERS,
+  COMPUTE_WORKLOADS,
+  EDITOR_TOOLS,
   RENDERER_REGISTRY,
   RENDER_GRAPH,
   SCENE_MIGRATIONS,
+  SHADER_OPERATORS,
   SIMULATION_SYSTEMS,
   SOLVER_REGISTRY,
+  UI_CONTROLS,
 } from "./plugins.js";
+export type { EditorToolFactory } from "./plugins.js";
+export { EditorToolRegistry } from "./plugins.js";
 
 // §79 support for the engine's own node classes and components (A-14, PH-17,
 // and the drawing tier — A-16, 2026-08-07). It lives here rather than in

@@ -33,20 +33,37 @@ export type {
 export { AnimationClip } from "./clip.js";
 
 export type {
+  BlendTree,
+  BlendTree1D,
+  BlendTree1DPoint,
+  BlendTree2D,
+  BlendTree2DPoint,
+} from "./blend-tree.js";
+export { isBlendTree } from "./blend-tree.js";
+
+export type {
   AnimationControllerOptions,
   AnimationControllerParameters,
   AnimationStateInput,
   AnimationStateOptions,
   AnimationTransition,
   BooleanCondition,
+  ControllerAdvanceOptions,
   ControllerPlaybackState,
   NumericComparison,
   NumericCondition,
   StateChangeListener,
   TransitionCondition,
+  TransitionWhen,
   TriggerCondition,
 } from "./controller.js";
-export { AnimationController } from "./controller.js";
+export { ANY_STATE, AnimationController } from "./controller.js";
+
+export type {
+  AnimationLayer,
+  AnimationLayerStackOptions,
+} from "./layer-stack.js";
+export { AnimationLayerStack } from "./layer-stack.js";
 
 export type { EasingFunction, EasingName } from "./easing.js";
 export {
@@ -124,6 +141,9 @@ export { AnimationTrack } from "./track.js";
 
 export type { TweenProperties, TweenState, TweenValue } from "./tween.js";
 export { Tween, animate, tween } from "./tween.js";
+
+export type { WhenParameterLookup } from "./when.js";
+export { compileWhenExpression } from "./when.js";
 
 export type { ColorRGBA, ValueAdapter, ValueKind } from "./values.js";
 export {

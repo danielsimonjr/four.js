@@ -21,15 +21,17 @@
  *
  * ## What is deliberately *not* modelled
  *
- * Everything this backend does not call: query sets, external textures. Each
- * joins the interface with the packet that calls it, so the double never has
- * to fake a member no code path reaches — the property that keeps it a double
- * rather than a reimplementation. `mapAsync` and `copyTextureToBuffer` joined
- * with WP-R1.6's readback, and §82's compute members (`createComputePipeline`,
- * `beginComputePass`, `copyBufferToBuffer`) with WP-R1.8, all as **optional**
- * members: presence is the capability (R-30b's rule), so every double written
- * before them still satisfies the surface — and WebGL 2, which has no compute
- * at all, keeps an honest structural mirror of that absence.
+ * Everything this backend does not call: external textures. Each joins the
+ * interface with the packet that calls it, so the double never has to fake a
+ * member no code path reaches — the property that keeps it a double rather
+ * than a reimplementation. `mapAsync` and `copyTextureToBuffer` joined with
+ * WP-R1.6's readback, §82's compute members (`createComputePipeline`,
+ * `beginComputePass`, `copyBufferToBuffer`) with WP-R1.8, and query sets
+ * (`createQuerySet`, `resolveQuerySet`) with A-1's GPU-frame timer, all as
+ * **optional** members: presence is the capability (R-30b's rule), so every
+ * double written before them still satisfies the surface — and WebGL 2,
+ * which has no compute at all, keeps an honest structural mirror of that
+ * absence.
  *
  * ## Names
  *
@@ -51,6 +53,8 @@
 export const GPU_BUFFER_USAGE = Object.freeze({
   /** Buffer may be mapped for reading (`mapAsync`) — WP-R1.6's readback. */
   MAP_READ: 0x0001,
+  /** Buffer may be the destination of a query-set resolve (A-1). */
+  QUERY_RESOLVE: 0x0200,
   /** Buffer may be the source of a copy. */
   COPY_SRC: 0x0004,
   /** Buffer may be the destination of a copy, including `queue.writeBuffer`. */
@@ -116,6 +120,17 @@ export interface GpuDeviceLostInfo {
   readonly reason?: string;
   /** Human-readable detail from the implementation. */
   readonly message?: string;
+}
+
+/**
+ * An opaque GPU query-set handle (A-1 timestamp queries).
+ *
+ * Optional on {@link GpuDevice.createQuerySet} — presence is the capability
+ * (R-30b). A double written before this packet still satisfies `GpuDevice`.
+ */
+export interface GpuQuerySet {
+  /** Releases the allocation (§83). */
+  destroy(): void;
 }
 
 /**
@@ -359,6 +374,16 @@ export interface GpuRenderPassDescriptor {
     readonly stencilLoadOp?: "load" | "clear";
     readonly stencilStoreOp?: "store" | "discard";
   };
+  /**
+   * Timestamp writes for this pass (A-1). Optional, and omitted on every
+   * frame that has not armed GPU timing, so a tape that never reads
+   * `lastGpuFrameTimeSeconds` stays the object it always was.
+   */
+  readonly timestampWrites?: {
+    readonly querySet: GpuQuerySet;
+    readonly beginningOfPassWriteIndex?: number;
+    readonly endingOfPassWriteIndex?: number;
+  };
 }
 
 /** The commands a render pass records. */
@@ -475,6 +500,17 @@ export interface GpuCommandEncoder {
       readonly rowsPerImage?: number;
     },
     size: readonly [number, number],
+  ): void;
+  /**
+   * Copies query results into `destination` (A-1). Optional — presence is
+   * the capability, and only the GPU-frame timer calls it.
+   */
+  resolveQuerySet?(
+    querySet: GpuQuerySet,
+    firstQuery: number,
+    queryCount: number,
+    destination: GpuBuffer,
+    destinationOffset: number,
   ): void;
   /** Closes the encoder and yields the buffer to submit. */
   finish(): GpuCommandBuffer;
@@ -676,6 +712,15 @@ export interface GpuDevice {
   createCommandEncoder(descriptor?: {
     readonly label?: string;
   }): GpuCommandEncoder;
+  /**
+   * Allocates a query set (A-1). Optional — presence is the capability,
+   * and only the GPU-frame timer calls it. A double written before this
+   * packet still satisfies the device.
+   */
+  createQuerySet?(descriptor: {
+    readonly type: "occlusion" | "timestamp";
+    readonly count: number;
+  }): GpuQuerySet;
   /** Releases the device (§83). */
   destroy(): void;
 }
@@ -689,6 +734,8 @@ export interface GpuAdapter {
   /** Requests a device; resolves `null` — or rejects — when none can be had. */
   requestDevice(descriptor?: {
     readonly label?: string;
+    /** Features this device must support — `timestamp-query` for A-1. */
+    readonly requiredFeatures?: readonly string[];
   }): Promise<GpuDevice | null>;
 }
 

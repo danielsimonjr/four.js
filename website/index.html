@@ -6,9 +6,8 @@
     <title>four.js</title>
     <!--
       Deployed to GitHub Pages by .github/workflows/docs.yml, which copies this
-      file to the site root next to /api/ and /examples/. Deliberately one plain
-      file with no build step: it is an index over what already exists, not the
-      §93 site, which is still staged (see README.md in this directory).
+      file to the site root next to /api/, /guides/, and /examples/. Deliberately
+      one plain file with no build step: it is an index over what already exists.
     -->
     <style>
       :root {
@@ -83,15 +82,12 @@
       scene graph. Not yet published to npm.
     </p>
 
-    <h2>API reference</h2>
-    <ul>
-      <li>
-        <a href="./api/">Generated API documentation</a>
-        <span>— all 24 packages, from the TypeScript declarations.</span>
-      </li>
-    </ul>
-
-    <h2>Examples</h2>
+    <h2>Demos</h2>
+    <p>
+      Interactive example sites, built with
+      <code>--base=/four.js/examples/&lt;name&gt;/</code> because Pages hosts
+      this repository under a subpath. Each URL is a real Vite bundle.
+    </p>
     <ul>
       <li>
         <a href="./examples/flagship/one-scene-everything-moves/"
@@ -114,15 +110,27 @@
       </li>
       <li>
         <a href="./examples/first-2d-scene/">first-2d-scene</a>
-        <span>— shapes, input and picking.</span>
+        <span>— shapes, input, picking, dragging, tweens and a timeline.</span>
       </li>
       <li>
         <a href="./examples/first-3d-scene/">first-3d-scene</a>
         <span>— perspective camera, lit 3D primitives.</span>
       </li>
       <li>
+        <a href="./examples/first-animated-scene/">first-animated-scene</a>
+        <span>— §93 name over first-2d-scene (tweens, clip, timeline).</span>
+      </li>
+      <li>
+        <a href="./examples/first-physics-scene/">first-physics-scene</a>
+        <span>— §93 name over physics-playground (gravity, collisions, impulses).</span>
+      </li>
+      <li>
+        <a href="./examples/mixed-scene/">mixed-scene</a>
+        <span>— §93 name over physics-playground (2D and 3D worlds side by side).</span>
+      </li>
+      <li>
         <a href="./examples/physics-playground/">physics-playground</a>
-        <span>— rigid bodies on the Rapier adapter.</span>
+        <span>— rigid bodies on the Rapier adapter, 2D + 3D through one API.</span>
       </li>
       <li>
         <a href="./examples/mechanism/">mechanism</a>
@@ -140,21 +148,211 @@
         <a href="./examples/ui-demo/">ui-demo</a>
         <span>— retained-mode UI nodes in the scene graph.</span>
       </li>
+      <li>
+        <a href="./examples/character-controller/">character-controller</a>
+        <span>— §12 swept controller, first-person look, and a plane-tier patrol.</span>
+      </li>
     </ul>
 
-    <h2>Guides and specification</h2>
-    <p>These are Markdown and render on GitHub rather than here:</p>
+    <h2>API reference</h2>
     <ul>
       <li>
-        <a href="https://github.com/danielsimonjr/four.js/tree/main/docs/guides"
-          >Guides</a
-        >
-        <span
-          >— scene graph, cameras, materials, transform authority, fixed-step
-          simulation, units, performance, custom shaders, custom solver
-          adapters, and more.</span
-        >
+        <a href="./api/">Generated API documentation</a>
+        <span>— all 24 packages, from the TypeScript declarations.</span>
       </li>
+    </ul>
+
+    <h2>Guides</h2>
+    <p>
+      Hosted here as HTML (rendered at deploy time from
+      <code>docs/guides/*.md</code>). The Markdown on GitHub remains the
+      editable source.
+    </p>
+    <ul>
+      <li>
+        <a href="./guides/">Guides index</a>
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/tree/main/docs/guides"
+            >Markdown on GitHub</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/scene-graph-and-transforms.html"
+          >The scene graph and transforms</a
+        >
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/scene-graph-and-transforms.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/cameras-and-coordinate-conversion.html"
+          >Cameras and coordinate conversion</a
+        >
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/cameras-and-coordinate-conversion.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/fixed-step-simulation.html">Fixed-step simulation</a>
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/fixed-step-simulation.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/transform-authority.html">Transform authority</a>
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/transform-authority.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/materials-and-render-graph.html"
+          >Materials and the render graph</a
+        >
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/materials-and-render-graph.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/collision-filtering.html">Collision filtering</a>
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/collision-filtering.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/units-and-numerical-stability.html"
+          >Units and numerical stability</a
+        >
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/units-and-numerical-stability.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/workers-and-cross-origin-isolation.html"
+          >Workers and cross-origin isolation</a
+        >
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/workers-and-cross-origin-isolation.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/performance-optimization.html"
+          >Performance optimization</a
+        >
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/performance-optimization.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/custom-shaders.html">Custom shaders</a>
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/custom-shaders.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/custom-solver-adapters.html"
+          >Custom solver adapters</a
+        >
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/custom-solver-adapters.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/engineering-dashboard.html"
+          >The engineering dashboard</a
+        >
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/engineering-dashboard.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/digital-twin.html">The digital twin</a>
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/digital-twin.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/security-and-untrusted-content.html"
+          >Security and untrusted content</a
+        >
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/security-and-untrusted-content.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+      <li>
+        <a href="./guides/raster-painting.html"
+          >Raster painting and dynamic textures</a
+        >
+        <span>
+          —
+          <a
+            href="https://github.com/danielsimonjr/four.js/blob/main/docs/guides/raster-painting.md"
+            >.md</a
+          >.
+        </span>
+      </li>
+    </ul>
+
+    <h2>Specification</h2>
+    <ul>
       <li>
         <a
           href="https://github.com/danielsimonjr/four.js/blob/main/docs/SPECIFICATION.md"
@@ -163,14 +361,20 @@
         <span>— the working reference the implementation follows.</span>
       </li>
       <li>
+        <a
+          href="https://github.com/danielsimonjr/four.js/blob/main/docs/COMPATIBILITY.md"
+          >Compatibility tables</a
+        >
+        <span>— §90 browsers, render backends, solvers, formats, plugin API.</span>
+      </li>
+      <li>
         <a href="https://github.com/danielsimonjr/four.js">Repository</a>
       </li>
     </ul>
 
     <footer>
-      The guides are not hosted here yet (this footer also said the flagship
-      demo was "not built yet" until 2026-08-07 — it now leads the example
-      list). Tracked; see
+      Guides are hosted under <code>/guides/</code> as HTML; the Markdown on
+      GitHub is the source. See
       <a
         href="https://github.com/danielsimonjr/four.js/blob/main/website/README.md"
         >website/README.md</a

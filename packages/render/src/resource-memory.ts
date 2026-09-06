@@ -35,6 +35,8 @@
  * about, and it is exact rather than approximate.
  */
 
+import { DEV, disposeTracked, trackDisposable } from "@four/core";
+
 /** Live (constructed, undisposed) `Texture` instances. */
 let liveTextures = 0;
 
@@ -107,4 +109,21 @@ export function liveTextureCount(): number {
  */
 export function liveRenderTargetCount(): number {
   return liveRenderTargets;
+}
+
+/**
+ * Registers `resource` with §83's FinalizationRegistry tracker (A-4).
+ * Call at construction beside {@link noteTexture} / {@link noteRenderTarget}.
+ * Production: no-op.
+ */
+export function trackRenderDisposable(resource: object, label: string): void {
+  if (DEV) trackDisposable(resource, label);
+}
+
+/**
+ * Marks `resource` disposed so a later finalization is not a leak.
+ * Call from `dispose()` beside the matching note decrement.
+ */
+export function releaseRenderDisposable(resource: object): void {
+  if (DEV) disposeTracked(resource);
 }

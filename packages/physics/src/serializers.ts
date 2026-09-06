@@ -149,6 +149,8 @@ import { RigidBody } from "./rigid-body.js";
 import {
   DEFAULT_GROUND_SNAP_DISTANCE,
   DEFAULT_MAX_SLIDES,
+  DEFAULT_PUSH_IMPULSE_SCALE,
+  DEFAULT_PUSH_MASS,
   DEFAULT_SKIN_WIDTH,
   DEFAULT_SLOPE_LIMIT,
   DEFAULT_STEP_HEIGHT,
@@ -970,6 +972,16 @@ export const SWEPT_CHARACTER_CONTROLLER_SERIALIZER: ComponentSerializerShape<Swe
       if (Number.isFinite(component.maxFallSpeed)) {
         payload.maxFallSpeed = component.maxFallSpeed;
       }
+      // Defaults stay omitted so a pre-PH-11c document is spelled the same.
+      if (component.pushMass !== DEFAULT_PUSH_MASS) {
+        payload.pushMass = component.pushMass;
+      }
+      if (component.pushImpulseScale !== DEFAULT_PUSH_IMPULSE_SCALE) {
+        payload.pushImpulseScale = component.pushImpulseScale;
+      }
+      if (component.pushDynamics === false) {
+        payload.pushDynamics = false;
+      }
       return payload;
     },
 
@@ -998,6 +1010,12 @@ export const SWEPT_CHARACTER_CONTROLLER_SERIALIZER: ComponentSerializerShape<Swe
         collisionMask: readNumber(source.collisionMask, ALL_COLLISION_GROUPS),
         verticalVelocity: readNumber(source.verticalVelocity, 0),
         grounded: readBoolean(source.grounded, false),
+        pushMass: readNumber(source.pushMass, DEFAULT_PUSH_MASS),
+        pushImpulseScale: readNumber(
+          source.pushImpulseScale,
+          DEFAULT_PUSH_IMPULSE_SCALE,
+        ),
+        pushDynamics: readBoolean(source.pushDynamics, true),
       });
     },
   };

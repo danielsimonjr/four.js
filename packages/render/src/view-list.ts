@@ -66,7 +66,11 @@ import { Frustum, type Matrix4, Vector3 } from "@four/math";
 import { layersMatch, type Viewport } from "@four/scene";
 
 import { computeWorldBoundingSphere, type BoundingSphere } from "./bounds.js";
-import { viewLayerMask, type RenderItem } from "./render-list.js";
+import {
+  compareRenderItems,
+  viewLayerMask,
+  type RenderItem,
+} from "./render-list.js";
 
 /**
  * Optional arguments of {@link buildViewRenderList}.
@@ -122,13 +126,13 @@ const scratchSphere: BoundingSphere = { center: new Vector3(), radius: 0 };
  * - An item whose node set `frustumCulled = false` (§49). That is the flag's
  *   entire job: geometry a vertex shader displaces, a skybox, a node whose
  *   bounds lie about where it draws.
- * - A **particle system** (§36). Its item carries the shared unit quad as
- *   `geometry` and its particles are spread across a volume by the instance
- *   stream, so the quad's bounds describe a square at the emitter and nothing
- *   about what is drawn. `buildRenderList` writes `frustumCulled = false` on
- *   every particle item for exactly this reason, so the exemption is a fact of
- *   the item rather than a `kind` check here. Culling emitters wants §36 to
- *   report a bound over its live particles, and that is a particles packet.
+ * - A **particle system** (§36) that has not published live bounds. Its
+ *   item carries the shared unit quad as `geometry`, so the quad's box is a
+ *   square at the emitter and says nothing about the particles. The builders
+ *   write `frustumCulled = false` in that case. When the emitter publishes
+ *   a local AABB (`computeBounds`), they copy a world sphere onto
+ *   `item.worldBounds` and set `frustumCulled` so this scan can hide it
+ *   (R-8 follow-up b) — still no `kind` check here.
  * - An item whose geometry cannot be bounded — see
  *   {@link computeWorldBoundingSphere} for the three cases and why each one
  *   fails towards drawing.
@@ -167,12 +171,7 @@ export function buildViewRenderList(
     if (
       frustum !== null &&
       item.frustumCulled &&
-      computeWorldBoundingSphere(
-        item.geometry,
-        item.worldMatrix,
-        scratchSphere,
-      ) &&
-      !frustum.intersectsSphere(scratchSphere.center, scratchSphere.radius)
+      isOutsideFrustum(item, frustum)
     ) {
       continue;
     }
@@ -184,42 +183,21 @@ export function buildViewRenderList(
 }
 
 /**
- * §66's comparator with **key 4 in place**: layer, opaque before transparent,
- * depth, explicit render order — reading the `viewDepth`
- * {@link sortRenderListByDepth} has just written on every item.
+ * Whether `item` lies wholly outside `frustum`.
  *
- * Opaque draws sort **near to far** and transparent ones **far to near**, which
- * is the split §66's own list implies and the two things depth ordering is for:
- * an opaque surface drawn first fills the depth buffer so the surfaces behind
- * it are rejected before they are shaded, and a blended surface only composites
- * correctly over what is already behind it. Both groups are already separated
- * by key 2, so the direction is decided once per comparison and never mixes.
+ * Prefers {@link RenderItem.worldBounds} when the builders published one
+ * (today: a particle system with live AABB). Otherwise derives the sphere
+ * from the item's geometry, which is the ordinary mesh / sprite path.
  */
-function compareDepthOrderedItems(a: RenderItem, b: RenderItem): number {
-  // §67's mask draws first, ahead of every other key (R-23): the stencil
-  // buffer must be complete before the first clipped fragment is tested, and
-  // nothing else in §66's order can be allowed to interleave content between a
-  // mask and the draws it masks. `false !== false` in every scene that names no
-  // clip, so this key is a single comparison and never a reordering.
-  const aMask = a.clip?.maskPass === true;
-  const bMask = b.clip?.maskPass === true;
-  if (aMask !== bMask) {
-    return aMask ? -1 : 1;
+function isOutsideFrustum(item: RenderItem, frustum: Frustum): boolean {
+  const published = item.worldBounds;
+  if (published !== undefined && published !== null) {
+    return !frustum.intersectsSphere(published.center, published.radius);
   }
-  if (a.renderLayer !== b.renderLayer) {
-    return a.renderLayer - b.renderLayer;
-  }
-  if (a.transparent !== b.transparent) {
-    return a.transparent ? 1 : -1;
-  }
-  if (a.viewDepth !== b.viewDepth) {
-    // Key 2 has already established that both items are on the same side of the
-    // opaque/transparent split, so one of them answers for the pair.
-    return a.transparent
-      ? b.viewDepth - a.viewDepth
-      : a.viewDepth - b.viewDepth;
-  }
-  return a.renderOrder - b.renderOrder;
+  return (
+    computeWorldBoundingSphere(item.geometry, item.worldMatrix, scratchSphere) &&
+    !frustum.intersectsSphere(scratchSphere.center, scratchSphere.radius)
+  );
 }
 
 /**
@@ -256,16 +234,14 @@ function compareDepthOrderedItems(a: RenderItem, b: RenderItem): number {
  * is why this verb takes a view matrix rather than reading one off a camera the
  * list does not know about.
  *
- * ## Key 3 and key 4 are alternatives at this tier
+ * ## Key 3 outranks key 4 (R-8 follow-up a)
  *
- * §66 orders the keys pipeline-then-depth, which means a list grouped by
- * material has depth ordering only *within* each material group — and the one
- * thing depth ordering is for, blended surfaces compositing in the right order,
- * is exactly what that destroys. The two verbs therefore each carry keys 1, 2
- * and 5 and one of 3 or 4, and applying both leaves whichever ran last. A
- * single comparator carrying both is a real design with a real question behind
- * it (which key wins for transparent content, and whether the answer differs
- * per group), and it is staged rather than guessed.
+ * §66's order is layer → opaque/transparent → pipeline/material → depth →
+ * explicit order. After writing `viewDepth`, this verb applies
+ * {@link compareRenderItems} — the one comparator that carries every key.
+ * Transparent items still sort back-to-front, but only *within* the same
+ * pipeline and material. A scene that never calls this function is untouched:
+ * the builders still sort with keys 1, 2 and 5 only.
  *
  * ## What is measured
  *
@@ -303,6 +279,6 @@ export function sortRenderListByDepth(
     const depth = -(e[2] * m[12] + e[6] * m[13] + e[10] * m[14] + e[14]);
     item.viewDepth = Number.isFinite(depth) ? depth : 0;
   }
-  list.sort(compareDepthOrderedItems);
+  list.sort(compareRenderItems);
   return list;
 }

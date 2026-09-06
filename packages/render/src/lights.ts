@@ -41,11 +41,12 @@
  * (which would flicker as the camera moves) and never "the brightest" (which
  * would flicker as a light animates). Sort by moving the nodes.
  *
- * The overflow is reported **once per root**, through `console.warn`, because
- * a scene that quietly drops a lamp is exactly the bug nobody finds. It is not
- * gated on §85's build flag: unlike a per-frame validity check it costs one
- * `WeakSet` lookup per collection, and the message it protects is worth more
- * in production than the bytes it costs.
+ * The overflow is reported **once per root**. Development builds go
+ * through {@link @four/core!devWarnOnce} (A-4). Production keeps an
+ * unconditional `console.warn`: a scene that quietly drops a lamp is
+ * the bug nobody finds, and that message is worth more in a shipped
+ * build than the bytes it costs (the 2026-08 decision, still in
+ * force). Both paths dedup per root.
  *
  * ## Structural contracts, like `particles.ts`
  *
@@ -62,6 +63,7 @@
  * assignments.
  */
 
+import { DEV, devWarnOnce } from "@four/core";
 import { Matrix4, Vector3 } from "@four/math";
 import type { Node } from "@four/scene";
 
@@ -651,18 +653,19 @@ export function collectSceneLights(root: Node, out: SceneLights): SceneLights {
     }
   }
 
-  if (
-    walkPunctualFound > MAX_PUNCTUAL_LIGHTS &&
-    !warnedOverflowRoots.has(root)
-  ) {
-    warnedOverflowRoots.add(root);
-    console.warn(
-      `[four] ${String(walkPunctualFound)} point and spot lights, but a frame ` +
-        `shades with at most ${String(MAX_PUNCTUAL_LIGHTS)} (§68): the first ` +
-        "in scene-graph order are used and the rest are skipped. Reorder the " +
-        "nodes to choose differently. Further overflows in this scene are " +
-        "suppressed.",
-    );
+  if (walkPunctualFound > MAX_PUNCTUAL_LIGHTS) {
+    const message =
+      `${String(walkPunctualFound)} point and spot lights, but a frame ` +
+      `shades with at most ${String(MAX_PUNCTUAL_LIGHTS)} (§68): the first ` +
+      "in scene-graph order are used and the rest are skipped. Reorder the " +
+      "nodes to choose differently. Further overflows in this scene are " +
+      "suppressed.";
+    if (DEV) {
+      devWarnOnce(`punctual-overflow:${root.id}`, message);
+    } else if (!warnedOverflowRoots.has(root)) {
+      warnedOverflowRoots.add(root);
+      console.warn(`[four] ${message}`);
+    }
   }
   return out;
 }

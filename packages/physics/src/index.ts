@@ -83,6 +83,7 @@ export type {
   JointLimits,
   JointType,
   LinearJointMotor,
+  LocalPlane,
   PhysicsWorldOptions,
   PrismaticJointDescriptor,
   RevoluteJointDescriptor,
@@ -165,7 +166,10 @@ export { PhysicsEventSystem } from "./physics-event-system.js";
 export type { PhysicsSystemOptions } from "./physics-system.js";
 export { PhysicsSystem } from "./physics-system.js";
 export type { StalePhysicsHandleKind } from "./stale-handle.js";
-export { rejectStalePhysicsHandle } from "./stale-handle.js";
+export {
+  rejectStalePhysicsHandle,
+  resetStaleHandleWarnings,
+} from "./stale-handle.js";
 export {
   DEFAULT_DENSITY,
   DEFAULT_FRICTION,
@@ -312,12 +316,32 @@ export type {
 export {
   DEFAULT_GROUND_SNAP_DISTANCE,
   DEFAULT_MAX_SLIDES,
+  DEFAULT_PUSH_IMPULSE_SCALE,
+  DEFAULT_PUSH_MASS,
   DEFAULT_SKIN_WIDTH,
   DEFAULT_SLOPE_LIMIT,
   DEFAULT_STEP_HEIGHT,
   SweptCharacterController,
   SweptCharacterSystem,
 } from "./swept-character-controller.js";
+export type { ResolvedLocalPlane } from "./local-plane.js";
+export {
+  DEFAULT_LOCAL_PLANE,
+  isDefaultLocalPlane,
+  planeToWorld,
+  planeToWorldVec,
+  resolveLocalPlane,
+  worldToPlane,
+  worldToPlaneVec,
+} from "./local-plane.js";
+export type { PhysicsWorldUnits } from "./world-units.js";
+export {
+  fromSiLength,
+  fromSiMass,
+  resolvePhysicsWorldUnits,
+  toSiLength,
+  toSiMass,
+} from "./world-units.js";
 export type {
   ActiveBodyVisitor,
   BodyControlModeOptions,
@@ -338,4 +362,9 @@ export {
   PhysicsWorld,
   createPoseTargetCaptureSystem,
 } from "./world.js";
-export { liveSolverBodyCount } from "./resource-memory.js";
+export {
+  liveSolverBodyCount,
+  liveSolverColliderCount,
+  liveSolverHandleCount,
+  liveSolverJointCount,
+} from "./resource-memory.js";

@@ -8,7 +8,71 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
-## [Unreleased]
+### 2026-09-06 — A-4 FinalizationRegistry leak tracking
+
+- **Tracker in `@four/core`.** `trackDisposable` / `disposeTracked` /
+  `auditFinalizedLeaks` / `trackedDisposableId` live next to `DEV` so
+  geometry, render, and materials can register without importing
+  `@four/diagnostics`. Diagnostics re-exports the same functions.
+- **Constructors register.** `Texture`, `CanvasTexture`, `RenderTarget`,
+  `BufferGeometry`, and `Material` call the tracker at construct and
+  `dispose()`. Reading the getter is not required; `auditFinalizedLeaks`
+  remains the opt-in drain (finalizers only enqueue).
+- **Production.** Helpers are `if (DEV)` so `__FOUR_DEV__: false` drops
+  the registry from Texture-carrying bundles.
+
+### 2026-09-06 — A-1 `gpuFrameTime`
+
+- **`Renderer.lastGpuFrameTimeSeconds`.** Optional last-completed GPU-frame
+  duration in seconds. Reading the getter arms measurement so unread
+  renderers keep byte-identical GPU transcripts (R-30b).
+- **WebGL 2.** Lazy `EXT_disjoint_timer_query_webgl2`; ping-pong
+  `TIME_ELAPSED_EXT` queries; disjoint samples discarded.
+- **WebGPU.** Requests `timestamp-query` when the adapter has it; views-pass
+  `timestampWrites` + resolve/copy/`mapAsync` ping-pong.
+- **`Application.stats.gpuFrameTime`.** Copies a finite backend number;
+  stays `NaN` when the member is absent, in flight, or disjoint.
+- **Coverage.** `GlGpuTimer` unit tests cover spare reuse, null queries,
+  forget/dispose, and missing entry points (per-file floor was 77%).
+
+### 2026-09-06 — Open-TODO subagent pass (fourth landing)
+
+- **Rapier 0.20.** `@dimforge/rapier{2,3}d-compat` 0.20.0; `contactPair`
+  takes `bodies`; CCD / contact-distance / snapshot-joint goldens updated.
+- **`NodeSpace` + local-plane.** §8 component + serializer; §21 plane mapping
+  and `local-plane.json` golden.
+- **PH-11c / §40 / PH-1.** Character push impulse; `PhysicsWorldOptions.units`;
+  authority-gated live velocity writes.
+- **Motion.** `CameraShake` (interpolated value-noise), `wanderSpherical`,
+  `solveCCD` / `solveFABRIK`.
+- **PH-9.** Blend trees, layer stack, controller clip events, `from: "*"`,
+  `when` sugar, one-depth live interrupt.
+- **§81 tokens.** `ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`,
+  `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`.
+- **A-13 / A-18.** Opt-in a11y DOM mirror; asset progress/stream/graph/worker/watch.
+- **R-32 / geometry / render.** Opt-in particle appearance; Boolean ops + SVG
+  document tokenizer; combined §66 comparator, idle batch cache, effect rects,
+  `maxAnisotropy`, `Clock` alias, `groupSpritesByTexture`.
+- **Materials / lights.** Closed-union `angle` operator + conic lowering;
+  CSS color strings on punctual lights.
+- **Docs / Pages.** Guides rendered to `/guides/`; Demos section; SolverBodyAccess
+  and motor-cap deviations; S-8 example names are thin real wrappers.
+- **Rapier 0.20 goldens (reviewed re-record).** Phase 5/6/7/10, force-fields,
+  event-dispatch-split, and swept-character goldens rewritten from their
+  scenario helpers after the 0.20.0 bump — the documented exception in each
+  `_warning`. Integration thresholds follow the measured 0.20 contact/PID/joint
+  behaviour (`FIRST_CONTACT_STEP` 35; dull-ball stay without a 3-event close;
+  3D shaft coast 2e-3; PID droop 1e-5).
+- **§33 / §96 hygiene.** `Node.#detach` and `rejectStalePhysicsHandle` no
+  longer import `DEV` (simulation envelope); a11y mirror writes individual
+  style properties instead of `cssText`; GATED list covers the new diagnostics
+  and render warn modules.
+- **RFCs 0007–0009 proposed** (path-planning adapters, §56 shaping engine,
+  GPU readback as a raster source). Owner acceptance pending; not implemented.
+- **A-5 live counts.** `liveMaterialCount` and solver-handle counters
+  (`body` / `collider` / `joint` / sum) plus `readLiveResourceCounts()`.
+- **PH-22f live anchors.** Body-local `Joint.setAnchors` +
+  `SolverJointAccess.setJointAnchors` on Rapier 2D/3D.
 
 ### 2026-09-06 — Open-TODO subagent pass (third landing)
 

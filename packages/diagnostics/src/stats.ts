@@ -84,24 +84,15 @@
  * - `cpuFrameTime` and `simulationTime` are the frame loop's own measurements;
  *   `Application` (`four`) makes them.
  *
- * ## What is staged, and why (2026-08-08)
+ * ## What is staged, and why
  *
- * Two of the eleven counters have no producer anywhere in this repository and
- * are left `NaN` by every path through it. They are staged deliberately, not
- * forgotten:
- *
- * - **`gpuFrameTime`** needs GPU timestamp queries — §62 lists "timestamp
- *   queries" among the capabilities a backend reports, and
- *   `RendererCapabilities` does not carry that field yet (it reports a backend
- *   tag and `maxTextureSize`). On WebGL 2 the measurement is
- *   `EXT_disjoint_timer_query_webgl2`, which is absent on most browsers and
- *   asynchronous where it exists, so a truthful value arrives with the packet
- *   that widens capabilities.
- * - **`contacts`** is the solver's to report, and no seam reports it.
- *   `PhysicsWorld` publishes §29 contact *events* and no live manifold count,
- *   and counting a step's events — or differencing begin against end to keep a
- *   running pair total — would answer a different question from the one §84
- *   asks. It arrives with the §37 seam that counts them.
+ * `gpuFrameTime` is produced when a backend publishes a finite
+ * `Renderer.lastGpuFrameTimeSeconds` (A-1, 2026-09-06). WebGL 2 uses
+ * `EXT_disjoint_timer_query_webgl2`; WebGPU uses `timestamp-query`. Both
+ * are asynchronous and often absent (SwiftShader, most WebGL 2 browsers),
+ * so a frame with no completed sample — or a renderer that does not
+ * declare the member — still reads `NaN`. `contacts` is the solver's live
+ * manifold count, written through {@link recordSolverStatistics}.
  *
  * `textureMemory` and `bufferMemory` were staged too until A-5 landed the §83
  * resource accounting they were waiting on (2026-08-07) — see
@@ -124,7 +115,7 @@ import type { DebugBodyAccess, SolverStatistics } from "./debug-draw.js";
  * application code.
  *
  * A field reading `NaN` was **not measured this frame**. See the module header
- * for which four are staged and why.
+ * for which producers write which fields.
  */
 export interface FrameStats {
   /**
@@ -133,14 +124,17 @@ export interface FrameStats {
    * the draw submission.
    *
    * Submission, not completion: the GPU is still working when this stops (that
-   * is `gpuFrameTime`, staged). Measured with the monotonic clock the
-   * application was given.
+   * is `gpuFrameTime`, when the backend measured one). Measured with the
+   * monotonic clock the application was given.
    */
   cpuFrameTime: number;
 
   /**
-   * Seconds the GPU spent on the frame. **Staged** — always `NaN`; needs §62
-   * timestamp queries (module header).
+   * Seconds the GPU spent on the most recently completed frame.
+   *
+   * Written from `Renderer.lastGpuFrameTimeSeconds` when that number is
+   * finite (A-1). `NaN` when the backend does not measure, the first armed
+   * frame has not landed a query, or the last sample was disjoint.
    */
   gpuFrameTime: number;
 

@@ -73,6 +73,7 @@ import {
   particleIntegratorWorkgroups,
   writeComputeBuffer,
   writeParticleSimulationParams,
+  type ParticleSimulationFieldParams,
 } from "./wgpu-compute.js";
 
 /** Bytes per particle in each flat x,y,z lane buffer (3 × f32). */
@@ -138,7 +139,7 @@ export class WgpuParticleSimulation {
   /** Flat x,y,z velocity lanes, `capacity × 12` bytes. Readable likewise. */
   readonly velocities: WgpuComputeBuffer;
 
-  /** The integrator's 32-byte params block (`writeParticleSimulationParams`). */
+  /** The integrator's params block (`writeParticleSimulationParams`). */
   readonly #params: WgpuComputeBuffer;
 
   /** The intra-buffer move scratch (module header). */
@@ -258,6 +259,17 @@ export class WgpuParticleSimulation {
     gravityX: number,
     gravityY: number,
     gravityZ: number,
+    extras?: {
+      readonly radial?: {
+        readonly originX: number;
+        readonly originY: number;
+        readonly originZ: number;
+        readonly strength: number;
+        readonly minDistance: number;
+      };
+      readonly collisionGroundY?: number;
+      readonly collisions?: "none" | "depth-buffer";
+    },
   ): void {
     this.#requireLive("integrate");
     if (!Number.isSafeInteger(count) || count <= 0 || count > this.capacity) {
@@ -267,6 +279,18 @@ export class WgpuParticleSimulation {
         { count, capacity: this.capacity },
       );
     }
+    const fields: ParticleSimulationFieldParams | undefined =
+      extras === undefined
+        ? undefined
+        : {
+            radialOriginX: extras.radial?.originX,
+            radialOriginY: extras.radial?.originY,
+            radialOriginZ: extras.radial?.originZ,
+            radialStrength: extras.radial?.strength,
+            radialMinDistance: extras.radial?.minDistance,
+            collisionGroundY: extras.collisionGroundY,
+            collisionMode: extras.collisions === "depth-buffer" ? 1 : 0,
+          };
     writeParticleSimulationParams(
       this.#paramsStaging,
       deltaSeconds,
@@ -274,6 +298,7 @@ export class WgpuParticleSimulation {
       gravityX,
       gravityY,
       gravityZ,
+      fields,
     );
     writeComputeBuffer(this.#device, this.#params, this.#paramsStaging);
     const dispatched = this.#compute.dispatch({

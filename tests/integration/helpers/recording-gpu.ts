@@ -40,6 +40,7 @@ import type {
   GpuCommandEncoder,
   GpuComputePassEncoder,
   GpuDevice,
+  GpuQuerySet,
   GpuRenderPassEncoder,
   GpuTexture,
   WebgpuCanvas,
@@ -305,6 +306,22 @@ export function createRecordingGpu(
         size,
       );
     },
+    resolveQuerySet: (
+      querySet,
+      firstQuery,
+      queryCount,
+      destination,
+      destinationOffset,
+    ): void => {
+      record(
+        "encoder.resolveQuerySet",
+        querySet,
+        firstQuery,
+        queryCount,
+        destination,
+        destinationOffset,
+      );
+    },
     finish: (): GpuCommandBuffer => {
       record("encoder.finish");
       return mint("command-buffer");
@@ -393,6 +410,15 @@ export function createRecordingGpu(
       record("device.createCommandEncoder", descriptor);
       return encoder;
     },
+    createQuerySet: (descriptor): GpuQuerySet => {
+      record("device.createQuerySet", descriptor);
+      return {
+        ...mint("query-set"),
+        destroy: (): void => {
+          record("querySet.destroy");
+        },
+      };
+    },
     destroy: (): void => {
       record("device.destroy");
     },
@@ -419,8 +445,10 @@ export function createRecordingGpu(
       ? null
       : {
           features: { has: (name: string): boolean => featureSet.has(name) },
-          requestDevice: (): Promise<GpuDevice | null> => {
-            record("adapter.requestDevice");
+          requestDevice: (descriptor?: {
+            readonly requiredFeatures?: readonly string[];
+          }): Promise<GpuDevice | null> => {
+            record("adapter.requestDevice", descriptor);
             return Promise.resolve(options.noDevice === true ? null : device);
           },
         };

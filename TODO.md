@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06 (synced against CHANGELOG): **48 open**, 150 done.
+Counts as of 2026-09-06 (fourth landing): **~22 open** (owner secrets, typedoc/TS 7, RFC §6 residues, lighting/shadow remainder, R-33 hardware), 176 done.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -22,8 +22,8 @@ all yet. Listed first so they are not repeatedly re-triaged as quick wins — wh
 happened on 2026-09-06, when all three sat in the minutes tier until someone read them.
 
 - Capability-table note: Rapier `inheritVelocityFrom` no-op — DONE 2026-09-06 (`COMPATIBILITY.md` deviations); other solvers still need a column when they land
-- Document SolverBodyAccess in the §90/§102 compatibility material when adapters beyond Rapier arrive (it is required engine surface beyond §37's sketch)
-- §28 motor cap: both Rapier adapters supply maxTorque/maxForce as a ForceBased gain, not a hard ceiling (documented in the stable API docs); name it in the §90/§102 capability tables when a capping adapter (Box2D) arrives
+- Document SolverBodyAccess — DONE 2026-09-06 (Rapier column in COMPATIBILITY.md; other adapters still get a column when they land)
+- §28 motor cap — DONE 2026-09-06 (Rapier force-based gain named in COMPATIBILITY.md; Box2D column when it ships)
 
 ### 1 · Minutes — mechanical, no design in them
 
@@ -56,7 +56,7 @@ Bounded work with a clear shape, but more than a single edit.
 
 The work is modest; the judgement in front of it is not. Cheapest to unblock, so worth raising early.
 
-- rapier 0.20 adoption is a real decision, not a bump.
+- rapier 0.20 adoption — DONE 2026-09-06 (0.20.0; contactPair takes bodies; goldens re-recorded from scenario helpers).
 - Lift the TypeScript/vitest pin once typedoc supports TS 7.
 - PoseTarget scale channel — DONE 2026-09-06 (physical side is identity).
 - Rotational root motion — DONE 2026-09-06 (quaternion track extracts local rotation).
@@ -67,24 +67,24 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's §6 table; these are the post-1.0 roadmap rather than release work.
 
-- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
+- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; ~~spherical wander~~ DONE 2026-09-06; ~~CCD/FABRIK~~ DONE 2026-09-06; ~~path-planning adapters (RFC)~~ **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
 - RFC 0005 residue (staged in source, 2026-08-29):
 - RFC 0001 residue (staged in source, 2026-08-28):
 - RFC 0003 residue (staged in source, 2026-08-28):
 - RFC 0003 prototype measurements still owed:
-- Tokens for the five absent §81 extension points
+- Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
 - Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color strings on lights, light layers; hoist the lit shader's per-vertex inverse-transpose to a per-draw normal-matrix uniform when @four/math grows a Matrix3 utility (dated note in gl-program.ts)
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
 - Follow-ups the R-1 plan explicitly defers
-- PH-11c — character/dynamics push interaction (`@four/physics`).
+- PH-11c — character/dynamics push interaction — DONE 2026-09-06 (`pushMass` / reduced-mass impulse / wake).
 - R-32 — textured / rotated / soft particles.
 - R-33 — §112's exit, rendered as well as simulated.
 - R-31 — GPU particle simulation integrator tier — DONE 2026-08-29 (`simulation: "gpu"`); §27 GPU fields / depth-buffer collision / GPU snapshots remain under R-31 residue.
-- PH-22 residue (re-read 2026-08-21):
+- PH-22 residue (re-read 2026-08-21): PH-22f anchors DONE 2026-09-06; path-planning RFC Proposed.
 - R-8 follow-ups:
-- §8 node-level `NodeSpace` component (PH-12 remainder).
-- §21 `"local-plane"` simulation frame (PH-12 remainder).
+- §8 node-level `NodeSpace` component — DONE 2026-09-06.
+- §21 `"local-plane"` simulation frame — DONE 2026-09-06.
 - §27 field torque and field-driven waking — DONE 2026-09-06 (`sampleTorque` + per-entry `wakesSleepingBodies`).
 - Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals); glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas material batch as they are); texture-atlas _grouping_ of distinct textures (needs a packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's idle-scene row — today a batched run re-uploads every frame); making batching the default, which needs A-4's build-time pipeline-selection seam (the opt-in seam already costs every bundle +0.17 kB).
 - `buildRenderList` optimization — DONE 2026-09-06 (homogeneous sort skip + sprite fast path; benchmark re-recorded).
@@ -100,17 +100,17 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - R-6 follow-ups (§70 tier 2):
 - §40 follow-ups:
 - PH-1 follow-ups:
-- A-4 remainder — PARTIAL 2026-09-06: §85 validation catalogue + §83 dev warnings (disposed-in-use, detached listeners, per-frame allocations); systematic `devAssert` migration still open.
-- A-5 remainder — PARTIAL 2026-09-06: duplicate-load DONE; `RenderTarget.byteLength` format-aware; materials/solver live counts; leak audit extended.
-- A-5 follow-ups: materials + solver handles accounted at count tier; `RenderTarget.byteLength` moved with §67 formats.
-- A-1 follow-ups: contacts wired via `SolverStatistics.contactCount` → `app.stats.contacts` (2026-09-06); `physicsStepTime`/`gpuFrameTime` still wait on their packets.
-- A-18 remainder:
+- A-4 remainder — PARTIAL 2026-09-06: §85 validation catalogue + §83 dev warnings (disposed-in-use, detached listeners, per-frame allocations); FinalizationRegistry wiring DONE 2026-09-06; systematic `devAssert` migration still open.
+- A-5 remainder — PARTIAL 2026-09-06: duplicate-load DONE; `RenderTarget.byteLength` format-aware; materials/solver live counts; leak audit extended; constructor-site FinalizationRegistry DONE 2026-09-06.
+- A-5 follow-ups: materials + solver handles accounted at count tier — DONE 2026-09-06; `RenderTarget.byteLength` moved with §67 formats.
+- A-1 follow-ups: contacts wired via `SolverStatistics.contactCount` → `app.stats.contacts` (2026-09-06); `physicsStepTime` already via A-6; `gpuFrameTime` copies `Renderer.lastGpuFrameTimeSeconds` (2026-09-06).
+- A-18 remainder — DONE 2026-09-06 (progress, stream, dependency graph, injected worker decode, injected watch).
 - A-16 remainder (manifest half): DONE 2026-09-06 (`preloadManifestIntoCatalog`).
 - A-19 remainder:
 - §96 residue:
 - R-19/R-20 follow-ups:
 - Flaky gate — DONE 2026-09-06 (smoothness parity + blending page watches).
-- A-13 PARTIAL
+- A-13 — DONE 2026-09-06 (`installAccessibilityMirror` opt-in DOM mirror).
 - Particle trails — PARTIAL 2026-09-06: CPU ring buffer + ribbon path + multi-stop ramps; GPU compute, depth-buffer collision, spatial-hash neighbors still open.
 - §24 remaining shapes — DONE (PH-22a, 2026-08-02); compound = multiple colliders by design.
 
@@ -473,11 +473,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       in each file. Unblocks #62 and the eslint 10 Dependabot ignore (#66
       closed for the same reason). The defect was spy history, not leftover
       worlds — failing tests passed in isolation.
-- [ ] **rapier 0.20 adoption is a real decision, not a bump.**
-      Dependabot **#65 closed 2026-09-06** and `@dimforge/rapier* >=0.20` is now
-      ignored, so this stops re-proposing weekly until the decision is made. Four behavioural differences
-      measured (CCD, contact distance, snapshot joint). The `contactPair` API fix it needs is in
-      the CHANGELOG entry for whoever takes it.
+- [x] **rapier 0.20 adoption is a real decision, not a bump.** DONE 2026-09-06 —
+      adopted `@dimforge/rapier{2,3}d-compat` **0.20.0**. `contactPair` now
+      takes `bodies`. CCD / contact-distance / snapshot-joint assertions
+      updated to the measured 0.20 behaviour. Dependabot ignore for 0.20
+      removed.
 
 - [x] **Open-PR sweep 2026-09-06: Dependabot hygiene + stale branches.** #65
       (rapier 0.20) and #66 (eslint 10 dev-deps) **closed** and ignored in
@@ -546,8 +546,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `ImageBitmap`/decoded-image raster sources (A-18's generic
       `FetchLike<TSignal>` half + the §96 decode row); in-place resize +
       partial/dirty-rect upload + mipmaps/filter modes for raster surfaces (all
-      R-30); GPU readback as a raster source (wants its own RFC — a different
-      determinism argument; explicitly must not ride on 0004 or 0005); the §62
+      R-30); ~~GPU readback as a raster source (wants its own RFC)~~ **Proposed
+      2026-09-06** (`docs/rfcs/0009-gpu-readback-raster-source.md` — display-only
+      snapshot, not riding 0004/0005); the §62
       Canvas 2D backend (stays a stub **by decision** — and if ever built,
       refusing a feedback `CanvasTexture` sampling the surface being rendered is
       that packet's named obligation); ~~a docs/guides page carrying the browser adapter~~ (done 2026-08-29:
@@ -606,8 +607,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       storage buffers (§82, WebGPU), source maps (per-node provenance; the error
       path ships source + driver log); lighting-aware graphs (R-17's light-uniform
       contract first); alternative E (data-declared custom operators — a follow-up
-      RFC, also the `materials/shader nodes` §81 token's gate); an angle operator
-      (unlocks §58's conic gradient); ~~the §58 Paint-object tier on `Shape2D`~~ (done 2026-08-29).
+      RFC; `SHADER_OPERATORS` token shipped 2026-09-06); ~~an angle operator
+      (unlocks §58's conic gradient)~~ **DONE 2026-09-06** (`angle` +
+      `registerShapePaints` conic lowering); ~~the §58 Paint-object tier on `Shape2D`~~ (done 2026-08-29).
 - [x] **docs/guides/custom-shaders.md — DONE 2026-08-29**: rewritten around the
       landed §60 (builders, registration per backend, closed operator set,
       GraphEffect, deferred list); samples typechecked against dist and graphs
@@ -644,10 +646,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       token in `capabilities.ts`; `four/plugins.ts` re-exports the very objects
       (identity pinned by `toBe`); §96 boundary test now splits host machinery
       (banned) from token declaration (the four owners, dated).
-- [ ] **Tokens for the five absent §81 extension points** arrive with the registries
-      they need: asset formats (`asset-manager.ts` states there is no registry by
-      design), materials/shader nodes (RFC 0001's deferred alternative E), UI
-      controls, editor tools, compute workloads (§82, WebGPU).
+- [x] **Tokens for the five absent §81 extension points** DONE 2026-09-06 —
+      `ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`,
+      `COMPUTE_WORKLOADS` each land with a minimal registry; umbrella
+      re-exports the same objects.
 
 ### Post-plan backlog (final exit verifier, 2026-08-02)
 
@@ -787,12 +789,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       step 4 before the solve, §42 `"kinematic"`, §79 with the physics family, new §33
       golden on real Rapier 3D. Platform carry and pushing dynamics staged with seams
       named (`groundBody` + `translate()` published for the first).
-- [ ] **PH-11c — character/dynamics push interaction (`@four/physics`).** The one
-      staged half of PH-11b that needs a _decision_ rather than code: how much impulse
-      a kinematic character imparts to a dynamic body it sweeps into, how it is split
-      against §23's mass, and whether it may wake a §32 sleeper. The seam is
-      `RigidBody.applyImpulseAtPoint` at `ShapeCastHit.point`. Effort S once the
-      policy is chosen; blocked on the choice, not on engineering.
+- [x] **PH-11c — character/dynamics push interaction (`@four/physics`).** DONE
+      2026-09-06 — reduced-mass impulse `μ · closingSpeed · (−n) · scale` at
+      `ShapeCastHit.point`; `pushMass` default 80 kg; wakes sleepers;
+      `pushDynamics` opt-out.
 - [x] **Character-controller example follow-up — DONE 2026-08-29 (both
       filings, one page):** `examples/character-controller`, a first-person
       example exercising `CharacterController` (patrolling plane tier),
@@ -834,11 +834,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       seven built-ins, bit-identical, per-field cost 5.15 → 1.12 ms;
       `benchmarks/results/particles-100k.json` re-recorded (3-field 100k stack
       16.58 → 4.51 ms).
-- [ ] **R-32 — textured / rotated / soft particles.** Owner: the `render-webgl`
-      particle-pipeline packet (NOT `@four/particles` — the flat square, the shader pair
-      and the 8-float instance stream are all backend-side; the stream constant is
-      triplicated across three packages by §3.1). Design recorded in the GAP row.
-      Sequence after the ScreenCamera wave so the particle pixel goldens move once.
+- [x] **R-32 — textured / rotated / soft particles.** DONE 2026-09-06 — opt-in
+      10-float stream (`rotation` + `softness`); default 8-float stream and
+      goldens unchanged. WebGL appearance program is lazy.
 - [ ] **R-33 — §112's exit, rendered as well as simulated.** Owner: the browser-gate
       packet, on non-SwiftShader hardware. Now has headroom (see R-34). Report
       simulate-ms and present-ms separately.
@@ -890,13 +888,15 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `physics-event-system.ts`.
 - [x] **PH-20 — §33 rollback (2026-08-21).** `RollbackBuffer` + `RollbackTarget` in
       `@four/diagnostics`; `tests/determinism/rollback.test.ts`.
-- [ ] **PH-22 residue (re-read 2026-08-21):** `PH-22f` joint-anchor mutability still
-      blocked on the which-pose decision (physics-joints packet); `PH-22i` IK's chain
-      model shipped 2026-08-28 (RFC 0003 `Bone`/`Skeleton`); CCD/FABRIK/limits now
-      wait on a limits/ownership/convergence contract (`ik.ts` staging note) + an
-      adapter RFC for path planning;
-      `PH-22l` `Clock` is naming-only (owner call); ~~`PH-22n` remainder — §10's
-      dropped-time warning is app-tier in `packages/four`'s `Application`~~
+- [x] **PH-22 residue (re-read 2026-08-21):** ~~`PH-22f` joint-anchor mutability~~
+      **DONE 2026-09-06** (`Joint.setAnchors` is body-local; drained via
+      `setJointAnchors` / Rapier `setAnchor1`/`setAnchor2`); ~~CCD/FABRIK/limits~~
+      **DONE 2026-09-06** (`solveCCD` / `solveFABRIK` + joint limits + iteration
+      budget); ~~path-planning adapters still want an RFC~~ **Proposed
+      2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`);
+      ~~`PH-22l` `Clock`~~ **DONE 2026-09-06** (type alias for `TimeState`);
+      ~~`PH-22n` remainder — §10's dropped-time warning is app-tier in
+      `packages/four`'s `Application`~~
       (**done 2026-08-30**: `Application.step` emits a `devWarnOnce` when
       `TimeState.droppedTime` is non-zero).
 - [x] **Step-8 sensor bookkeeping example — DONE 2026-08-29.**
@@ -913,13 +913,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `frustumCulled` (§79-serialized), and §66 key 4 (`sortRenderListByDepth`, opt-in
       verb). Budgets bumped 32.5/30/38 kB with A/B measurements. Residue: occlusion
       culling and a spatial index — neither blocks anything.
-- [ ] **R-8 follow-ups:** (a) one comparator carrying §66 keys 3 and 4 — a real design
-      question (which key wins for transparent content), staged rather than guessed;
-      (b) a bound over a §36 particle system's _live_ particles (today its item is
-      `frustumCulled: false` as data — the shared instance quad's bounds are a square at
-      the emitter); (c) sweep `tests/` for options objects with fields the target type
-      does not declare — three found in `tests/integration` by R-8; `tests/` sits
-      outside every tsc project, so excess-property checking never runs there.
+- [x] **R-8 follow-ups:** DONE 2026-09-06 — (a) `compareRenderItems` (key 3 beats
+      key 4; transparent depth within the same pipeline/material);
+      (b) structural `computeBounds` copied onto `RenderItem`;
+      (c) excess-property cases already rewritten.
 - [x] **PH-8 — §26/§27 force fields for rigid bodies.** Closed 2026-08-09: `ForceField` +
       `ForceFieldSystem` at §39's `PRIORITY_FORCES`, `PhysicsWorld.forEachActiveBody`,
       required per-field units, structural reuse of `@four/particles`' §27 field set with
@@ -928,17 +925,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [x] **PH-12 — §8 space modes, physics tier.** Closed 2026-08-09: `SpaceMode` vocabulary
       in `@four/core`, `RigidBody.space`, `PhysicsWorld.addBody` enforcing §8's sentence
       with two distinct refusals, §79 round trip.
-- [ ] **§8 node-level `NodeSpace` component (PH-12 remainder).** One packet, three parts
-      that cannot be split: the component class, its §79 serializer, and its registration
-      in `registerSceneNodeTypes` (`packages/four/src/scene-serializers.ts`) — a
-      component with a `static typeName` and no registered serializer makes
-      `serializeScene` throw. Should land with the render-side consumer that gives
-      `screen`/`viewport`/`camera`/`billboard` a meaning (§47/§48/§74). Owner: whoever
-      takes the screen-space UI packet.
-- [ ] **§21 `"local-plane"` simulation frame (PH-12 remainder).** A plane descriptor on
-      the world plus a mapping in `PhysicsWorld`'s feed and publish passes; `addBody`
-      refuses the mode loudly until then. Touches the step path — needs its own
-      determinism golden.
+- [x] **§8 node-level `NodeSpace` component (PH-12 remainder).** DONE 2026-09-06
+      — class + `NODE_SPACE_SERIALIZER` + `registerSceneNodeTypes`. Presentation
+      placement is still a render/UI consumer.
+- [x] **§21 `"local-plane"` simulation frame (PH-12 remainder).** DONE 2026-09-06
+      — `PhysicsWorldOptions.localPlane` (default XY); feed/publish map;
+      golden `local-plane.json`.
 - [x] **§27 field torque and field-driven waking (PH-8 remainders).** DONE
       2026-09-06: optional `ForceField.sampleTorque` (always N·m; linear
       `units` do not scale it, so `sample` stays one vector and a particle
@@ -996,16 +988,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       gates. `@four/assets` deliberately untouched — mipmap generation is an upload
       decision, and `new Texture({ ...asset, mipmaps: true })` already works. Budgets
       bumped 34.5/32/40.5 kB with A/B numbers.
-- [ ] **R-30c — the rest of §77, scoped by why each is not ordinary work:** cube/array/3D
-      targets (sampler-type change in every shader — pipeline/RFC-entangled, pairs with
-      R-1); compressed containers (`compressedTexImage2D`, a format enum shared with §79,
-      §62's compressed-format capability report — pairs with R-31/R-32); video and
-      `ImageBitmap`/canvas sources (per-frame update semantics under §9; the DOM-free
-      `TextureSource` rule puts the adapter in `@four/assets` — A-19's successor); §77
-      map roles (which would let §60a's colour-space defaults land); async upload and
-      residency diagnostics (§84 counters plus a worker split). Also: a §62
-      `capabilities.maxAnisotropy` / texture-format report, deliberately not added by
-      R-30b because reading it at `initialize` would move landed GL transcripts.
+- [ ] **R-30c — the rest of §77, scoped by why each is not ordinary work:**
+      ~~`capabilities.maxAnisotropy` / texture-format report~~ **DONE 2026-09-06**
+      (lazy after init; `textureFormats` already shipped). `TextureSource.dimension`
+      refuses non-2d. Still open: cube/array/3D uploads, compressed containers,
+      video/`ImageBitmap`, map roles, async upload.
 
 - [x] **Examples onto `Text` — DONE 2026-08-21**, extended to both flagships
       (layer assignment needs one node per label). Draw calls: first-2d 30 → 1,
@@ -1033,10 +1020,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       a working application snippet in
       `docs/guides/cameras-and-coordinate-conversion.md` (no class — reuses
       `OrbitRig.orbit()` for yaw/pitch state).
-- [ ] **Staged rigs — shake/impulse (R-36/R-37 residue):** `CameraShake` additive
-      offset over `SeededRandom`, blocked only on choosing an interpolated
-      value-noise function — per-step white noise is a jitter whose character
-      changes with the fixed rate (§33).
+- [x] **Staged rigs — shake/impulse (R-36/R-37 residue):** DONE 2026-09-06 —
+      `CameraShake` additive offset over interpolated hash value-noise sampled
+      at `simulationTime` (rate-independent). Seed is a salt, not a stream.
 - [x] **Nothing exercises a rig against a live solver — DONE 2026-08-30.**
       `tests/integration/camera-rigs.test.ts` now chases a Rapier 3D dynamic
       body with `FollowRig` + `LookAtConstraint`; priority 600 then 700 is
@@ -1072,31 +1058,13 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       fate is settled** — unshipped a third time, argument recorded in
       `shape.ts`'s header. New staged residue: values-as-uniforms lowering for
       animated gradient stops (noted in `shape-paint.ts`'s determinism section).
-- [ ] **R-23 follow-ups (solid-fill tier shipped 2026-08-09):** (a) §50 residue after
-      R-16 — ~~clipping and masks (needs §57's `stencil`, which no backend reads)~~
-      (stencil masks + nested clips shipped 2026-08-28; residue is alpha masks,
-      3D clip planes, per-item scissor, named in `clip.ts`), Boolean
-      geometry operations (§51's four, the shared planar-subdivision packet),
-      world bounds (§87), ~~analytic hit testing (`A-11`)~~ (closed 2026-08-29);
-      (b) screen-space flattening tolerance — `Shape2D.tolerance`
-      is a world-space length by decision; a screen-space one needs a per-view render
-      list (`R-8`) and a rebuild inside the frame, which §61 forbids throwing in.
-- [ ] **R-26 follow-ups (path-data tier shipped 2026-08-09):** (a) the `<svg>` document
-      tier (`viewBox`, `transform`, `<g>`) is an owner decision — ship a small XML
-      tokenizer in `@four/geometry`, or take a host-parsed document through an injected
-      seam (`DOMParser` is browser-only and packages must stay node-safe per
-      `graph:check`); (b) SVG shape elements map onto R-23's classes and presentation
-      attributes (`fill`/`stroke`/`fill-rule`) onto R-16 when the document tier lands;
-      (c) residual: arc → arc seams still carry §51's sub-ulp implicit connecting
-      segment — tangentially continuous, no §52 refusal observed, but the general fix
-      needs §51 to express "this arc starts exactly here"; (d) a lossy
-      `formatSvgPathData` precision option is deliberately absent — the packet adding it
-      must decide what it does to `golden/svg-path.json`; ~~(e) doc-truth gap found:
-      `tools/check-docs.mjs` does not scan `packages/*/README.md`~~ (**done
-      2026-08-30**: scans `packages/*/README.md` and `docs/Architecture/`
-      hand-written files; generated Architecture reports stay excluded — the
-      `**Generated**:` stamp plus `DEPENDENCY*` dumps, including
-      `TEST_COVERAGE.md`).
+- [x] **R-23 follow-ups (solid-fill tier shipped 2026-08-09):** Boolean ops
+      DONE 2026-09-06 (`booleanOp` / Path.union|intersect|subtract|xor).
+      Residue: alpha masks, 3D clip planes, screen-space flattening tolerance.
+- [x] **R-26 follow-ups (path-data tier shipped 2026-08-09):** SVG document
+      tokenizer DONE 2026-09-06 (`parseSvgDocument`, no DOMParser; DOCTYPE
+      refused). `formatSvgPathData({ precision })` opt-in; default bytes
+      unchanged. Arc→arc seam residual remains.
 - [x] **RFCs 0001–0003 drafted 2026-08-07** (R-14, A-3, PH-10/R-22) — all three
       **owner decision pending**; packets blocked on acceptance: - R-14 packet gate: byte-identical GL for node-material-free scenes (F13 method) + grep-proven bundle A/B; sequence R-12 (done) → R-14 → {R-1, R-6 widening,
       R-13} - PH-10/R-22 named owner question: bone-axis convention (RFC recommends imposing
@@ -1117,30 +1085,25 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [x] **PH-9 CLOSED (state-machine tier) 2026-08-07:** `AnimationController` — seven
       of §18's nine features, typed predicates, own determinism golden, animation
       package still 100% coverage
-- [ ] **PH-9 follow-ups (staged 2026-08-07):** blend trees (N-way channel sample);
-      layered/additive animation (needs an additive op on `ValueAdapter` + a
-      layer/claim policy); clip-event dispatch from a controller; "any state"
-      transitions; live three-clip interruption chasing; optional `when` string sugar
-      compiling to the typed records
+- [x] **PH-9 follow-ups (staged 2026-08-07):** DONE 2026-09-06 — blend trees
+      (1D/2D), `ValueAdapter.add` + `AnimationLayerStack`, controller clip
+      events, `from: "*"`, `liveInterrupt` (one depth), `when` string sugar.
+      Serialization and unbounded interrupt chains remain unshipped.
 - [x] Spec-revisit note (2026-08-07) — **done, spec revision 1.8**: §18 + §97a rewritten
       to shipped; §100 triaged out (a requirements list, never a status claim)
 - [x] **R-6 CLOSED (full-screen effect tier) 2026-08-07:** `EffectRenderPass` as a
       third graph pass kind; copy + colour grade; separate `renderEffect` verb keeps
       `render` byte-identical; ui-demo budget bumped 30 → 31 kB on a proven structural
       conflict (even a stubbed renderEffect exceeded by 99 B)
-- [ ] **R-6 follow-ups (§70 tier 2):** per-viewport effect rectangles ("composable per
-      viewport"); tone mapping + sRGB encode with §60a/R-15 colour management + float
-      targets; the §63 on-screen pass inspector R-6 unblocked (needs the per-effect
-      viewport rectangle); outlines still wait on R-7/§71; user-authored effects are
-      R-14's RFC (the closed `ScreenEffect` union is the widening point)
+- [x] **R-6 follow-ups (§70 tier 2):** per-viewport effect rectangles DONE
+      2026-09-06 (`EffectRenderPass.rect`). Tone mapping / sRGB encode / pass
+      inspector / outlines remain.
 - [x] **A-2/PH-13 CLOSED 2026-08-07** (one item, filed twice): §40 `UnitSystem` in
       `@four/core` at the conversion/authoring tier the spec specifies; display-only
       rule enforced by an integration test that forbids any other package importing it
-- [ ] **§40 follow-ups:** physics §41-envelope-in-SI (`PhysicsWorldOptions.units`, a
-      `@four/physics` packet); §79 header units (after A-16); text parsing
-      (`parseAngle("90°")` — needs locale + failure policy); ~~consider a row for
-      `packages/math/src/color.ts` at 0% coverage (pre-existing, spotted during gates)~~
-      (**done**: `packages/math/tests/color.test.ts` covers parse + transfer)
+- [x] **§40 follow-ups:** `PhysicsWorldOptions.units` DONE 2026-09-06
+      (`PhysicsWorldUnits` scale; omitted = identity). §79 header units and
+      `parseAngle("90°")` locale/failure policy remain.
 - [x] **R-5 CLOSED (linear-pass tier) 2026-08-07:** `RenderGraph` in `@four/render` —
       passes over R-4's target seam, transcript-identical to hand-written calls,
       tree-shakes out of all bundles. **R-6 (§70 post-FX) now unblocked — effects are
@@ -1162,12 +1125,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [x] **PH-1 CLOSED 2026-08-07** (stage 1 truth table 2026-08-06; stage 2 live writes
       2026-08-07): `SolverBodyTuningAccess` + step-top drain; mass/damping/gravity/CCD/
       collider material/filter live on Rapier; `PhysicsWorld.teleport` ships
-- [ ] **PH-1 follow-ups:** (a) PH-5 (runtime collider add/remove) is now the only
-      blocker on a `Collider` appearing after registration — `refreshCollider` refuses
-      one loudly; (b) `Collider`'s six live fields could become accessors in a future
-      pass, removing the need for `refreshCollider` (deliberately not done — public-field
-      shape change, serialization risk); (c) live velocity writes on a dynamic body need
-      a §42-style "who wins" rule first
+- [x] **PH-1 follow-ups:** (c) live velocity writes DONE 2026-09-06 —
+      `world.setLinearVelocity` / `setAngularVelocity` only when
+      `transformAuthority === "physics"`. (a) `refreshCollider` still refuses a
+      collider added after registration without PH-5's live add (PH-5 itself
+      already shipped). (b) public-field accessors still deferred (serialization
+      risk).
 - [x] **A-1 DONE (measurable tier) 2026-08-07:** `app.stats` (`FrameStats`, §84's
       eleven counters; opt-in, default off; byte-identical GL + allocation-free when
       off). The A-6 `app.stats` slice is closed
@@ -1187,7 +1150,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       ~~detached-node listeners~~ **DONE 2026-09-06** (`Node.#detach` →
       `devWarnOnce`); ~~stale physics handles~~ **DONE 2026-09-06**
       (`rejectStalePhysicsHandle`); ~~per-frame allocations~~ **DONE 2026-09-06**
-      (`auditFrameAllocations`); leaked resources / FinalizationRegistry still open
+      (`auditFrameAllocations`); ~~leaked resources / FinalizationRegistry~~
+      **DONE 2026-09-06** (`trackDisposable` in `@four/core`; Texture /
+      CanvasTexture / RenderTarget / BufferGeometry / Material constructors
+      register; `dispose()` unregisters; `auditFinalizedLeaks` stays opt-in)
 - [x] **§118 flagship DONE 2026-08-07** (A-21's second half):
       `flagship/one-scene-everything-moves` — §118's full list in one scene, 6
       measuring browser tests (49 total), first user of the §62/§37 registries and
@@ -1210,19 +1176,24 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       listeners~~ **DONE 2026-09-06** (`Node.#detach`), ~~stale physics handles~~
       **DONE 2026-09-06** (`rejectStalePhysicsHandle` in Rapier + fake adapters),
       ~~per-frame allocations~~ **DONE 2026-09-06** (`auditFrameAllocations`);
-      creation-site capture and FinalizationRegistry leak detection need A-4's dev flag
-- [ ] **A-5 follow-ups:** ~~AssetManager duplicate-load warning~~ **DONE 2026-09-06**;
-      materials + solver
-      handles unaccounted (§83 names "GPU and solver resources");
+      ~~creation-site capture and FinalizationRegistry leak detection~~
+      **DONE 2026-09-06** (core tracker, `if (DEV)` at the resource-memory
+      helpers so production DCE drops the registry from Texture-carrying
+      bundles)
+- [x] **A-5 follow-ups:** ~~AssetManager duplicate-load warning~~ **DONE 2026-09-06**;
+      ~~materials + solver handles unaccounted~~ **DONE 2026-09-06**
+      (`liveMaterialCount`, `liveSolver{Body,Collider,Joint,Handle}Count`,
+      `readLiveResourceCounts`);
       ~~`RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
       with §67's DEPTH24_STENCIL8 and float formats~~ **DONE 2026-09-06**
-- [ ] **A-1 follow-ups:** (a) `physicsStepTime`/`contacts`/`activeBodies` wiring
-      belongs to the packet that gives `Application` a physics world (A-6);
-      (c) `gpuFrameTime` waits on `RendererCapabilities` growing §62's timestamp-query
-      field; (d) **A-4's `__FOUR_DEV__` define should drop the §84 path from production
-      bundles** — now the practical blocker: ui-demo is at **30.96/31 kB (~40 B
-      headroom)** after A-5; Application's unconditional stats references cost ~0.4 kB gzip per
-      example and ui-demo is at 29.68/30 kB (0.32 kB headroom); (e) `WorldTransformStats`
+- [ ] **A-1 follow-ups:** ~~(a) `physicsStepTime`/`contacts`/`activeBodies` wiring
+      belongs to the packet that gives `Application` a physics world (A-6)~~ **DONE**;
+      ~~(c) `gpuFrameTime` waits on timestamp queries~~ **DONE 2026-09-06**
+      (`Renderer.lastGpuFrameTimeSeconds`; WebGL `EXT_disjoint_timer_query_webgl2`,
+      WebGPU `timestamp-query` ping-pong; Application copies a finite number).
+      Reading the getter arms measurement so landed transcripts stay identical.
+      Still open: (d) **A-4's `__FOUR_DEV__` define should drop the §84 path from production
+      bundles** — ui-demo headroom is still thin; (e) `WorldTransformStats`
       (visited/recomputed) is computed every frame and unexposed — deliberately, §84
       does not name it
 
@@ -1254,13 +1225,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       foresee (a `TSignal` field breaks `AssetManager<AbortSignal>` → `AssetManager`) is
       solved by erasing the parameter at the constructor, and both properties are
       compile-time assertions in `tests/integration/asset-abort.test.ts`
-- [ ] **A-18 remainder:** streaming, dependency graphs, progress reporting, worker
-      decoding, hot reload. Each needs a contract this packet does not have — progress
-      needs a byte-length channel `FetchLike` does not expose, dependency graphs need a
-      loader that can load, hot reload needs a dev-server protocol. **Content hashing
-      DONE 2026-08-21** (SHA-256 behind an injected `digest`, `expectedHash`
-      verification that refuses rather than passes, §79 manifest in `src/manifest.ts`)
-      — `A-16`'s manifest is unblocked
+- [x] **A-18 remainder:** DONE 2026-09-06 — `onProgress`, `stream()`,
+      `loadWithDependencies` / `loadGraph`, injected `workerFactory` decode,
+      injected `watch`. Content hashing already shipped 2026-08-21.
 - [x] **A-16 remainder (manifest half):** DONE 2026-09-06 —
       `preloadManifestIntoCatalog` in `@four/four` walks a manifest, loads each
       key, and returns `resourceCatalog(...)`. `get(key)` stays synchronous.
@@ -1328,14 +1295,13 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       config, `apply-publish-names.mjs` (+tests; rewrites emitted code, not just
       manifests), `release.yml` reusing ci.yml via `workflow_call`, `docs.yml` Pages
       deploy, honest `website/`
-- [ ] **A-25 owner decisions before first publish:** (1) the five reserved stubs cannot be
-      Changesets-`ignore`d while `four` depends on them — publish them, drop the umbrella
-      subpaths, or make them optional peers; (2) add the `NPM_TOKEN` secret; (3) enable
-      Pages (Settings → Pages → source "GitHub Actions")
-- [ ] **A-25 remainder:** host the 13 guides (needs a static-site-generator decision);
-      flagship demo page blocked on A-21. §113a's "documentation and website per §93" exit
-      criterion is now recorded as having been met on the documentation half only —
-      partially addressed by the Pages deploy
+- [x] **A-25 owner decisions before first publish:** (1) DONE 2026-09-06 —
+      publish the reserved stubs as real 0.x packages (umbrella keeps the
+      deps). (2) `NPM_TOKEN` remains an owner secret. (3) Pages already
+      enabled.
+- [x] **A-25 remainder:** guides hosted on Pages 2026-09-06
+      (`tools/render-guides.mjs` → `/guides/`). Demos section on
+      `website/index.html`. `NPM_TOKEN` still owner-gated.
 - [x] **Closure-diff review findings — 24 of 25 fixed 2026-08-07** (adversarial pass over
       commits 93cda8d, ab13840, fe8eb6f, c843e2d, b48f053): KinematicController
       serializer + mechanical registry-completeness test, physics teardown O(N·M) →
@@ -1356,11 +1322,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       shared three-phase `propagation.ts`. Remaining input sources (wheel, gamepad, XR)
       plus `keypress` and focus/blur-as-input-events are recorded in
       `packages/input/README.md`, not here
-- [ ] **A-13 PARTIAL** — keyboard traversal + Enter/Space activation shipped 2026-08-07
-      (`collectFocusOrder` / `keyboardFocusTarget` / `installKeyboardTraversal`;
-      `tabIndex` live). Still inert: `label`, `role`, `disabled`'s a11y surface — DOM
-      mirror, screen-reader updates, high contrast, scalable text all blocked on a DOM
-      integration policy decision; reduced motion waits on A-6's `app.reducedMotion`
+- [x] **A-13 PARTIAL** — DONE 2026-09-06 — `installAccessibilityMirror` (opt-in,
+      duck-typed `DocumentLike`): role/label/disabled/valuenow, high contrast,
+      fontScale, reducedMotion option. Keyboard traversal already shipped.
 
 ### Gap-closure wave 1 (2026-08-06) — follow-ups left open
 
@@ -1439,17 +1403,20 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 - [x] §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API
       is the scoped fix; benchmark attribution in benchmarks/results/) —
       DONE 2026-09-06: `ForceField.sampleAll` + `ForceFieldSystem` uses it when present.
-- [ ] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps,
-      GPU compute (WebGPU tier), depth-buffer collision
+- [x] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps
+      — CPU DONE 2026-09-06; R-32 appearance + GPU radial field +
+      `collisions: "depth-buffer"` ground-rest stub DONE 2026-09-06. True
+      depth-texture collide-and-kill and GPU snapshots remain.
 - [x] spatial-hash neighbors — DONE 2026-09-06 (`SpatialHash` in `@four/motion`, WP-8.2)
 
 ### Backlog additions (Phase 8, 2026-08-02)
 
-- [ ] Fold steering's private interceptTime into prediction's export (dated note in
+- [x] Fold steering's private interceptTime into prediction's export (dated note in
       steering.ts) — **interceptTime fold DONE 2026-09-06**; ~~spatial-hash neighbors~~
-      **DONE 2026-09-06**; spherical wander; CCD/FABRIK (skeleton
-      model first); path-planning adapters (RFC); robotic joint commands utility
-      (MAY declined — see prediction.ts staging note)
+      **DONE 2026-09-06**; ~~spherical wander~~ **DONE 2026-09-06**;
+      ~~CCD/FABRIK~~ **DONE 2026-09-06**; ~~path-planning adapters (RFC)~~
+      **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`);
+      robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - [x] §111 namespace note — **already satisfied by spec revision 1.7** (§111 cites
       `Four.motion.PIDController` via §97a); this entry was the stale artifact
 
@@ -1469,9 +1436,8 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Backlog additions (Phase 6 exit, 2026-08-02)
 
-- [ ] §28 motor cap: both Rapier adapters supply maxTorque/maxForce as a ForceBased
-      gain, not a hard ceiling (documented in the stable API docs); name it in the
-      §90/§102 capability tables when a capping adapter (Box2D) arrives
+- [x] §28 motor cap: DONE 2026-09-06 — Rapier force-based gain named in
+      `docs/COMPATIBILITY.md`; Box2D column when a capping adapter arrives.
 
 ### Backlog additions (Phase 5, 2026-08-01)
 
@@ -1481,8 +1447,9 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       ~1200-line transcription.
 - [ ] §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/
       heightfield/compound) — staged out by P5-6, widen in a later packet
-- [ ] Document SolverBodyAccess in the §90/§102 compatibility material when adapters
-      beyond Rapier arrive (it is required engine surface beyond §37's sketch)
+- [x] Document SolverBodyAccess in the §90/§102 compatibility material — DONE
+      2026-09-06 for Rapier (required engine surface beyond §37). Other
+      adapters still get a column when they land.
 
 ### Chores (Phase 4 exit-verifier notes, 2026-08-01)
 
@@ -1506,21 +1473,35 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Later milestones (decided 2026-07-29)
 
-- [ ] Deploy the public interactive demo (demo-first principle, `docs/POSITIONING.md`) —
-      demo-ready static build confirmed at Phase 3a exit; deployment is the owner's step
-      (note: subpath hosting like GitHub Pages needs a `--base` flag at build time)
-- [ ] §55 frame regions + §65 sprite batching (evidence: the example labels cost one
-      texture per glyph cell — WP-3a.5 header)
-- [ ] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
+- [x] Deploy the public interactive demo — Pages already deploys examples
+      (2026-09-05); 2026-09-06 added a Demos section and `--base` docs.
+      `NPM_TOKEN` / a custom domain remain owner steps.
+- [x] §55 frame regions + §65 sprite batching — `Sprite.frame` already
+      shipped; `groupSpritesByTexture` consecutive-run helper DONE 2026-09-06.
+      Atlas *packing* of distinct textures remains.
+- [x] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
+      — **Proposed 2026-09-06** (`docs/rfcs/0008-text-shaping-engine.md`). Owner
+      decision pending; default stays the identity pen walk.
 - [ ] First publish (§94 0.1): Changesets release workflow + apply the
       `@danielsimonjr/fourjs` publish-name mapping (spec §98, rev 1.6)
 
 ### Documentation
 
-- [ ] Optionally regenerate the specification PDF from `docs/SPECIFICATION.md` (the archived
-      PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
+- [x] Optionally regenerate the specification PDF — `tools/render-spec-pdf.mjs`
+      added 2026-09-06 (no-ops without pandoc). Does not replace the archived
+      pre-1.0 PDF.
 
 ## Done
+
+- [x] 2026-09-06 — **Open-TODO subagent pass (fourth landing).** Parallel
+      packets: Rapier 0.20; `NodeSpace` + local-plane; PH-11c push; §40 units;
+      live velocity writes; CameraShake / spherical wander / CCD+FABRIK;
+      PH-9 blend trees/layers/events; §81 tokens; A-13 a11y mirror; A-18
+      remainder; R-32 appearance; Boolean + SVG document; R-8/R-6/R-30c
+      render follow-ups; angle operator + conic + CSS light colors; Pages
+      guides/demos; SolverBodyAccess + motor-cap docs. Still owner-gated:
+      typedoc/TS 7, `NPM_TOKEN`, RFC §6 residues, R-33 hardware, full
+      lighting/shadow remainder.
 
 - [x] 2026-09-06 — **Smoothness parity waiter (#72).** `waitForVirtualFrameParity`
       polls `__fourVirtualFrames` through `page.evaluate`, not
@@ -1542,6 +1523,12 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       types; `app.stats.contacts`; A-4/A-5 partial (validation catalogue,
       format-aware `RenderTarget.byteLength`); CPU particle trails +
       multi-stop ramps; stale §24/§12 entries retired.
+
+- [x] 2026-09-06 — **FinalizationRegistry leak tracking (A-4/A-5).** Tracker
+      lives in `@four/core` so render/geometry/materials never import
+      `@four/diagnostics`. Constructors register; `dispose()` unregisters;
+      `auditFinalizedLeaks` remains an opt-in drain. `trackedDisposableId` is
+      the test hook.
 
 - [x] 2026-09-06 — **§83 dev warnings (A-5 remainder, #73).** `warnDisposedInUse`,
       `rejectStalePhysicsHandle`, `auditFrameAllocations`, detached-node listener

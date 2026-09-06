@@ -389,6 +389,10 @@ export function createRapierShape(shape: CollisionShape): RapierShape {
  * Indices are always passed explicitly — the upstream "omit for a line strip"
  * default would make the open case implicit and the closed case explicit, and
  * one code path that reads the same for both is worth the extra array.
+ *
+ * **Compound.** §24 lists it as a 2D shape; Rapier has no compound collider.
+ * A compound is several colliders on one body (`createCollider` called more
+ * than once). There is no `{ type: "compound" }` tag to map here.
  */
 export function createRapierColliderDesc(
   shape: CollisionShape,

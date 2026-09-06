@@ -568,18 +568,38 @@ export interface SolverJointAccess {
    * Turns contact generation between the two joined bodies on or off after
    * creation (§28 `collisionEnabled`; PH-22f, 2026-08-08).
    *
-   * The third of §28's live reconfigurations, and the last one every shipped
-   * solver can actually perform: Rapier's base `ImpulseJoint` carries
-   * `setContactsEnabled` for **every** joint type in both dimensions, which is
-   * what separates this from the anchors, axis, rope length, spring terms and
-   * swing cone — those have no live setter at 0.19.3 and stay frozen (see
-   * `joints.ts`'s table for the per-property measurement).
+   * The third of §28's live reconfigurations: Rapier's base `ImpulseJoint`
+   * carries `setContactsEnabled` for **every** joint type in both dimensions.
+   * Axis, rope length, spring terms and the spherical swing cone stay frozen
+   * (see `joints.ts`'s table). Anchors are the fourth live write — see
+   * {@link SolverJointAccess.setJointAnchors}.
    *
    * Same call discipline as {@link SolverJointAccess.setJointLimits}: at most
    * once per joint per fixed step, from the scene→solver phase, only for a
    * joint that queued the change.
    */
   setJointCollisionEnabled(handle: PhysicsJointHandle, enabled: boolean): void;
+
+  /**
+   * Replaces both body-local anchors after creation (§28, PH-22f).
+   *
+   * `anchorA` is in `bodyA`'s local frame and `anchorB` in `bodyB`'s — the
+   * same space `createJoint` received after `PhysicsWorld.addJoint` converted
+   * the world-space constructor options. The caller supplies local-space
+   * points; this method must not re-measure against any pose.
+   *
+   * Rapier implements this as `ImpulseJoint.setAnchor1` / `setAnchor2`, which
+   * exist on the base joint class in both dimensions, so every shipped §28
+   * type can be re-anchored. Same call discipline as
+   * {@link SolverJointAccess.setJointLimits}: at most once per joint per
+   * fixed step, from the scene→solver phase, only for a joint that queued
+   * the change.
+   */
+  setJointAnchors(
+    handle: PhysicsJointHandle,
+    anchorA: Vector3,
+    anchorB: Vector3,
+  ): void;
 
   /** The monotonic id this joint is registered and iterated under (§33). */
   getJointId(handle: PhysicsJointHandle): number;
@@ -598,6 +618,7 @@ const JOINT_ACCESS_METHODS = [
   "setJointLimits",
   "setJointMotor",
   "setJointCollisionEnabled",
+  "setJointAnchors",
   "getJointId",
   "forEachJoint",
 ] as const satisfies readonly (keyof SolverJointAccess)[];

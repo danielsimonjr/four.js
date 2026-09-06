@@ -180,6 +180,39 @@ describe("UIWidget construction", () => {
     expect(widget.focusable).toBe(true);
     expect(widget.disabled).toBe(true);
     expect(widget.accessibility).toBe(accessibility);
+    expect(widget.label).toBe("Go");
+    expect(widget.role).toBe("button");
+  });
+
+  it("accepts a lone label and role without an accessibility record", () => {
+    const widget = new TestWidget({ label: "Save", role: "button" });
+    expect(widget.label).toBe("Save");
+    expect(widget.role).toBe("button");
+    expect(widget.accessibility).toEqual({ label: "Save", role: "button" });
+  });
+
+  it("constructs a record from a lone role", () => {
+    const widget = new TestWidget({ role: "slider" });
+    expect(widget.role).toBe("slider");
+    expect(widget.accessibility).toEqual({ role: "slider" });
+  });
+
+  it("writes label and role through the existing accessibility record", () => {
+    const accessibility = { description: "does the thing", tabIndex: 1 };
+    const widget = new TestWidget({
+      accessibility,
+      label: "Go",
+      role: "button",
+    });
+    expect(widget.accessibility).toBe(accessibility);
+    expect(accessibility.label).toBe("Go");
+    expect(accessibility.role).toBe("button");
+    expect(accessibility.description).toBe("does the thing");
+    widget.label = "Stop";
+    expect(accessibility.label).toBe("Stop");
+    expect(widget.accessibilityVersion).toBeGreaterThan(0);
+    widget.role = undefined;
+    expect(accessibility.role).toBeUndefined();
   });
 
   it("defaults everything else", () => {
@@ -193,6 +226,9 @@ describe("UIWidget construction", () => {
     expect(widget.focusable).toBe(false);
     expect(widget.disabled).toBe(false);
     expect(widget.accessibility).toBeNull();
+    expect(widget.label).toBeUndefined();
+    expect(widget.role).toBeUndefined();
+    expect(widget.accessibilityVersion).toBe(0);
     expect(widget.skin).toBeNull();
     expect(widget.disposed).toBe(false);
     expect(widget.layoutLeft).toBe(0);
@@ -741,13 +777,21 @@ describe("UI_STAGED (§73–§75)", () => {
     expect(Object.isFrozen(UI_STAGED)).toBe(true);
   });
 
-  it("records the accessibility mirror's blocker and the layout gaps", () => {
+  it("records the remaining layout gaps and the reduced-motion consumer note", () => {
     const text = UI_STAGED.join("\n");
-    expect(text).toContain("DOM integration");
-    expect(text).toContain("screen-reader");
     expect(text).toContain("reduced motion");
     expect(text).toContain("grid");
     expect(text).toContain("percentages");
+  });
+
+  it("no longer stages the §75 DOM mirror, which shipped (A-13 remainder)", () => {
+    // The hidden-mirror / screen-reader / high-contrast / scalable-text
+    // entries left the array when `installAccessibilityMirror` landed.
+    const text = UI_STAGED.join("\n");
+    expect(text).not.toContain("DOM integration");
+    expect(text).not.toContain("hidden DOM accessibility mirror");
+    expect(text).not.toContain("WidgetAccessibility data ships");
+    expect(text).not.toContain("screen-reader updates, high-contrast");
   });
 
   it("no longer stages §75 keyboard navigation, which shipped (A-13)", () => {

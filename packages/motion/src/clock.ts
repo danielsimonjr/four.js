@@ -6,6 +6,10 @@
  * every system reads the domain it cares about from it (§9: "Individual
  * systems may select a time source").
  *
+ * §9's section title is **Clock and Time Domains**. {@link Clock} is that
+ * public name — a type alias for {@link TimeState}, not a second record
+ * (PH-22l). Behaviour is unchanged; the two names are the same type.
+ *
  * All fields are **seconds** (§7a) — durations included; nothing in four.js
  * takes milliseconds.
  *
@@ -88,6 +92,24 @@ export interface TimeState {
  * frames must copy it with {@link copyTimeState}.
  */
 export type ReadonlyTimeState = Readonly<TimeState>;
+
+/**
+ * §9's public name for the time record.
+ *
+ * The specification titles the section "Clock and Time Domains" and
+ * lists both `Clock` and `TimeState` in Phase 1 (§104). The
+ * implementation name is {@link TimeState} because the
+ * {@link Scheduler} owns the writable record and everyone else reads
+ * {@link ReadonlyTimeState}. This alias does not wrap, copy, or change
+ * behaviour — `Clock` and `TimeState` are the same type (PH-22l).
+ */
+export type Clock = TimeState;
+
+/**
+ * A {@link Clock} as consumers see it — identical to
+ * {@link ReadonlyTimeState}.
+ */
+export type ReadonlyClock = ReadonlyTimeState;
 
 /** Options for {@link createTimeState}. */
 export interface TimeStateOptions {

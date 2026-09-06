@@ -24,7 +24,9 @@ import {
   PARTICLE_INSTANCE_STRIDE_BYTES,
   PARTICLE_MODEL_OFFSET,
   PARTICLE_PROJECTION_OFFSET,
+  PARTICLE_APPEARANCE_SHADER_SOURCE,
   PARTICLE_SHADER_SOURCE,
+  PARTICLE_WIDE_INSTANCE_STRIDE_BYTES,
   PARTICLE_UNIFORM_BYTES,
   PARTICLE_VERTEX_BUFFER_LAYOUTS,
   PARTICLE_VIEW_OFFSET,
@@ -154,6 +156,17 @@ describe("the particle WGSL module", () => {
     // No texture and no sampler: §36's textured tier is staged with §55's
     // texture path, as recorded in gl-particles.ts.
     expect(PARTICLE_SHADER_SOURCE).not.toContain("textureSample");
+  });
+});
+
+describe("R-32 appearance WGSL (opt-in, default shader unchanged)", () => {
+  it("rotates the billboard, samples map, and fades by view-Z when no depth", () => {
+    expect(PARTICLE_APPEARANCE_SHADER_SOURCE).toContain("cos(instanceRotation)");
+    expect(PARTICLE_APPEARANCE_SHADER_SOURCE).toContain("textureSample");
+    expect(PARTICLE_APPEARANCE_SHADER_SOURCE).toContain(
+      "abs(input.viewZ) * input.softness",
+    );
+    expect(PARTICLE_WIDE_INSTANCE_STRIDE_BYTES).toBe(40);
   });
 });
 

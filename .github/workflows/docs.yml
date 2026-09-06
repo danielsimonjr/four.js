@@ -1,12 +1,9 @@
 name: Docs
 
-# Publishes the §93 documentation site to GitHub Pages: the TypeDoc API reference
-# plus the eight built example applications, under one hand-written index.
-#
-# The guides are not copied. Pages serves files, it does not render Markdown, so
-# `docs/guides/*.md` would arrive as plain text; the index links them on GitHub,
-# where they render. Moving them onto the site properly is part of the real
-# website, which is still staged (`website/README.md`).
+# Publishes the §93 documentation site to GitHub Pages: the TypeDoc API
+# reference, the built example applications (the public interactive demos),
+# and HTML renderings of docs/guides/*.md (Pages serves files; it does not
+# render Markdown, so tools/render-guides.mjs converts them at assemble time).
 #
 # Independent of ci.yml on purpose: docs are not a gate, and a docs failure must
 # not read as a red build. The package build and the TypeDoc run happen here
@@ -33,11 +30,14 @@ jobs:
     name: Build the site
     runs-on: ubuntu-latest
     env:
-      # The nine examples that have a main.ts. Named once, looped over twice.
-      # The flagship is nested one level deeper (`flagship/<demo>`), which the
-      # `vite build` path, the `--base` and the `mkdir -p` below all take as
-      # written — nothing here assumes a flat name.
-      EXAMPLES: first-2d-scene first-3d-scene physics-playground mechanism blending particles-demo ui-demo flagship/one-scene-everything-moves flagship/motor-digital-twin
+      # Every example directory that has a main.ts. Named once, looped over
+      # twice. Nested flagships (`flagship/<demo>`) are taken as written —
+      # the `vite build` path, `--base` and `mkdir -p` all accept a slash.
+      # `--base=/four.js/examples/<name>/` is required: Pages hosts this
+      # repository at https://<owner>.github.io/four.js/, so a bundle built
+      # with the default base "/" requests assets from the domain root and
+      # loads nothing. See website/README.md.
+      EXAMPLES: first-2d-scene first-3d-scene first-animated-scene first-physics-scene mixed-scene physics-playground mechanism blending particles-demo ui-demo character-controller flagship/one-scene-everything-moves flagship/motor-digital-twin
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -77,6 +77,11 @@ jobs:
           mkdir -p _site/examples
           cp website/index.html _site/index.html
           cp -R docs/api _site/api
+          bun tools/render-guides.mjs --out=_site/guides
+          bun tools/render-spec-pdf.mjs
+          if [ -f docs/SPECIFICATION.generated.pdf ]; then
+            cp docs/SPECIFICATION.generated.pdf _site/SPECIFICATION.generated.pdf
+          fi
           for example in $EXAMPLES; do
             mkdir -p "_site/examples/$example"
             cp -R "examples/$example/dist/." "_site/examples/$example/"

@@ -516,7 +516,9 @@ describe("the §36 integrator kernel (R-31's GPU-simulation half)", () => {
     const result = writeParticleSimulationParams(out, 0.5, 3, 0, -10, 2);
 
     expect(result).toBe(out);
-    expect(Array.from(out)).toEqual([0.5, 3, 0, 0, 0, -10, 2, 0]);
+    expect(Array.from(out)).toEqual([
+      0.5, 3, 0, 0, 0, -10, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
   });
 
   it("covers count particles with ceil(count / workgroup) groups along x", () => {
@@ -549,11 +551,12 @@ describe("the §36 integrator kernel (R-31's GPU-simulation half)", () => {
     // v += g·dt lands in the velocity lanes before p += v·dt reads them —
     // @four/particles' documented closed form, per lane.
     expect(PARTICLE_INTEGRATOR_SHADER_SOURCE).toContain(
-      "let vx = velocities[base] + params.gravity.x * dt;",
+      "var vx = velocities[base] + ax * dt;",
     );
     expect(PARTICLE_INTEGRATOR_SHADER_SOURCE).toContain(
-      "positions[base] = positions[base] + vx * dt;",
+      "positions[base] = px;",
     );
+    expect(PARTICLE_INTEGRATOR_SHADER_SOURCE).toContain("radialStrength");
   });
 });
 

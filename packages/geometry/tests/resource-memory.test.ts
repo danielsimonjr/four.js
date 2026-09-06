@@ -1,4 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  auditFinalizedLeaks,
+  reportFinalized,
+  resetDevWarnings,
+  resetLeakRegistry,
+  trackedDisposableId,
+} from "@four/core";
 
 import { BufferGeometry } from "../src/buffer-geometry.js";
 import {
@@ -11,6 +19,12 @@ import { boxGeometry } from "../src/primitives.js";
 function triangle(): BufferGeometry {
   return new BufferGeometry({ positions: new Float32Array(9) });
 }
+
+afterEach(() => {
+  resetLeakRegistry();
+  resetDevWarnings();
+  vi.restoreAllMocks();
+});
 
 describe("§83 geometry resource accounting (A-5)", () => {
   // Every assertion is a delta against the totals as this test found them: the
@@ -154,5 +168,27 @@ describe("§83 geometry resource accounting (A-5)", () => {
     // surface is numbers, so there is nowhere for a reference to hide.
     expect(typeof geometryMemoryBytes()).toBe("number");
     expect(typeof liveGeometryCount()).toBe("number");
+  });
+
+  it("registers a geometry with the FinalizationRegistry tracker (A-4)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const geometry = triangle();
+    const id = trackedDisposableId(geometry);
+    expect(id).toBeGreaterThan(0);
+    reportFinalized(id);
+    expect(auditFinalizedLeaks()).toBe(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain(geometry.id);
+    expect(String(warn.mock.calls[0]?.[0])).toContain("Creation site:");
+  });
+
+  it("does not warn when the geometry was disposed before finalization", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const geometry = triangle();
+    const id = trackedDisposableId(geometry);
+    geometry.dispose();
+    reportFinalized(id);
+    expect(auditFinalizedLeaks()).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
+    expect(trackedDisposableId(geometry)).toBe(0);
   });
 });

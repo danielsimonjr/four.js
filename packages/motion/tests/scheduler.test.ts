@@ -5,6 +5,8 @@ import {
   DEFAULT_MAXIMUM_SUB_STEPS,
   copyTimeState,
   createTimeState,
+  type Clock,
+  type ReadonlyClock,
   type ReadonlyTimeState,
   type TimeState,
 } from "../src/clock.js";
@@ -70,6 +72,17 @@ describe("createTimeState (§9)", () => {
       simulationStep: 0,
       droppedTime: 0,
     } satisfies TimeState);
+  });
+
+  it("Clock is TimeState under §9's public name (PH-22l)", () => {
+    const state: TimeState = createTimeState();
+    const clock: Clock = state;
+    const back: TimeState = clock;
+    const readonlyClock: ReadonlyClock = state;
+    const readonlyState: ReadonlyTimeState = readonlyClock;
+    expect(clock).toBe(state);
+    expect(back).toBe(state);
+    expect(readonlyState).toBe(state);
   });
 
   it("uses the Appendix A defaults", () => {
