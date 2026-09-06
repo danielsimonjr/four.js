@@ -6,6 +6,19 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [x] **Open-PR sweep 2026-09-05: 4 open -> 2.** #58 MERGED (conflicted only on trackers, all of
+      whose entries were already on `main`; its real contribution was one changeset file, and
+      `main` had no pending changesets). #56 CLOSED — byte-identical to the already-closed #54,
+      same branch and commit, and re-measured at **0 files / +0-0** against current `main`.
+      #63 and #62 remain open and are tracked below.
+- [ ] **four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.**
+      The dev-dep bump to vitest 4 exposes it: 7 tests fail because an extra `console.warn` fires —
+      our own §42 authority warning, not a dependency deprecation. The decisive evidence is that a
+      failing test PASSES ALONE and fails with its file, so state carries between tests. NOT fixed
+      by `--pool=forks`, `--sequence.concurrent=false`, and not explained by the module-level
+      solver registry. Pinning vitest back to 3 would make it green by RE-HIDING a real bug —
+      same class of move as widening the rapier assertions. Needs the leaking state identified.
+
 - [x] **Repository configuration repaired 2026-09-05.** Pages enabled (`build_type: workflow`) —
       `Docs` green and the site serves HTTP 200 at https://danielsimonjr.github.io/four.js/;
       Actions permitted to create PRs (`default_workflow_permissions` left at **read**) — `Release`
