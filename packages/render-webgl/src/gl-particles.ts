@@ -96,6 +96,9 @@ import {
   PARTICLE_INSTANCE_FLOATS,
   PARTICLE_POSITION_OFFSET,
   PARTICLE_SIZE_OFFSET,
+  TRAIL_COLOR_OFFSET,
+  TRAIL_POSITION_OFFSET,
+  TRAIL_VERTEX_FLOATS,
   type ParticleRenderItem,
 } from "@four/render";
 
@@ -620,5 +623,231 @@ export class ParticleBatchCache {
     const gl = this.#gl;
     gl.deleteVertexArray(record.vertexArray);
     gl.deleteBuffer(record.instanceBuffer);
+  }
+}
+
+/** Bytes per trail vertex — `@four/render`'s interleaved stride. */
+const TRAIL_STRIDE_BYTES = TRAIL_VERTEX_FLOATS * Float32Array.BYTES_PER_ELEMENT;
+
+const TRAIL_VERTEX_SHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 trailPosition;
+layout(location = 1) in vec4 trailColor;
+
+uniform mat4 projection;
+uniform mat4 view;
+uniform mat4 model;
+
+out vec4 vColor;
+
+void main() {
+  gl_Position = projection * view * model * vec4(trailPosition, 1.0);
+  vColor = trailColor;
+}
+`;
+
+/** Reuses the particle fragment shader — straight-alpha passthrough. */
+const TRAIL_FRAGMENT_SHADER_SOURCE = PARTICLE_FRAGMENT_SHADER_SOURCE;
+
+/**
+ * The trail ribbon pipeline — one `drawArrays(TRIANGLES)` per system.
+ */
+export class ParticleTrailProgram implements Disposable {
+  readonly #gl: WebglContext;
+  readonly #program: GlProgramHandle;
+  readonly #projectionLocation: GlUniformLocation;
+  readonly #viewLocation: GlUniformLocation;
+  readonly #modelLocation: GlUniformLocation;
+  #disposed = false;
+
+  private constructor(
+    gl: WebglContext,
+    program: GlProgramHandle,
+    projectionLocation: GlUniformLocation,
+    viewLocation: GlUniformLocation,
+    modelLocation: GlUniformLocation,
+  ) {
+    this.#gl = gl;
+    this.#program = program;
+    this.#projectionLocation = projectionLocation;
+    this.#viewLocation = viewLocation;
+    this.#modelLocation = modelLocation;
+  }
+
+  static create(gl: WebglContext): ParticleTrailProgram {
+    const program = createLinkedProgram(
+      gl,
+      "particle-trail",
+      TRAIL_VERTEX_SHADER_SOURCE,
+      TRAIL_FRAGMENT_SHADER_SOURCE,
+    );
+    try {
+      return new ParticleTrailProgram(
+        gl,
+        program,
+        requireUniform(gl, program, "projection", "particle-trail"),
+        requireUniform(gl, program, "view", "particle-trail"),
+        requireUniform(gl, program, "model", "particle-trail"),
+      );
+    } catch (error: unknown) {
+      gl.deleteProgram(program);
+      throw error;
+    }
+  }
+
+  get disposed(): boolean {
+    return this.#disposed;
+  }
+
+  use(): void {
+    this.#gl.useProgram(this.#program);
+  }
+
+  setProjection(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(this.#projectionLocation, false, matrixScratch);
+  }
+
+  setView(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(this.#viewLocation, false, matrixScratch);
+  }
+
+  setModel(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
+  }
+
+  dispose(): void {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    this.#gl.deleteProgram(this.#program);
+  }
+}
+
+export interface ParticleTrailBatchRecord {
+  readonly vertexArray: GlVertexArray;
+  readonly vertexBuffer: GlBuffer;
+  readonly capacityFloats: number;
+}
+
+/** Per-system trail vertex buffer cache, keyed by `ParticleRenderItem.id`. */
+export class ParticleTrailBatchCache {
+  readonly #gl: ParticleGlContext;
+  readonly #records = new Map<string, ParticleTrailBatchRecord>();
+  #disposed = false;
+
+  constructor(gl: ParticleGlContext) {
+    this.#gl = gl;
+  }
+
+  get size(): number {
+    return this.#records.size;
+  }
+
+  get disposed(): boolean {
+    return this.#disposed;
+  }
+
+  acquire(item: ParticleRenderItem): ParticleTrailBatchRecord | null {
+    const trailVertices = item.trailVertices;
+    if (trailVertices === undefined || trailVertices.length === 0) {
+      return null;
+    }
+    const key = `${item.id}:trail`;
+    const existing = this.#records.get(key);
+    if (existing !== undefined) {
+      if (existing.capacityFloats === trailVertices.length) {
+        return existing;
+      }
+      this.#deleteRecord(existing);
+      this.#records.delete(key);
+    }
+    const record = this.#create(trailVertices);
+    if (record === null) {
+      return null;
+    }
+    this.#records.set(key, record);
+    return record;
+  }
+
+  upload(record: ParticleTrailBatchRecord, item: ParticleRenderItem): void {
+    const count = item.trailVertexCount ?? 0;
+    const floats = count * TRAIL_VERTEX_FLOATS;
+    if (floats === 0 || item.trailVertices === undefined) {
+      return;
+    }
+    const gl = this.#gl;
+    gl.bindBuffer(GL.ARRAY_BUFFER, record.vertexBuffer);
+    gl.bufferSubData(GL.ARRAY_BUFFER, 0, item.trailVertices, 0, floats);
+    gl.bindBuffer(GL.ARRAY_BUFFER, null);
+  }
+
+  forget(): void {
+    this.#records.clear();
+  }
+
+  dispose(): void {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    for (const record of this.#records.values()) {
+      this.#deleteRecord(record);
+    }
+    this.#records.clear();
+  }
+
+  #create(vertices: Float32Array): ParticleTrailBatchRecord | null {
+    const gl = this.#gl;
+    const vertexArray = gl.createVertexArray();
+    if (vertexArray === null) {
+      return null;
+    }
+    const vertexBuffer = gl.createBuffer();
+    if (vertexBuffer === null) {
+      gl.deleteVertexArray(vertexArray);
+      return null;
+    }
+
+    gl.bindVertexArray(vertexArray);
+    gl.bindBuffer(GL.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(GL.ARRAY_BUFFER, vertices, PARTICLE_GL.DYNAMIC_DRAW);
+
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(
+      0,
+      3,
+      GL.FLOAT,
+      false,
+      TRAIL_STRIDE_BYTES,
+      TRAIL_POSITION_OFFSET * Float32Array.BYTES_PER_ELEMENT,
+    );
+
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(
+      1,
+      4,
+      GL.FLOAT,
+      false,
+      TRAIL_STRIDE_BYTES,
+      TRAIL_COLOR_OFFSET * Float32Array.BYTES_PER_ELEMENT,
+    );
+
+    gl.bindVertexArray(null);
+    gl.bindBuffer(GL.ARRAY_BUFFER, null);
+
+    return {
+      vertexArray,
+      vertexBuffer,
+      capacityFloats: vertices.length,
+    };
+  }
+
+  #deleteRecord(record: ParticleTrailBatchRecord): void {
+    const gl = this.#gl;
+    gl.deleteVertexArray(record.vertexArray);
+    gl.deleteBuffer(record.vertexBuffer);
   }
 }

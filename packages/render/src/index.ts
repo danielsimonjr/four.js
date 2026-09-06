@@ -71,6 +71,9 @@ export {
   PARTICLE_INSTANCE_FLOATS,
   PARTICLE_POSITION_OFFSET,
   PARTICLE_SIZE_OFFSET,
+  TRAIL_COLOR_OFFSET,
+  TRAIL_POSITION_OFFSET,
+  TRAIL_VERTEX_FLOATS,
   isParticleDrawable,
   particleQuadGeometry,
 } from "./particles.js";

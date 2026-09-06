@@ -182,18 +182,28 @@
  */
 
 import { FourError } from "@four/core";
-import { Vector3 } from "@four/math";
+import { Vector3, Vector4 } from "@four/math";
 
 import { ParticlePool } from "./pool.js";
 import { SeededRandom } from "./random.js";
+import {
+  ParticleTrailStore,
+  resolveTrailOptions,
+  type ParticleTrailOptions,
+} from "./trail.js";
 import type {
   ParticleBurst,
   ParticleColor,
   ParticleForceField,
   ParticleGpuSimulation,
   ParticleLifetimeRamp,
+  ParticleLifetimeStop,
   ParticleRange,
   ParticleSimulationMode,
+} from "./types.js";
+import {
+  evaluateLifetimeRampColor,
+  evaluateLifetimeRampNumber,
 } from "./types.js";
 
 /** `2π`. */
@@ -345,6 +355,12 @@ export interface ParticleEmitterOptions {
    * and are not rejected.
    */
   readonly restitution?: number;
+
+  /**
+   * Optional position-history trail (§36). CPU simulation only; refused when
+   * `simulation: "gpu"`. Omit for no trail.
+   */
+  readonly trail?: ParticleTrailOptions;
 }
 
 /**
@@ -366,6 +382,8 @@ export class ParticleEmitter {
   readonly #lifetimeMax: number;
   readonly #speedMin: number;
   readonly #speedMax: number;
+  readonly #sizeRamp: ParticleLifetimeRamp<number>;
+  readonly #colorRamp: ParticleLifetimeRamp<ParticleColor>;
   readonly #startSize: number;
   readonly #endSize: number;
   readonly #startColor: ParticleColor;
@@ -425,10 +443,18 @@ export class ParticleEmitter {
   /** The bound GPU driver, or `null` (always `null` in CPU mode). */
   #gpu: ParticleGpuSimulation | null = null;
 
+  /** Per-slot position history, or `undefined` when trails are off. */
+  readonly #trail: ParticleTrailStore | undefined;
+  readonly #trailMinDistance: number;
+  readonly #trailHeadWidth: number;
+  readonly #trailTailWidthFactor: number;
+
   /** Scratch handed to `ParticleForceField.sample` — never allocated per step. */
   readonly #samplePosition = new Vector3();
   readonly #sampleVelocity = new Vector3();
   readonly #sampleForce = new Vector3();
+  readonly #evaluateColorStart = new Vector4();
+  readonly #evaluateColorEnd = new Vector4();
 
   #elapsedTime = 0;
   #emissionAccumulator = 0;
@@ -471,6 +497,11 @@ export class ParticleEmitter {
       if (options.collisionPlaneY !== undefined) {
         throw new RangeError(
           'ParticleEmitter: simulation "gpu" does not accept `collisionPlaneY` (§36 depth-buffer collision is a follow-up; R-31)',
+        );
+      }
+      if (options.trail !== undefined && options.trail.enabled !== false) {
+        throw new RangeError(
+          'ParticleEmitter: simulation "gpu" does not accept `trail` (§36 CPU trail history is a follow-up on the device; R-31)',
         );
       }
       if (this.pool.capacity === 0) {
@@ -524,10 +555,12 @@ export class ParticleEmitter {
       start: DEFAULT_PARTICLE_SIZE,
       end: DEFAULT_PARTICLE_SIZE,
     };
+    this.#sizeRamp = copySizeRamp(size);
     this.#startSize = assertFinite(size.start, "size.start");
     this.#endSize = assertFinite(size.end, "size.end");
 
     const color = options.color;
+    this.#colorRamp = copyColorRamp(color);
     this.#startColor = copyColor(color?.start, "color.start");
     this.#endColor = copyColor(color?.end, "color.end");
 
@@ -607,6 +640,19 @@ export class ParticleEmitter {
       0,
       "restitution",
     );
+
+    const trail = resolveTrailOptions(options.trail);
+    if (trail === undefined) {
+      this.#trail = undefined;
+      this.#trailMinDistance = 0;
+      this.#trailHeadWidth = -1;
+      this.#trailTailWidthFactor = 0;
+    } else {
+      this.#trail = new ParticleTrailStore(this.pool.capacity, trail.length!);
+      this.#trailMinDistance = trail.minDistance!;
+      this.#trailHeadWidth = trail.width!;
+      this.#trailTailWidthFactor = trail.tailWidthFactor!;
+    }
   }
 
   /** Live particle count — `pool.aliveCount`. */
@@ -646,6 +692,76 @@ export class ParticleEmitter {
   /** §36's `simulation` option, as constructed. */
   get simulationMode(): ParticleSimulationMode {
     return this.#simulation;
+  }
+
+  /** Whether this emitter records position-history trails. */
+  get hasTrail(): boolean {
+    return this.#trail !== undefined;
+  }
+
+  /** The trail store, or `undefined` when trails are disabled. */
+  get trailStore(): ParticleTrailStore | undefined {
+    return this.#trail;
+  }
+
+  /** Trail ribbon head width in world units, or `-1` to use particle size. */
+  get trailHeadWidth(): number {
+    return this.#trailHeadWidth;
+  }
+
+  /** Tail width as a fraction of the head width. */
+  get trailTailWidthFactor(): number {
+    return this.#trailTailWidthFactor;
+  }
+
+  /**
+   * Current size of live particle `index`, including multi-stop ramps when
+   * configured. Endpoints come from the pool slot (spawn values).
+   */
+  evaluateSize(index: number): number {
+    const pool = this.pool;
+    const t = pool.getNormalizedAge(index);
+    const start = pool.getStartSize(index);
+    const end = pool.getEndSize(index);
+    const stops = this.#sizeRamp.stops;
+    if (stops === undefined || stops.length === 0) {
+      return start + (end - start) * t;
+    }
+    return evaluateLifetimeRampNumber({ start, end, stops }, t);
+  }
+
+  /**
+   * Current colour of live particle `index`, including multi-stop ramps when
+   * configured. Writes straight RGBA into `out`; endpoints come from the pool.
+   */
+  evaluateColor(index: number, out: Vector4): Vector4 {
+    const pool = this.pool;
+    const t = pool.getNormalizedAge(index);
+    pool.getStartColor(index, this.#evaluateColorStart);
+    pool.getEndColor(index, this.#evaluateColorEnd);
+    const start = {
+      r: this.#evaluateColorStart.x,
+      g: this.#evaluateColorStart.y,
+      b: this.#evaluateColorStart.z,
+      a: this.#evaluateColorStart.w,
+    };
+    const end = {
+      r: this.#evaluateColorEnd.x,
+      g: this.#evaluateColorEnd.y,
+      b: this.#evaluateColorEnd.z,
+      a: this.#evaluateColorEnd.w,
+    };
+    const stops = this.#colorRamp.stops;
+    const color =
+      stops === undefined || stops.length === 0
+        ? {
+            r: start.r + (end.r - start.r) * t,
+            g: start.g + (end.g - start.g) * t,
+            b: start.b + (end.b - start.b) * t,
+            a: start.a + (end.a - start.a) * t,
+          }
+        : evaluateLifetimeRampColor({ start, end, stops }, t);
+    return out.set(color.r, color.g, color.b, color.a);
   }
 
   /**
@@ -778,6 +894,7 @@ export class ParticleEmitter {
     this.#emissionAccumulator = 0;
     this.#emittedCount = 0;
     this.#droppedCount = 0;
+    this.#trail?.clear();
     return this;
   }
 
@@ -910,6 +1027,10 @@ export class ParticleEmitter {
       positions[base + 1] = py;
       positions[base + 2] = pz;
 
+      if (this.#trail !== undefined) {
+        this.#trail.pushSample(index, px, py, pz, this.#trailMinDistance);
+      }
+
       // Store first, then re-read: the expiry test must use the same float32
       // value `getAge` reports, not the unrounded binary64 sum.
       ages[index] = ages[index] + deltaSeconds;
@@ -924,6 +1045,12 @@ export class ParticleEmitter {
           accumulator[base] = accumulator[last];
           accumulator[base + 1] = accumulator[last + 1];
           accumulator[base + 2] = accumulator[last + 2];
+        }
+        if (this.#trail !== undefined) {
+          const last = pool.aliveCount - 1;
+          if (index !== last) {
+            this.#trail.copySlot(last, index);
+          }
         }
         pool.kill(index);
       } else {
@@ -1085,6 +1212,14 @@ export class ParticleEmitter {
     const index = this.pool.spawn();
     this.pool.setPosition(index, this.#originX, this.#originY, this.#originZ);
     this.pool.setVelocity(index, dirX * speed, dirY * speed, dirZ * speed);
+    this.#trail?.resetSlot(index);
+    this.#trail?.pushSample(
+      index,
+      this.#originX,
+      this.#originY,
+      this.#originZ,
+      0,
+    );
     if (this.#gpu !== null) {
       // GPU mode: the spawn state enters device residency here — read back
       // from the pool so the device receives exactly the float32 values the
@@ -1164,4 +1299,64 @@ function copyColor(
     b: assertFinite(color.b, `${name}.b`),
     a: assertFinite(color.a, `${name}.a`),
   };
+}
+
+function copySizeRamp(
+  ramp: ParticleLifetimeRamp<number>,
+): ParticleLifetimeRamp<number> {
+  const stops = ramp.stops;
+  if (stops === undefined) {
+    return { start: ramp.start, end: ramp.end };
+  }
+  const copied: ParticleLifetimeStop<number>[] = [];
+  for (let i = 0; i < stops.length; i += 1) {
+    const stop = stops[i];
+    assertFinite(stop.t, `size.stops[${String(i)}].t`);
+    if (stop.t <= 0 || stop.t >= 1) {
+      throw new RangeError(
+        `ParticleEmitter: size.stops[${String(i)}].t must be in (0, 1); received ${String(stop.t)}`,
+      );
+    }
+    if (i > 0 && stop.t <= stops[i - 1].t) {
+      throw new RangeError(
+        `ParticleEmitter: size.stops must be sorted ascending by t`,
+      );
+    }
+    copied.push({
+      t: stop.t,
+      value: assertFinite(stop.value, `size.stops[${String(i)}].value`),
+    });
+  }
+  return { start: ramp.start, end: ramp.end, stops: copied };
+}
+
+function copyColorRamp(
+  ramp: ParticleLifetimeRamp<ParticleColor> | undefined,
+): ParticleLifetimeRamp<ParticleColor> {
+  const start = copyColor(ramp?.start, "color.start");
+  const end = copyColor(ramp?.end, "color.end");
+  const stops = ramp?.stops;
+  if (stops === undefined) {
+    return { start, end };
+  }
+  const copied: ParticleLifetimeStop<ParticleColor>[] = [];
+  for (let i = 0; i < stops.length; i += 1) {
+    const stop = stops[i];
+    assertFinite(stop.t, `color.stops[${String(i)}].t`);
+    if (stop.t <= 0 || stop.t >= 1) {
+      throw new RangeError(
+        `ParticleEmitter: color.stops[${String(i)}].t must be in (0, 1); received ${String(stop.t)}`,
+      );
+    }
+    if (i > 0 && stop.t <= stops[i - 1].t) {
+      throw new RangeError(
+        `ParticleEmitter: color.stops must be sorted ascending by t`,
+      );
+    }
+    copied.push({
+      t: stop.t,
+      value: copyColor(stop.value, `color.stops[${String(i)}]`),
+    });
+  }
+  return { start, end, stops: copied };
 }

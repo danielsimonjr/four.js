@@ -118,6 +118,20 @@ export const PARTICLE_SIZE_OFFSET = 3;
 export const PARTICLE_COLOR_OFFSET = 4;
 
 /**
+ * Floats per trail ribbon vertex — position `xyz` plus straight-alpha `rgba`.
+ *
+ * Duplicated in `@four/particles`' `trail.ts` for the same reason as
+ * {@link PARTICLE_INSTANCE_FLOATS}.
+ */
+export const TRAIL_VERTEX_FLOATS = 7;
+
+/** Offset, in floats, of a trail vertex centre within its stride. */
+export const TRAIL_POSITION_OFFSET = 0;
+
+/** Offset, in floats, of a trail vertex straight-alpha RGBA. */
+export const TRAIL_COLOR_OFFSET = 3;
+
+/**
  * A scene node that draws a particle system (§36, §49's `ParticleSystem`).
  *
  * Implemented **structurally** — see the module header for why there is no base
@@ -182,6 +196,26 @@ export interface ParticleDrawable {
    * allocate (plan D7) and must not touch the scene (§42).
    */
   updateParticleInstances(): void;
+
+  /**
+   * Whether this node produces an optional trail ribbon mesh. When `true`,
+   * {@link ParticleDrawable.trailVertexCount} and
+   * {@link ParticleDrawable.trailVertices} are valid after
+   * {@link ParticleDrawable.updateParticleInstances}.
+   */
+  readonly hasTrail?: boolean;
+
+  /**
+   * Trail ribbon vertex count for the frame. `0` when {@link hasTrail} is
+   * false or no segment has ≥ 2 samples yet.
+   */
+  readonly trailVertexCount?: number;
+
+  /**
+   * Interleaved trail vertices (`TRAIL_VERTEX_FLOATS` stride). Valid for
+   * `trailVertexCount × TRAIL_VERTEX_FLOATS` floats after repack.
+   */
+  readonly trailVertices?: Float32Array;
 }
 
 /**
