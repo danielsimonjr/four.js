@@ -8,6 +8,36 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-05 — reverted #62 and #63: `main` was red on three workflows
+
+- **Reverted the dev-dependency bump (#62).** It moved TypeScript 5.9.3 -> 7.0.2 together with
+  vitest 3 -> 4, and that pair has **no working TypeScript version** in this repo:
+
+  | TypeScript | `bun run docs` | `bun run lint` |
+  |---|---|---|
+  | 7.0.2 | **crash** — `Cannot read properties of undefined (reading 'PropertyDeclaration')` | pass |
+  | 6.0.3 | 7 errors — `@types/node` unresolved in test files | 76 errors |
+  | 5.9.3 | **pass** | 38 errors |
+
+  typedoc 0.28.20 is the latest published version and peers at TypeScript `<= 6.0.x`, so TS 7 has
+  no supported typedoc at all; below TS 7, vitest 4's types degrade to `any`, which is what the
+  lint errors are. The bump also caused 7 test failures by exposing a pre-existing test-isolation
+  defect (the §42 authority warning fires an extra time; the affected tests pass in isolation).
+- **Reverted the production-dependency bump (#63)**, `@dimforge/rapier` 0.19.3 -> 0.20.0. Four
+  physics tests failed on solver behaviour drift — a bullet that no longer tunnels at a tiny CCD
+  prediction distance, a contact distance of 0.005 where `<= 0` was expected, and a snapshot-
+  restored joint at −0.75 where `> −0.22` was expected. Adopting 0.20 is a deliberate decision
+  (the CCD change looks like an improvement, the joint one may be a regression); it should not
+  arrive as an unreviewed dependency bump. This also reverts the `contactPair` adapter fix, which
+  is only needed for 0.20 and is recorded here for whoever picks that up: rapier 0.20 inserted a
+  `bodies: RigidBodySet` parameter, so `contactPair(c1, c2, f)` became `contactPair(c1, c2, bodies, f)`.
+- **Both are now pinned in `.github/dependabot.yml`** with the measured reason, so the same
+  incompatible set is not re-proposed next Monday. Lift `typescript` and `vitest` together, in one
+  PR, once typedoc supports TypeScript 7.
+
+After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rapier` is back to
+341/341 passing (it was 337 passing / 4 failing on 0.20).
+
 ### 2026-09-05 — repository configuration repairs (Docs, Release, Dependabot)
 
 - **GitHub Pages enabled (`build_type: workflow`).** The `Docs` workflow had been failing on every

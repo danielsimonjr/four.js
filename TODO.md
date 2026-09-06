@@ -6,6 +6,20 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [x] **`main` was RED on CI, Docs and Release; reverted #62 and #63 to restore it.** Both had been
+      merged over documented failures. Full evidence in CHANGELOG; the short version is that
+      vitest 4 and typedoc 0.28.20 have no TypeScript version in common.
+- [ ] **Lift the TypeScript/vitest pin once typedoc supports TS 7.** Currently ignored in
+      `.github/dependabot.yml`. Both must move in ONE PR — bumping either alone re-breaks a gate.
+      Check `npm view typedoc peerDependencies` for a range that includes 7.x.
+- [ ] **Pre-existing test-isolation defect, still unfixed and now hidden again.** vitest 3 masks it;
+      vitest 4 exposed it. 7 tests fail because an extra §42 authority warning fires, and the
+      failing tests PASS IN ISOLATION. Not caused by the dependency — reverting only re-hid it.
+      Worth fixing before vitest 4 is attempted again, or the same PR fails the same way.
+- [ ] **rapier 0.20 adoption is a real decision, not a bump.** Four behavioural differences
+      measured (CCD, contact distance, snapshot joint). The `contactPair` API fix it needs is in
+      the CHANGELOG entry for whoever takes it.
+
 - [x] **Open-PR sweep 2026-09-05: 4 open -> 2.** #58 MERGED (conflicted only on trackers, all of
       whose entries were already on `main`; its real contribution was one changeset file, and
       `main` had no pending changesets). #56 CLOSED — byte-identical to the already-closed #54,

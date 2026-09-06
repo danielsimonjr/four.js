@@ -32,6 +32,23 @@ updates:
     commit-message:
       prefix: 'deps'
       prefix-development: 'deps-dev'
+    ignore:
+      # BLOCKED, and both were reverted on 2026-09-05 after being merged together in #62.
+      # Measured matrix -- no TypeScript version satisfies both gates with vitest 4 + typedoc:
+      #   TS 7.0.2  docs CRASH ("Cannot read properties of undefined")  lint pass
+      #   TS 6.0.3  docs 7 errors (@types/node unresolved in tests)     lint 76 errors
+      #   TS 5.9.3  docs pass                                           lint 38 errors
+      # typedoc 0.28.20 is the LATEST and peers at TypeScript <= 6.0.x, so TS 7 has no supported
+      # typedoc at all; vitest 4's types degrade to `any` below TS 7, which is what the lint
+      # errors are. The two are mutually exclusive until typedoc ships TS 7 support.
+      # LIFT BOTH TOGETHER, in ONE PR, once typedoc supports TypeScript 7 -- bumping either alone
+      # re-breaks a gate.
+      - dependency-name: 'typescript'
+        versions: ['>=6']
+      - dependency-name: 'vitest'
+        versions: ['>=4']
+      - dependency-name: '@vitest/coverage-v8'
+        versions: ['>=4']
 
   # Keep the action versions current. Grouped so a week of bumps is one PR, not six.
   - package-ecosystem: 'github-actions'
