@@ -232,6 +232,10 @@ its source in `packages/physics-rapier/src`):
 - **A motor's `maxTorque` / `maxForce` is a gain, not §28's hard cap.** Rapier
   parameterises its motors by force-based gains; the value reaches the solver
   but does not clamp the way §28 describes.
+- **`inheritVelocityFrom` is nearly a no-op on both Rapier adapters (2026-09-06).**
+  Rapier derives kinematic velocity itself from the pose it is given, so seeding
+  velocities from a `PoseTarget` does not change what the solver already
+  computes. Other solvers may need the seed.
 - **A 3D `spherical` joint ships without limit support.** A limited one is
   refused loudly rather than simulated unlimited.
 - **Restitution combine is forced to `Max`.** Rapier's default is `Average`,
