@@ -131,6 +131,34 @@ export class EventEmitter<EventMap> {
     return count;
   }
 
+  totalListenerCount(): number {
+    let count = 0;
+    for (const records of this.#listeners.values()) {
+      for (const record of records) {
+        if (!record.removed) count += 1;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Number of live listener registrations across every event type (§83).
+   *
+   * Used by teardown diagnostics — a detached node that still holds listeners
+   * pins its subtree until those listeners are removed.
+   */
+  listenerCountAll(): number {
+    let count = 0;
+    for (const records of this.#listeners.values()) {
+      for (const record of records) {
+        if (!record.removed) {
+          count += 1;
+        }
+      }
+    }
+    return count;
+  }
+
   /**
    * Removes every listener, or every listener of one type. Used by teardown
    * paths that must not leave detached nodes retaining listeners (§83).

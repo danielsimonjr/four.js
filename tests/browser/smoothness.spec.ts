@@ -591,42 +591,44 @@ async function virtualFrameCount(page: Page): Promise<number> {
 }
 
 /**
- * How long {@link waitForVirtualFrameParity} will wait for the next
- * odd/even virtual frame before failing. One delivered frame is a
- * browser rAF (~16 ms); fifteen seconds is a hung clock, not a slow
- * runner.
+ * How long {@link waitForVirtualFrameCount} will wait for the next virtual
+ * frame before failing. One delivered frame is a browser rAF (~16 ms); fifteen
+ * seconds is a hung clock, not a slow runner.
  */
-const VIRTUAL_FRAME_PARITY_BUDGET_MS = 15_000;
+const VIRTUAL_FRAME_WAIT_BUDGET_MS = 15_000;
 
 /**
- * Waits until the injected clock has delivered a new frame of the requested
- * parity (odd = alpha 0.5, even = alpha 0.0). Polled through
- * {@link virtualFrameCount} (`page.evaluate`), not `waitForFunction`.
+ * Waits until the injected clock has delivered at least `minimum` virtual
+ * frames. Each poll pumps one real `requestAnimationFrame` turn so headless
+ * SwiftShader advances the example's patched loop between checks.
  *
- * Playwright's `waitForFunction` defaults to `polling: "raf"`. This test
- * replaces `requestAnimationFrame`, and on CI that combination left the
- * waiter parked until the 120 s test timeout (2026-09-06, `b55a8c1`)
- * even though `evaluate` could already read `__fourVirtualFrames`.
+ * Playwright's `waitForFunction` (default `polling: "raf"`) deadlocks against
+ * this test's `requestAnimationFrame` override — CI hung 120 s on `b55a8c1`
+ * even though `page.evaluate` could read `__fourVirtualFrames`. Waiting for
+ * `start + 1` avoids parity-matching races when two increments land per pump.
  */
-async function waitForVirtualFrameParity(
+async function waitForVirtualFrameCount(
   page: Page,
-  parity: 0 | 1,
+  minimum: number,
 ): Promise<number> {
-  const start = await virtualFrameCount(page);
-  const deadline = Date.now() + VIRTUAL_FRAME_PARITY_BUDGET_MS;
-  for (;;) {
+  const deadline = Date.now() + VIRTUAL_FRAME_WAIT_BUDGET_MS;
+  while (Date.now() < deadline) {
     const n = await virtualFrameCount(page);
-    if (n > start && n % 2 === parity) {
+    if (n >= minimum) {
       return n;
     }
-    if (Date.now() >= deadline) {
-      throw new Error(
-        `virtual clock stuck at ${String(n)} (started ${String(start)}); ` +
-          `wanted a new frame with parity ${String(parity)}`,
-      );
-    }
-    await page.waitForTimeout(16);
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        }),
+    );
   }
+  const stuck = await virtualFrameCount(page);
+  throw new Error(
+    `virtual frame ${String(minimum)} not reached within ${String(VIRTUAL_FRAME_WAIT_BUDGET_MS / 1000)} s ` +
+      `(stuck at ${String(stuck)})`,
+  );
 }
 
 /** Screenshots until a drawn frame appears or the budget runs out. */
@@ -812,12 +814,10 @@ test.describe("§106: moving primitives render smoothly under fixed-step simulat
     const fractions: number[] = [];
     const frameNumbers: number[] = [];
     for (let i = 0; i < INTERPOLATION_SAMPLE_COUNT; i++) {
-      // Alternate odd / even virtual frames so both alpha 0.5 and alpha 0.0
-      // appear. Waiting on the rAF counter, not wall-clock, is what breaks
-      // the even-frame alias.
-      frameNumbers.push(
-        await waitForVirtualFrameParity(page, i % 2 === 0 ? 1 : 0),
-      );
+      // One new virtual frame per sample — consecutive counts alternate parity,
+      // so both alpha 0.5 and 0.0 appear without a wall-clock alias.
+      const start = await virtualFrameCount(page);
+      frameNumbers.push(await waitForVirtualFrameCount(page, start + 1));
       const image = await grab(canvas);
       const fix = locateOrbiter(image);
       expect(

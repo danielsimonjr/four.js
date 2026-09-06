@@ -63,6 +63,7 @@
  */
 
 import type { RenderItem } from "@four/render";
+import { warnDisposedInUse } from "@four/render";
 
 import {
   COLOR_ATTRIBUTE_LOCATION,
@@ -282,6 +283,9 @@ export class GeometryCache {
     }
 
     if (geometry.drawCount === 0) {
+      if (geometry.disposed) {
+        warnDisposedInUse("geometry", geometry.id);
+      }
       return null;
     }
 

@@ -42,6 +42,7 @@ import { Matrix4, Quaternion, Rectangle2, Vector3 } from "@four/math";
 import {
   MAX_PUNCTUAL_LIGHTS,
   PARTICLE_INSTANCE_FLOATS,
+  TRAIL_VERTEX_FLOATS,
   RenderTarget,
   Renderable,
   Sprite,
@@ -80,6 +81,8 @@ import {
   POSITION_ATTRIBUTE_LOCATION,
   ParticleBatchCache,
   ParticleProgram,
+  ParticleTrailBatchCache,
+  ParticleTrailProgram,
   PunctualLightUniforms,
   RenderTargetCache,
   SHADOW_GLSL,
@@ -2642,12 +2645,12 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
 
     canvas.dispatch("webglcontextrestored");
 
-    // Unlit, sprite (WP-3a.3), particles (WP-9.3), lit (§68, 2026-08-04),
-    // standard (§59, R-13, 2026-08-08), the §70 effect pipeline (R-6,
-    // 2026-08-07), and §69's depth-only caster pipeline (R-18, 2026-08-09):
-    // §61 requires engine-owned GPU resources to be re-created before
-    // `contextrestored` is emitted, and every pipeline is.
-    expect(gl.countOf("createProgram")).toBe(7);
+    // Unlit, sprite (WP-3a.3), particles (WP-9.3), particle trails (§36),
+    // lit (§68, 2026-08-04), standard (§59, R-13, 2026-08-08), the §70 effect
+    // pipeline (R-6, 2026-08-07), and §69's depth-only caster pipeline (R-18,
+    // 2026-08-09): §61 requires engine-owned GPU resources to be re-created
+    // before `contextrestored` is emitted, and every pipeline is.
+    expect(gl.countOf("createProgram")).toBe(8);
     expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
       GL.DEPTH_TEST,
       GL.SCISSOR_TEST,
@@ -2753,7 +2756,7 @@ describe("WebglRenderer — disposal (§83)", () => {
 
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(7);
+    expect(gl.countOf("deleteProgram")).toBe(8);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(3);
     expect(renderer.disposed).toBe(true);
@@ -2777,7 +2780,7 @@ describe("WebglRenderer — disposal (§83)", () => {
     renderer.dispose();
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(7);
+    expect(gl.countOf("deleteProgram")).toBe(8);
   });
 
   it("succeeds during a lost context, without touching the context", async () => {
@@ -3253,6 +3256,8 @@ describe("TextureCache — textures keyed by id and version (§77, §61)", () =>
   });
 
   it("drops a disposed texture and keeps no entry (§83)", () => {
+    resetDevWarnings();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const gl = createFakeGl();
     const cache = new TextureCache(gl);
     const texture = new TestTexture();
@@ -3261,6 +3266,8 @@ describe("TextureCache — textures keyed by id and version (§77, §61)", () =>
     texture.dispose();
 
     expect(cache.acquire(texture.asTexture)).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain("disposed");
     expect(gl.countOf("deleteTexture")).toBe(1);
     expect(gl.countOf("createTexture")).toBe(1);
     expect(cache.size).toBe(0);
@@ -3895,6 +3902,19 @@ function particleItem(
     frustumCulled: false,
     // §66 key 4, unmeasured until a view sorts by it.
     viewDepth: 0,
+    trailVertexCount: 0,
+  };
+}
+
+function trailParticleItem(
+  trailVertices: Float32Array,
+  trailVertexCount: number,
+  id = "item-trail",
+): ParticleRenderItem {
+  return {
+    ...particleItem(new Float32Array(PARTICLE_INSTANCE_FLOATS), 0, id),
+    trailVertices,
+    trailVertexCount,
   };
 }
 
@@ -4227,6 +4247,105 @@ describe("ParticleBatchCache — one vertex array per system (§61, §64)", () =
     expect(cache.size).toBe(0);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(2);
+  });
+});
+
+describe("ParticleTrailProgram — compilation and linking (§36 trail tier)", () => {
+  it("compiles, links, and resolves the three uniforms", () => {
+    const gl = createFakeGl();
+    const program = ParticleTrailProgram.create(gl);
+    expect(gl.countOf("linkProgram")).toBe(1);
+    expect(
+      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
+    ).toEqual(["projection", "view", "model"]);
+    program.dispose();
+    expect(program.disposed).toBe(true);
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+});
+
+describe("ParticleTrailBatchCache — ribbon vertex cache (§36 trail tier)", () => {
+  it("builds position and colour attributes for trail vertices", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleTrailBatchCache(gl);
+    const vertices = new Float32Array(TRAIL_VERTEX_FLOATS * 2);
+    const item = trailParticleItem(vertices, 2);
+
+    const record = cache.acquire(item);
+    expect(record).not.toBeNull();
+    expect(cache.size).toBe(1);
+    expect(gl.callsOf("vertexAttribPointer").map((call) => call.args)).toEqual([
+      [0, 3, GL.FLOAT, false, TRAIL_VERTEX_FLOATS * 4, 0],
+      [1, 4, GL.FLOAT, false, TRAIL_VERTEX_FLOATS * 4, 12],
+    ]);
+  });
+
+  it("returns null without trail vertices and rebuilds when capacity changes", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleTrailBatchCache(gl);
+    expect(
+      cache.acquire(trailParticleItem(new Float32Array(0), 0)),
+    ).toBeNull();
+
+    const small = trailParticleItem(new Float32Array(TRAIL_VERTEX_FLOATS), 1);
+    const first = cache.acquire(small);
+    const grown = trailParticleItem(
+      new Float32Array(TRAIL_VERTEX_FLOATS * 3),
+      3,
+    );
+    const second = cache.acquire(grown);
+    expect(second).not.toBe(first);
+    expect(cache.size).toBe(1);
+  });
+
+  it("uploads the live trail prefix and disposes cleanly", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleTrailBatchCache(gl);
+    const vertices = new Float32Array(TRAIL_VERTEX_FLOATS * 2);
+    const item = trailParticleItem(vertices, 2);
+    const record = cache.acquire(item);
+    expect(record).not.toBeNull();
+    gl.reset();
+    cache.upload(record!, item);
+    expect(gl.countOf("bufferSubData")).toBe(1);
+    cache.dispose();
+    expect(cache.disposed).toBe(true);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+    expect(gl.countOf("deleteBuffer")).toBe(1);
+  });
+
+  it("returns null when GL will not allocate trail buffers", () => {
+    const vertices = new Float32Array(TRAIL_VERTEX_FLOATS);
+    const item = trailParticleItem(vertices, 1);
+    expect(
+      new ParticleTrailBatchCache(
+        createFakeGl({ allocateVertexArrays: false }),
+      ).acquire(item),
+    ).toBeNull();
+    const bufferless = createFakeGl({ allocateBuffers: false });
+    expect(new ParticleTrailBatchCache(bufferless).acquire(item)).toBeNull();
+    expect(bufferless.countOf("deleteVertexArray")).toBe(1);
+  });
+
+  it("skips upload when there are no live trail vertices", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleTrailBatchCache(gl);
+    const record = cache.acquire(
+      trailParticleItem(new Float32Array(TRAIL_VERTEX_FLOATS), 1),
+    );
+    gl.reset();
+    cache.upload(record!, trailParticleItem(new Float32Array(0), 0));
+    expect(gl.countOf("bufferSubData")).toBe(0);
+  });
+
+  it("dispose is idempotent", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleTrailBatchCache(gl);
+    cache.acquire(trailParticleItem(new Float32Array(TRAIL_VERTEX_FLOATS), 1));
+    cache.dispose();
+    gl.reset();
+    cache.dispose();
+    expect(gl.calls).toHaveLength(0);
   });
 });
 
@@ -8170,7 +8289,7 @@ describe("WebglRenderer — §61 context-loss recovery (A-24)", () => {
     // could throw where §61 forbids throwing; everything keyed by an
     // application object comes back on the next draw that asks for it, because
     // the caches cannot know which of them the next frame will use.
-    expect(gl.countOf("createProgram")).toBe(7);
+    expect(gl.countOf("createProgram")).toBe(8);
     for (const allocator of RESOURCE_ALLOCATORS) {
       expect([allocator, gl.countOf(allocator)]).toEqual([allocator, 0]);
     }
@@ -10575,8 +10694,8 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     const { root, skeleton } = skinnedScene();
     skeleton.jointMatrices[13] = 5;
     const views = [createView(camera)];
-    // Seven programs at initialize, none of them skinned.
-    expect(gl.countOf("createProgram")).toBe(7);
+    // Eight programs at initialize (incl. particle trails), none skinned.
+    expect(gl.countOf("createProgram")).toBe(8);
     gl.reset();
 
     renderer.render(root, views);
@@ -10629,8 +10748,8 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     registerSkinningPipeline();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      // Program 8 is the first skinned compile (7 at initialize).
-      const { renderer, gl, camera } = await initialized({ failProgramAt: 8 });
+      // Program 9 is the first skinned compile (8 at initialize).
+      const { renderer, gl, camera } = await initialized({ failProgramAt: 9 });
       const { root } = skinnedScene();
       const views = [createView(camera)];
       gl.reset();
@@ -10659,9 +10778,9 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     canvas.dispatch("webglcontextlost");
     gl.reset();
     canvas.dispatch("webglcontextrestored");
-    // The restore rebuilds the seven eager programs only — the skinned pair
+    // The restore rebuilds the eight eager programs only — the skinned pair
     // waits for the next skinned draw.
-    expect(gl.countOf("createProgram")).toBe(7);
+    expect(gl.countOf("createProgram")).toBe(8);
 
     gl.reset();
     renderer.render(root, views);
@@ -10678,8 +10797,8 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
 
     renderer.dispose();
 
-    // Seven eager programs plus the skinned pair.
-    expect(gl.countOf("deleteProgram")).toBe(9);
+    // Eight eager programs plus the skinned pair.
+    expect(gl.countOf("deleteProgram")).toBe(10);
   });
 
   it("excludes skinned casters from the §69 shadow pass (bind pose)", async () => {
@@ -11161,7 +11280,9 @@ describe("WebglRenderer — §60 node materials (RFC 0001)", () => {
       renderer.render(root, [createView(camera)]);
       expect(gl.countOf("drawArrays")).toBe(0);
       expect(gl.countOf("bufferData")).toBe(0);
-      expect(warn).toHaveBeenCalledTimes(2);
+      // Two node-material skip warnings (unbound + disposed sampler) plus one
+      // §83 disposed-in-use warning when the texture cache refuses the texture.
+      expect(warn).toHaveBeenCalledTimes(3);
     } finally {
       warn.mockRestore();
     }

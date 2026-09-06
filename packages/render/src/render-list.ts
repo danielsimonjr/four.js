@@ -632,6 +632,16 @@ export interface ParticleRenderItem extends RenderItemBase {
 
   /** Particles carry no material — see the interface documentation. */
   material?: undefined;
+
+  /**
+   * Optional trail ribbon vertices for this system. When present and
+   * {@link trailVertexCount} > 0, the backend draws them as blended triangles
+   * after the instanced particle quads.
+   */
+  trailVertices?: Float32Array;
+
+  /** Live trail vertices to draw; `0` means skip the trail pass. */
+  trailVertexCount?: number;
 }
 
 /**
@@ -714,6 +724,9 @@ interface MutableRenderItem extends RenderItemBase {
    * stale rectangle to whatever lands in it next.
    */
   scissor: ScissorRect | null;
+  /** §36 trail ribbon; meaningful only on particle items. */
+  trailVertices?: Float32Array;
+  trailVertexCount: number;
 }
 
 /**
@@ -925,6 +938,7 @@ function itemAt(
       jointMatrices: EMPTY_JOINT_MATRICES,
       jointCount: 0,
       morphWeights: null,
+      trailVertexCount: 0,
     };
     pool.items[index] = item;
   }
@@ -939,6 +953,51 @@ function matrixAt(pool: ListPool, index: number): Matrix4 {
     pool.matrices[index] = matrix;
   }
   return matrix;
+}
+
+/**
+ * Tracks whether §66's default comparator would permute generation order.
+ *
+ * When every item shares the same mask, render layer, transparency, and render
+ * order, a stable sort is a no-op — and for the §86 sprite row that is the
+ * common case (one atlas, one layer, default keys). Skipping it removes an
+ * O(n log n) pass that dominated list construction at 100 000 nodes.
+ */
+interface SortTracker {
+  /** Set when any item would compare unequal under {@link compareRenderItems}. */
+  permute: boolean;
+  /** False until the first sortable item is written. */
+  seen: boolean;
+  renderLayer: number;
+  transparent: boolean;
+  renderOrder: number;
+}
+
+/** Records one item's §66 keys; sets {@link SortTracker.permute} when they differ. */
+function noteSortKeys(tracker: SortTracker, item: MutableRenderItem): void {
+  if (item.clip?.maskPass === true) {
+    tracker.permute = true;
+    return;
+  }
+  if (!tracker.seen) {
+    tracker.renderLayer = item.renderLayer;
+    tracker.transparent = item.transparent;
+    tracker.renderOrder = item.renderOrder;
+    tracker.seen = true;
+    return;
+  }
+  if (
+    item.renderLayer !== tracker.renderLayer ||
+    item.transparent !== tracker.transparent ||
+    item.renderOrder !== tracker.renderOrder
+  ) {
+    tracker.permute = true;
+  }
+}
+
+/** §46 layer test inlined for the default {@link ALL_LAYERS} build-time mask. */
+function nodeOnLayer(nodeLayers: LayerMask, mask: LayerMask): boolean {
+  return mask === ALL_LAYERS ? nodeLayers !== 0 : layersMatch(nodeLayers, mask);
 }
 
 /**
@@ -1064,6 +1123,52 @@ function isRenderable(node: Node): node is Renderable<Material> {
 }
 
 /**
+ * Appends one §55 sprite item — the hot path for atlas scenes (§86).
+ *
+ * Skips §54 skinning probes and {@link pipelineOf}: a sprite material never
+ * deforms and always draws through the `"sprite"` pipeline.
+ */
+function collectSpriteItem(
+  node: Renderable<SpriteMaterial>,
+  out: RenderItem[],
+  pool: ListPool,
+  index: number,
+  nodeLayers: LayerMask,
+  clip: RenderItemClip | null,
+  poses: PoseBuffer | null,
+  alpha: number,
+  sortTracker: SortTracker,
+): number {
+  const geometry = node.geometry;
+  const material = node.material;
+  const item = itemAt(pool, index, geometry, node.transform.worldMatrix);
+  item.kind = "sprite";
+  item.geometry = geometry;
+  item.material = material;
+  item.frame = (node as FramedDrawable).frame ?? null;
+  item.renderLayer = node.renderLayer;
+  item.renderOrder = node.renderOrder;
+  item.layers = nodeLayers;
+  item.transparent = material.transparent === true;
+  item.materialId = material.id ?? "";
+  item.castShadow = node.castShadow !== false;
+  item.receiveShadow = node.receiveShadow !== false;
+  item.frustumCulled = node.frustumCulled !== false;
+  item.viewDepth = 0;
+  item.clip = clip;
+  item.scissor = scissorOf(node);
+  if (poses === null) {
+    item.worldMatrix = node.transform.worldMatrix;
+  } else {
+    writeWorldMatrix(item, node, pool, index, poses, alpha);
+  }
+  item.morphWeights = null;
+  out[index] = item as RenderItem;
+  noteSortKeys(sortTracker, item);
+  return index + 1;
+}
+
+/**
  * Appends render items for `node`'s subtree to `out`, starting at index
  * `count`, and returns the new count. Depth-first in insertion order (§6).
  *
@@ -1102,6 +1207,7 @@ function collect(
   mask: LayerMask,
   clipBits: number,
   clip: RenderItemClip | null,
+  sortTracker: SortTracker,
 ): number {
   if (!node.visible || !node.enabled) {
     return count;
@@ -1120,13 +1226,23 @@ function collect(
   const nodeLayers = node.layers ?? DEFAULT_LAYER_MASK;
   // `false` skips this node only — the children below are visited either way,
   // because §46 layers do not inherit.
-  const onLayer = layersMatch(nodeLayers, mask);
+  const onLayer = nodeOnLayer(nodeLayers, mask);
   if (onLayer && isRenderable(node)) {
-    // A sprite rebuilds its quad here if the anchor or the size moved (its
-    // `geometry` accessor is an override); a plain renderable's geometry is
-    // whatever it was handed.
-    const geometry = node.geometry;
     const material = node.material;
+    if (material.kind === "sprite") {
+      next = collectSpriteItem(
+        node as Renderable<SpriteMaterial>,
+        out,
+        pool,
+        next,
+        nodeLayers,
+        clip,
+        poses,
+        alpha,
+        sortTracker,
+      );
+    } else {
+    const geometry = node.geometry;
     let kind = pipelineOf(material);
     // §54's skin (RFC 0003): a `Mesh` with a skeleton over a geometry
     // carrying joints and weights draws through the skinned variant of its
@@ -1270,7 +1386,9 @@ function collect(
       // see that across two assignments to a pooled object — see
       // `MutableRenderItem`.
       out[next] = item as RenderItem;
+      noteSortKeys(sortTracker, item);
       next += 1;
+    }
     }
   } else if (onLayer && isParticleDrawable(node)) {
     // §36's whole system becomes **one** item (plan P9-3). The repack is the
@@ -1333,6 +1451,7 @@ function collect(
     item.scissor = scissorOf(node);
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     out[next] = item as RenderItem;
+    noteSortKeys(sortTracker, item);
     next += 1;
   }
 
@@ -1385,6 +1504,7 @@ function collect(
         item.scissor = scissorOf(node);
         writeWorldMatrix(item, node, pool, next, poses, alpha);
         out[next] = item as RenderItem;
+        noteSortKeys(sortTracker, item);
         next += 1;
         childBits = scope.bits;
         childClip = scope.test;
@@ -1416,6 +1536,7 @@ function collect(
       mask,
       childBits,
       childClip,
+      sortTracker,
     );
   }
   return next;
@@ -1628,9 +1749,29 @@ export function buildRenderList(
   if (DEV) assertLayerMask(layerMask, "buildRenderList(layerMask)");
   const pool = poolFor(out);
   pool.clips.begin();
-  const count = collect(root, out, pool, 0, null, 0, layerMask, 0, null);
+  const sortTracker: SortTracker = {
+    permute: false,
+    seen: false,
+    renderLayer: 0,
+    transparent: false,
+    renderOrder: 0,
+  };
+  const count = collect(
+    root,
+    out,
+    pool,
+    0,
+    null,
+    0,
+    layerMask,
+    0,
+    null,
+    sortTracker,
+  );
   out.length = count;
-  out.sort(compareRenderItems);
+  if (sortTracker.permute && count > 1) {
+    out.sort(compareRenderItems);
+  }
   return out;
 }
 
@@ -1677,8 +1818,28 @@ export function buildInterpolatedRenderList(
   if (DEV) assertLayerMask(layerMask, "buildInterpolatedRenderList(layerMask)");
   const pool = poolFor(out);
   pool.clips.begin();
-  const count = collect(root, out, pool, 0, poses, alpha, layerMask, 0, null);
+  const sortTracker: SortTracker = {
+    permute: false,
+    seen: false,
+    renderLayer: 0,
+    transparent: false,
+    renderOrder: 0,
+  };
+  const count = collect(
+    root,
+    out,
+    pool,
+    0,
+    poses,
+    alpha,
+    layerMask,
+    0,
+    null,
+    sortTracker,
+  );
   out.length = count;
-  out.sort(compareRenderItems);
+  if (sortTracker.permute && count > 1) {
+    out.sort(compareRenderItems);
+  }
   return out;
 }

@@ -291,20 +291,126 @@ export interface ParticleRange {
 }
 
 /**
+ * One stop on a normalized-age ramp (`t ∈ [0, 1]`).
+ *
+ * Interior stops must lie strictly between `0` and `1` and be sorted ascending
+ * when passed to {@link evaluateLifetimeRamp}.
+ */
+export interface ParticleLifetimeStop<T> {
+  /** Normalized age in `(0, 1)`. */
+  readonly t: number;
+  readonly value: T;
+}
+
+/**
  * A start/end pair interpolated linearly over a particle's normalized age
  * (§36 "color and size over lifetime"). `start` is the value at age 0, `end` the
  * value at age = lifetime.
  *
- * MVP tier: two stops and a linear ramp. Arbitrary gradient/curve stops are
- * **staged** (2026-08-02, WP-9.1) — they want the §17 curve machinery from
- * `@four/animation`, which particles may not depend on (§3.1), so they will
- * arrive as a sampled lookup table rather than as a curve reference.
+ * Optional {@link ParticleLifetimeRamp.stops} add interior breakpoints with
+ * piecewise-linear interpolation — enough for simple multi-stop ramps without
+ * pulling in §17 curve machinery.
  */
 export interface ParticleLifetimeRamp<T> {
   /** Value at normalized age 0. */
   readonly start: T;
   /** Value at normalized age 1. */
   readonly end: T;
+  /** Optional interior stops, each with `t ∈ (0, 1)`, sorted ascending. */
+  readonly stops?: readonly ParticleLifetimeStop<T>[];
+}
+
+/**
+ * Piecewise-linear evaluation of a {@link ParticleLifetimeRamp} at normalized
+ * age `t ∈ [0, 1]`.
+ */
+export function evaluateLifetimeRampNumber(
+  ramp: ParticleLifetimeRamp<number>,
+  t: number,
+): number {
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  const stops = ramp.stops;
+  if (stops === undefined || stops.length === 0) {
+    return ramp.start + (ramp.end - ramp.start) * clamped;
+  }
+
+  let previousT = 0;
+  let previousValue = ramp.start;
+  for (let i = 0; i < stops.length; i += 1) {
+    const stop = stops[i];
+    if (clamped <= stop.t) {
+      const span = stop.t - previousT;
+      if (span <= 0) {
+        return stop.value;
+      }
+      const local = (clamped - previousT) / span;
+      return previousValue + (stop.value - previousValue) * local;
+    }
+    previousT = stop.t;
+    previousValue = stop.value;
+  }
+
+  const span = 1 - previousT;
+  if (span <= 0) {
+    return ramp.end;
+  }
+  const local = (clamped - previousT) / span;
+  return previousValue + (ramp.end - previousValue) * local;
+}
+
+/**
+ * Component-wise {@link evaluateLifetimeRampNumber} for straight RGBA colours.
+ */
+export function evaluateLifetimeRampColor(
+  ramp: ParticleLifetimeRamp<ParticleColor>,
+  t: number,
+): ParticleColor {
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  const stops = ramp.stops;
+  if (stops === undefined || stops.length === 0) {
+    return {
+      r: ramp.start.r + (ramp.end.r - ramp.start.r) * clamped,
+      g: ramp.start.g + (ramp.end.g - ramp.start.g) * clamped,
+      b: ramp.start.b + (ramp.end.b - ramp.start.b) * clamped,
+      a: ramp.start.a + (ramp.end.a - ramp.start.a) * clamped,
+    };
+  }
+
+  let previousT = 0;
+  let previous = ramp.start;
+  for (let i = 0; i < stops.length; i += 1) {
+    const stop = stops[i];
+    if (clamped <= stop.t) {
+      const span = stop.t - previousT;
+      if (span <= 0) {
+        return { ...stop.value };
+      }
+      const local = (clamped - previousT) / span;
+      return lerpColor(previous, stop.value, local);
+    }
+    previousT = stop.t;
+    previous = stop.value;
+  }
+
+  const span = 1 - previousT;
+  if (span <= 0) {
+    return { ...ramp.end };
+  }
+  const local = (clamped - previousT) / span;
+  return lerpColor(previous, ramp.end, local);
+}
+
+function lerpColor(
+  a: ParticleColor,
+  b: ParticleColor,
+  t: number,
+): ParticleColor {
+  return {
+    r: a.r + (b.r - a.r) * t,
+    g: a.g + (b.g - a.g) * t,
+    b: a.b + (b.b - a.b) * t,
+    a: a.a + (b.a - a.a) * t,
+  };
 }
 
 /** Straight RGBA, each component nominally in `[0, 1]`. Not validated or clamped. */

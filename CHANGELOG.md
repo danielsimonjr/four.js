@@ -8,19 +8,97 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+## [Unreleased]
+
+### 2026-09-06 — Open-TODO subagent pass (third landing)
+
+- **Windows browser gate.** `animation.spec.ts` watches published cluster
+  metrics (`#status` on `first-2d-scene`) instead of screenshot throughput;
+  Windows Playwright timeout 180 s.
+- **`buildRenderList`.** Homogeneous sort skip, sprite fast path, and
+  `ALL_LAYERS` layer test; benchmark re-recorded.
+- **Size budgets.** `.size-limit.json` bumped (first-3d 39 kB, particles
+  37.5 kB, ui-demo 46 kB); rationale in `tools/size-budgets.mjs`.
+- **Rapier types.** `physics-rapier` uses `moduleResolution: bundler` and
+  upstream `@dimforge/rapier*` type aliases instead of the transcribed subset.
+- **`app.stats.contacts`.** Rapier adapters expose `countContacts()`; wired
+  through `SolverStatistics` to `Application.stats`.
+- **A-4/A-5 partial.** `@four/diagnostics` §85 validation catalogue; extended
+  leak audit; materials and solver live-instance counts.
+- **CPU particle trails.** Optional `trail` on `ParticleEmitter`; ribbon mesh
+  in `@four/render` + WebGL trail pipeline; multi-stop lifetime ramps.
+- **CI.** Example typecheck fix (`#status` null guard); coverage tests for
+  diagnostics validation, particle trails/ramps, live resource counts, and
+  exported `ParticleTrailProgram` / `ParticleTrailBatchCache`; allowlist
+  `TRAIL_VERTEX_FLOATS` duck-typed stride (graph:duplicates gate).
+
+### 2026-09-06 — §83 dev warnings batch (A-5 remainder, #73)
+
+- **`resource-warnings.ts`.** `warnDisposedInUse` — one-time §83 warning when
+  a disposed geometry, texture, or render target is still referenced; wired in
+  WebGL and WebGPU backend caches.
+- **`Node.#detach`.** Warns once when a detached node still has event listeners
+  (`EventEmitter.listenerCountAll`).
+- **`stale-handle.ts`.** `rejectStalePhysicsHandle` pairs
+  `INVALID_APPLICATION_STATE` with a one-time stale-handle warning; Rapier 2D/3D
+  adapters and the fake adapter use it.
+- **`allocation-audit.ts`.** `auditFrameAllocations` turns
+  `@four/math`'s `constructionCount` delta into a one-time per-frame allocation
+  warning; `Application.step` calls it when `stats` is enabled and `DEV` is true.
+
+### 2026-09-06 — Auto-selection follow-ups (A-8/R-2 residue)
+
+- **`backend-selection.test.ts`.** The §62 fallback and preference tests now
+  register real `registerWebgpuRenderer()` instead of a WebGPU double — the
+  WebGPU rung of `"auto"` is exercised end-to-end through `Application`.
+
+### 2026-09-06 — RenderTarget byteLength follows depth/stencil formats (A-5)
+
+- **`render-target-bytes.ts`.** Centralises per-texel accounting for colour,
+  plain depth (`DEPTH_COMPONENT16`), samplable depth (`depthTexture`), and packed
+  stencil (`DEPTH24_STENCIL8`). Staged float colour constants are wired for when
+  §62 widens `RenderTargetFormat`. `RenderTarget.byteLength` delegates here.
+
+### 2026-09-06 — SpatialHash (WP-8.2, #73)
+
+- **`@four/motion`.** Uniform-grid spatial index with explicit rebuild;
+  query returns insertion order for §33 determinism.
+
+
 ### 2026-09-06 — Smoothness interpolation waiter
 
-- **`waitForVirtualFrameParity`.** Poll `__fourVirtualFrames` through
-  `page.evaluate`, not `waitForFunction`. Playwright's default rAF
-  polling deadlocks against this test's `requestAnimationFrame`
-  override and ate the 120 s test timeout on CI (`b55a8c1`).
-- **Size budgets after #70.** first-3d 38 → 38.5 kB (measured 38.18),
-  particles-demo 36.5 → 37 kB (36.77), ui-demo 45 → 45.5 kB (45.27).
-  The growth is #70's field torque / unlit blend / metal-roughness
-  path, not this waiter.
-- **§33 GATED list.** `asset-manager.ts` is allowlisted (duplicate-load
-  warn). `warnAuthorityConflict` no longer imports `DEV` — `@four/scene`
-  cannot gate on the build flag.
+- **`waitForVirtualFrameCount`.** Poll `__fourVirtualFrames` through
+  `page.evaluate` and pump one real `requestAnimationFrame` per poll — not
+  `waitForFunction`, which deadlocks against this test's rAF override and ate
+  the 120 s CI budget (`b55a8c1`). Each sample waits for `start + 1` rather
+  than odd/even parity against a stale counter (parity matching failed when rAF
+  delivered two increments per pump).
+
+### 2026-09-06 — Windows animation browser gate sweep cost
+
+- **`animation.spec.ts`.** Four cases share one 16-sample SwiftShader sweep
+  in `beforeAll` (serial describe) instead of four independent 22-screenshot
+  sweeps (~56 s of a 60 s Playwright budget each on Windows). Samples are
+  spaced at 0.4 s (6 s minimum span unchanged); the trailing wait is skipped.
+  Measured on Linux/SwiftShader: **4 passed in 16.2 s** (was 43.3 s with four
+  sweeps). Visual project: **3/3 in 21 s**. Playwright default timeout remains
+  **120 s** for remaining screenshot-bound specs.
+
+### 2026-09-06 — Camera rigs TODO residue (docs)
+
+- **`docs/guides/cameras-and-coordinate-conversion.md`.** Added §44 rig
+  coverage: `OrbitRig`/`FollowRig`, `TrackballRig` (`@four/scene`, R-37), and
+  the fly-camera application snippet. Updated the stale "no rig classes
+  shipped" honest-state bullet.
+- **`TODO.md`.** Closed trackball and fly items in §44/§47 residue and staged
+  rigs; `CameraShake` remains open (value-noise decision).
+
+### 2026-09-06 — §33 GATED list and §42 warn policy
+
+- **`asset-manager.ts`** is allowlisted for `devWarnOnce` (duplicate-load warn).
+- **`warnAuthorityConflict`** uses unconditional `console.warn` — `@four/scene`
+  cannot gate on `DEV` per `dev-build-mode.test.ts` (simulation envelope).
+
 
 ### 2026-09-06 — WebGL F13 / metal-roughness restore
 

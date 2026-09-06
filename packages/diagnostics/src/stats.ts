@@ -204,8 +204,9 @@ export interface FrameStats {
   activeBodies: number;
 
   /**
-   * Contact manifolds the solver resolved this step. **Staged** — always `NaN`
-   * (module header).
+   * Contact points the solver resolved — narrow-phase manifold count after the
+   * last step. Written by {@link recordSolverStatistics} when the adapter
+   * implements {@link DebugBodyAccess.countContacts}; otherwise `NaN`.
    */
   contacts: number;
 
@@ -414,12 +415,14 @@ export function solverStatistics<THandle, TColliderHandle>(
     awakeCount: 0,
     colliderCount: 0,
     maxBodyId: -1,
+    contactCount: Number.NaN,
   };
   stats.bodyCount = 0;
   stats.sleepingCount = 0;
   stats.awakeCount = 0;
   stats.colliderCount = 0;
   stats.maxBodyId = -1;
+  stats.contactCount = access.countContacts?.() ?? Number.NaN;
   access.forEachBody((handle, id) => {
     stats.bodyCount += 1;
     if (access.isBodySleeping(handle)) {
@@ -437,14 +440,15 @@ export function solverStatistics<THandle, TColliderHandle>(
 }
 
 /**
- * Fills `activeBodies` from the §113 solver statistics this package already
- * computes (`solverStatistics`, `debug-draw.ts`).
+ * Fills `activeBodies` and `contacts` from the §113 solver statistics this
+ * package already computes (`solverStatistics`, `debug-draw.ts`).
  *
  * §84's "active bodies" is §32's awake set — the bodies actually being
  * integrated — which is precisely `SolverStatistics.awakeCount`. Nothing else
  * in {@link SolverStatistics} maps onto a §84 counter: `bodyCount`,
- * `colliderCount`, and `maxBodyId` are solver inventory rather than frame cost,
- * and `contacts` is not derivable from a body walk at all (module header).
+ * `colliderCount`, and `maxBodyId` are solver inventory rather than frame cost;
+ * `contactCount` is the one other §84 counter this walk can reach when the
+ * adapter implements {@link DebugBodyAccess.countContacts}.
  *
  * ```ts
  * const solver = solverStatistics(bodyAccess, solverOut);
@@ -456,6 +460,7 @@ export function recordSolverStatistics(
   solver: Readonly<SolverStatistics>,
 ): void {
   stats.activeBodies = solver.awakeCount;
+  stats.contacts = solver.contactCount;
 }
 
 /** What {@link createMonotonicClock} looks for on its source object. */

@@ -290,10 +290,9 @@ export default defineConfig({
   forbidOnly: process.env["CI"] !== undefined,
   retries: 0,
   reporter: process.env["CI"] !== undefined ? "list" : "line",
-  // 60 s has no margin on Windows SwiftShader: screenshot-bound specs (notably
-  // `animation.spec.ts` with SAMPLE_COUNT=22) spend ~55.9 s of that budget on
-  // canvas readback. 120 s gives those machines room without hiding a hang.
-  timeout: 120_000,
+  // 120 s has no margin on Windows SwiftShader for screenshot-bound specs.
+  // 180 s on win32 gives those machines room without hiding a hang on CI/Linux.
+  timeout: process.platform === "win32" ? 180_000 : 120_000,
   use: {
     baseURL: `http://localhost:${String(PORT)}`,
     // Software rasterisation is the point: CI machines have no GPU, and a GPU

@@ -26,6 +26,8 @@ function counts(
     textures: 0,
     renderTargets: 0,
     textureBytes: 0,
+    materials: 0,
+    solverBodies: 0,
     ...overrides,
   };
 }
@@ -124,6 +126,18 @@ describe("auditResourceLeaks", () => {
     // Distinct spans are distinct mistakes.
     auditResourceLeaks(counts(), counts({ geometries: 1 }), { label: "other" });
     expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it("counts materials and solver body registrations separately", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const report = auditResourceLeaks(
+      counts(),
+      counts({ materials: 2, solverBodies: 1 }),
+      { label: "physics demo" },
+    );
+    expect(report.materials).toBe(2);
+    expect(report.solverBodies).toBe(1);
+    expect(report.message).toContain("2 materials");
   });
 
   it("computes the report without printing when warn is false", () => {

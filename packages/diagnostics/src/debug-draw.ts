@@ -882,6 +882,13 @@ export interface DebugBodyAccess<THandle = unknown, TColliderHandle = unknown> {
 
   /** Visits every live collider in creation order (§33). */
   forEachCollider(visit: (handle: TColliderHandle, id: number) => void): void;
+
+  /**
+   * Live contact points in the narrow phase after the last step (§84). Optional:
+   * adapters that cannot walk manifolds omit this and {@link SolverStatistics.contactCount}
+   * stays `NaN`.
+   */
+  countContacts?(): number;
 }
 
 /**
@@ -1345,6 +1352,12 @@ export interface SolverStatistics {
    * `bodyCount` shows how many bodies have been destroyed over the session.
    */
   maxBodyId: number;
+
+  /**
+   * Live contact points summed across narrow-phase manifolds (§84). `NaN` when
+   * {@link DebugBodyAccess.countContacts} is absent on the adapter.
+   */
+  contactCount: number;
 }
 
 /**

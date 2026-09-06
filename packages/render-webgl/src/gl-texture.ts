@@ -96,6 +96,7 @@
  */
 
 import type { SpriteRenderItem } from "@four/render";
+import { warnDisposedInUse } from "@four/render";
 
 import { GL, type GlTexture, type WebglContext } from "./gl-program.js";
 
@@ -260,6 +261,7 @@ export class TextureCache {
     }
 
     if (texture.disposed) {
+      warnDisposedInUse("texture", texture.id);
       return null;
     }
 

@@ -33,6 +33,7 @@ export type {
   SurfaceResize,
 } from "./application.js";
 export { Application } from "./application.js";
+export { readLiveResourceCounts } from "./live-resource-counts.js";
 
 // §81's capability tokens (RFC 0002, A-3). Declared by their owning packages
 // since 2026-08-29 (RFC 0002 §2's spelling) and re-exported here as the very

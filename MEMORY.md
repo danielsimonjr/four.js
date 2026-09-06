@@ -30,6 +30,30 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+## Decisions
+
+- **2026-09-06 — open-TODO subagent pass (third landing).** Six parallel
+  agents landed: Windows animation gate (simulation-bound `#status` sampling,
+  not screenshot throughput); `buildRenderList` sort skip + sprite fast path;
+  size budgets with measured A/B in `tools/size-budgets.mjs`; Rapier upstream
+  types via `moduleResolution: bundler`; partial A-4/A-5 (validation catalogue,
+  format-aware render-target bytes); CPU particle trails. Still owner-gated or
+  deferred: rapier 0.20, typedoc/TS 7, first publish, RFC residues, PH-11c,
+  batching follow-ups, GPU particle items.
+
+- **2026-09-06 — TODO sprint: actionable items closed; ~45 remain blocked
+  (#73).** Subagent sprint landed A-5 §83 dev warnings (`warnDisposedInUse`,
+  `rejectStalePhysicsHandle`, `auditFrameAllocations`, detached-node listener
+  warn), `SpatialHash` (WP-8.2), size-budget bumps, auto-selection WebGPU
+  integration test, and camera-rigs docs.
+
+- **2026-09-06 — SpatialHash lives in `@four/motion` (WP-8.2).**
+  Explicit rebuild (`clear` + `insert` / `update`); query returns insertion order
+  for §33 determinism; cell size is caller-chosen (no default). Steering flocking
+  behaviours stay agnostic — they accept `Iterable<SteeringNeighbor>` from brute
+  force or this index.
+
+
 - **2026-09-06 — §42 warn stays off the DEV flag.** A-4 step 4
   routed `warnAuthorityConflict` through `devWarnOnce`, which
   `dev-build-mode.test.ts` refuses in `@four/scene` (simulation
@@ -38,17 +62,20 @@ readable; never delete the pointer itself.
   first conflict. `asset-manager.ts` stays on `devWarnOnce` and is
   on the GATED list — assets is IO.
 
-- **2026-09-06 — #70 size budgets.** first-3d 38.18/38, particles
-  36.77/36.5, ui-demo 45.27/45. Bumped half a kilobyte each. The
-  waiter-only PR did not grow the library; CI first reached `size`
-  after #70's field torque / unlit blend / metal-roughness path.
+- **2026-09-06 — R-36 size-budget TODO closed; limits at 38.5/37/45.5 kB.**
+  The 2026-08-09 proposal (31.5→32, 37→37.5, 29→29.5 kB) was absorbed through
+  R-8 and later bumps (38/36.5/45 kB). Fresh A/B measured
+  38.18/36.77/45.27 kB gzip; +0.5 kB headroom each restores green. Growth is
+  #70's field torque / unlit blend / metal-roughness path, not the smoothness
+  waiter.
 
-- **2026-09-06 — smoothness parity wait cannot use `waitForFunction`.**
-  `useVirtualFrameClock` replaces `requestAnimationFrame`.
-  Playwright's `waitForFunction` defaults to `polling: "raf"` and
-  then never observes `__fourVirtualFrames` moving — CI hung 120 s
-  on `b55a8c1`. Poll with `page.evaluate` (the path that already
-  read the counter) and a 15 s budget.
+- **2026-09-06 — smoothness virtual-frame wait cannot use `waitForFunction`.**
+  `useVirtualFrameClock` replaces `requestAnimationFrame`. Playwright's
+  `waitForFunction` defaults to `polling: "raf"` and never observes
+  `__fourVirtualFrames` moving — CI hung 120 s on `b55a8c1`. Poll through
+  `page.evaluate`, pump one real rAF per poll, and wait for `start + 1` (parity-
+  against-stale-`since` also failed when two increments landed per pump).
+
 
 - **2026-09-06 — unlit `color` is read after bind + features (F13).**
   `unlitColorBlends` must not run before the texture unit and
@@ -56,6 +83,14 @@ readable; never delete the pointer itself.
   F13's mid-draw raise; blend still applies before `draw*`. Metal-
   roughness restore on unit 2 skips `activeTexture(TEXTURE2)` only when
   that unit is still active (no unit-0 restore in the same `finally`).
+
+- **2026-09-06 — §83 dev-warning tier (A-5 remainder).** Four of six §83
+  development warnings now ship: `warnDisposedInUse` in render backend caches;
+  `Node.#detach` + `listenerCountAll` for detached nodes retaining listeners;
+  `rejectStalePhysicsHandle` in Rapier/fake adapters; `auditFrameAllocations`
+  (+ `Application.step` when stats on). Still open: explicit leaked-resource
+  warn (derivable from A-5 counters via `auditResourceLeaks` only), creation-
+  site capture, FinalizationRegistry.
 
 - **2026-09-06 — §83 duplicate-load warns on a settled cache hit.**
   Concurrent `load`s of the same key coalesce without a warning — that
@@ -2987,6 +3022,10 @@ __FOUR_DEV__ : true` in one file (`@four/core` `dev.ts`); the identifier is neve
     `"auto"` uses registration order (§37 fixes no preference); the headless tier is
     never auto-selected; a _named_ solver is handed back unfiltered so `PhysicsWorld`
     reports mismatches with its own precise message.
+- **2026-09-06 — Auto-selection follow-ups closed.** `backend-selection.test.ts`
+  now registers real `registerWebgpuRenderer()` for §62's WebGPU rung (fallback when
+  `requestAdapter()` resolves null, and preference over WebGL 2 through `Application`).
+  ui-demo's TODO budget note (30.74/31 kB) was stale — `.size-limit.json` is 45 kB.
 - **2026-08-07 — PH-9 AnimationController.** Decisions worth keeping:
   - **The controller is a pose evaluator, not a mixer scheduler** — cross-fades need
     two clips writing one property at once, which the mixer's claim semantics call a
