@@ -591,15 +591,27 @@ async function virtualFrameCount(page: Page): Promise<number> {
 }
 
 /**
+ * How long {@link waitForVirtualFrameCount} will wait for the next virtual
+ * frame before failing. One delivered frame is a browser rAF (~16 ms); fifteen
+ * seconds is a hung clock, not a slow runner.
+ */
+const VIRTUAL_FRAME_WAIT_BUDGET_MS = 15_000;
+
+/**
  * Waits until the injected clock has delivered at least `minimum` virtual
  * frames. Each poll pumps one real `requestAnimationFrame` turn so headless
  * SwiftShader advances the example's patched loop between checks.
+ *
+ * Playwright's `waitForFunction` (default `polling: "raf"`) deadlocks against
+ * this test's `requestAnimationFrame` override — CI hung 120 s on `b55a8c1`
+ * even though `page.evaluate` could read `__fourVirtualFrames`. Waiting for
+ * `start + 1` avoids parity-matching races when two increments land per pump.
  */
 async function waitForVirtualFrameCount(
   page: Page,
   minimum: number,
 ): Promise<number> {
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + VIRTUAL_FRAME_WAIT_BUDGET_MS;
   while (Date.now() < deadline) {
     const n = await virtualFrameCount(page);
     if (n >= minimum) {
@@ -614,7 +626,7 @@ async function waitForVirtualFrameCount(
   }
   const stuck = await virtualFrameCount(page);
   throw new Error(
-    `virtual frame ${String(minimum)} not reached within 30 s ` +
+    `virtual frame ${String(minimum)} not reached within ${String(VIRTUAL_FRAME_WAIT_BUDGET_MS / 1000)} s ` +
       `(stuck at ${String(stuck)})`,
   );
 }

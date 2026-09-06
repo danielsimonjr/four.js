@@ -21,7 +21,7 @@ Each waits on a **second solver adapter** existing. None is minutes-work; none i
 all yet. Listed first so they are not repeatedly re-triaged as quick wins — which is what
 happened on 2026-09-06, when all three sat in the minutes tier until someone read them.
 
-- Capability-table note: Rapier derives kinematic velocity itself, so inheritVelocityFrom is nearly a no-op there; other solvers may need it
+- Capability-table note: Rapier `inheritVelocityFrom` no-op — DONE 2026-09-06 (`COMPATIBILITY.md` deviations); other solvers still need a column when they land
 - Document SolverBodyAccess in the §90/§102 compatibility material when adapters beyond Rapier arrive (it is required engine surface beyond §37's sketch)
 - §28 motor cap: both Rapier adapters supply maxTorque/maxForce as a ForceBased gain, not a hard ceiling (documented in the stable API docs); name it in the §90/§102 capability tables when a capping adapter (Box2D) arrives
 
@@ -80,7 +80,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - PH-11c — character/dynamics push interaction (`@four/physics`).
 - R-32 — textured / rotated / soft particles.
 - R-33 — §112's exit, rendered as well as simulated.
-- R-31 — GPU particle simulation.
+- R-31 — GPU particle simulation integrator tier — DONE 2026-08-29 (`simulation: "gpu"`); §27 GPU fields / depth-buffer collision / GPU snapshots remain under R-31 residue.
 - PH-22 residue (re-read 2026-08-21):
 - R-8 follow-ups:
 - §8 node-level `NodeSpace` component (PH-12 remainder).
@@ -89,7 +89,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals); glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas material batch as they are); texture-atlas _grouping_ of distinct textures (needs a packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's idle-scene row — today a batched run re-uploads every frame); making batching the default, which needs A-4's build-time pipeline-selection seam (the opt-in seam already costs every bundle +0.17 kB).
 - `buildRenderList` is now ~40% of a 100 000-sprite frame's preparation (`benchmarks/results/render-batching.json`, 2026-08-09) — the next §86 batching win is in list construction, not in batching. Worth a look together with `R-8`'s per-view restructure.
 - R-30c — the rest of §77, scoped by why each is not ordinary work:
-- §12 character controllers, and first-person camera control with them (PH-11 residue, 2026-08-09)
+- §12 character controllers + first-person look — DONE (PH-11/PH-11b 2026-08-21; `examples/character-controller` browser gate 2026-08-29).
 - Staged rigs (R-36/R-37 residue, 2026-08-09):
 - §44/§47 camera rigs residue
 - R-23 follow-ups (solid-fill tier shipped 2026-08-09):
@@ -123,6 +123,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       from wall-clock aliasing. Failed CI on `dd03d1a` and `94860b0`; passed on
       `d704cd8` and `c14dafa`, and `94860b0`'s *Release* run passed the same job the CI run
       failed — so roughly 2 in 5, and not caused by any change of mine.
+      **Follow-up 2026-09-06:** `waitForFunction` + default rAF polling hung
+      the same test for 120 s on `b55a8c1`. The waiter now polls via
+      `page.evaluate` with a 15 s budget.
 
       Diagnosis, from reading the mechanism rather than the failure rate. The test installs
       `useVirtualFrameClock(page, 1.5 × FIXED_DELTA)`, which overrides
@@ -477,11 +480,23 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       measured (CCD, contact distance, snapshot joint). The `contactPair` API fix it needs is in
       the CHANGELOG entry for whoever takes it.
 
+- [x] **Open-PR sweep 2026-09-06: Dependabot hygiene + stale branches.** #65
+      (rapier 0.20) and #66 (eslint 10 dev-deps) **closed** and ignored in
+      `.github/dependabot.yml` with recorded reasons — both went red on known
+      blockers, not fresh defects. Three stale branches deleted after content
+      verification against `main` (`claude/tools-integration-rji2sr`,
+      `cursor/sanitize-todo-security-coverage-28a3`, `cursor/typescript-on-bun-b951`).
+      **#67 ("Release: version packages") deliberately left open** — Changesets'
+      standing release-staging PR; merge when 0.1 is actually cut. **#69** (six
+      dev-deps) is the live Dependabot PR; the bun-lock workflow should keep it
+      green. Remaining tracked branches: `main`, `changeset-release/main`.
+
 - [x] **Open-PR sweep 2026-09-05: 4 open -> 2.** #58 MERGED (conflicted only on trackers, all of
       whose entries were already on `main`; its real contribution was one changeset file, and
       `main` had no pending changesets). #56 CLOSED — byte-identical to the already-closed #54,
       same branch and commit, and re-measured at **0 files / +0-0** against current `main`.
-      #63 and #62 remain open and are tracked below.
+      #63 MERGED (rapier bump, later reverted on `main`); #62 MERGED then reverted — the
+      vitest-4 / eslint-10 blocker is fixed separately (spy restore, 2026-09-06).
 - [x] **four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.**
       DONE 2026-09-06 with the spy-restore fix above. The leak was spy history,
       not leftover worlds. #62 can be retried once typedoc supports TS 7.
@@ -834,9 +849,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **R-33 — §112's exit, rendered as well as simulated.** Owner: the browser-gate
       packet, on non-SwiftShader hardware. Now has headroom (see R-34). Report
       simulate-ms and present-ms separately.
-- [ ] **R-31 — GPU particle simulation.** Blocked by R-1 (WebGPU is one line) and §82.
-      Do NOT add an accepted-then-rejected `simulation: "gpu"` option — the type-level
-      absence is a recorded WP-9.1 decision.
+- [x] **R-31 — GPU particle simulation integrator tier.** DONE 2026-08-29 (WP-R1.8 +
+      R-31 residue) — `simulation: "gpu"` on `ParticleEmitter` with a bound
+      `ParticleGpuSimulation`; CPU spawn, GPU semi-implicit Euler under constant
+      gravity. §27 GPU fields, `collisions: "depth-buffer"`, GPU-emitter §79/§34,
+      and device-loss recovery remain separate follow-up packets (see R-31
+      residue above). The stale "blocked by R-1" note predated WP-R1.8.
 - [x] **R-7 — §67 stencil support (2026-08-21).** `StencilState` in `@four/materials`,
       `RendererOptions.stencil` / `RenderTargetOptions.stencil`, backend application and
       packed `DEPTH24_STENCIL8` allocation, `FRAME_BEFORE_R7` recorded on the reverted
@@ -1008,12 +1026,13 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       by composition (no class). §85 refusals at authoring, counted skips
       mid-simulation, §79 serializers registered in the same batch, new determinism
       golden. 0 B in five of six bundles, +2.8 kB in `motor-digital-twin`.
-- [ ] **§12 character controllers, and first-person camera control with them (PH-11
-      residue, 2026-08-09)** — the last open §12 feature. First-person is filed here
-      rather than with the rigs because it _writes a rotation_, so it collides with
-      `LookAtConstraint` for the node's one §42 authority; the packet has to decide the
-      aim-vs-free-look arbitration, and a character controller wants the same yaw
-      source. Effort M.
+- [x] **§12 character controllers + first-person look (PH-11 residue).** DONE —
+      `CharacterController` + `FirstPersonLook` in `@four/motion` (2026-08-21),
+      `SweptCharacterController` + `SweptCharacterSystem` in `@four/physics`
+      (PH-11b, same date), and `examples/character-controller` as the tenth
+      browser-gate site (2026-08-29). First-person closed by composition
+      (character yaw + child-eye pitch), not a new rig class. PH-11c
+      (kinematic→dynamic push) remains the only staged half.
 - [x] **Staged rigs — trackball and fly DONE 2026-09-06.** `TrackballRig` verified
       in `@four/scene` (`packages/scene/src/trackball.ts`,
       `packages/scene/tests/trackball.test.ts`, R-37 2026-08-21). Fly documented as
@@ -1524,6 +1543,18 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 - [x] 2026-09-06 — **Auto-selection §62.** Real WebGPU rung in integration tests.
 
 - [x] 2026-09-06 — **Camera rigs docs.** Trackball + fly snippet; shake open.
+
+- [x] 2026-09-06 — **Platform and repository hygiene.** `js-yaml >=5` ignored
+      (#68 — vendored graph tool needs default export). ESLint ignores
+      `.dogfood/**` so local dogfood runs do not break `bun run lint`. Dynamic
+      body with no collider/`inertiaTensor` warns once at first step (§23).
+      Identical `registerRapierSolver()` re-registration is a no-op (§37).
+      glTF suite tests pass Windows paths as URLs, not native paths. `FollowRig`
+      skips non-positive `deltaSeconds`. `KeyboardInput` rejects malformed
+      options with a `FourError`. `new Node()` left to TypeScript (unconditional
+      guard over §86 budget). `transformAuthority` default stays `"manual"` (§42
+      warn is sufficient). Deleted `windowsFullChromium()` (never matched);
+      `CHROMIUM_BINARIES` lists Windows layouts.
 
 - [x] 2026-09-06 — **§83 duplicate asset loads.** `AssetManager.load` of a
       settled `(url, loader)` slot warns once; in-flight coalescing does

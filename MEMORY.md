@@ -44,11 +44,28 @@ readable; never delete the pointer itself.
   behaviours stay agnostic — they accept `Iterable<SteeringNeighbor>` from brute
   force or this index.
 
+- **2026-09-06 — §42 warn stays off the DEV flag.** A-4 step 4
+  routed `warnAuthorityConflict` through `devWarnOnce`, which
+  `dev-build-mode.test.ts` refuses in `@four/scene` (simulation
+  envelope). The WeakMap still suppresses once per node per writer;
+  the message is unconditional `console.warn`. Production prints the
+  first conflict. `asset-manager.ts` stays on `devWarnOnce` and is
+  on the GATED list — assets is IO.
+
 - **2026-09-06 — R-36 size-budget TODO closed; limits at 38.5/37/45.5 kB.**
   The 2026-08-09 proposal (31.5→32, 37→37.5, 29→29.5 kB) was absorbed through
-  R-8 and later bumps (38/36.5/45 kB). Fresh A/B on this branch measured
-  38.18/36.77/45.27 kB gzip; +0.5 kB headroom each restores green without
-  touching §86's 150 kB gate.
+  R-8 and later bumps (38/36.5/45 kB). Fresh A/B measured
+  38.18/36.77/45.27 kB gzip; +0.5 kB headroom each restores green. Growth is
+  #70's field torque / unlit blend / metal-roughness path, not the smoothness
+  waiter.
+
+- **2026-09-06 — smoothness virtual-frame wait cannot use `waitForFunction`.**
+  `useVirtualFrameClock` replaces `requestAnimationFrame`. Playwright's
+  `waitForFunction` defaults to `polling: "raf"` and never observes
+  `__fourVirtualFrames` moving — CI hung 120 s on `b55a8c1`. Poll through
+  `page.evaluate`, pump one real rAF per poll, and wait for `start + 1` (parity-
+  against-stale-`since` also failed when two increments landed per pump).
+
 
 - **2026-09-06 — unlit `color` is read after bind + features (F13).**
   `unlitColorBlends` must not run before the texture unit and
@@ -82,10 +99,9 @@ readable; never delete the pointer itself.
   (WP-5.2), so a non-zero waking contribution calls `RigidBody.wake()`.
   `forEachSleepingDynamicBody` is the complementary walk.
 
-- **2026-09-06 — §42 authority conflicts go through `devWarnOnce`.** A-4
-  remainder step 4. The WeakMap still owns once-per-node-per-writer;
-  production (`__FOUR_DEV__ === false`) prints nothing. The stale
-  "no build-mode flag" comment in `authority.ts` is retired.
+- **2026-09-06 — §42 authority conflicts go through `devWarnOnce`.**
+  Superseded the same day: `@four/scene` cannot import `DEV`. See
+  "§42 warn stays off the DEV flag" above.
 
 - **2026-09-06 — PoseTarget scale blends against identity.** A solver
   body has no scale, so the invented physical side is `(1, 1, 1)`. At

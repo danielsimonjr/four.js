@@ -22,6 +22,8 @@ specification; until then, entries are grouped by date under **Unreleased**.
   `@four/math`'s `constructionCount` delta into a one-time per-frame allocation
   warning; `Application.step` calls it when `stats` is enabled and `DEV` is true.
 
+### 2026-09-06 — Auto-selection follow-ups (A-8/R-2 residue)
+
 - **`backend-selection.test.ts`.** The §62 fallback and preference tests now
   register real `registerWebgpuRenderer()` instead of a WebGPU double — the
   WebGPU rung of `"auto"` is exercised end-to-end through `Application`.
@@ -39,8 +41,17 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 - **`.size-limit.json`.** first-3d-scene 38 → 38.5 kB, particles-demo 36.5 → 37
   kB, ui-demo 45 → 45.5 kB (measured A/B: 38.18/36.77/45.27 kB gzip; closes the
-  R-36 thin-budget TODO — the original 32/37.5/29.5 kB proposal was absorbed
-  through intermediate bumps).
+  R-36 thin-budget TODO — growth is #70's field torque / unlit blend /
+  metal-roughness path, not the smoothness waiter).
+
+### 2026-09-06 — Smoothness interpolation waiter
+
+- **`waitForVirtualFrameCount`.** Poll `__fourVirtualFrames` through
+  `page.evaluate` and pump one real `requestAnimationFrame` per poll — not
+  `waitForFunction`, which deadlocks against this test's rAF override and ate
+  the 120 s CI budget (`b55a8c1`). Each sample waits for `start + 1` rather
+  than odd/even parity against a stale counter (parity matching failed when rAF
+  delivered two increments per pump).
 
 ### 2026-09-06 — Windows animation browser gate sweep cost
 
@@ -60,6 +71,13 @@ specification; until then, entries are grouped by date under **Unreleased**.
   shipped" honest-state bullet.
 - **`TODO.md`.** Closed trackball and fly items in §44/§47 residue and staged
   rigs; `CameraShake` remains open (value-noise decision).
+
+### 2026-09-06 — §33 GATED list and §42 warn policy
+
+- **`asset-manager.ts`** is allowlisted for `devWarnOnce` (duplicate-load warn).
+- **`warnAuthorityConflict`** uses unconditional `console.warn` — `@four/scene`
+  cannot gate on `DEV` per `dev-build-mode.test.ts` (simulation envelope).
+
 
 ### 2026-09-06 — WebGL F13 / metal-roughness restore
 
