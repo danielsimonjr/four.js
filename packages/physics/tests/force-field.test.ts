@@ -774,6 +774,30 @@ describe("ForceFieldSystem batch path (§27 sampleAll)", () => {
     }
     expect(constructionCount()).toBe(0);
   });
+
+  it("does not keep applying to a body after its world goes quiet (§83)", async () => {
+    const first = await readyWorld();
+    const second = await readyWorld();
+    first.world.addBody(bodyNode({ mass: 1 }));
+    second.world.addBody(bodyNode({ mass: 1 }));
+    const system = new ForceFieldSystem({
+      worlds: [first.world, second.world],
+      fields: [{ field: countingBatchField(1, 0, 0), units: "force" }],
+    });
+    system.fixedUpdate(contextAt(0));
+    first.world.step(1 / 60);
+    second.world.step(1 / 60);
+    expect(solverForce(first.adapter, 1).x).toBe(1);
+
+    system.untrack(first.world);
+    first.adapter.body(1).force.set(0, 0, 0);
+    system.fixedUpdate(contextAt(0));
+    first.world.step(1 / 60);
+    second.world.step(1 / 60);
+
+    expect(solverForce(first.adapter, 1).x).toBe(0);
+    expect(solverForce(second.adapter, 1).x).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -624,6 +624,10 @@ export class ForceFieldSystem implements SimulationSystem {
       count += 1;
     });
 
+    // Drop slots past this gather immediately: a quieter world (or a body
+    // that left) must not stay reachable from the system (§83). Cleared
+    // again in `finally` so a throw mid-apply cannot leak the live set.
+    bodies.length = count;
     if (count === 0) {
       return;
     }
@@ -632,29 +636,33 @@ export class ForceFieldSystem implements SimulationSystem {
     const newtonAcc = this.#newtonAcc;
     newtonAcc.fill(0, 0, live);
 
-    for (let f = 0; f < fields.length; f += 1) {
-      this.#accumulateField(fields[f], count, time);
-    }
+    try {
+      for (let f = 0; f < fields.length; f += 1) {
+        this.#accumulateField(fields[f], count, time);
+      }
 
-    const total = this.#total;
-    const hasTorque = this.#hasTorqueField();
-    for (let i = 0; i < count; i += 1) {
-      const base = i * 3;
-      const x = newtonAcc[base];
-      const y = newtonAcc[base + 1];
-      const z = newtonAcc[base + 2];
-      if (x !== 0 || y !== 0 || z !== 0) {
-        total.set(x, y, z);
-        bodies[i].applyForce(total);
+      const total = this.#total;
+      const hasTorque = this.#hasTorqueField();
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        const x = newtonAcc[base];
+        const y = newtonAcc[base + 1];
+        const z = newtonAcc[base + 2];
+        if (x !== 0 || y !== 0 || z !== 0) {
+          total.set(x, y, z);
+          bodies[i].applyForce(total);
+        }
+        if (hasTorque) {
+          this.#position.set(
+            positions[base],
+            positions[base + 1],
+            positions[base + 2],
+          );
+          this.#applyTorqueToBody(bodies[i], this.#position, time, false);
+        }
       }
-      if (hasTorque) {
-        this.#position.set(
-          positions[base],
-          positions[base + 1],
-          positions[base + 2],
-        );
-        this.#applyTorqueToBody(bodies[i], this.#position, time, false);
-      }
+    } finally {
+      bodies.length = 0;
     }
   }
 
@@ -917,6 +925,7 @@ export class ForceFieldSystem implements SimulationSystem {
   dispose(): void {
     this.#worlds.length = 0;
     this.#fields.length = 0;
+    this.#bodies.length = 0;
     this.#masslessWarned = undefined;
   }
 }
