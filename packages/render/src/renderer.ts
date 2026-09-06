@@ -534,6 +534,31 @@ export interface Renderer extends Disposable {
   statistics?: RenderStatistics | null;
 
   /**
+   * Seconds the GPU spent on the most recently **completed** frame
+   * (§84 `gpuFrameTime`, A-1), or `undefined` when this backend does not
+   * measure GPU time.
+   *
+   * **Optional, and its presence is the capability** — the same stance
+   * {@link Renderer.statistics} takes. A backend that can time GPU work
+   * declares the member (the WebGL 2 and WebGPU backends do); one that
+   * cannot omits it, and `Application` then leaves `stats.gpuFrameTime`
+   * as `NaN` rather than inventing a zero.
+   *
+   * The value is seconds (§7a). `NaN` means "measuring, but no completed
+   * sample yet" — timestamp queries are asynchronous on both GPU APIs, so
+   * the first armed frame (and any frame whose query was disjoint or still
+   * in flight) honestly reports unmeasured. A finite number is the last
+   * query that landed, never the frame still on the GPU.
+   *
+   * **Reading the getter is what arms measurement.** A renderer whose
+   * `lastGpuFrameTimeSeconds` is never read issues not one extra GPU
+   * command (R-30b): landed transcripts stay byte-identical. That is why
+   * this is not gated on {@link Renderer.statistics} — A-1's draw counters
+   * must not add, remove, or reorder a GPU call, and a timer query would.
+   */
+  readonly lastGpuFrameTimeSeconds?: number;
+
+  /**
    * Acquires the backend's context or device (§61, §45).
    *
    * Asynchronous because WebGPU adapter/device acquisition is (§45's

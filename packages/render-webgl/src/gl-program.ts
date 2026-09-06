@@ -160,6 +160,22 @@ export const GL = {
    * cache the first time a texture asks for anisotropy (§62, §77, R-30b).
    */
   MAX_TEXTURE_MAX_ANISOTROPY_EXT: 0x84ff,
+  /**
+   * `GL_TIME_ELAPSED_EXT` — `EXT_disjoint_timer_query_webgl2`'s elapsed-time
+   * query target (§62 timestamp queries, A-1). Nanoseconds between
+   * `beginQuery` and `endQuery`.
+   */
+  TIME_ELAPSED_EXT: 0x88bf,
+  /**
+   * `GL_GPU_DISJOINT_EXT` — `true` when the GPU reset its timers this
+   * interval. A completed elapsed-time query whose disjoint flag is set is
+   * discarded rather than published as `gpuFrameTime`.
+   */
+  GPU_DISJOINT_EXT: 0x8fbb,
+  /** `GL_QUERY_RESULT` — the completed query's value (nanoseconds here). */
+  QUERY_RESULT: 0x8866,
+  /** `GL_QUERY_RESULT_AVAILABLE` — whether {@link GL.QUERY_RESULT} may be read. */
+  QUERY_RESULT_AVAILABLE: 0x8867,
   /** `GL_CCW` — counter-clockwise front faces (§7a right-handed, Y-up). */
   CCW: 0x0901,
   /** `GL_CULL_FACE`, deliberately left disabled — see `webgl-renderer.ts`. */
@@ -289,6 +305,9 @@ export type GlRenderbuffer = object;
 
 /** Opaque `WebGLSync` handle (§71's fence read-back; RFC 0005, `gl-picking.ts`). */
 export type GlSync = object;
+
+/** Opaque `WebGLQuery` handle (§62 timestamp queries; A-1, `gl-gpu-timer.ts`). */
+export type GlQuery = object;
 
 /**
  * The GL 2 entry points this package calls — the whole of them.
@@ -484,6 +503,28 @@ export interface WebglContext {
     sourceByteOffset: number,
     into: ArrayBufferView,
   ) => void;
+
+  // --- Timestamp queries (`gl-gpu-timer.ts`; §62, §84, A-1) ---
+  //
+  // Core WebGL 2 query objects plus `EXT_disjoint_timer_query_webgl2`.
+  // Optional, presence is the capability (R-30b): a double written before
+  // this group still compiles, and a renderer that never reads
+  // `lastGpuFrameTimeSeconds` never calls any of them.
+
+  /** Allocates an elapsed-time query object. */
+  createQuery?(): GlQuery | null;
+  /** Releases `query` (§83). */
+  deleteQuery?(query: GlQuery): void;
+  /** Starts `TIME_ELAPSED_EXT` accumulation into `query`. */
+  beginQuery?(target: number, query: GlQuery): void;
+  /** Stops the active query of `target`. */
+  endQuery?(target: number): void;
+  /**
+   * Reads `QUERY_RESULT_AVAILABLE` (boolean) or `QUERY_RESULT` (nanoseconds)
+   * from a completed query. Typed `unknown` so the caller narrows, same as
+   * {@link WebglContext.getParameter}.
+   */
+  getQueryParameter?(query: GlQuery, pname: number): unknown;
 
   // --- Buffers and vertex arrays (`gl-geometry.ts`) ---
 

@@ -83,6 +83,7 @@ import {
   EffectProgram,
 } from "./gl-effect.js";
 import { GeometryCache } from "./gl-geometry.js";
+import { GlGpuTimer, hasDisjointTimerQuery } from "./gl-gpu-timer.js";
 import {
   ParticleAppearanceProgram,
   ParticleBatchCache,
@@ -995,11 +996,14 @@ function asContext(value: unknown): ParticleGlContext | null {
  * Every value is a statement about *this backend on WebGL 2*, and every one of
  * them is true by construction rather than by query:
  *
- * - `computeShaders`, `storageBuffers`, `indirectDraw`, `timestampQueries` —
- *   WebGL 2 has no compute stage, no storage buffers and no indirect draw at
- *   all, and this tier requests no timer extension. §62's tiers exist so that
- *   an application can read a `false` here and take the CPU path, rather than
- *   discover the absence at dispatch time.
+ * - `computeShaders`, `storageBuffers`, `indirectDraw` — WebGL 2 has no
+ *   compute stage, no storage buffers and no indirect draw at all. §62's
+ *   tiers exist so that an application can read a `false` here and take
+ *   the CPU path, rather than discover the absence at dispatch time.
+ * - `timestampQueries` is **not** in this table: it is a lazy
+ *   `getExtension("EXT_disjoint_timer_query_webgl2")` on first read of
+ *   the field, the same law `maxAnisotropy` follows, so `initialize`
+ *   and any test that never reads it issue the identical transcript.
  * - `floatRenderTargets` — `render-target.ts`'s `RenderTargetFormat` is the
  *   single-member union `"rgba8"`, and this backend requests no
  *   `EXT_color_buffer_float`; it cannot allocate a float target, whatever the
@@ -1035,7 +1039,6 @@ const WEBGL_STATIC_CAPABILITIES = Object.freeze({
   textureFormats: Object.freeze(["rgba8"]),
   multisampling: true,
   floatRenderTargets: false,
-  timestampQueries: false,
   storageBuffers: false,
   computeShaders: false,
   indirectDraw: false,
@@ -1067,6 +1070,7 @@ function queryMaxAnisotropy(gl: ParticleGlContext): number {
 function readCapabilities(gl: ParticleGlContext): RendererCapabilities {
   const maxTextureSize = gl.getParameter(GL.MAX_TEXTURE_SIZE);
   let maxAnisotropy: number | undefined;
+  let timestampQueries: boolean | undefined;
   return Object.freeze({
     backend: "webgl2",
     maxTextureSize: typeof maxTextureSize === "number" ? maxTextureSize : 0,
@@ -1074,6 +1078,10 @@ function readCapabilities(gl: ParticleGlContext): RendererCapabilities {
     get maxAnisotropy(): number {
       maxAnisotropy ??= queryMaxAnisotropy(gl);
       return maxAnisotropy;
+    },
+    get timestampQueries(): boolean {
+      timestampQueries ??= hasDisjointTimerQuery(gl);
+      return timestampQueries;
     },
   } satisfies RendererCapabilities);
 }
@@ -1343,6 +1351,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   #capabilities: RendererCapabilities = Object.freeze({
     backend: "webgl2",
     maxTextureSize: 0,
+    timestampQueries: false,
     ...WEBGL_STATIC_CAPABILITIES,
   } satisfies RendererCapabilities);
 
@@ -1497,6 +1506,19 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   statistics: RenderStatistics | null = null;
 
   /**
+   * Last completed GPU-frame duration in seconds (A-1). Reading this
+   * getter is what arms `EXT_disjoint_timer_query_webgl2`; a renderer
+   * that never reads it issues not one extra GL call (R-30b).
+   */
+  get lastGpuFrameTimeSeconds(): number {
+    this.#gpuTimer ??= new GlGpuTimer();
+    this.#gpuTimer.arm();
+    return this.#gpuTimer.lastGpuFrameTimeSeconds;
+  }
+
+  #gpuTimer: GlGpuTimer | null = null;
+
+  /**
    * §65 batching, or `null` (the default) to batch nothing — the opt-in
    * capability (R-9, 2026-08-09; see `gl-batch.ts`).
    *
@@ -1602,6 +1624,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // and its vertex array died with the context like every other handle; the
     // next batched draw recreates them.
     this.batching?.forget();
+    // Query objects died with the context; the next armed frame reallocates.
+    this.#gpuTimer?.forget();
     this.events.emit("contextlost", { renderer: this });
   };
 
@@ -1869,6 +1893,10 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // per item to its draw loop and not a single GL call — the same
     // byte-identity contract A-1's counters make.
     const batching = this.batching;
+    const gpuTimer = this.#gpuTimer !== null && this.#gpuTimer.armed
+      ? this.#gpuTimer
+      : null;
+    gpuTimer?.begin(gl);
     // Whether a texture is bound to unit 0 — the sprite path binds one, and
     // since R-19 so does an unlit or lit draw whose material carries a `map`,
     // so a frame of particles and untextured geometry still has nothing to
@@ -2869,6 +2897,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         }
       }
     } finally {
+      gpuTimer?.end(gl);
       // Restore the fixed state the frame borrowed, and leave nothing bound:
       // the next thing to touch this context may not be this renderer (§61
       // allows several renderers over one application).
@@ -3369,6 +3398,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       this.#particleBatches?.dispose();
       this.#particleTrailBatches?.dispose();
       this.batching?.dispose();
+      if (this.#gl !== null) {
+        this.#gpuTimer?.dispose(this.#gl);
+      }
     }
 
     this.#program = null;
@@ -3396,6 +3428,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#particleTrailBatches = null;
     this.#gl = null;
     this.#canvas = null;
+    this.#gpuTimer = null;
     this.events.removeAllListeners();
   }
 

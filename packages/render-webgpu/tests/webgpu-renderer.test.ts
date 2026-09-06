@@ -511,6 +511,75 @@ describe("WebgpuRenderer.initialize", () => {
     expect(capabilities.maxAnisotropy).toBe(16);
   });
 
+  it("requests timestamp-query when the adapter has it (A-1)", async () => {
+    const gpu = createRecordingGpu();
+    const renderer = new WebgpuRenderer();
+    await withHostGpu(gpu.gpu, async () => {
+      await renderer.initialize({ canvas: gpu.canvas });
+    });
+
+    expect(gpu.callsOf("adapter.requestDevice")[0]?.args[0]).toEqual({
+      requiredFeatures: ["timestamp-query"],
+    });
+    renderer.dispose();
+  });
+
+  it("does not request timestamp-query when the adapter lacks it (A-1)", async () => {
+    const gpu = createRecordingGpu({ features: [] });
+    const renderer = new WebgpuRenderer();
+    await withHostGpu(gpu.gpu, async () => {
+      await renderer.initialize({ canvas: gpu.canvas });
+    });
+
+    expect(gpu.callsOf("adapter.requestDevice")[0]?.args[0]).toBeUndefined();
+    expect(renderer.capabilities.timestampQueries).toBe(false);
+    renderer.dispose();
+  });
+
+  it("does not issue timestamp writes until lastGpuFrameTimeSeconds is read (A-1)", async () => {
+    const { gpu, renderer } = await initialized();
+    renderer.render(createRoot(), [createView()]);
+
+    expect(gpu.countOf("device.createQuerySet")).toBe(0);
+    const viewsPass = gpu
+      .callsOf("encoder.beginRenderPass")
+      .find(
+        (call) => (call.args[0] as { label?: string } | undefined)?.label === "four:views",
+      );
+    expect(
+      (viewsPass?.args[0] as { timestampWrites?: unknown } | undefined)
+        ?.timestampWrites,
+    ).toBeUndefined();
+  });
+
+  it("writes views-pass timestamps after lastGpuFrameTimeSeconds is read (A-1)", async () => {
+    const { gpu, renderer } = await initialized();
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    gpu.reset();
+    renderer.render(createRoot(), [createView()]);
+
+    expect(gpu.countOf("device.createQuerySet")).toBe(1);
+    expect(gpu.countOf("encoder.resolveQuerySet")).toBe(1);
+    expect(gpu.countOf("buffer.mapAsync")).toBe(1);
+    await Promise.resolve();
+    expect(renderer.lastGpuFrameTimeSeconds).toBeCloseTo(0.002, 12);
+  });
+
+  it("leaves lastGpuFrameTimeSeconds NaN when timestamp-query is absent (A-1)", async () => {
+    const gpu = createRecordingGpu({ features: [] });
+    const renderer = new WebgpuRenderer();
+    await withHostGpu(gpu.gpu, async () => {
+      await renderer.initialize({ canvas: gpu.canvas });
+    });
+    renderer.resize(256, 256, 1);
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    renderer.render(createRoot(), [createView()]);
+    await Promise.resolve();
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    expect(gpu.countOf("device.createQuerySet")).toBe(0);
+    renderer.dispose();
+  });
+
   it("reports the floor for a device that will not state its limits", async () => {
     const gpu = createRecordingGpu({ limits: {}, features: [] });
     const renderer = new WebgpuRenderer();

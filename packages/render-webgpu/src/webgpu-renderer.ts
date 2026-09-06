@@ -166,6 +166,7 @@ import {
   type WgpuEffectKind,
 } from "./wgpu-effect.js";
 import { WgpuGeometryCache, type WgpuGeometryRecord } from "./wgpu-geometry.js";
+import { WgpuGpuTimer } from "./wgpu-gpu-timer.js";
 import {
   LIGHTS_BIND_GROUP_INDEX,
   LIGHT_UNIFORM_BYTES,
@@ -598,6 +599,19 @@ export class WebgpuRenderer implements Renderer {
    */
   statistics: RenderStatistics | null = null;
 
+  /**
+   * Last completed GPU-frame duration in seconds (A-1). Reading this
+   * getter is what arms `timestamp-query`; a renderer that never reads
+   * it issues not one extra GPU command (R-30b).
+   */
+  get lastGpuFrameTimeSeconds(): number {
+    this.#gpuTimer ??= new WgpuGpuTimer();
+    this.#gpuTimer.arm();
+    return this.#gpuTimer.lastGpuFrameTimeSeconds;
+  }
+
+  #gpuTimer: WgpuGpuTimer | null = null;
+
   #capabilities: RendererCapabilities = Object.freeze({
     backend: "webgpu",
     maxTextureSize: 0,
@@ -923,7 +937,13 @@ export class WebgpuRenderer implements Renderer {
       );
     }
 
-    const device = await adapter.requestDevice();
+    const timestampQueries =
+      adapter.features?.has("timestamp-query") === true;
+    const device = timestampQueries
+      ? await adapter.requestDevice({
+          requiredFeatures: ["timestamp-query"],
+        })
+      : await adapter.requestDevice();
     if (device === null) {
       throw new FourError(
         "RENDERER_INITIALIZATION_FAILED",
@@ -1253,6 +1273,9 @@ export class WebgpuRenderer implements Renderer {
         : targetRecord.colorView;
 
     const statistics = this.statistics;
+    const gpuTimer =
+      this.#gpuTimer !== null && this.#gpuTimer.armed ? this.#gpuTimer : null;
+    const timestampWrites = gpuTimer?.beginPass(device);
     const encoder = device.createCommandEncoder({ label: "four:frame" });
     let block = 0;
 
@@ -1330,6 +1353,7 @@ export class WebgpuRenderer implements Renderer {
                   depthStoreOp: "store",
                 },
           }),
+      ...(timestampWrites === undefined ? {} : { timestampWrites }),
     });
 
     // §65's uploader (R-9's seam), read once for the frame exactly as
@@ -2024,7 +2048,9 @@ export class WebgpuRenderer implements Renderer {
     // beside the two above and before the submit that reads it (queue
     // order); absent to the byte on a frame that recorded no node draw.
     nodeFrame?.endFrame();
+    gpuTimer?.resolve(encoder);
     device.queue.submit([encoder.finish()]);
+    gpuTimer?.afterSubmit();
   }
 
   /**
@@ -2614,12 +2640,14 @@ export class WebgpuRenderer implements Renderer {
       // §65's uploader, when the application assigned one (R-9): its buffers
       // belong to the lost device — dropped, never destroyed.
       this.batching?.forget();
+      this.#gpuTimer?.forget();
     } else {
       this.#geometries?.dispose();
       this.#textures?.dispose();
       this.#renderTargets?.dispose();
       this.#particles?.dispose();
       this.batching?.dispose();
+      this.#gpuTimer?.dispose();
       this.#uniformBuffer?.destroy();
       this.#lightsBuffer?.destroy();
       this.#effectBuffer?.destroy();
@@ -2678,6 +2706,7 @@ export class WebgpuRenderer implements Renderer {
     this.#context = null;
     this.#device = null;
     this.#canvas = null;
+    this.#gpuTimer = null;
     this.events.removeAllListeners();
   }
 
@@ -3603,6 +3632,7 @@ export class WebgpuRenderer implements Renderer {
       // §65's uploader (R-9): its buffers died with the device, like every
       // other handle — dropped, never destroyed.
       this.batching?.forget();
+      this.#gpuTimer?.forget();
       this.#pipelines?.dispose();
       // §82's compute caches (WP-R1.8): pipelines and layouts of a dead
       // device — dropped whole; the next compute() call reports the loss.

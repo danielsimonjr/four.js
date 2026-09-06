@@ -177,8 +177,9 @@ describe("§84 physics counters — real solver (A-6)", () => {
     );
     // Two falling bodies are two awake bodies (§32).
     expect(stats?.activeBodies).toBe(2);
-    // Contacts ride `SolverStatistics.contactCount` (2026-09-06). GPU timestamps
-    // still have no producer (§84).
+    // Contacts ride `SolverStatistics.contactCount` (2026-09-06). This
+    // harness's renderer does not publish `lastGpuFrameTimeSeconds`, so
+    // `gpuFrameTime` stays `NaN` — "not measured", not a confident zero.
     expect(stats?.contacts).toBeGreaterThanOrEqual(0);
     expect(stats?.gpuFrameTime).toBeNaN();
 

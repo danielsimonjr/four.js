@@ -1366,14 +1366,28 @@ describe("Application — §84 statistics (A-1)", () => {
     app.step(FIXED);
     app.step(FIXED);
 
-    // The four §84 counters with no producer in this repository. They must read
-    // "not measured", not 0 — see `FrameStats` for what each one waits on.
-    // `textureMemory`/`bufferMemory` left this list when A-5 landed §83's
-    // resource accounting (2026-08-07); they are asserted live below.
+    // Counters this headless fixture has no producer for. `gpuFrameTime`
+    // stays `NaN` because `CountingRenderer` does not declare
+    // `lastGpuFrameTimeSeconds`; a backend that publishes a finite number
+    // is copied in the dedicated test below. `physicsStepTime` /
+    // `activeBodies` / `contacts` need an attached world.
     expect(app.stats?.gpuFrameTime).toBeNaN();
     expect(app.stats?.physicsStepTime).toBeNaN();
     expect(app.stats?.activeBodies).toBeNaN();
     expect(app.stats?.contacts).toBeNaN();
+  });
+
+  it("copies a finite lastGpuFrameTimeSeconds into gpuFrameTime (A-1)", async () => {
+    class GpuTimingRenderer extends CountingRenderer {
+      lastGpuFrameTimeSeconds = 0.0025;
+    }
+    const renderer = new GpuTimingRenderer();
+    const app = await startedApplication({ renderer, stats: true });
+    app.views.push(createFullscreenViewport(new PerspectiveCamera()));
+
+    app.step(FIXED);
+
+    expect(app.stats?.gpuFrameTime).toBeCloseTo(0.0025, 12);
   });
 
   it("reports §83's live-resource totals as the two memory counters (A-5)", async () => {

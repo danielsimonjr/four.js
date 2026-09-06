@@ -184,6 +184,21 @@ interface FakeGlOptions {
    */
   anisotropyExtension?: boolean | null;
   /**
+   * When true, `getExtension("EXT_disjoint_timer_query_webgl2")` returns
+   * an object and the query entry points exist (A-1). Default false — a
+   * device without the timer extension, which is the CI/SwiftShader case.
+   */
+  timerExtension?: boolean;
+  /**
+   * What `getQueryParameter(..., QUERY_RESULT)` reports in nanoseconds
+   * once `QUERY_RESULT_AVAILABLE` is true. Default 2_000_000 (2 ms).
+   */
+  timerResultNanoseconds?: number;
+  /** When false, a completed query reports as still in flight. Default true. */
+  timerResultAvailable?: boolean;
+  /** When true, `getParameter(GPU_DISJOINT_EXT)` is true. Default false. */
+  timerDisjoint?: boolean;
+  /**
    * What `getParameter(MAX_TEXTURE_MAX_ANISOTROPY_EXT)` reports (R-30b).
    * Default 16; `unknown` so a test can hand back what a hostile driver would.
    */
@@ -278,6 +293,10 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     allocateTextures = true,
     canGenerateMipmaps = true,
     anisotropyExtension = true,
+    timerExtension = false,
+    timerResultNanoseconds = 2_000_000,
+    timerResultAvailable = true,
+    timerDisjoint = false,
     maxAnisotropy = 16,
     allocateBuffers = true,
     allocateFramebuffers = true,
@@ -569,9 +588,13 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
 
     getParameter(pname) {
       record("getParameter", pname);
-      return pname === GL.MAX_TEXTURE_MAX_ANISOTROPY_EXT
-        ? maxAnisotropy
-        : maxTextureSize;
+      if (pname === GL.MAX_TEXTURE_MAX_ANISOTROPY_EXT) {
+        return maxAnisotropy;
+      }
+      if (pname === GL.GPU_DISJOINT_EXT) {
+        return timerDisjoint;
+      }
+      return maxTextureSize;
     },
     enable(capability) {
       record("enable", capability);
@@ -641,10 +664,41 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
       record("generateMipmap", target);
     };
   }
-  if (anisotropyExtension !== null) {
+  if (anisotropyExtension !== null || timerExtension) {
     gl.getExtension = (name: string): unknown => {
       record("getExtension", name);
-      return anisotropyExtension ? { name } : null;
+      if (name === "EXT_texture_filter_anisotropic") {
+        return anisotropyExtension ? { name } : null;
+      }
+      if (name === "EXT_disjoint_timer_query_webgl2") {
+        return timerExtension ? { name } : null;
+      }
+      return null;
+    };
+  }
+  if (timerExtension) {
+    gl.createQuery = (): object => {
+      record("createQuery");
+      return handle("query");
+    };
+    gl.deleteQuery = (query: object): void => {
+      record("deleteQuery", query);
+    };
+    gl.beginQuery = (target: number, query: object): void => {
+      record("beginQuery", target, query);
+    };
+    gl.endQuery = (target: number): void => {
+      record("endQuery", target);
+    };
+    gl.getQueryParameter = (query: object, pname: number): unknown => {
+      record("getQueryParameter", query, pname);
+      if (pname === GL.QUERY_RESULT_AVAILABLE) {
+        return timerResultAvailable;
+      }
+      if (pname === GL.QUERY_RESULT) {
+        return timerResultNanoseconds;
+      }
+      return 0;
     };
   }
 
@@ -1413,14 +1467,16 @@ describe("WebglRenderer — initialization (§61, §62)", () => {
 
     // Every member is a statement about *this backend on WebGL 2*, and each is
     // true by construction (see `WEBGL_STATIC_CAPABILITIES`): WebGL 2 has no
-    // compute stage, no storage buffers and no indirect draw at all, this tier
-    // requests no timer extension and no float target, and GLSL ES 3.00
-    // requires fragment-stage `highp`.
+    // compute stage, no storage buffers and no indirect draw at all, this
+    // default fake has no timer extension and no float target, and GLSL ES
+    // 3.00 requires fragment-stage `highp`.
     expect(capabilities.computeShaders).toBe(false);
     expect(capabilities.storageBuffers).toBe(false);
     expect(capabilities.indirectDraw).toBe(false);
-    expect(capabilities.timestampQueries).toBe(false);
     expect(capabilities.floatRenderTargets).toBe(false);
+    // timestampQueries is a getter: unread here so initialize's transcript
+    // is still one getParameter (MAX_TEXTURE_SIZE). See the dedicated test.
+    expect(Object.hasOwn(capabilities, "timestampQueries")).toBe(true);
     expect(capabilities.multisampling).toBe(true);
     expect(capabilities.shaderPrecision).toBe("highp");
     expect(capabilities.textureFormats).toEqual(["rgba8"]);
@@ -1456,6 +1512,71 @@ describe("WebglRenderer — initialization (§61, §62)", () => {
     const { renderer } = await initialized({ anisotropyExtension: false });
 
     expect(renderer.capabilities.maxAnisotropy).toBe(1);
+  });
+
+  it("reports timestampQueries from the extension after init, not during it (A-1)", async () => {
+    const { renderer, gl } = await initialized({ timerExtension: true });
+
+    expect(gl.countOf("getExtension")).toBe(0);
+    expect(gl.countOf("getParameter")).toBe(1);
+    expect(renderer.capabilities.timestampQueries).toBe(true);
+    expect(gl.callsOf("getExtension").map((call) => call.args[0])).toEqual([
+      "EXT_disjoint_timer_query_webgl2",
+    ]);
+    expect(renderer.capabilities.timestampQueries).toBe(true);
+    expect(gl.countOf("getExtension")).toBe(1);
+  });
+
+  it("reports timestampQueries false when the timer extension is absent (A-1)", async () => {
+    const { renderer } = await initialized();
+
+    expect(renderer.capabilities.timestampQueries).toBe(false);
+  });
+
+  it("does not issue timer queries until lastGpuFrameTimeSeconds is read (A-1)", async () => {
+    const { renderer, gl, camera } = await initialized({ timerExtension: true });
+    gl.reset();
+    renderer.render(createRoot(), [createView(camera)]);
+    expect(gl.countOf("beginQuery")).toBe(0);
+    expect(gl.countOf("createQuery")).toBe(0);
+  });
+
+  it("publishes a completed elapsed-time query as lastGpuFrameTimeSeconds (A-1)", async () => {
+    const { renderer, gl, camera } = await initialized({
+      timerExtension: true,
+      timerResultNanoseconds: 4_000_000,
+    });
+
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    gl.reset();
+    renderer.render(createRoot(), [createView(camera)]);
+    expect(gl.countOf("beginQuery")).toBe(1);
+    expect(gl.countOf("endQuery")).toBe(1);
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+
+    renderer.render(createRoot(), [createView(camera)]);
+    expect(renderer.lastGpuFrameTimeSeconds).toBeCloseTo(0.004, 12);
+  });
+
+  it("discards a disjoint elapsed-time sample (A-1)", async () => {
+    const { renderer, camera } = await initialized({
+      timerExtension: true,
+      timerDisjoint: true,
+    });
+
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    renderer.render(createRoot(), [createView(camera)]);
+    renderer.render(createRoot(), [createView(camera)]);
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+  });
+
+  it("stays NaN when the timer extension is missing, even after the getter is read (A-1)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    renderer.render(createRoot(), [createView(camera)]);
+    renderer.render(createRoot(), [createView(camera)]);
+    expect(renderer.lastGpuFrameTimeSeconds).toBeNaN();
+    expect(gl.countOf("beginQuery")).toBe(0);
   });
 
   it("requests a webgl2 context with depth, no stencil, and the antialias hint", async () => {

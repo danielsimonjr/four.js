@@ -40,6 +40,7 @@ export type {
   GpuDevice,
   GpuDeviceLostInfo,
   GpuPipelineLayout,
+  GpuQuerySet,
   GpuQueue,
   GpuRenderPassDescriptor,
   GpuRenderPassEncoder,

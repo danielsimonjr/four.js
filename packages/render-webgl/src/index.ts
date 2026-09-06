@@ -43,6 +43,7 @@ export type {
   GlBuffer,
   GlProgramHandle,
   GlShader,
+  GlQuery,
   GlSync,
   GlTexture,
   GlUniformLocation,
