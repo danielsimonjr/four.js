@@ -103,7 +103,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - A-4 remainder — PARTIAL 2026-09-06: §85 validation catalogue + §83 dev warnings (disposed-in-use, detached listeners, per-frame allocations); systematic `devAssert` migration still open.
 - A-5 remainder — PARTIAL 2026-09-06: duplicate-load DONE; `RenderTarget.byteLength` format-aware; materials/solver live counts; leak audit extended.
 - A-5 follow-ups: materials + solver handles accounted at count tier — DONE 2026-09-06; `RenderTarget.byteLength` moved with §67 formats.
-- A-1 follow-ups: contacts wired via `SolverStatistics.contactCount` → `app.stats.contacts` (2026-09-06); `physicsStepTime`/`gpuFrameTime` still wait on their packets.
+- A-1 follow-ups: contacts wired via `SolverStatistics.contactCount` → `app.stats.contacts` (2026-09-06); `physicsStepTime` already via A-6; `gpuFrameTime` copies `Renderer.lastGpuFrameTimeSeconds` (2026-09-06).
 - A-18 remainder — DONE 2026-09-06 (progress, stream, dependency graph, injected worker decode, injected watch).
 - A-16 remainder (manifest half): DONE 2026-09-06 (`preloadManifestIntoCatalog`).
 - A-19 remainder:
@@ -1180,13 +1180,14 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `readLiveResourceCounts`);
       ~~`RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
       with §67's DEPTH24_STENCIL8 and float formats~~ **DONE 2026-09-06**
-- [ ] **A-1 follow-ups:** (a) `physicsStepTime`/`contacts`/`activeBodies` wiring
-      belongs to the packet that gives `Application` a physics world (A-6);
-      (c) `gpuFrameTime` waits on `RendererCapabilities` growing §62's timestamp-query
-      field; (d) **A-4's `__FOUR_DEV__` define should drop the §84 path from production
-      bundles** — now the practical blocker: ui-demo is at **30.96/31 kB (~40 B
-      headroom)** after A-5; Application's unconditional stats references cost ~0.4 kB gzip per
-      example and ui-demo is at 29.68/30 kB (0.32 kB headroom); (e) `WorldTransformStats`
+- [ ] **A-1 follow-ups:** ~~(a) `physicsStepTime`/`contacts`/`activeBodies` wiring
+      belongs to the packet that gives `Application` a physics world (A-6)~~ **DONE**;
+      ~~(c) `gpuFrameTime` waits on timestamp queries~~ **DONE 2026-09-06**
+      (`Renderer.lastGpuFrameTimeSeconds`; WebGL `EXT_disjoint_timer_query_webgl2`,
+      WebGPU `timestamp-query` ping-pong; Application copies a finite number).
+      Reading the getter arms measurement so landed transcripts stay identical.
+      Still open: (d) **A-4's `__FOUR_DEV__` define should drop the §84 path from production
+      bundles** — ui-demo headroom is still thin; (e) `WorldTransformStats`
       (visited/recomputed) is computed every frame and unexposed — deliberately, §84
       does not name it
 

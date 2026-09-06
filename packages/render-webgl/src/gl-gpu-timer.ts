@@ -20,9 +20,9 @@
  *   or a completed non-disjoint sample is missing. The field stays `NaN`.
  */
 
-import { GL, type GlQuery, type WebglContext } from "./gl-program.js";
+import { GL, type GlQuery } from "./gl-program.js";
 
-/** The query surface this helper needs, all optional on {@link WebglContext}. */
+/** The query surface this helper needs, all optional on `WebglContext`. */
 interface TimerGl {
   getExtension?(name: string): unknown;
   getParameter(pname: number): unknown;
@@ -125,17 +125,14 @@ export class GlGpuTimer {
    * may be armed again; the next `begin` reallocates.
    */
   dispose(gl: TimerGl): void {
-    const deleteQuery = gl.deleteQuery;
-    if (deleteQuery !== undefined) {
-      if (this.#active !== null) {
-        deleteQuery.call(gl, this.#active);
-      }
-      if (this.#pending !== null) {
-        deleteQuery.call(gl, this.#pending);
-      }
-      if (this.#spare !== null) {
-        deleteQuery.call(gl, this.#spare);
-      }
+    if (this.#active !== null) {
+      gl.deleteQuery?.(this.#active);
+    }
+    if (this.#pending !== null) {
+      gl.deleteQuery?.(this.#pending);
+    }
+    if (this.#spare !== null) {
+      gl.deleteQuery?.(this.#spare);
     }
     this.forget();
   }
@@ -151,16 +148,15 @@ export class GlGpuTimer {
 
   #poll(gl: TimerGl): void {
     const pending = this.#pending;
-    const getQueryParameter = gl.getQueryParameter;
-    if (pending === null || getQueryParameter === undefined) {
+    if (pending === null || gl.getQueryParameter === undefined) {
       return;
     }
-    if (getQueryParameter.call(gl, pending, GL.QUERY_RESULT_AVAILABLE) !== true) {
+    if (gl.getQueryParameter(pending, GL.QUERY_RESULT_AVAILABLE) !== true) {
       return;
     }
     const disjoint = gl.getParameter(GL.GPU_DISJOINT_EXT) === true;
     if (!disjoint) {
-      const nanoseconds = getQueryParameter.call(gl, pending, GL.QUERY_RESULT);
+      const nanoseconds = gl.getQueryParameter(pending, GL.QUERY_RESULT);
       if (typeof nanoseconds === "number" && Number.isFinite(nanoseconds)) {
         this.lastGpuFrameTimeSeconds = nanoseconds * 1e-9;
       }

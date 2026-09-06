@@ -32,6 +32,14 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — A-1 `gpuFrameTime` is last-completed-frame seconds.**
+  `Renderer.lastGpuFrameTimeSeconds` is optional; reading the getter arms
+  measurement (R-30b: unread → no extra GPU commands). WebGL 2 uses
+  `EXT_disjoint_timer_query_webgl2` (discard on `GPU_DISJOINT_EXT`).
+  WebGPU requests `timestamp-query` when the adapter has it and times the
+  views pass with a resolve/copy/mapAsync ping-pong. `Application` copies
+  a finite number into `stats.gpuFrameTime` and leaves `NaN` otherwise.
+
 - **2026-09-06 — PH-22f live joint anchors are body-local.** `setAnchors`
   and the field setters take the same local frames `addJoint` stores after
   converting world-space constructor options. They are not re-measured

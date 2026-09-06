@@ -8,6 +8,18 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — A-1 `gpuFrameTime`
+
+- **`Renderer.lastGpuFrameTimeSeconds`.** Optional last-completed GPU-frame
+  duration in seconds. Reading the getter arms measurement so unread
+  renderers keep byte-identical GPU transcripts (R-30b).
+- **WebGL 2.** Lazy `EXT_disjoint_timer_query_webgl2`; ping-pong
+  `TIME_ELAPSED_EXT` queries; disjoint samples discarded.
+- **WebGPU.** Requests `timestamp-query` when the adapter has it; views-pass
+  `timestampWrites` + resolve/copy/`mapAsync` ping-pong.
+- **`Application.stats.gpuFrameTime`.** Copies a finite backend number;
+  stays `NaN` when the member is absent, in flight, or disjoint.
+
 ### 2026-09-06 — Open-TODO subagent pass (fourth landing)
 
 - **Rapier 0.20.** `@dimforge/rapier{2,3}d-compat` 0.20.0; `contactPair`

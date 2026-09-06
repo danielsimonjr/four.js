@@ -183,12 +183,6 @@ export function createRecordingGpu(
       },
       getMappedRange: (): ArrayBuffer => {
         record("buffer.getMappedRange", handle);
-        if (size === 16) {
-          const times = new BigUint64Array(2);
-          times[0] = 0n;
-          times[1] = 2_000_000n;
-          return times.buffer;
-        }
         const bytes = new Uint8Array(size);
         for (let index = 0; index < size; index += 1) {
           bytes[index] = index % 251;

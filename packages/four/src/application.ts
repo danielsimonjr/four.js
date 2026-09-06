@@ -1855,7 +1855,11 @@ export class Application extends EventEmitter<ApplicationEventMap> {
         );
       }
       stats.cpuFrameTime = (this.#now ?? monotonicNowSeconds)() - frameStarted;
-      const gpuSeconds = this.#renderer?.lastGpuFrameTimeSeconds;
+      const renderer = this.#renderer;
+      const gpuSeconds: unknown =
+        renderer === null
+          ? undefined
+          : Reflect.get(renderer, "lastGpuFrameTimeSeconds");
       if (typeof gpuSeconds === "number" && Number.isFinite(gpuSeconds)) {
         stats.gpuFrameTime = gpuSeconds;
       }

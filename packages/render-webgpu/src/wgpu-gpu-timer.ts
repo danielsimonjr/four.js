@@ -161,14 +161,13 @@ export class WgpuGpuTimer {
     this.#wroteThisFrame = false;
     const slots = this.#slots;
     const slot = slots?.[this.#slot];
-    const mapAsync = slot?.buffer.mapAsync;
-    if (slot === undefined || mapAsync === undefined) {
+    if (slot === undefined || slot.buffer.mapAsync === undefined) {
       return;
     }
     const captured = slot;
     captured.busy = true;
     this.#slot ^= 1;
-    void mapAsync.call(captured.buffer, GPU_MAP_MODE.READ).then(() => {
+    void captured.buffer.mapAsync(GPU_MAP_MODE.READ).then(() => {
       const range = captured.buffer.getMappedRange?.();
       if (range !== undefined) {
         const times = new BigUint64Array(range);
@@ -219,11 +218,10 @@ export class WgpuGpuTimer {
     if (this.#querySet !== null && this.#slots !== null) {
       return { querySet: this.#querySet, slots: this.#slots };
     }
-    const createQuerySet = device.createQuerySet;
-    if (createQuerySet === undefined) {
+    if (device.createQuerySet === undefined) {
       return null;
     }
-    const querySet = createQuerySet.call(device, {
+    const querySet = device.createQuerySet({
       type: "timestamp",
       count: 2,
     });
