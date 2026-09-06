@@ -2,7 +2,7 @@
  * The Rapier 2D solver adapter (§37, §102, plan WP-5.4).
  *
  * `Rapier2dAdapter` is a `PhysicsSolverAdapter` backed by
- * `@dimforge/rapier2d-compat` (pinned at `0.19.3` by plan P5-1). It is the first
+ * `@dimforge/rapier2d-compat` (pinned at `0.20.0`). It is the first
  * concrete solver behind `@four/physics`'s stable API, and it may import
  * *nothing* from scene, motion, or render — the whole point of §37's seam is
  * that a solver knows about bodies and colliders and not about nodes.
@@ -2133,9 +2133,14 @@ export class Rapier2dAdapter
       const handle = record.rapierHandle;
       narrowPhase.contactPairsWith(handle, (otherHandle) => {
         if (handle < otherHandle) {
-          narrowPhase.contactPair(handle, otherHandle, (manifold) => {
-            total += manifold.numContacts();
-          });
+          narrowPhase.contactPair(
+            handle,
+            otherHandle,
+            world.bodies,
+            (manifold) => {
+              total += manifold.numContacts();
+            },
+          );
         }
       });
     }
@@ -2943,6 +2948,7 @@ export class Rapier2dAdapter
     world.narrowPhase.contactPair(
       a.rapierHandle,
       b.rapierHandle,
+      world.bodies,
       (manifold, flipped) => {
         const manifoldNormal = manifold.normal();
         normalX = flipped ? -manifoldNormal.x : manifoldNormal.x;
@@ -3153,6 +3159,7 @@ export class Rapier2dAdapter
         narrowPhase.contactPair(
           record.rapierHandle,
           otherHandle,
+          world.bodies,
           (manifold) => {
             touching ||= manifold.numContacts() > 0;
           },

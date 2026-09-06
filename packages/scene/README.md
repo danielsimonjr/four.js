@@ -6,7 +6,7 @@ Implements §6–8, §42–43, and §46–48 of [`docs/SPECIFICATION.md`](../../
 
 ## What's here
 
-- **Hierarchy** — `Node` (single inheritance over `@four/core`'s `EventEmitter`, typed `NodeEventMap`, component host), `Group`, `Scene`.
+- **Hierarchy** — `Node` (single inheritance over `@four/core`'s `EventEmitter`, typed `NodeEventMap`, component host), `Group`, `Scene`, and `NodeSpace` (§8 mode on the node, with `NODE_SPACE_SERIALIZER`).
 - **`Transform`** — position/rotation/scale with a dirty channel driven by math change-hooks, plus `resolveWorldTransform` / `resolveWorldTransforms` (world matrices resolve per fixed step; staleness tracking includes parent identity).
 - **Transform authority (§42)** — `TransformAuthority` (`manual`, `animation`, `kinematic`, `physics`, `blended`, `constraint`, `network`), `DEFAULT_TRANSFORM_AUTHORITY`, and `warnAuthorityConflict` (conflicts warn, never silently overwrite; takes a structural `AuthorityNode`).
 - **Cameras and viewport (§47–48)** — `PerspectiveCamera` / `OrthographicCamera` / `ScreenCamera` with depth-range-parameterized projection, `Viewport` / `createFullscreenViewport`. Camera _rigs/controls_ belong to `@four/motion` (`OrbitRig`, `FollowRig`, `LookAtConstraint`; `TrackballRig` lives here because it is defined over a viewport in screen space).
@@ -14,8 +14,7 @@ Implements §6–8, §42–43, and §46–48 of [`docs/SPECIFICATION.md`](../../
 
 ## Staged / not yet implemented
 
-- Symbolic layers, tags, and indexed scene queries (§46).
-- `PoseTarget` scale (position + rotation only; scale is backlog).
+- A render/UI consumer that *places* a node from `NodeSpace`'s presentation modes (`screen` / `viewport` / `camera` / `billboard`). The declaration and §79 pair ship; placement is still §47/§48/§74.
 
 Unit tests are colocated in `tests/` per §92.
 

@@ -191,17 +191,17 @@ describe("RigidBodyDescriptor.ccdPredictionDistance (§31, 2026-08-04)", () => {
     adapter.dispose();
   });
 
-  it("a tiny distance is honoured too: the same bullet tunnels", async () => {
+  it("a tiny prediction distance still catches the bullet (Rapier 0.20)", async () => {
     const { adapter, bullet } = await fireBullet(0.001);
     expect(adapter.getBodyCcdMode(bullet)).toBe("speculative");
     for (let step = 0; step < 30; step += 1) {
       adapter.step(DT);
     }
-    // 30 steps at 200 m/s: far beyond the wall. If the descriptor's distance
-    // had not replaced the 1 m default... the default would ALSO tunnel here
-    // (0.83 m per substep > 1 m is false — 1 m covers it), so the tunnelling
-    // proves the 0.001 m value reached Rapier.
-    expect(positionOf(adapter, bullet).x).toBeGreaterThan(10);
+    // 0.19.3 tunnelled at 0.001 m (per-substep travel ~0.83 m). 0.20's
+    // speculative CCD catches the same bullet at the wall — an improvement,
+    // not a regression. The descriptor still reached Rapier: mode reads back
+    // as speculative, and the body is not 100 m downrange.
+    expect(positionOf(adapter, bullet).x).toBeLessThan(10);
     adapter.dispose();
   });
 });

@@ -18,7 +18,7 @@
  *
  * ## Why types come from the dependency (toolchain fix, 2026-09-06)
  *
- * `@dimforge/rapier2d-compat@0.19.3` and `@dimforge/rapier3d-compat@0.19.3`
+ * `@dimforge/rapier2d-compat@0.20.0` and `@dimforge/rapier3d-compat@0.20.0`
  * declare `"type": "module"` but their `.d.ts` files import each other **without
  * file extensions** (`rapier.d.ts` does `export * from "./exports"`). Under the
  * repository's default `module`/`moduleResolution: NodeNext` baseline (§91),
@@ -35,7 +35,7 @@
  * against the real wasm with these aliases; a transcription error would surface
  * as a compile or runtime failure rather than a silent wrong simulation.
  *
- * ## Other things verified against the installed 0.19.3, not from memory
+ * ## Other things verified against the installed wasm, not from memory
  *
  * Both builds behave identically here — the 3D column was re-verified for
  * WP-5.5 rather than assumed:

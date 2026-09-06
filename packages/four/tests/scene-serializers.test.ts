@@ -35,6 +35,7 @@ import {
   Bone,
   DirectionalLight,
   MorphWeights,
+  NodeSpace,
   PointLight,
   Skeleton,
   SpotLight,
@@ -805,6 +806,31 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     expect(restored?.rotationAmplitude.z).toBe(0);
   });
 
+  it("round-trips NodeSpace (§8) through registerSceneNodeTypes", () => {
+    const io = registerSceneNodeTypes();
+    const root = new Group();
+    root.addComponent(
+      new NodeSpace({
+        space: "billboard",
+        planeNormal: new Vector3(0, 1, 0),
+      }),
+    );
+
+    const reloaded = instantiateScene(
+      decodeSceneDocument(
+        encodeSceneDocument(serializeScene(root, io.components, io.write)),
+      ),
+      io.components,
+      io.read,
+    );
+
+    const restored = reloaded.getComponent(NodeSpace);
+    expect(restored).toBeInstanceOf(NodeSpace);
+    expect(restored?.host).toBe(reloaded);
+    expect(restored?.space).toBe("billboard");
+    expect(restored?.planeNormal.y).toBe(1);
+  });
+
   it("round-trips the §44 camera rigs and §12's look-at constraint (2026-08-13)", () => {
     // The three components that arrived with `ConstraintSystem`. What a
     // document carries is the authored configuration: a `Vector3` target is
@@ -955,6 +981,7 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     // exported would otherwise make this test pass by finding less.
     expect([...shipped.keys()].sort()).toEqual([
       "CameraShake",
+      "NodeSpace",
       "character-controller",
       "collider",
       "first-person-look",

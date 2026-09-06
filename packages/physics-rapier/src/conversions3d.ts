@@ -397,6 +397,9 @@ export function createRapierShape3d(shape: CollisionShape): RapierShape3d {
  * `rows − 1` / `columns − 1`. The heights array is passed straight through:
  * both sides are column-major and `(rows − 1 + 1) · (columns − 1 + 1)` is
  * `rows · columns`, which `validateCollisionShape` has already checked.
+ *
+ * **Compound.** Same as 2D: several colliders on one body, not a shape tag.
+ * Cylinder, cone, convex-hull, triangle-mesh, and height-field all map above.
  */
 export function createRapierColliderDesc3d(
   shape: CollisionShape,

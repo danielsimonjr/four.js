@@ -29,24 +29,16 @@
  * | Consumer | State |
  * | --- | --- |
  * | `@four/physics` | **ships** (PH-8/PH-12): `RigidBody.space` declares the frame a body is solved in, and `PhysicsWorld.addBody` refuses every value it cannot honour — which is §8's second sentence, enforced. |
- * | renderer / camera / UI | **not implemented.** No package places a node by a §8 mode; screen-space presentation is §47/§48/§74's business and the flagship's camera-parented panel is the standing workaround. |
+ * | renderer / camera / UI | **declaration shipped** (`NodeSpace` in `@four/scene`, 2026-09-06). Presentation modes persist; a render/UI consumer still has to *place* by them. Screen-space presentation remains §47/§48/§74's business. |
  *
  * So this module makes §8 *sayable* everywhere and makes the physics half of it
- * *true*. It does not make anything render in screen space.
+ * *true*. It does not by itself make anything render in screen space.
  *
- * ## The node-level declaration is staged, and here is its blocker
+ * ## The node-level declaration shipped 2026-09-06
  *
- * §8 sits in Part I beside §7's transform, which reads like a property of a
- * *node* rather than of a body — a screen-space panel is in screen space
- * whether or not anyone ever gives it a `RigidBody`. The §6a spelling of that
- * is a one-field component, and it is deliberately **not shipped yet**: a
- * component class carries a `static typeName`, which is §79's serialization
- * key, and a component with no registered serializer makes `serializeScene`
- * *throw* by default. Shipping the class before its serializer is registered
- * (`registerSceneNodeTypes`, in the umbrella package) would turn "the mode is
- * not persisted" into "a scene containing one cannot be saved at all". The two
- * land together, in one packet, with the render-side consumer that gives the
- * four presentation modes a meaning.
+ * `NodeSpace` (`@four/scene`) plus `NODE_SPACE_SERIALIZER`, registered by
+ * `registerSceneNodeTypes`. `"local-plane"` is accepted by `PhysicsWorld.addBody`
+ * when the world has a plane (or the default XY plane).
  */
 
 /**
@@ -92,11 +84,10 @@ export const SPACE_MODES: readonly SpaceMode[] = Object.freeze([
  * `"local-plane"` answer `true`.
  *
  * This is the **specification's** line, not an implementation status: a `true`
- * here does not promise that any package can simulate the mode. `"local-plane"`
- * is legal under §8 and is still refused by `PhysicsWorld.addBody`, because
- * §21's plane→XY mapping does not exist yet. The two questions are deliberately
- * separate so that neither can quietly answer the other — a packet implementing
- * §21's mapping changes the refusal and leaves this predicate alone.
+ * here does not by itself promise a solver mapping. `"local-plane"` is legal
+ * under §8; `PhysicsWorld.addBody` accepts it when the world has a plane
+ * (default XY). The predicate stays a vocabulary check so a later adapter
+ * cannot quietly redefine §8.
  */
 export function isSimulationSpaceMode(mode: SpaceMode): boolean {
   return mode === "world" || mode === "local-plane";

@@ -209,6 +209,8 @@ import {
   DirectionalLight,
   MORPH_WEIGHTS_SERIALIZER,
   MorphWeights,
+  NODE_SPACE_SERIALIZER,
+  NodeSpace,
   OrthographicCamera,
   PerspectiveCamera,
   PointLight,
@@ -3367,6 +3369,9 @@ export function registerSceneNodeTypes(
   // the class, declared against the same structural shape the motion
   // serializers use.
   components.register(MorphWeights, MORPH_WEIGHTS_SERIALIZER);
+  // §8's node-level space declaration (PH-12 remainder). Class and
+  // serializer land together so a scene carrying one can be saved (A-15).
+  components.register(NodeSpace, NODE_SPACE_SERIALIZER);
   registerPhysicsSerializers(components);
   return {
     components,

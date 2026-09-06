@@ -962,7 +962,9 @@ describe("events (§29, §32)", () => {
     expect(Math.abs(contact.normal.y)).toBeCloseTo(1, 4);
     expect(Math.abs(contact.normal.x)).toBeLessThan(1e-3);
     expect(Math.abs(contact.normal.z)).toBeLessThan(1e-3);
-    expect(contact.separation).toBeLessThanOrEqual(0);
+    // Rapier 0.20 reports a small positive allowed-margin distance (~0.005)
+    // at first contact; 0.19.3 reported <= 0. Either is a touching pair.
+    expect(contact.separation).toBeLessThanOrEqual(0.01);
     expect(contact.impulse).toBeGreaterThan(0);
     // Contact points are world space: the floor's surface is y = 0, and the
     // ball's witness point sits at most one penetration depth below it.
