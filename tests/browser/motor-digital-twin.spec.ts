@@ -602,7 +602,14 @@ test.describe("examples/flagship/motor-digital-twin (§119)", () => {
     // §32's awake set, filled by the application because §45 has no
     // `app.physics` yet (gap `A-6`): four bodies, none asleep.
     expect(status["activebodies"]).toBe("4");
-    expect(status["contacts"]).toBe("nan");
+    // `recordSolverStatistics` now writes `SolverStatistics.contactCount`
+    // (A-5 / #76). `NaN` would mean "not measured"; a finite count — including
+    // zero — means the producer ran. The twin is joint-held, so this is often
+    // 0, but CI has also seen a handful of resting contacts.
+    expect(Number.isFinite(Number(status["contacts"]))).toBe(true);
+    expect(Number(status["contacts"])).toBeGreaterThanOrEqual(0);
+    // SwiftShader / CI has no `timestamp-query` / `EXT_disjoint_timer_query`,
+    // so `gpuFrameTime` stays the §84 "not measured" sentinel.
     expect(status["gpuframe"]).toBe("nan");
 
     // §40: the declared display units, and the fixed step in the declared time

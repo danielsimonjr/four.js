@@ -310,9 +310,9 @@ interface FrameCounts {
   readonly rotor: number;
   readonly orbit: number;
   readonly particles: number;
-  /** Glyphs in the upper 40 % of the frame: the two **world-space** labels. */
+  /** Glyphs outside the panel column: world-space labels and left-side HUD. */
   readonly worldGlyphs: number;
-  /** Bright neutral pixels in the lower 60 %: the panel's own text and chrome. */
+  /** Bright neutral pixels in the panel column (x ≥ {@link PANEL_LEFT_EDGE}). */
   readonly panelGlyphs: number;
   /** Left-most and top-most panel-chrome pixel, for the screen-space claim. */
   readonly panelLeft: number;
@@ -368,7 +368,11 @@ function measure(image: DecodedImage): FrameCounts {
       } else if (isParticlePixel(r, g, b)) {
         particles += 1;
       } else if (isGlyphPixel(r, g, b)) {
-        if (y < upperBand) {
+        // World / HUD labels also sit in the lower 60 % (cube caption, orbit
+        // readouts). Only glyphs in the panel column count as panel chrome —
+        // otherwise `panelLeft` walks to x ≈ 170 and the screen-space claim
+        // fails even though the panel itself is still at x ≥ 590.
+        if (y < upperBand || x < PANEL_LEFT_EDGE) {
           worldGlyphs += 1;
         } else {
           panelGlyphs += 1;
