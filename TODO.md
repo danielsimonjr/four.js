@@ -11,7 +11,7 @@ changes in `CHANGELOG.md`.
       control: JS runtime · TypeScript types (strict, `skipLibCheck: false`) · publish/staging
       path · all 25 umbrella subpaths · §33/§34 determinism · §34 snapshot round-trip · §7a
       Y-up in 2D. Evidence in MEMORY.md under 2026-09-06.
-      NOT yet exercised: the browser/render path (WebGL + WebGPU, all 12 examples are browser and
+      NOT yet exercised: the browser/render path (WebGL + WebGPU, all 10 browser examples are `index.html` + vite and
       I have only run headless), animation/tweens (§93 timeline), assets/glTF loading, UI, input,
       particles, and the 2D↔3D mixed-scene story. Those are where the next findings are.
 
