@@ -30,6 +30,13 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — PoseTarget scale blends against identity.** A solver
+  body has no scale, so the invented physical side is `(1, 1, 1)`. At
+  `animationWeight === 1` the node's `transform.scale` is
+  `PoseTarget.scale`; at `physicsWeight === 1` it is identity; between,
+  a lerp. Pivot stays off the target. §79 omits identity so documents
+  written before the channel stay byte-identical.
+
 - **2026-09-06 — rotational root motion is local composition.** A
   quaternion root-motion track extracts `conjugate(previous) * sampled`
   and `transform.rotation.multiply(delta)`. That is the same space

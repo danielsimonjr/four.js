@@ -35,15 +35,14 @@
  * Because a binding writes *into* the existing object (never replacing it), the
  * change hooks below survive animation, and so does {@link PoseTarget.version}.
  *
- * ## No scale (P7-1 MVP)
+ * ## Scale (decision, 2026-09-06)
  *
- * Position and rotation only. §19's pipeline blends a pose that a rigid body
- * can also produce, and a solver body has no scale — blending an animated scale
- * against a physical one would mean inventing the physical side. §43's render
- * interpolation makes the same cut (`PoseBuffer` stores position and rotation).
- * A node's animated scale therefore stays on its `Transform` and is not part of
- * the blend; a scale channel here would need a decision about what it blends
- * *against* first.
+ * {@link PoseTarget.scale} is the animated scale channel. A solver body has
+ * no scale, so the invented **physical** side of the blend is identity
+ * `(1, 1, 1)` — the only scale a rigid body can have. At
+ * `animationWeight === 1` the node's `transform.scale` is this vector; at
+ * `physicsWeight === 1` it is identity; between, a lerp. Pivot stays off
+ * the target: it is not a pose.
  *
  * ## The dirty channel and the history (decision, WP-7.1)
  *
@@ -141,6 +140,13 @@ export class PoseTarget implements Component {
   readonly rotation: Quaternion;
 
   /**
+   * Target scale, in the same space as the node's `transform.scale`.
+   * Identity `(1, 1, 1)` by default. The physical side of a §19 blend is
+   * also identity — a solver body has no scale (decision, 2026-09-06).
+   */
+  readonly scale: Vector3;
+
+  /**
    * Target position at the previous {@link PoseTarget.capturePrevious} — the
    * finite-difference history, not a render-interpolation store. Engine-owned
    * and hookless; treat it as read-only outside the blend system.
@@ -149,6 +155,9 @@ export class PoseTarget implements Component {
 
   /** Target rotation at the previous {@link PoseTarget.capturePrevious}. */
   readonly previousRotation: Quaternion;
+
+  /** Target scale at the previous {@link PoseTarget.capturePrevious}. */
+  readonly previousScale: Vector3;
 
   /** Backing store for {@link PoseTarget.version}; only `markDirty` writes it. */
   #version = 0;
@@ -164,7 +173,10 @@ export class PoseTarget implements Component {
     this.previousPosition = new Vector3(0, 0, 0);
     this.previousRotation = new Quaternion(0, 0, 0, 1);
 
-    // Plan D3, as in `Transform`: one shared hook over the two authored
+    this.scale = new Vector3(1, 1, 1);
+    this.previousScale = new Vector3(1, 1, 1);
+
+    // Plan D3, as in `Transform`: one shared hook over the authored
     // members, so one math method call is one version bump. The `previous*`
     // pair deliberately gets none.
     const markDirty = (): void => {
@@ -172,12 +184,13 @@ export class PoseTarget implements Component {
     };
     this.position.onChanged = markDirty;
     this.rotation.onChanged = markDirty;
+    this.scale.onChanged = markDirty;
   }
 
   /**
-   * Counter incremented on every mutation of {@link PoseTarget.position} or
-   * {@link PoseTarget.rotation}, so the blend system can skip a node whose
-   * target has not moved.
+   * Counter incremented on every mutation of {@link PoseTarget.position},
+   * {@link PoseTarget.rotation}, or {@link PoseTarget.scale}, so the blend
+   * system can skip a node whose target has not moved.
    *
    * Opaque and monotonic, exactly like `Transform.version`: compare two stamps
    * for inequality, never subtract them. A single call may bump it more than
@@ -214,6 +227,7 @@ export class PoseTarget implements Component {
   capturePrevious(): void {
     this.previousPosition.copy(this.position);
     this.previousRotation.copy(this.rotation);
+    this.previousScale.copy(this.scale);
   }
 
   /**
@@ -223,17 +237,21 @@ export class PoseTarget implements Component {
    * The **history is seeded too**, because seeding is not a simulation step: a
    * target that adopted a node's pose without also adopting it as its history
    * would finite-difference the whole jump from the origin into a velocity on
-   * the first step. Scale and pivot are ignored (see the class documentation).
+   * the first step. Pivot is ignored (it is not a pose). Scale is copied —
+   * the physical side of the blend is still identity (see the class
+   * documentation).
    *
    * Copies values; the transform is not retained and nothing is aliased.
-   * Allocates nothing, and bumps {@link PoseTarget.version} twice — once per
-   * hooked member.
+   * Allocates nothing, and bumps {@link PoseTarget.version} three times —
+   * once per hooked member.
    */
   copyFrom(transform: Transform): this {
     this.position.copy(transform.position);
     this.rotation.copy(transform.rotation);
+    this.scale.copy(transform.scale);
     this.previousPosition.copy(transform.position);
     this.previousRotation.copy(transform.rotation);
+    this.previousScale.copy(transform.scale);
     return this;
   }
 }

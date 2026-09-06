@@ -280,6 +280,7 @@ describe("weight extremes are bit-identical (§19, plan P7-4)", () => {
     }
     target.position.set(1 / 3, -0, 1e-8);
     target.rotation.copy(rotation(new Vector3(1, 0, 1).normalize(), 2.3));
+    target.scale.set(2, 3, 4);
     placeSolverBody(
       adapter,
       1,
@@ -297,6 +298,20 @@ describe("weight extremes are bit-identical (§19, plan P7-4)", () => {
       quaternionComponents(node.transform.rotation),
       quaternionComponents(target.rotation),
     );
+    expectBitIdentical(vectorComponents(node.transform.scale), [2, 3, 4]);
+  });
+
+  it("1 / 0 writes identity scale — a solver body has none", async () => {
+    const { adapter, world } = await readyWorld();
+    const node = bodyNode({ physicsWeight: 1, animationWeight: 0 });
+    node.transform.scale.set(4, 5, 6);
+    world.addBody(node);
+    node.getComponent(PoseTarget)?.scale.set(2, 2, 2);
+    placeSolverBody(adapter, 1, new Vector3(1, 2, 3));
+
+    world.step(DT);
+
+    expectBitIdentical(vectorComponents(node.transform.scale), [1, 1, 1]);
   });
 
   it("both weights zero falls back to fully physical, still bit-identical", async () => {

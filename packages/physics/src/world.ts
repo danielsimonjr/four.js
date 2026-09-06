@@ -3338,7 +3338,11 @@ export class PhysicsWorld {
    * w        = body.normalizedWeights()          (§19's two sliders, summing to 1)
    * position = lerp(solverPosition, targetPosition, w.animation)
    * rotation = slerp(solverRotation, targetRotation, w.animation)   shortest arc
+   * scale    = lerp((1, 1, 1), targetScale, w.animation)
    * ```
+   *
+   * Scale's physical side is identity: a solver body has no scale
+   * (decision, 2026-09-06).
    *
    * `Quaternion.slerp` already takes the short way round an antipodal pair (it
    * negates the far end when the dot product is negative, plan D8), so a target
@@ -3365,15 +3369,17 @@ export class PhysicsWorld {
     const { node, body, handle } = registration;
     const target = this.#requirePoseTarget(registration);
     const weights = body.normalizedWeights(this.#blendWeights);
-    const { position, rotation } = node.transform;
+    const { position, rotation, scale } = node.transform;
 
     if (weights.animation === 0) {
       this.#adapter.getBodyTransform(handle, position, rotation);
+      scale.set(1, 1, 1);
       return;
     }
     if (weights.physics === 0) {
       position.copy(target.position);
       rotation.copy(target.rotation);
+      scale.copy(target.scale);
       return;
     }
 
@@ -3382,6 +3388,7 @@ export class PhysicsWorld {
     this.#adapter.getBodyTransform(handle, blendedPosition, blendedRotation);
     position.copy(blendedPosition.lerp(target.position, weights.animation));
     rotation.copy(blendedRotation.slerp(target.rotation, weights.animation));
+    scale.set(1, 1, 1).lerp(target.scale, weights.animation);
   }
 
   /**

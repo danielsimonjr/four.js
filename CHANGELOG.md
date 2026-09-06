@@ -8,6 +8,13 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — PoseTarget scale channel
+
+- **`PoseTarget.scale`.** Animated scale, default identity. The physical
+  side of a §19 blend is also identity — a solver body has no scale.
+  `copyFrom` copies `transform.scale`; `capturePrevious` keeps
+  `previousScale`. §79 writes the vector only when it is not `(1, 1, 1)`.
+
 ### 2026-09-06 — Rotational root motion
 
 - **`AnimationMixer` quaternion `rootMotion`.** A quaternion track is no

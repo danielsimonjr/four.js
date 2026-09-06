@@ -42,6 +42,7 @@ describe("PoseTarget construction (§19, P7-1)", () => {
 
     expectVector(target.position, 0, 0, 0);
     expectQuaternion(target.rotation, new Quaternion(0, 0, 0, 1));
+    expectVector(target.scale, 1, 1, 1);
     expect(target.version).toBe(0);
     expect(target.host).toBeNull();
   });
@@ -51,6 +52,7 @@ describe("PoseTarget construction (§19, P7-1)", () => {
 
     expectVector(target.previousPosition, 0, 0, 0);
     expectQuaternion(target.previousRotation, new Quaternion(0, 0, 0, 1));
+    expectVector(target.previousScale, 1, 1, 1);
   });
 
   it("gives every instance its own math objects", () => {
@@ -62,10 +64,10 @@ describe("PoseTarget construction (§19, P7-1)", () => {
     expect(b.version).toBe(0);
   });
 
-  it("carries no scale channel (P7-1 MVP)", () => {
-    // Position and rotation only — a solver body has no scale to blend
-    // against. The assertion exists so adding one later is a deliberate act.
-    expect("scale" in new PoseTarget()).toBe(false);
+  it("carries a scale channel that defaults to identity", () => {
+    // Physical side of the blend is also identity — a solver body has no
+    // scale (decision, 2026-09-06).
+    expectVector(new PoseTarget().scale, 1, 1, 1);
   });
 
   it("is keyed as `pose-target` (plan D2, §79)", () => {
@@ -324,7 +326,7 @@ describe("PoseTarget.copyFrom", () => {
     expect(target.rotation).not.toBe(transform.rotation);
   });
 
-  it("ignores scale and pivot (P7-1 MVP)", () => {
+  it("copies scale and still ignores pivot", () => {
     const transform = new Transform();
     transform.scale.set(3, 3, 3);
     transform.pivot.set(1, 1, 1);
@@ -333,6 +335,8 @@ describe("PoseTarget.copyFrom", () => {
     const target = new PoseTarget().copyFrom(transform);
 
     expectVector(target.position, 7, 0, 0);
+    expectVector(target.scale, 3, 3, 3);
+    expectVector(target.previousScale, 3, 3, 3);
   });
 
   it("returns `this` so it chains off addComponent", () => {
@@ -344,10 +348,10 @@ describe("PoseTarget.copyFrom", () => {
     expectVector(target.position, 0, 3, 0);
   });
 
-  it("bumps the version twice — once per hooked member", () => {
+  it("bumps the version three times — once per hooked member", () => {
     const target = new PoseTarget();
     target.copyFrom(new Transform());
-    expect(target.version).toBe(2);
+    expect(target.version).toBe(3);
   });
 
   it("allocates nothing", () => {

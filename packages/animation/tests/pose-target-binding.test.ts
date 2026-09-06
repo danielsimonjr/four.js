@@ -68,6 +68,10 @@ describe("PoseTarget bindings (§16, P7-1)", () => {
     expect(position.get()).toBe(target.position);
     expect(rotation.adapter).toBe(quaternionAdapter);
     expect(rotation.get()).toBe(target.rotation);
+
+    const scale = createBinding(target, "scale");
+    expect(scale.adapter).toBe(vector3Adapter);
+    expect(scale.get()).toBe(target.scale);
   });
 
   it("writes in place, so the version hook survives the write", () => {

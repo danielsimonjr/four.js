@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **55 open**, 134 done.
+Counts as of 2026-09-06: **54 open**, 135 done.
 
 ### 1 · Minutes — mechanical, no design in them
 
@@ -51,7 +51,7 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 - rapier 0.20 adoption is a real decision, not a bump.
 - Lift the TypeScript/vitest pin once typedoc supports TS 7.
-- PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends against; solver bodies have no scale)
+- PoseTarget scale channel — DONE 2026-09-06 (physical side is identity).
 - Rotational root motion — DONE 2026-09-06 (quaternion track extracts local rotation).
 - A-25 owner decisions before first publish:
 - A-25 remainder:
@@ -1428,8 +1428,9 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       — DONE 2026-09-06: a quaternion `rootMotion` track differences
       `conjugate(previous) * sampled` and multiplies onto
       `transform.rotation`. Loops compose the same way translation adds.
-- [ ] PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends
-      against; solver bodies have no scale)
+- [x] PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends
+      against; solver bodies have no scale) — DONE 2026-09-06: physical side
+      is identity `(1, 1, 1)`. `copyFrom` copies scale; §79 omits identity.
 - [x] Capability-table note: Rapier derives kinematic velocity itself, so
       inheritVelocityFrom is nearly a no-op there — DONE 2026-09-06, documented
       in `docs/COMPATIBILITY.md` deviations. Other solvers still get a column
@@ -1487,6 +1488,11 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- [x] 2026-09-06 — **PoseTarget scale channel.** Physical side of the §19
+      blend is identity `(1, 1, 1)` — the only scale a rigid body has.
+      `copyFrom` copies `transform.scale`. §79 omits identity so old
+      documents stay identical.
 
 - [x] 2026-09-06 — **Rotational root motion.** A quaternion `rootMotion`
       track extracts `conjugate(previous) * sampled` and multiplies it onto

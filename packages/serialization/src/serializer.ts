@@ -317,14 +317,20 @@ export class ComponentSerializerRegistry {
  * is the same state a freshly authored target has and differences to zero
  * velocity rather than to a spurious spike.
  *
- * Scale is absent because `PoseTarget` has none (P7-1: a solver body has no
- * scale to blend against).
+ * Scale is omitted when it is identity `(1, 1, 1)` so a document written
+ * before the channel still round-trips. A present scale restores; absence
+ * leaves the default. The physical side of a §19 blend is identity
+ * (decision, 2026-09-06).
  */
 export const POSE_TARGET_SERIALIZER: ComponentSerializer<PoseTarget> = {
   serialize(component: PoseTarget): JsonValue {
+    const { scale } = component;
     return {
       position: vector3Json(component.position),
       rotation: quaternionJson(component.rotation),
+      ...(scale.x === 1 && scale.y === 1 && scale.z === 1
+        ? {}
+        : { scale: vector3Json(scale) }),
     };
   },
   deserialize(data: JsonValue): PoseTarget {
@@ -343,6 +349,10 @@ export const POSE_TARGET_SERIALIZER: ComponentSerializer<PoseTarget> = {
         "pose-target.rotation",
       );
       target.rotation.set(rotation.x, rotation.y, rotation.z, rotation.w);
+    }
+    if (record.scale !== undefined) {
+      const scale = validateVector3Document(record.scale, "pose-target.scale");
+      target.scale.set(scale.x, scale.y, scale.z);
     }
     // Seed the history to the restored pose; see the doc comment above.
     target.capturePrevious();
