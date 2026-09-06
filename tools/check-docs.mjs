@@ -484,6 +484,219 @@ for (const rel of prosePaths()) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 4. Counts claimed in prose must match the filesystem.
+//
+//    Each pin extracts a bold number (`**N**`) from a known sentence or table
+//    row and compares it to a directory listing. Adding a package, a suite, or
+//    a browser spec without updating the sentence fails here, which is the
+//    defect `tests/README.md` carried (8 determinism suites, 6+1 integration,
+//    9 browser specs, `pnpm test:suites`) until 2026-09-06.
+// ---------------------------------------------------------------------------
+
+/** Immediate child files of `rel` whose names end with `suffix`. */
+function countDirect(rel, suffix) {
+  const dir = join(root, rel);
+  if (!existsSync(dir)) return 0;
+  return readdirSync(dir).filter(
+    (name) => name.endsWith(suffix) && statSync(join(dir, name)).isFile(),
+  ).length;
+}
+
+/** Files under `rel` (any depth) whose names end with `suffix`. */
+function countNested(rel, suffix) {
+  const dir = join(root, rel);
+  if (!existsSync(dir)) return 0;
+  let n = 0;
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) {
+      n += countNested(join(rel, name), suffix);
+    } else if (name.endsWith(suffix)) {
+      n += 1;
+    }
+  }
+  return n;
+}
+
+const packageCount = existsSync(join(root, "packages"))
+  ? readdirSync(join(root, "packages")).filter((name) =>
+      existsSync(join(root, "packages", name, "package.json")),
+    ).length
+  : 0;
+
+const determinismSuites = countDirect("tests/determinism", ".test.ts");
+const determinismGoldens = countDirect("tests/determinism/golden", ".json");
+const integrationSuites = countDirect("tests/integration", ".test.ts");
+const browserSpecs = countDirect("tests/browser", ".spec.ts");
+const visualSpecs = countDirect("tests/visual", ".spec.ts");
+const visualGoldens = countNested("tests/visual", ".png");
+
+const readme = read("README.md");
+if (readme === null) {
+  errors.push("README.md is missing");
+} else {
+  const claimed = readme.match(/(\d+) workspace packages/);
+  if (claimed === null) {
+    errors.push(
+      'README.md: must claim "N workspace packages" so the count can be ' +
+        "compared against packages/*/package.json",
+    );
+  } else if (Number(claimed[1]) !== packageCount) {
+    errors.push(
+      `README.md: claims ${claimed[1]} workspace packages, but ` +
+        `packages/*/package.json counts ${String(packageCount)}`,
+    );
+  }
+}
+
+const testsReadmeRel = "tests/README.md";
+const testsReadme = read(testsReadmeRel);
+if (testsReadme === null) {
+  errors.push(`${testsReadmeRel} is missing`);
+} else {
+  /**
+   * The summary table's row for `dir` must state each count as `**N**` so this
+   * check can read it without judging the surrounding prose.
+   */
+  function tableRow(dir) {
+    const row = testsReadme.split("\n").find((l) => l.includes(`[\`${dir}/\`]`));
+    if (row === undefined) {
+      errors.push(`${testsReadmeRel}: no summary-table row for ${dir}/`);
+      return null;
+    }
+    return row;
+  }
+
+  function boldNumbers(row) {
+    return [...row.matchAll(/\*\*(\d+)\*\*/g)].map((m) => Number(m[1]));
+  }
+
+  const detRow = tableRow("determinism");
+  if (detRow !== null) {
+    const nums = boldNumbers(detRow);
+    if (nums.length < 2) {
+      errors.push(
+        `${testsReadmeRel}: the determinism row must state its suite and ` +
+          `golden counts as "**N** suites + **M** committed goldens"`,
+      );
+    } else {
+      if (nums[0] !== determinismSuites) {
+        errors.push(
+          `${testsReadmeRel}: determinism row claims ${String(nums[0])} suites, ` +
+            `but tests/determinism/*.test.ts counts ${String(determinismSuites)}`,
+        );
+      }
+      if (nums[1] !== determinismGoldens) {
+        errors.push(
+          `${testsReadmeRel}: determinism row claims ${String(nums[1])} goldens, ` +
+            `but tests/determinism/golden/*.json counts ${String(determinismGoldens)}`,
+        );
+      }
+    }
+  }
+
+  const intRow = tableRow("integration");
+  if (intRow !== null) {
+    const nums = boldNumbers(intRow);
+    if (nums.length < 1) {
+      errors.push(
+        `${testsReadmeRel}: the integration row must state its count as "**N** suites"`,
+      );
+    } else if (nums[0] !== integrationSuites) {
+      errors.push(
+        `${testsReadmeRel}: integration row claims ${String(nums[0])} suites, ` +
+          `but tests/integration/*.test.ts counts ${String(integrationSuites)}`,
+      );
+    }
+  }
+
+  const broRow = tableRow("browser");
+  if (broRow !== null) {
+    const nums = boldNumbers(broRow);
+    if (nums.length < 1) {
+      errors.push(
+        `${testsReadmeRel}: the browser row must state its count as "**N** Playwright specs"`,
+      );
+    } else if (nums[0] !== browserSpecs) {
+      errors.push(
+        `${testsReadmeRel}: browser row claims ${String(nums[0])} specs, ` +
+          `but tests/browser/*.spec.ts counts ${String(browserSpecs)}`,
+      );
+    }
+  }
+
+  const visRow = tableRow("visual");
+  if (visRow !== null) {
+    const nums = boldNumbers(visRow);
+    if (nums.length < 2) {
+      errors.push(
+        `${testsReadmeRel}: the visual row must state its spec and golden ` +
+          `counts as "**N** specs, **M** committed PNG goldens"`,
+      );
+    } else {
+      if (nums[0] !== visualSpecs) {
+        errors.push(
+          `${testsReadmeRel}: visual row claims ${String(nums[0])} specs, ` +
+            `but tests/visual/*.spec.ts counts ${String(visualSpecs)}`,
+        );
+      }
+      if (nums[1] !== visualGoldens) {
+        errors.push(
+          `${testsReadmeRel}: visual row claims ${String(nums[1])} goldens, ` +
+            `but tests/visual/**/*.png counts ${String(visualGoldens)}`,
+        );
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5. docs/AUDIT-120.md's verdict table is internally consistent.
+//
+//    The census is the file's own item tables (Scene through Tooling): each
+//    row whose status cell is `shipped`, `shipped (MVP tier)`, or `staged`.
+//    The verdict table above them states three bold totals that must sum to
+//    that census. README.md's "43/43" is pinned only when the census is 43
+//    and staged is 0 — decided by reading the audit's table, not by
+//    inventing a verdict.
+// ---------------------------------------------------------------------------
+
+if (audit !== null) {
+  const itemRow =
+    /^\| (?![-: ])(?!\s*§120 item).+\| (shipped(?: \(MVP tier\))?|staged)\s+\|/;
+  const items = audit.split("\n").filter((l) => itemRow.test(l));
+  const stagedItems = items.filter((l) => /\|\s*staged\s+\|/.test(l)).length;
+  const verdictTotals = [
+    ...audit.matchAll(/\|\s+\*\*(\d+)\*\*\s+\|\s+of 43\s+\|/g),
+  ].map((m) => Number(m[1]));
+  const verdictSum = verdictTotals.reduce((a, b) => a + b, 0);
+
+  if (items.length === 0) {
+    errors.push(`${auditRel}: no §120 item rows with a shipped/staged status`);
+  }
+  if (verdictTotals.length !== 3) {
+    errors.push(
+      `${auditRel}: the Verdict table must state three bold totals as ` +
+        `"**N** | of 43" (shipped / MVP-tier / staged)`,
+    );
+  } else if (verdictSum !== items.length) {
+    errors.push(
+      `${auditRel}: Verdict table sums to ${String(verdictSum)}, but the ` +
+        `item tables list ${String(items.length)} rows`,
+    );
+  }
+
+  if (readme !== null && /\b43\/43\b/.test(readme)) {
+    if (items.length !== 43 || stagedItems !== 0) {
+      errors.push(
+        `README.md: claims 43/43, but ${auditRel}'s item tables list ` +
+          `${String(items.length)} rows (${String(stagedItems)} staged)`,
+      );
+    }
+  }
+}
+
 if (errors.length) {
   console.error(`check-docs: ${errors.length} problem(s)`);
   for (const e of errors) console.error(`  - ${e}`);
@@ -491,5 +704,6 @@ if (errors.length) {
 }
 console.log(
   `check-docs: OK (${realExamples.length} runnable examples, ` +
-    `${placeholderExamples.length} placeholders, ${RETIRED.length} retired claims pinned)`,
+    `${placeholderExamples.length} placeholders, ${RETIRED.length} retired claims pinned, ` +
+    `${String(packageCount)} packages, ${String(determinismSuites)}/${String(integrationSuites)}/${String(browserSpecs)} suites)`,
 );

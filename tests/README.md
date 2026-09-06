@@ -6,17 +6,24 @@ This file described §92's _taxonomy_ — the categories the specification asks 
 colocated in each package (`packages/<name>/tests/`); performance measurements live in
 [`benchmarks/`](../benchmarks/) and are recorded, never gated.
 
-| directory                      | runner                                   | what is committed                                   |
-| ------------------------------ | ---------------------------------------- | --------------------------------------------------- |
-| [`determinism/`](determinism/) | `pnpm test:suites`                       | 8 suites + 8 committed goldens                      |
-| [`integration/`](integration/) | `pnpm test:suites`                       | 6 scenario suites + 1 example-build coverage suite  |
-| [`browser/`](browser/)         | `pnpm test:browser` (project `chromium`) | 9 Playwright specs over the six built example sites |
-| [`visual/`](visual/)           | `pnpm test:browser` (project `visual`)   | 1 spec, 2 committed PNG goldens                     |
+| directory                      | runner                                      | what is committed                        |
+| ------------------------------ | ------------------------------------------- | ---------------------------------------- |
+| [`determinism/`](determinism/) | `bun run test:suites`                       | **25** suites + **22** committed goldens |
+| [`integration/`](integration/) | `bun run test:suites`                       | **65** suites                            |
+| [`browser/`](browser/)         | `bun run test:browser` (project `chromium`) | **30** Playwright specs                  |
+| [`visual/`](visual/)           | `bun run test:browser` (project `visual`)   | **2** specs, **3** committed PNG goldens |
+
+The bold numbers are pinned by `tools/check-docs.mjs` against the filesystem
+(`tests/determinism/*.test.ts` and `golden/*.json`, `tests/integration/*.test.ts`,
+`tests/browser/*.spec.ts`, `tests/visual/*.spec.ts` and `**/*.png`). Adding a
+file without updating this table fails that gate.
 
 ## `determinism/` — §33, §92
 
-Eight suites, one per phase that produced a determinism obligation, each pinned to a
-committed checksum golden in `determinism/golden/phase<N>.json`:
+**25** suites. Eight of them are the original phase goldens (one per phase that
+produced a determinism obligation), each pinned to a committed checksum in
+`determinism/golden/phase<N>.json`. The rest pin later packets (path, stroke,
+camera rigs, glTF, …) against their own goldens under `determinism/golden/`:
 
 | suite                              | golden    | what it pins                           |
 | ---------------------------------- | --------- | -------------------------------------- |
@@ -36,36 +43,43 @@ and is not claimed.
 
 ## `integration/` — §92
 
-Six scenario suites plus one repository-hygiene suite. Scenario builders shared between
-them live in `integration/helpers/`.
+**65** suites. Seven of them are the original scenario set plus the repository-hygiene
+suite; the rest landed with later packets. Scenario builders shared between them live
+in `integration/helpers/`.
 
-| suite                             | what it crosses                                                                                                                  |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `physics-rapier.test.ts`          | `@four/physics` ↔ the Rapier adapter, both dimensions                                                                            |
-| `physics-joints.test.ts`          | joints and motors across scene + physics                                                                                         |
-| `physics-blending.test.ts`        | §19 animation → kinematic → physics → interpolated render                                                                        |
-| `physics-replay.test.ts`          | §34 snapshot, restore and replay across packages                                                                                 |
-| `motion-advanced.test.ts`         | §13–§14 trajectories and path following                                                                                          |
-| `scene-roundtrip.test.ts`         | §79 serialization round-trips of a populated scene                                                                               |
-| `examples-build-coverage.test.ts` | repository hygiene, not engine behaviour: every example `playwright.config.ts` previews must be one `pnpm examples:build` builds |
+| suite                             | what it crosses                                                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `physics-rapier.test.ts`          | `@four/physics` ↔ the Rapier adapter, both dimensions                                                                                 |
+| `physics-joints.test.ts`          | joints and motors across scene + physics                                                                                              |
+| `physics-blending.test.ts`        | §19 animation → kinematic → physics → interpolated render                                                                             |
+| `physics-replay.test.ts`          | §34 snapshot, restore and replay across packages                                                                                      |
+| `motion-advanced.test.ts`         | §13–§14 trajectories and path following                                                                                               |
+| `scene-roundtrip.test.ts`         | §79 serialization round-trips of a populated scene                                                                                    |
+| `examples-build-coverage.test.ts` | repository hygiene, not engine behaviour: every example `playwright.config.ts` previews must be one `bun run examples:build` builds |
 
 ## `browser/` — §92's browser tier
 
-Nine Playwright specs, run by the `chromium` project against the **built** example sites
-(`pnpm examples:build` first). See `playwright.config.ts` for the site/port/spec map. The
-assertions are thresholds — canvas is not blank, frame pacing is smooth, pointer and
-keyboard reach the scene — because SwiftShader does not rasterise like a GPU.
+**30** Playwright specs in the `chromium` project (`tests/browser/*.spec.ts`; the
+`webgpu/` subdirectory is a separate project). Most drive the **built** example
+sites (`bun run examples:build` first — see `playwright.config.ts` for the
+site/port/spec map). A handful — batching, culling, stencil, the README Quick
+start snippet — bundle an inline fixture and inject it into the first site's
+origin, so they need no extra `webServer`. The assertions are thresholds —
+canvas is not blank, frame pacing is smooth, pointer and keyboard reach the
+scene — because SwiftShader does not rasterise like a GPU.
 
 ## `visual/` — §92's visual-regression tier, seeded 2026-08-04
 
-One spec (`ui-demo.spec.ts`) with two committed PNG goldens under
-`ui-demo.spec.ts-snapshots/`. It runs in its own Playwright project (`visual`) so that the
-comparison is SwiftShader-to-SwiftShader, which is what makes a pixel match legitimate
-here; the `chromium` project's no-golden-images doctrine does not apply to it. Refresh with
-`npx playwright test --project visual --update-snapshots` after reviewing the diff.
+**2** specs (`ui-demo.spec.ts`, `text.spec.ts`) with **3** committed PNG goldens
+under their `*.spec.ts-snapshots/` directories. They run in their own Playwright
+project (`visual`) so that the comparison is SwiftShader-to-SwiftShader, which
+is what makes a pixel match legitimate here; the `chromium` project's
+no-golden-images doctrine does not apply to it. Refresh with
+`npx playwright test --project visual --update-snapshots` after reviewing the
+diff.
 
-Only pages that are **static at rest** can join this suite. Animated example sites cannot,
-which is why exactly one spec lives here.
+Only pages that are **static at rest** can join this suite. Animated example
+sites cannot.
 
 ## Not yet covered, by §92 category
 
