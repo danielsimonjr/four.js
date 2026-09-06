@@ -30,6 +30,11 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — #70 size budgets.** first-3d 38.18/38, particles
+  36.77/36.5, ui-demo 45.27/45. Bumped half a kilobyte each. The
+  waiter-only PR did not grow the library; CI first reached `size`
+  after #70's field torque / unlit blend / metal-roughness path.
+
 - **2026-09-06 — smoothness parity wait cannot use `waitForFunction`.**
   `useVirtualFrameClock` replaces `requestAnimationFrame`.
   Playwright's `waitForFunction` defaults to `polling: "raf"` and
