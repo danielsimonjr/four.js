@@ -219,6 +219,8 @@ export {
   liveTextureCount,
   textureMemoryBytes,
 } from "./resource-memory.js";
+export type { DisposedResourceKind } from "./resource-warnings.js";
+export { warnDisposedInUse } from "./resource-warnings.js";
 export type {
   RenderStatistics,
   RenderStatisticsReporter,
