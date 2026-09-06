@@ -8,6 +8,41 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — open PRs and branches swept
+
+- **Two Dependabot PRs closed, neither blocked on a rebase.**
+  - **#65** (`@dimforge/rapier` 0.19.3 → 0.20.0) is the change merged as #63 and reverted
+    on 2026-09-05. CI red for the same recorded cause: four *behavioural* differences, not
+    an API break — a bullet that no longer tunnels at a small CCD prediction distance, a
+    contact distance of 0.005 where `<= 0` was expected, and a snapshot-restored joint at
+    −0.75 where `> −0.22` was expected. Adopting 0.20 is a decision, and it needs the
+    `contactPair(c1, c2, bodies, f)` adapter change besides.
+  - **#66** (eight dev-dependencies, including **eslint 9 → 10**) went red on `warn`-count
+    assertions — the **pre-existing test-isolation defect** already tracked here, where the
+    §42 authority warning fires an extra time under a full run and the affected tests pass
+    in isolation. A dependency bump neither caused it nor can fix it.
+
+  Both are now **ignored in `.github/dependabot.yml`** with their reasons, so they stop
+  returning every Monday to spend a CI run going red the same way.
+
+- **Three stale branches deleted, each verified superseded by content rather than by
+  ancestry** — a squash-merged branch reads as "unmerged" and deleting on that signal
+  alone would be guesswork:
+  - `claude/tools-integration-rji2sr` (13 commits): every sampled artifact is in `main` —
+    `docs/GAP ANALYSIS v2.md`, `examples/character-controller/main.ts`,
+    `packages/math/src/rectangle2.ts`, `packages/render/src/read-pixels.ts`.
+  - `cursor/sanitize-todo-security-coverage-28a3`: **zero** diff lines against `main`.
+  - `cursor/typescript-on-bun-b951`: RFC 0006 landed — `main`'s `test` script already runs
+    `bun tools/run-in-packages.mjs`.
+
+  Remaining: `main` and `changeset-release/main`, which Changesets manages itself.
+
+- **#67 ("Release: version packages") is deliberately left open.** It is the standing
+  release-staging PR: Changesets regenerates it from the pending changeset on the next
+  push, so closing it is churn rather than cleanup. It should be merged when 0.1 is
+  actually being cut, not before — merging it now would version packages we are not
+  releasing.
+
 ### 2026-09-06 — a dynamic body with nothing to derive inertia from now says so
 
 - **A dynamic body with no collider and no `inertiaTensor` has zero angular inertia, so the

@@ -463,11 +463,16 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **Lift the TypeScript/vitest pin once typedoc supports TS 7.** Currently ignored in
       `.github/dependabot.yml`. Both must move in ONE PR — bumping either alone re-breaks a gate.
       Check `npm view typedoc peerDependencies` for a range that includes 7.x.
-- [ ] **Pre-existing test-isolation defect, still unfixed and now hidden again.** vitest 3 masks it;
+- [ ] **Pre-existing test-isolation defect, still unfixed and now hidden again.**
+      **Now blocking a second thing:** Dependabot #66 (eight dev-deps incl. eslint 9 → 10)
+      went red on this defect's `warn`-count assertions and was closed 2026-09-06;
+      `eslint >=10` is ignored until this is fixed. Fixing it unblocks the linter major. vitest 3 masks it;
       vitest 4 exposed it. 7 tests fail because an extra §42 authority warning fires, and the
       failing tests PASS IN ISOLATION. Not caused by the dependency — reverting only re-hid it.
       Worth fixing before vitest 4 is attempted again, or the same PR fails the same way.
-- [ ] **rapier 0.20 adoption is a real decision, not a bump.** Four behavioural differences
+- [ ] **rapier 0.20 adoption is a real decision, not a bump.**
+      Dependabot **#65 closed 2026-09-06** and `@dimforge/rapier* >=0.20` is now
+      ignored, so this stops re-proposing weekly until the decision is made. Four behavioural differences
       measured (CCD, contact distance, snapshot joint). The `contactPair` API fix it needs is in
       the CHANGELOG entry for whoever takes it.
 
