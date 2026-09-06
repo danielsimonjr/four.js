@@ -695,16 +695,15 @@ export class ForceFieldSystem implements SimulationSystem {
       if (wakingOnly && !entry.wakesSleepingBodies) {
         continue;
       }
-      const sampleTorque = entry.field.sampleTorque;
-      if (sampleTorque === undefined) {
+      const field = entry.field;
+      if (field.sampleTorque === undefined) {
         continue;
       }
       if (!angularCopied) {
         this.#angularVelocity.copy(body.angularVelocity);
         angularCopied = true;
       }
-      const sampled = sampleTorque.call(
-        entry.field,
+      const sampled = field.sampleTorque(
         centerOfMass,
         velocity,
         this.#angularVelocity,
@@ -734,12 +733,11 @@ export class ForceFieldSystem implements SimulationSystem {
    */
   #accumulateField(entry: ForceFieldEntry, count: number, time: number): void {
     const scaleIsMass = entry.units === "acceleration";
-    const batch = entry.field.sampleAll;
-    if (batch !== undefined) {
+    const field = entry.field;
+    if (field.sampleAll !== undefined) {
       const scratch = this.#fieldScratch;
       scratch.fill(0, 0, count * 3);
-      batch.call(
-        entry.field,
+      field.sampleAll(
         this.#positions,
         this.#velocities,
         count,
