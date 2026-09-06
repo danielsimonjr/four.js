@@ -8,9 +8,10 @@
  * + §75 arrow keys), {@link ProgressIndicator}, {@link ImageWidget}, and
  * {@link CanvasViewWidget} (§77a's skin-drawn canvas view; RFC 0004,
  * 2026-08-29), plus §75's keyboard navigation over all of them
- * ({@link installKeyboardTraversal}, {@link keyboardFocusTarget}). Everything
- * else §73–§75 names is staged with a dated note in {@link UI_STAGED} — read
- * that array before assuming a control exists.
+ * ({@link installKeyboardTraversal}, {@link keyboardFocusTarget}) and the
+ * opt-in hidden DOM accessibility mirror ({@link installAccessibilityMirror}).
+ * Everything else §73–§75 names is staged with a dated note in
+ * {@link UI_STAGED} — read that array before assuming a control exists.
  *
  * ```ts
  * const root = new Panel({ layout: { type: "flex", direction: "column", gap: 12, padding: 20 } });
@@ -26,6 +27,7 @@
  * });
  * new KeyboardInput(window, { focusTarget: keyboardFocusTarget(root) });  // §75
  * installKeyboardTraversal(root);                                         // Tab
+ * installAccessibilityMirror(root, { document });                         // §75
  * start.on("uiactivate", () => simulation.start());   // click, Enter, or Space
  * ```
  *
@@ -38,6 +40,18 @@
 
 export const PACKAGE_NAME = "@four/ui";
 
+export type {
+  AccessibilityMirror,
+  AccessibilityMirrorOptions,
+  AccessibilityMirrorRoot,
+  DocumentLike,
+  ElementLike,
+} from "./accessibility.js";
+export {
+  accessibilityElementId,
+  installAccessibilityMirror,
+  prefersReducedMotion,
+} from "./accessibility.js";
 export type { ButtonOptions } from "./button.js";
 export { Button } from "./button.js";
 export type { CanvasViewWidgetOptions } from "./canvas-view.js";
@@ -74,6 +88,7 @@ export { RadioButton, checkedRadio, collectRadioGroup } from "./radio.js";
 export type { SliderOptions, SliderOrientation } from "./slider.js";
 export { Slider } from "./slider.js";
 export type {
+  AccessibilitySync,
   InsetsInit,
   UIFocusEvent,
   UIWidgetOptions,
@@ -94,4 +109,5 @@ export {
   collectPickables,
   focusedWidget,
   isUIWidget,
+  registerAccessibilitySync,
 } from "./widget.js";

@@ -143,8 +143,9 @@ export const UI_LAYOUT_AUTHORITY = "constraint" as const;
  * navigation and focus order left it on 2026-08-07 (A-13): `@four/input` gained
  * the key source that was its stated blocker (A-10), and `keyboard.ts` now
  * implements Tab/Shift-Tab traversal while `Button` implements Enter/Space
- * activation. The four remaining §75 entries are unchanged, and three of them
- * still wait on the same DOM integration policy.
+ * activation. The hidden DOM mirror, screen-reader updates, high-contrast
+ * hook, and scalable text left it on 2026-09-06 (A-13 remainder):
+ * `installAccessibilityMirror` is the opt-in consumer of this record.
  */
 export const UI_STAGED: readonly string[] = Object.freeze([
   "§73 controls — text input, scroll view, list, virtual list, menu, " +
@@ -179,19 +180,11 @@ export const UI_STAGED: readonly string[] = Object.freeze([
     "percentages and RTL need a resolution pass this packet does not own; " +
     "scroll extent belongs with the scroll view; device-pixel scaling is the " +
     "renderer's `resolution`, §47).",
-  "§75 hidden DOM accessibility mirror — the WidgetAccessibility data ships " +
-    "and is inert (2026-08-02, P11-3: mirroring needs a DOM integration " +
-    "policy — who owns the element, where it is mounted, how it is torn down, " +
-    "and how a package that may not name DOM types reaches one. Roles, names, " +
-    "descriptions, and states are already carried here, so the mirror is a " +
-    "consumer of existing data rather than a change to this API).",
-  "§75 screen-reader updates, high-contrast theme hooks, and scalable text — " +
-    "not implemented (2026-08-02, P11-3: the first two follow the DOM mirror; " +
-    "the third is a skin and camera concern, since layout units are already " +
-    "resolution-independent).",
-  "§75 reduced motion — not consulted here (2026-08-02, WP-11.3: §45 makes " +
-    "`reducedMotion` an application-level policy and nothing in this MVP " +
-    "animates; the widgets that will (menu, tooltip) must read it).",
+  "§75 reduced motion — installAccessibilityMirror accepts the already-" +
+    "resolved boolean (2026-09-06, A-13 remainder; Application.reducedMotion " +
+    "ships on the umbrella). Nothing in this MVP animates; the widgets that " +
+    "will (menu, tooltip) must read prefersReducedMotion() or the option " +
+    "they were given. They still wait on a per-frame update hook.",
 ]);
 
 /**
@@ -393,13 +386,14 @@ export interface UIFocusEvent {
  * `button.accessibility = { role, label, description, tabIndex }` — and that is
  * exactly what ships: typed, serializable (§79).
  *
- * **One field is live**: {@link WidgetAccessibility.tabIndex} orders (and can
+ * **Live fields.** {@link WidgetAccessibility.tabIndex} orders (and can
  * exclude from) the Tab traversal `keyboard.ts` implements, as of 2026-08-07
- * (A-13). `role`, `label`, and `description` are still carried and still read by
- * nobody — they are the hidden DOM mirror's data, and the mirror is staged (see
- * {@link UI_STAGED}). They ship anyway because an application that annotates its
- * UI today loses nothing when the mirror lands, and because the mirror is then a
- * reader of this data rather than a change to this API.
+ * (A-13). `role`, `label`, `description`, and the §75 states (`disabled`,
+ * `checked`, slider/progress values) are projected by
+ * `installAccessibilityMirror` (2026-09-06, A-13 remainder). Convenience
+ * accessors {@link UIWidget.label} and {@link UIWidget.role} write these
+ * fields so a setter can push a screen-reader update without replacing the
+ * whole record.
  */
 export interface WidgetAccessibility {
   /** Semantic role, e.g. `"button"` (§75). Free-form: ARIA's vocabulary is not restated here. */
@@ -515,6 +509,17 @@ export interface UIWidgetOptions extends NodeOptions {
   disabled?: boolean;
   /** {@link UIWidget.accessibility}. */
   accessibility?: WidgetAccessibility;
+  /**
+   * {@link UIWidget.label} — writes `accessibility.label`. Applied after
+   * {@link UIWidgetOptions.accessibility} so an explicit record still wins on
+   * every other field, and a lone `label` does not require building one.
+   */
+  label?: string;
+  /**
+   * {@link UIWidget.role} — writes `accessibility.role`. Same merge rule as
+   * {@link UIWidgetOptions.label}.
+   */
+  role?: string;
 }
 
 declare module "@four/scene" {
@@ -555,6 +560,29 @@ declare module "@four/scene" {
  * keep it alive.
  */
 const focusOwners = new WeakMap<Node, UIWidget>();
+
+/**
+ * Installed accessibility mirrors subscribe here so a widget setter can push
+ * a screen-reader update without importing the mirror module (and without
+ * pulling that module into a tree that never installed one).
+ */
+export type AccessibilitySync = (widget: UIWidget) => void;
+
+const accessibilitySyncs = new Set<AccessibilitySync>();
+
+/**
+ * Registers `sync` to be called when a widget's accessibility surface
+ * changes. Returns the unsubscriber. Used by `installAccessibilityMirror`;
+ * not part of the everyday widget API.
+ */
+export function registerAccessibilitySync(
+  sync: AccessibilitySync,
+): Unsubscribe {
+  accessibilitySyncs.add(sync);
+  return () => {
+    accessibilitySyncs.delete(sync);
+  };
+}
 
 /** The topmost ancestor of `node` — `node` itself when it is a root. */
 function scopeRootOf(node: Node): Node {
@@ -660,11 +688,8 @@ export abstract class UIWidget extends Node implements Disposable {
    */
   grow = 0;
 
-  /**
-   * §75's accessibility record, or `null`. Inert data — see
-   * {@link WidgetAccessibility} and {@link UI_STAGED}.
-   */
-  accessibility: WidgetAccessibility | null = null;
+  #accessibility: WidgetAccessibility | null = null;
+  #accessibilityVersion = 0;
 
   /** Intrinsic measurement scratch — per widget, so a bottom-up pass cannot alias. */
   readonly #intrinsic: Vector2 = new Vector2();
@@ -775,8 +800,13 @@ export abstract class UIWidget extends Node implements Disposable {
     if (options.focusable !== undefined) this.focusable = options.focusable;
     if (options.disabled !== undefined) this.#disabled = options.disabled;
     if (options.accessibility !== undefined) {
-      this.accessibility = options.accessibility;
+      this.#accessibility = options.accessibility;
     }
+    // Applied after the record so a lone `label` / `role` constructs one, and
+    // a pair next to `accessibility` writes those two fields into it (the
+    // rest of the record is left alone). No notify: nothing is mirrored yet.
+    if (options.label !== undefined) this.#writeLabel(options.label);
+    if (options.role !== undefined) this.#writeRole(options.role);
     // There is deliberately no `skin` option: assigning a skin calls
     // `onAttach`/`onLayout`/`onStateChange` immediately, and a base constructor
     // runs *before* a subclass's field initializers — so a skin passed here
@@ -893,6 +923,61 @@ export abstract class UIWidget extends Node implements Disposable {
       }
     }
     this.publishState();
+  }
+
+  /**
+   * §75's accessibility record, or `null`. Assigning replaces the record and
+   * notifies an installed DOM mirror. Mutating fields in place does not —
+   * assign a new object, write {@link UIWidget.label} / {@link UIWidget.role},
+   * or call `mirror.sync(widget)`.
+   */
+  get accessibility(): WidgetAccessibility | null {
+    return this.#accessibility;
+  }
+
+  set accessibility(value: WidgetAccessibility | null) {
+    if (value === this.#accessibility) return;
+    this.#accessibility = value;
+    this.notifyAccessibility();
+  }
+
+  /**
+   * Accessible name (§75). Writes `accessibility.label`, creating the record
+   * when there is not one yet. Empty-string is stored as authored; `undefined`
+   * removes the field.
+   */
+  get label(): string | undefined {
+    return this.#accessibility?.label;
+  }
+
+  set label(value: string | undefined) {
+    if (value === this.label) return;
+    this.#writeLabel(value);
+    this.notifyAccessibility();
+  }
+
+  /**
+   * Semantic role (§75). Writes `accessibility.role` with the same create-or-
+   * mutate rule as {@link UIWidget.label}.
+   */
+  get role(): string | undefined {
+    return this.#accessibility?.role;
+  }
+
+  set role(value: string | undefined) {
+    if (value === this.role) return;
+    this.#writeRole(value);
+    this.notifyAccessibility();
+  }
+
+  /**
+   * Generation of this widget's accessibility surface. Incremented by every
+   * setter that a mirror cares about (`disabled`, `checked`, `value`,
+   * `label` / `role` / `accessibility`). An installer that would rather poll
+   * than subscribe compares this against the last value it projected.
+   */
+  get accessibilityVersion(): number {
+    return this.#accessibilityVersion;
   }
 
   /**
@@ -1105,6 +1190,7 @@ export abstract class UIWidget extends Node implements Disposable {
     this.#subscriptions.length = 0;
     this.skin = null;
     this.#disposed = true;
+    this.notifyAccessibility();
   }
 
   // --- internals --------------------------------------------------------------
@@ -1191,6 +1277,12 @@ export abstract class UIWidget extends Node implements Disposable {
     const current = this.state;
     this.#skin?.onStateChange?.(this);
     this.emit("uistatechange", { widget: this, previous, current });
+    // Hover and press are not an accessibility surface; disabled and checked
+    // are. A mirror that subscribed via registerAccessibilitySync is pushed
+    // only for the latter so a pointer sweep does not rewrite the DOM.
+    if (before.disabled !== this.#disabled || before.checked !== this.checked) {
+      this.notifyAccessibility();
+    }
   }
 
   /**
@@ -1206,6 +1298,47 @@ export abstract class UIWidget extends Node implements Disposable {
    */
   protected notifyContentChange(): void {
     this.#skin?.onContentChange?.(this);
+    this.notifyAccessibility();
+  }
+
+  /**
+   * Bumps {@link UIWidget.accessibilityVersion} and notifies every installed
+   * DOM mirror. `protected` so a subclass that owns a field the base does not
+   * (a future `expanded`) can push the same way `checked` does.
+   */
+  protected notifyAccessibility(): void {
+    this.#accessibilityVersion += 1;
+    for (const sync of accessibilitySyncs) {
+      sync(this);
+    }
+  }
+
+  #writeLabel(value: string | undefined): void {
+    if (value === undefined) {
+      if (this.#accessibility !== null) {
+        delete this.#accessibility.label;
+      }
+      return;
+    }
+    if (this.#accessibility === null) {
+      this.#accessibility = { label: value };
+      return;
+    }
+    this.#accessibility.label = value;
+  }
+
+  #writeRole(value: string | undefined): void {
+    if (value === undefined) {
+      if (this.#accessibility !== null) {
+        delete this.#accessibility.role;
+      }
+      return;
+    }
+    if (this.#accessibility === null) {
+      this.#accessibility = { role: value };
+      return;
+    }
+    this.#accessibility.role = value;
   }
 
   /** Drops the focus-owner record, whatever scope it was taken in. */
