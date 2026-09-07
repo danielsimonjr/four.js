@@ -1169,8 +1169,29 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       §83 leak audit gated; eight example configs define it false; 0.46–0.52 kB gzip
       saved each (ui-demo 30.46/31); §33 allowlist enforced by an integration test.
       A-1 follow-up (d) closed; A-5's dev-flag dependency discharged
-- [ ] **A-4 remainder:** the `@four/diagnostics` §85 validation catalogue (closure
+- [x] **A-4 remainder:** the `@four/diagnostics` §85 validation catalogue (closure
       step 2); converting scattered scene/physics checks to `devAssert` (step 3);
+      **CLOSED 2026-09-07. Step 2 is DONE; step 3 is WON'T-DO, for the same reason
+      step 4 was reverted — and the item should have said so already.**
+      · *Step 2 verified independently, not taken on report:* `validation.ts` is 278
+      lines / 18 exports, re-exported from `diagnostics/src/index.ts`, carries its own
+      `tests/validation.test.ts`, and is consumed by `packages/four`
+      (`application.ts`, `diagnostics.ts`) — a catalogue nothing imported would not
+      have counted.
+      · *Step 3 cannot be done as written.* `devAssert` opens `if (!DEV) return`, so
+      converting scene/physics checks means those packages import the build flag. They
+      do not, and may not: **`GATED` in `dev-build-mode.test.ts` lists 26 files and NOT
+      ONE is from `packages/scene` or `packages/physics`.** Verified by a second method
+      — a grep for real `import { DEV | devAssert | devWarn }` statements across scene,
+      physics, physics-rapier, physics-box2d, physics-soft and math returns **zero**
+      (a first grep for the bare word matched only prose in `authority.ts`, which says
+      *"not `DEV` / `devWarnOnce`"*). Suite green, 10/10.
+      · *Where the work actually belongs:* §33's envelope is the point, not an obstacle
+      — a replay recorded in a dev build must reproduce bit-exactly in production, so a
+      simulation package must behave identically either way. Checks that want DEV live
+      in `@four/diagnostics`, which is already GATED and already holds the catalogue.
+      Scene/physics keep unconditional `console.warn` + WeakMap suppression, which is
+      exactly what `warnAuthorityConflict` settled on when step 4 was reverted.
       ~~routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
       package)~~ **REVERTED on `main` 2026-09-06** — `@four/scene` cannot import
       `DEV` (§33 simulation envelope); `warnAuthorityConflict` stays

@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — A-4 closed: step 3 was never possible, and the item knew why
+
+`A-4 remainder` carried three sub-parts. Two were settled; the third contradicted the second,
+and nobody had said so.
+
+- **Step 2 (the §85 validation catalogue) is done**, verified rather than assumed:
+  `diagnostics/src/validation.ts` is 278 lines / 18 exports, re-exported from the package
+  entry, covered by its own test, and consumed by `packages/four`. A catalogue nothing
+  imported would not have counted.
+- **Step 3 (convert scene/physics checks to `devAssert`) is WON'T-DO.** `devAssert` opens
+  `if (!DEV) return`, so converting those checks means the simulation packages import the
+  build flag. They do not, and may not: `GATED` in `dev-build-mode.test.ts` lists 26 files and
+  **not one** is from `packages/scene` or `packages/physics`.
+- **Step 4 was already reverted on 2026-09-06 for exactly this reason**, and the item recorded
+  that revert one line above the step it invalidated. The contradiction sat in plain sight.
+
+This is §33 working, not §33 in the way: a replay recorded in a development build must
+reproduce bit-exactly in a production one, so a simulation package has to behave identically
+in both. Checks that want `DEV` belong in `@four/diagnostics` — already gated, and already the
+catalogue's home. Scene and physics keep unconditional `console.warn` with WeakMap
+suppression, which is what `warnAuthorityConflict` settled on when step 4 came out.
+
+Method note: the first grep for the flag reported 3 hits in scene and 2 in physics. All five
+were **prose** — `authority.ts` literally says *"not `DEV` / `devWarnOnce`"*. Matching real
+`import` statements instead returns zero across all six simulation packages.
+
 ## Unreleased — AUDIT-120 had drifted in both directions at once
 
 Chasing one TODO row — "qualify `AUDIT-120.md`'s *basic 3D meshes: shipped* row honestly" —
