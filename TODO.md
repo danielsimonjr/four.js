@@ -1298,7 +1298,16 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `@four/diagnostics` packet). R-9/R-13/R-22/R-30/R-32 lose their R-19 dependency
 - [ ] **R-19/R-20 follow-ups:** §52 tessellation module (lifts the concave-extrude
       restriction); §55 atlas packet (retires the sprite `quad` uniform with authored
-      uvs); qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly
+      uvs); ~~qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly~~
+      **DONE 2026-09-07** — and it was wrong in the OPPOSITE direction to the one this
+      row assumed. The claim was not overstated; it was UNDER-evidenced: the evidence
+      column named only `boxGeometry`, while `primitives-3d.ts` ships nine more
+      (sphere, cylinder, cone, capsule, torus, lathe, extrude, tube, heightField). Now
+      cites them, and says what actually remains staged (skinning/morph, §52
+      tessellation) rather than implying the primitive set is thin. Two neighbouring
+      defects fell out of reading it: the **basic colliders** row still called §24's
+      shapes "staged" a month after they shipped, and **S-2** still claimed
+      `{ type: "cylinder" }` is "deliberately a compile error". Both corrected
 - [x] **Flaky gate (pre-existing, confirmed at baseline 2026-08-07):**
       DONE 2026-09-06 — RECOVER / ANIMATED / RAGDOLL now watch `data-chain-y`
       until span/floor; smoothness samples on virtual-frame parity. The
@@ -1485,8 +1494,15 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       DONE 2026-09-06 — package tsconfig uses `moduleResolution: bundler`;
       init re-exports upstream `@dimforge/rapier*` types instead of the
       ~1200-line transcription.
-- [ ] §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/
+- [x] §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/
       heightfield/compound) — staged out by P5-6, widen in a later packet
+      — **STALE DUPLICATE, closed 2026-09-07.** Line 115 already recorded this DONE
+      (PH-22a, 2026-08-02) and the 2026-08-05 sweep that "retired stale §24/§12 entries"
+      missed this copy, so the row has read open for a month over shipped work. Verified
+      rather than taken on the earlier line's word: all eight are defined in
+      `packages/physics/src/shapes.ts` and wired into BOTH Rapier converters
+      (`conversions3d.ts`, `conversions2d.ts`) — a type alone would not have counted.
+      `compound` is not a shape tag: it is multiple colliders by design.
 - [x] Document SolverBodyAccess in the §90/§102 compatibility material — DONE
       2026-09-06 for Rapier (required engine surface beyond §37). Other
       adapters still get a column when they land.

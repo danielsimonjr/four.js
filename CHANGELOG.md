@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — AUDIT-120 had drifted in both directions at once
+
+Chasing one TODO row — "qualify `AUDIT-120.md`'s *basic 3D meshes: shipped* row honestly" —
+turned up three defects, and the original row was wrong the opposite way round from the one
+the TODO assumed.
+
+- **`basic 3D meshes` was UNDER-evidenced, not overstated.** Its evidence column named only
+  `boxGeometry`, which reads as a box-only tier. `primitives-3d.ts` ships nine more — sphere,
+  cylinder, cone, capsule, torus, lathe, extrude, tube, heightField. Now cited, with what is
+  genuinely staged (skinning/morph per RFC 0003, and §52 tessellation for the concave-extrude
+  restriction) named instead of implied.
+- **`basic colliders` still said "§24's remaining shapes are staged"** — a month after they
+  shipped (PH-22a, 2026-08-02).
+- **S-2 still claimed `{ type: "cylinder" }` is "deliberately a compile error".** It compiles;
+  the shape ships. The staging record is kept as history, now labelled RESOLVED with its
+  untrue lines called out, rather than quietly rewritten.
+
+Re-verified rather than taken on the older entries' word: all eight §24 shapes are defined in
+`packages/physics/src/shapes.ts` AND wired into both Rapier converters — a type with no
+converter would not have counted. `TODO.md` also carried a **stale duplicate** row for the same
+§24 work, still open beside the line that recorded it done; the 2026-08-05 sweep that "retired
+stale §24/§12 entries" had missed this copy. Gates: `check-docs` and `check-spec` both OK.
+
 ## Unreleased — the look gate measured the runner, not the controller
 
 `main` went red on a **docs-only** commit (run 34090671121), which is the tell that the gate
