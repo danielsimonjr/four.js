@@ -77,7 +77,13 @@ describe("§78: a .gltf with a separate .bin becomes a renderable scene", () => 
     const asset = await assets.load(`${FIXTURES}quad.gltf`, gltfLoader);
 
     // The parse tier carried the file's content faithfully.
-    expect(asset.extras).toEqual({ fixture: "fourJS §78 integration quad" });
+    // NOT rebranded to "fourJS": this asserts the FIXTURE FILE's own `extras`,
+    // i.e. that the parse tier carried the document's content faithfully. The
+    // string belongs to `tests/fixtures/gltf/quad.gltf`, not to our branding, so
+    // it changes only if that file changes. The 2026-09-07 rebrand rewrote this
+    // expectation without touching the `.gltf` (its extension was outside the
+    // pass), and turned CI red.
+    expect(asset.extras).toEqual({ fixture: "four.js §78 integration quad" });
     const primitive = asset.meshes[0].primitives[0];
     expect(primitive.positions).toHaveLength(12);
     // The fixture authors v top-down (image convention); the loader flips it
