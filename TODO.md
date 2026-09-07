@@ -676,7 +676,13 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
       family list now names `LitMaterial`
 - [ ] First publish (§94 0.1): Changesets release workflow + the
-      @danielsimonjr/fourjs publish-name mapping — owner step
+      @danielsimonjr/fourjs publish-name mapping — owner step.
+      **Infrastructure is done (verified 2026-09-07); the publish itself is not.**
+      `release.yml` runs Changesets, `tools/apply-publish-names.mjs` exists with its own
+      test, the version PR (#67) merged, and every package carries a 0.1.0/0.0.x version.
+      What is missing is the release itself: **no git tag exists and nothing is on npm.**
+      Publishing is ZBOOK-manual by charter and gated on Daniel's "not ready until we run
+      more dogfooding cycles" — so this stays open on his word, not on missing work.
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
 
@@ -1181,8 +1187,18 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       accounting on BufferGeometry/Texture/RenderTarget; §84's two memory counters
       live. A-1 follow-up (b) closed
 - [ ] **A-5 remainder (dev-warning tier, folded into A-4):** the six §83 development
-      warnings — leaked resources (now _derivable_ from the counters, but nothing
-      warns), ~~disposed-in-use~~ **DONE 2026-09-06** (`warnDisposedInUse` in
+      warnings — leaked resources: **the mechanism now exists but nothing emits it**
+      (verified 2026-09-07). `trackDisposable` IS wired — `if (DEV) trackDisposable(…)`
+      at `geometry/materials/render` `resource-memory.ts:120/78/120` — but
+      `auditFinalizedLeaks`, which its own doc calls "the call that prints", is reached
+      only from the two `index.ts` re-export lists and from its own tests
+      (`core/tests/leak-registry.test.ts`, `diagnostics/tests/leak-registry.test.ts`) —
+      no engine code path calls it. The mechanism is therefore tested, just never
+      triggered by the runtime itself. So
+      it is an opt-in audit a consumer must invoke, not a warning the runtime raises.
+      Whether that is the intended end state is a design call, not a tick: closing it
+      needs either an engine-side caller or a line saying opt-in IS the design,
+      ~~disposed-in-use~~ **DONE 2026-09-06** (`warnDisposedInUse` in
       WebGL/WebGPU backends), ~~duplicate asset loads~~ **DONE 2026-09-06**
       (`AssetManager.load` of a settled slot → `devWarnOnce`), ~~detached-node
       listeners~~ **DONE 2026-09-06** (`Node.#detach`), ~~stale physics handles~~
@@ -1494,8 +1510,9 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 - [x] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
       — **Proposed 2026-09-06** (`docs/rfcs/0008-text-shaping-engine.md`). Owner
       decision pending; default stays the identity pen walk.
-- [ ] First publish (§94 0.1): Changesets release workflow + apply the
-      `@danielsimonjr/fourjs` publish-name mapping (spec §98, rev 1.6)
+- [ ] First publish (§94 0.1) — **duplicate row; the canonical one is under Gap-closure
+      wave 3.** Kept as a pointer rather than a second copy: two rows for one task drift
+      apart and each looks authoritative. Do not re-expand this one.
 
 ### Documentation
 

@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — TODO audit against the code (2026-09-07)
+
+A verification pass over the 21 open items after #70-#78, to find any that the code had already
+closed. **Result: one row was wrong, one was duplicated, and the rest were open for good reason.**
+Two of the three findings are corrections to claims, not code changes.
+
+- **`A-5` "leaked resources" stays open — but not for the reason it said.** The row read "now
+  _derivable_ from the counters, but nothing warns". The mechanism does now exist and is tested:
+  `trackDisposable` is wired behind `if (DEV)` at `geometry`/`materials`/`render`
+  `resource-memory.ts`, with `core/tests/leak-registry.test.ts` and its diagnostics twin covering
+  it. What is missing is a trigger: `auditFinalizedLeaks` — "the call that prints", by its own
+  doc — is reached only from the re-export lists and its own tests. **No engine path calls it**,
+  so it is an opt-in audit rather than a warning the runtime raises. Closing it needs either an
+  engine-side caller or an explicit line saying opt-in is the design. Row rewritten to say that.
+- **"First publish (§94 0.1)" existed TWICE**, in wave 3 and again under Documentation, each
+  looking authoritative. Two rows for one task drift apart; the second is now a pointer. The
+  canonical row records what is actually done — `release.yml`, `apply-publish-names.mjs` with its
+  own test, #67 merged, versions bumped — and what is not: **no tag, nothing on npm.** It is
+  blocked on the owner's "not ready until more dogfooding", not on missing work.
+- **The other 19 are correctly open**, including two that describe the same unshipped renderer
+  gap (§77 cube/array/3D + compressed containers) from two places, and one standing assignment
+  that by design never terminates.
+
 ## Unreleased — browser gate: assert §84's contract, not the runner's GPU
 
 `main` went red on 2026-09-07 (run 34082373822, 104 passed / 1 failed) at
