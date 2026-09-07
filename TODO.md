@@ -963,8 +963,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **Follow-ups the R-1 plan explicitly defers** (each needs its own filing): §63
       transient-target pooling and barrier scheduling (must land on both backends or
       neither); §65's persistent-mapped/staging-ring buffers; §27 GPU fields and §36
-      `collisions: "depth-buffer"`; RFC 0005's `Rectangle2` prerequisite for a regional
-      `readPixels`.
+      `collisions: "depth-buffer"`; ~~RFC 0005's `Rectangle2` prerequisite for a regional
+      `readPixels`~~ **DONE 2026-08-29** — `render/src/renderer.ts:464` states it outright
+      (*"`readPixels` joined the interface when `Rectangle2` landed in `@four/math`
+      (2026-08-29; RFC 0005's recorded prerequisite, cleared)"*), `Rectangle2` is exported
+      from `@four/math`, and `render/src/read-pixels.ts:44` declares
+      `readPixels(target, region?)`.
 - [x] **PH-11 residue — §12 character controllers DONE 2026-08-21.**
       `CharacterController` + `FirstPersonLook` in `@four/motion`, advanced by the
       existing `KinematicSystem` under §42's `"kinematic"` authority; §79 pair
@@ -1145,8 +1149,13 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       50 k shapes → 4. Two §86 rows moved from feature-blocked to half-measured.
 - [ ] Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09):
       instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals);
-      glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas
-      material batch as they are); texture-atlas _grouping_ of distinct textures (needs a
+      ~~glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas
+      material batch as they are)~~ **DONE 2026-08-13 (R-28)** — and both the CHANGELOG and
+      the code say so: *"consecutive labels sharing a material merge into one draw under
+      §65 batching, which closes §65's glyph-batching strategy at the label level"*, and
+      `four/src/text-node.ts:71` repeats it, adding that the residue is grouping labels
+      that do NOT share a material — which is the atlas-grouping sub-part already listed
+      separately below, not a second open claim; texture-atlas _grouping_ of distinct textures (needs a
       packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's
       idle-scene row — today a batched run re-uploads every frame); making batching the
       default, which needs A-4's build-time pipeline-selection seam (the opt-in seam
@@ -1408,16 +1417,23 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `readLiveResourceCounts`);
       ~~`RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
       with §67's DEPTH24_STENCIL8 and float formats~~ **DONE 2026-09-06**
-- [ ] **A-1 follow-ups:** ~~(a) `physicsStepTime`/`contacts`/`activeBodies` wiring
+- [x] **A-1 follow-ups:** ~~(a) `physicsStepTime`/`contacts`/`activeBodies` wiring
       belongs to the packet that gives `Application` a physics world (A-6)~~ **DONE**;
       ~~(c) `gpuFrameTime` waits on timestamp queries~~ **DONE 2026-09-06**
       (`Renderer.lastGpuFrameTimeSeconds`; WebGL `EXT_disjoint_timer_query_webgl2`,
       WebGPU `timestamp-query` ping-pong; Application copies a finite number).
       Reading the getter arms measurement so landed transcripts stay identical.
-      Still open: (d) **A-4's `__FOUR_DEV__` define should drop the §84 path from production
-      bundles** — ui-demo headroom is still thin; (e) `WorldTransformStats`
-      (visited/recomputed) is computed every frame and unexposed — deliberately, §84
-      does not name it
+      ~~Still open: (d) **A-4's `__FOUR_DEV__` define should drop the §84 path from production
+      bundles** — ui-demo headroom is still thin~~ **DONE — verified 2026-09-07 on the REAL
+      bundle, not the synthetic test entry.** `examples/ui-demo/dist` rebuilt from source
+      contains **zero** occurrences of `cpuFrameTime`, `textureMemory` and `__FOUR_DEV__`;
+      `tests/integration/dev-build-mode.test.ts` proves the same through a real Vite build
+      with `stats: true` explicitly requested (10/10 green). The trailing "headroom is
+      still thin" is a standing observation (48.47 kB against a 49.5 kB budget), not an
+      unmet ask — and it is tracked by the size-budget row closed 2026-09-07.
+      (e) `WorldTransformStats` (visited/recomputed) is computed every frame and unexposed
+      — **deliberately, §84 does not name it**, so it is a stated non-goal rather than
+      pending work. With (a), (c) and (d) done and (e) a non-goal, this item is CLOSED.
 
 - [x] **A-12 cheap tier DONE 2026-08-07:** `Toggle`, `Checkbox`, `RadioButton`,
       `Slider`, `ProgressIndicator`, `ImageWidget` — nine of §73's sixteen now ship.

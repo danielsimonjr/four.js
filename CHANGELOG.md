@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — TODO audited against CHANGELOG and code: 1 closed, 2 sub-parts struck
+
+The first audit that cross-referenced **TODO.md against CHANGELOG.md**, not just against the
+code — the direction never checked before. 23 open rows, all 23 examined, three fan-out
+verifiers plus my own checks on the rest.
+
+**Result: 1 item closed, 2 sub-parts struck, 20 correctly open.** A low yield, which is the
+honest finding: this backlog is mostly deferred-by-decision packets, not stale bookkeeping.
+
+- **`A-1 follow-ups` CLOSED.** Its last live sub-part asked that `__FOUR_DEV__` drop the §84
+  path from production bundles. It already does: `examples/ui-demo/dist`, rebuilt from source,
+  contains **zero** occurrences of `cpuFrameTime`, `textureMemory` or `__FOUR_DEV__`, and
+  `dev-build-mode.test.ts` proves it through a real Vite build with `stats: true` explicitly
+  asked for. The trailing "ui-demo headroom is still thin" is a standing measurement (48.47 kB
+  against 49.5 kB), not an unmet ask, and it has its own row — closed 2026-09-07. Sub-part (e)
+  is a stated non-goal ("§84 does not name it").
+- **§65 glyph batching struck** from the batching row. CHANGELOG (R-28) and
+  `four/src/text-node.ts:71` both say it outright: labels sharing a material merge into one
+  draw, which *"closes §65's glyph-batching strategy at the label level"*. The residue named
+  there — grouping labels that do NOT share a material — is the atlas-grouping sub-part already
+  listed separately, not a second open claim.
+- **RFC 0005's `Rectangle2` prerequisite struck** from the R-1 follow-ups.
+  `render/src/renderer.ts:464` states it directly: *"`readPixels` joined the interface when
+  `Rectangle2` landed in `@four/math` (2026-08-29; RFC 0005's recorded prerequisite, cleared)"*.
+
+**One verifier was overruled.** It reported `A-1 follow-ups` should stay open. The synthetic
+bundle test it relied on is not the same claim as the real example bundle, so I rebuilt
+`ui-demo` and checked the shipped artifact. A relayed verdict is a hypothesis until the
+load-bearing half is checked.
+
 ## Unreleased — dogfooding cycle 3d: our error messages name minified classes
 
 Round-tripped a scene through §34/§79 in the browser — the "save my game" path — and the failure
