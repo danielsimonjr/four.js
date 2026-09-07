@@ -1736,9 +1736,6 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 - [x] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
       — **Proposed 2026-09-06** (`docs/rfcs/0008-text-shaping-engine.md`). Owner
       decision pending; default stays the identity pen walk.
-- [ ] First publish (§94 0.1) — **duplicate row; the canonical one is under Gap-closure
-      wave 3.** Kept as a pointer rather than a second copy: two rows for one task drift
-      apart and each looks authoritative. Do not re-expand this one.
 
 ### Documentation
 

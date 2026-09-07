@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — the duplicate "First publish" row is deleted, not pointed at
+
+Follow-up to the audit. Two verifiers independently recommended deleting the duplicate row
+rather than keeping the pointer I left this morning, and they are right: the charter's rule is
+that **deleting a duplicate beats syncing it**, and a pointer is a mild form of syncing — a row
+that itself has to be maintained and re-read. It carried no unique content, and
+"Gap-closure wave 3" appears nowhere else in the file, so nothing referenced it.
+
+Verified after deleting rather than assumed, because deleting the wrong row would be silent:
+the canonical row survives, and `git diff` shows exactly the three pointer lines removed. (A
+first check printed "0 rows remaining" and looked alarming — that was a broken grep pattern in
+my own command, not a lost row.)
+
 ## Unreleased — TODO audited against CHANGELOG and code: 1 closed, 2 sub-parts struck
 
 The first audit that cross-referenced **TODO.md against CHANGELOG.md**, not just against the
