@@ -116,6 +116,37 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 ## Now
 
+- [ ] **`smoothness.spec.ts:794` is still flaky, and this time it is PROVEN, not suspected.**
+      A controlled comparison, which is what makes this worth acting on:
+
+      | commit | `smoothness.spec.ts:794` |
+      |---|---|
+      | `17fd7e6` | ✓ passed |
+      | `1f75125` | ✘ failed |
+
+      The **entire** diff between those two commits is `.gitignore` (+8), `TODO.md` (+14) and
+      one comment plus one string literal in `examples/ui-demo/main.ts`. Nothing there can
+      touch motion interpolation, so the test is nondeterministic — not a regression, and not
+      caused by the rebrand (whose 40 changes under `packages/` are provably all comments,
+      README prose and error strings).
+
+      **Failure signature:** `every frame landed on an exact fixed-step pose`, 0 mid-step
+      frames against a floor of 2. That is the SAME aliasing mode the 2026-09-06 entry
+      ("Smoothness interpolation flake") was written to fix by sampling after a known
+      `__fourVirtualFrames` count. That fix reduced the rate; it did not remove it.
+
+      **Hypothesis, explicitly unverified:** the test assumes `interpolationAlpha` alternates
+      0.5 / 0.0 because the virtual frame is 1.5× the fixed step. That parity holds only while
+      no step is dropped — and §10's dropped-time guard has been firing under load all day
+      (`maximumSubSteps=5`). One catch-up shifts the phase and every later sample lands
+      on-step. **Do not act on this without measuring it**; the honest next step is to log
+      `droppedTime` alongside the sampled fractions and see whether a drop precedes every
+      failure.
+
+      **Do not fix it by widening `MINIMUM_MID_STEP_FRAMES` to 0** — that deletes the only
+      assertion §106 makes about interpolation.
+
+
 ### 🔧 "fourJS" is the library name — rebrand, staged (2026-09-07)
 
 Daniel: *"fourJS is the library name; not four or four.js. Refactor codebase to reflect
