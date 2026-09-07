@@ -116,34 +116,35 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 ## Now
 
-- [x] **Re-ran BOTH of Daniel's described personas against current `main` (2026-09-07).** They
-      were last exercised on 09-06, before ten commits landed; a passing scenario from
-      yesterday is not evidence about today's tree. Both **pass**, and the fixes they
-      originally produced are holding.
-
-      · **Indie-studio flight simulator.** Flies under real key input: orientation composes
-      from identity to `[-0.398, -0.138, 0.553, 0.719]`, position `[0,60,350]` →
-      `[-237,176,746]` (rolled, climbed, accelerated 120→157), chase camera trailing, **zero
-      page errors**. The `FollowRig` crash found on 09-06 stays fixed.
-      **Quaternion norm measured at full precision: exactly `1`** — no drift. Worth recording
-      *how* that was nearly misreported: the app's own diagnostic rounds the quaternion to 4
-      decimals, so computing the norm from telemetry read **1.000062** and looked like
-      normalisation drift. It was my instrument, not the engine. A rounded readout cannot
-      measure a quantity whose interesting deviation is smaller than the rounding.
-
-      · **Engineering-student two-cylinder boxer.** The crank turns (θ swept a full
-      revolution over 400 samples), so the frozen-engine defect from 09-06 — a dynamic body
-      with no collider has zero angular inertia — stays fixed. Measured against closed form:
-      piston error **mean 0.46 %, max 0.99 %** of a 1.0043 stroke; mirror invariant
-      `|x_A + x_B|` mean 3.4 mm, max 9.5 mm; piston **y-drift exactly 0**; zero errors.
-
-      **One number I cannot account for, stated rather than smoothed:** on 09-06 I recorded a
-      mean piston error of **1.56 mm (0.16 %)**; today the same app measures **4.62 mm
-      (0.46 %)**, roughly 3×. Both are small and every invariant still holds, but I will not
-      call that "consistent" — the sample window, crank speed and Rapier version (0.20 landed
-      09-06) all differ, and I did not run a controlled comparison. It needs one before either
-      figure is quoted as the engine's accuracy.
-
+> **VERIFICATION RECORD — not a task, so deliberately not a checkbox.**
+> Re-ran BOTH described personas against current `main` (2026-09-07). They
+> were last exercised on 09-06, before ten commits landed; a passing scenario from
+> yesterday is not evidence about today's tree. Both **pass**, and the fixes they
+> originally produced are holding.
+>
+> · **Indie-studio flight simulator.** Flies under real key input: orientation composes
+> from identity to `[-0.398, -0.138, 0.553, 0.719]`, position `[0,60,350]` →
+> `[-237,176,746]` (rolled, climbed, accelerated 120→157), chase camera trailing, **zero
+> page errors**. The `FollowRig` crash found on 09-06 stays fixed.
+> **Quaternion norm measured at full precision: exactly `1`** — no drift. Worth recording
+> *how* that was nearly misreported: the app's own diagnostic rounds the quaternion to 4
+> decimals, so computing the norm from telemetry read **1.000062** and looked like
+> normalisation drift. It was my instrument, not the engine. A rounded readout cannot
+> measure a quantity whose interesting deviation is smaller than the rounding.
+>
+> · **Engineering-student two-cylinder boxer.** The crank turns (θ swept a full
+> revolution over 400 samples), so the frozen-engine defect from 09-06 — a dynamic body
+> with no collider has zero angular inertia — stays fixed. Measured against closed form:
+> piston error **mean 0.46 %, max 0.99 %** of a 1.0043 stroke; mirror invariant
+> `|x_A + x_B|` mean 3.4 mm, max 9.5 mm; piston **y-drift exactly 0**; zero errors.
+>
+> **One number I cannot account for, stated rather than smoothed:** on 09-06 I recorded a
+> mean piston error of **1.56 mm (0.16 %)**; today the same app measures **4.62 mm
+> (0.46 %)**, roughly 3×. Both are small and every invariant still holds, but I will not
+> call that "consistent" — the sample window, crank speed and Rapier version (0.20 landed
+> 09-06) all differ, and I did not run a controlled comparison. It needs one before either
+> figure is quoted as the engine's accuracy.
+>
 
 - [ ] **Error messages name MINIFIED classes in exactly the builds users ship.** Dogfooding
       cycle 3d, §34 round-trip in the browser. `serializeScene(hero, registry)` threw:
