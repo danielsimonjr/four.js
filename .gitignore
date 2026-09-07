@@ -10,3 +10,11 @@ examples/**/dist
 
 # Local dogfooding probes (ZBOOK_Github); not part of the product
 .dogfood/
+
+# Visual goldens are LINUX only, because CI is ubuntu and a golden is only
+# comparable against the renderer that recorded it. Running `tests/visual` on
+# Windows or macOS makes Playwright WRITE a `-visual-win32.png` /
+# `-visual-darwin.png` beside the real one and fail -- committing those would
+# add dead files that never match CI. Ignore them so a local run cannot leak.
+tests/visual/*-snapshots/*-visual-win32.png
+tests/visual/*-snapshots/*-visual-darwin.png

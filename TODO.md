@@ -134,6 +134,20 @@ and only the first is unambiguous.
       Gates: check-docs OK, check-spec OK, graph:check OK, lint clean, **24/24 packages,
       7,520 tests passing**.
 
+- [ ] **Stage 1b — rebrand the ONE rendered string, which needs a Linux runner.**
+      `examples/ui-demo`'s title label is drawn on the canvas, so it is pixel-coupled to
+      `tests/visual/ui-demo.spec.ts-snapshots/ui-demo-*-visual-linux.png`. Changing it to
+      "fourJS" turned CI red (run 34161187665, both §92 visual goldens), and the golden
+      cannot be re-recorded here: CI is ubuntu, the goldens are `-visual-linux.png`, and
+      `--update-snapshots` on Windows writes `-visual-win32.png` instead — leaving CI just as
+      red plus two dead files. No Docker on this box, and no snapshot-update path in CI.
+      **So the label is deliberately still "four.js - ui demo", with the reason inline at the
+      call site.** It needs one Linux run of
+      `playwright test tests/visual --project=visual --update-snapshots`, committed with the
+      new PNGs. Everything else in the rebrand is done.
+      · Stray `-visual-win32/-darwin.png` files are now gitignored, so a local visual run on
+        Windows cannot leak goldens that could never match CI.
+
 - [ ] **Stage 2 — PACKAGE IDENTIFIERS (needs Daniel's call, not mine).** `four` → `fourjs`
       and `@four/*` → `@fourjs/*`. Both are npm-legal (lowercase) and would match the
       already-chosen publish target `@danielsimonjr/fourjs`. **Why this is not a drive-by:**
