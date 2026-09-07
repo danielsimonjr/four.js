@@ -5,7 +5,7 @@
     "": {
       "name": "four.js-monorepo",
       "devDependencies": {
-        "@changesets/cli": "3.0.1",
+        "@changesets/cli": "3.0.2",
         "@four/animation": "workspace:*",
         "@four/assets": "workspace:*",
         "@four/core": "workspace:*",
@@ -29,7 +29,7 @@
         "@four/serialization": "workspace:*",
         "@four/text": "workspace:*",
         "@four/ui": "workspace:*",
-        "@playwright/test": "1.62.1",
+        "@playwright/test": "1.63.0",
         "@size-limit/preset-small-lib": "13.0.3",
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^26.4.1",
@@ -49,7 +49,7 @@
     },
     "packages/animation": {
       "name": "@four/animation",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -59,7 +59,7 @@
     },
     "packages/assets": {
       "name": "@four/assets",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@four/core": "workspace:*",
       },
@@ -70,7 +70,7 @@
     },
     "packages/diagnostics": {
       "name": "@four/diagnostics",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -79,7 +79,7 @@
     },
     "packages/four": {
       "name": "four",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@four/animation": "workspace:*",
         "@four/assets": "workspace:*",
@@ -116,7 +116,7 @@
     },
     "packages/input": {
       "name": "@four/input",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -137,7 +137,7 @@
     },
     "packages/motion": {
       "name": "@four/motion",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -146,7 +146,7 @@
     },
     "packages/particles": {
       "name": "@four/particles",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -155,7 +155,7 @@
     },
     "packages/physics": {
       "name": "@four/physics",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -165,14 +165,14 @@
     },
     "packages/physics-box2d": {
       "name": "@four/physics-box2d",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@four/physics": "workspace:*",
       },
     },
     "packages/physics-rapier": {
       "name": "@four/physics-rapier",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@dimforge/rapier2d-compat": "0.20.0",
         "@dimforge/rapier3d-compat": "0.20.0",
@@ -183,14 +183,14 @@
     },
     "packages/physics-soft": {
       "name": "@four/physics-soft",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@four/physics": "workspace:*",
       },
     },
     "packages/render": {
       "name": "@four/render",
-      "version": "0.0.0",
+      "version": "0.0.2",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/geometry": "workspace:*",
@@ -201,7 +201,7 @@
     },
     "packages/render-canvas": {
       "name": "@four/render-canvas",
-      "version": "0.0.0",
+      "version": "0.0.2",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -210,7 +210,7 @@
     },
     "packages/render-svg": {
       "name": "@four/render-svg",
-      "version": "0.0.0",
+      "version": "0.0.2",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -219,7 +219,7 @@
     },
     "packages/render-webgl": {
       "name": "@four/render-webgl",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -228,7 +228,7 @@
     },
     "packages/render-webgpu": {
       "name": "@four/render-webgpu",
-      "version": "0.0.0",
+      "version": "0.0.2",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -237,7 +237,7 @@
     },
     "packages/scene": {
       "name": "@four/scene",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -245,7 +245,7 @@
     },
     "packages/serialization": {
       "name": "@four/serialization",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -263,7 +263,7 @@
     },
     "packages/ui": {
       "name": "@four/ui",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/input": "workspace:*",
@@ -292,7 +292,7 @@
 
     "@changesets/changelog-git": ["@changesets/changelog-git@1.0.0", "", { "dependencies": { "@changesets/types": "^7.0.0" } }, "sha512-3Dst2Ime2Op5nd4XmWJLPIgp11ZFqJqSkVug9izK6TDcIV4YlhPS4ECbEVR+eGI0bk0r1ItogD4j2Oli87bJrA=="],
 
-    "@changesets/cli": ["@changesets/cli@3.0.1", "", { "dependencies": { "@changesets/apply-release-plan": "^8.0.0", "@changesets/assemble-release-plan": "^7.0.0", "@changesets/changelog-git": "^1.0.0", "@changesets/config": "^4.0.0", "@changesets/errors": "^1.0.0", "@changesets/get-dependents-graph": "^3.0.0", "@changesets/git": "^4.0.0", "@changesets/pre": "^3.0.0", "@changesets/read": "^1.0.0", "@changesets/should-skip-package": "^1.0.0", "@changesets/types": "^7.0.0", "@changesets/write": "^1.0.1", "@clack/prompts": "^1.7.0", "@manypkg/get-packages": "^3.1.0", "@pnpm/deps.graph-sequencer": "^1100.0.1", "cac": "^7.0.0", "import-meta-resolve": "^4.2.0", "launch-editor": "^2.14.1", "package-manager-detector": "^1.6.0", "semver": "^7.8.1", "tinyexec": "^1.3.0" }, "bin": { "changeset": "bin.js" } }, "sha512-3IVpRSgiKDj2aRbBHKtWTXSRH2/iR3bWxau9iQUoEsZjDhRIj9nhl90k7FWMxZAJvLgJBbgMq8+qS0xQsenYsQ=="],
+    "@changesets/cli": ["@changesets/cli@3.0.2", "", { "dependencies": { "@changesets/apply-release-plan": "^8.1.0", "@changesets/assemble-release-plan": "^7.0.0", "@changesets/changelog-git": "^1.0.0", "@changesets/config": "^4.0.0", "@changesets/errors": "^1.0.0", "@changesets/get-dependents-graph": "^3.0.0", "@changesets/git": "^4.0.1", "@changesets/pre": "^3.0.0", "@changesets/read": "^1.0.1", "@changesets/should-skip-package": "^1.0.0", "@changesets/types": "^7.0.0", "@changesets/write": "^1.0.1", "@clack/prompts": "^1.7.0", "@manypkg/get-packages": "^3.1.0", "@pnpm/deps.graph-sequencer": "^1100.0.1", "cac": "^7.0.0", "import-meta-resolve": "^4.2.0", "launch-editor": "^2.14.1", "package-manager-detector": "^1.6.0", "semver": "^7.8.1", "tinyexec": "^1.3.0" }, "bin": { "changeset": "bin.js" } }, "sha512-t/omGJj/I+Jv0kmJAkj5cstYEdUQiJnpip2F+2m3F4lQ3kAZ3o8Exep4/Fm1qq4rvw6ovlhJvZNrKdwLJ4lkuQ=="],
 
     "@changesets/config": ["@changesets/config@4.0.0", "", { "dependencies": { "@changesets/get-dependents-graph": "^3.0.0", "@changesets/should-skip-package": "^1.0.0", "@changesets/types": "^7.0.0", "@manypkg/get-packages": "^3.1.0", "picomatch": "^4.0.4" } }, "sha512-mw95/YrkOuhZZxfnVAA4bSXOFUi+KlhzOBTM8C4x777NhUU6HWIl9Z+K+nME+E4PVsv5NQVQwTfiHihAS1A/ow=="],
 
@@ -476,7 +476,7 @@
 
     "@pkgjs/parseargs": ["@pkgjs/parseargs@0.11.0", "", {}, "sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg=="],
 
-    "@playwright/test": ["@playwright/test@1.62.1", "", { "dependencies": { "playwright": "1.62.1" }, "bin": { "playwright": "cli.js" } }, "sha512-DTcUc8qii+cpHvtOwggMtBRMjKZHXYWdw8syRYu2vtzuq4Wxphqq4NfCs5Zt44L6mA8rfDfj+PHnxFc/FeK6mQ=="],
+    "@playwright/test": ["@playwright/test@1.63.0", "", { "dependencies": { "playwright": "1.63.0" }, "bin": { "playwright": "cli.js" } }, "sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ=="],
 
     "@pnpm/deps.graph-sequencer": ["@pnpm/deps.graph-sequencer@1100.0.1", "", {}, "sha512-pOr5+q1fLYKwFN3LAJuGZEnfXDcQ73zqgDHMtGy+K+uIoUqyY+6MeDCWFwfu+4EFuq76I5EPFofoNAI+Bmmq4A=="],
 
@@ -882,9 +882,9 @@
 
     "picomatch": ["picomatch@4.0.7", "", {}, "sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA=="],
 
-    "playwright": ["playwright@1.62.1", "", { "dependencies": { "playwright-core": "1.62.1" }, "optionalDependencies": { "fsevents": "2.3.2" }, "bin": { "playwright": "cli.js" } }, "sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg=="],
+    "playwright": ["playwright@1.63.0", "", { "dependencies": { "playwright-core": "1.63.0" }, "bin": { "playwright": "cli.js" } }, "sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg=="],
 
-    "playwright-core": ["playwright-core@1.62.1", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw=="],
+    "playwright-core": ["playwright-core@1.63.0", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg=="],
 
     "postcss": ["postcss@8.5.28", "", { "dependencies": { "nanoid": "^3.3.18", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A=="],
 
@@ -997,8 +997,6 @@
     "@typescript-eslint/visitor-keys/eslint-visitor-keys": ["eslint-visitor-keys@5.0.1", "", {}, "sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA=="],
 
     "glob/minimatch": ["minimatch@9.0.9", "", { "dependencies": { "brace-expansion": "^2.0.2" } }, "sha512-OBwBN9AL4dqmETlpS2zasx+vTeWclWzkblfZk7KTA5j3jeOONz/tRCnZomUyvNg83wL5Zv9Ss6HMJXAgL8R2Yg=="],
-
-    "playwright/fsevents": ["fsevents@2.3.2", "", { "os": "darwin" }, "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA=="],
 
     "postcss/nanoid": ["nanoid@3.3.18", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w=="],
 
