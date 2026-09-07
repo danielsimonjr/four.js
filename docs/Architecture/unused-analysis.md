@@ -1,16 +1,16 @@
 # Unused Files and Exports Analysis
 
-**Generated**: 2026-09-06
+**Generated**: 2026-09-07
 
 ## Summary
 
 - **Potentially unused files**: 0
-- **Dormant files** (runtime code on disk, unreachable from any entry/build root): 0
+- **Dormant files** (runtime code on disk, unreachable from any entry/build root): 1
   - **Orphaned (reachable from nothing — delete/wire candidates)**: 0
-  - **Test-only (exercised by a test, ships nothing)**: 0
-- **Potentially unused exports**: 2
+  - **Test-only (exercised by a test, ships nothing)**: 1
+- **Potentially unused exports**: 4
   - **Unreferenced anywhere (deletion candidates)**: 0
-  - **Referenced in-module (type contracts / helpers backing live exports)**: 2
+  - **Referenced in-module (type contracts / helpers backing live exports)**: 4
 
 ## Dormant Files — Orphaned (delete/wire candidates)
 
@@ -27,7 +27,9 @@ Not reachable from any package entry point, but imported by a test — deliberat
 kept, standalone-tested code (e.g. legacy signal kernels) or a helper a test drives
 directly. Not dead; not shipped. No action needed.
 
-_None._
+### `packages/diagnostics` (1)
+
+- `packages/diagnostics/src/dev-warnings.ts`
 
 ## Potentially Unused Files
 
@@ -53,4 +55,12 @@ interfaces typing live guards and per-package API completeness, not rot.
 ### `packages/geometry/src/geometry.ts`
 
 - `nextGeometryIdentifier` (function) — 1 in-file ref
+
+### `packages/geometry/src/path-boolean.ts`
+
+- `ringsContain` (function) — 2 in-file refs
+
+### `packages/geometry/src/svg-document.ts`
+
+- `parseTransform` (function) — 1 in-file ref
 
