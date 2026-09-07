@@ -238,19 +238,35 @@ const WALK_HOLD_SECONDS = 4;
 const JUMP_RISE_MINIMUM = 0.5;
 
 /**
- * Yaw the gate requires after holding → for {@link LOOK_HOLD_SECONDS}.
+ * Yaw the gate requires while → is held — now a TARGET, not a threshold.
  *
- * The example turns at 1.6 rad/s, so 0.6 s is nominally 0.96 rad; the
- * reference run measured **0.853** (key delivery eats the difference). 0.35
- * leaves 59 % margin on the measurement.
+ * {@link holdUntilMoved} holds the key until yaw has moved this far, so the
+ * value sets how much simulated turn the gate insists on rather than how much
+ * it hopes 0.6 s will buy. The example turns at 1.6 rad/s and the reference run
+ * measured **0.853**; 0.35 is a little over a third of that, so a controller
+ * that turns far too slowly still fails.
+ *
+ * It was previously a threshold checked after a fixed 0.6 s wall-clock hold,
+ * and its doc claimed 59 % margin. Run 34090671121 measured **0.133** — 6.4×
+ * under the reference — because a starved rAF loop plus §10's dropped time meant
+ * the simulation barely advanced. Margin does not cover starvation; waiting on
+ * the simulation does.
  */
 const YAW_MINIMUM = 0.35;
 
-/** Pitch required after holding ↓ — rate 1.1 rad/s; reference **0.623**. */
+/** Pitch required while ↓ is held — rate 1.1 rad/s; reference **0.623**. */
 const PITCH_MINIMUM = 0.25;
 
-/** Seconds each look key is held. */
-const LOOK_HOLD_SECONDS = 0.6;
+/**
+ * Longest a look key is held while waiting for the simulation to reach its
+ * target, in seconds of wall-clock.
+ *
+ * This is a CAP, not a dose: {@link holdUntilMoved} releases as soon as the
+ * published value has moved far enough, so a fast runner is not slowed and a
+ * starved one is not cut short. 10 s is deliberately far above the ~0.6 s a
+ * healthy run needs — it exists to end a hung page, not to time the turn.
+ */
+const LOOK_HOLD_TIMEOUT_SECONDS = 10;
 
 /**
  * Pixels that must differ between the frames before and after the yaw turn.
@@ -323,6 +339,57 @@ async function waitForRunning(page: Page): Promise<void> {
 }
 
 /** Reads one numeric `data-*` attribute off `#status`. */
+/**
+ * Holds `code` until `name` has moved `minimum` away from `from`, or until
+ * {@link LOOK_HOLD_TIMEOUT_SECONDS} elapses — then releases it and reports the
+ * delta actually achieved.
+ *
+ * This used to be `keyboard.down` → `waitForTimeout(0.6s)` → `keyboard.up`, and
+ * that turned `main` red on a docs-only commit (run 34090671121):
+ * `yaw moved -0.133`, against a 0.35 minimum whose own doc claimed "59 % margin
+ * on the measurement". The margin was never the problem. Look is integrated in
+ * `fixedUpdate` as `rad/s × the injected fixed delta`, so it advances with
+ * SIMULATED time — and §10's dropped-time guard throws the backlog away when the
+ * rAF loop is starved. On a contended runner 0.6 real seconds bought roughly
+ * 0.12 simulated ones, so the gate measured the container's spare capacity
+ * rather than the controller.
+ *
+ * Waiting on the published value instead makes the gate independent of how fast
+ * the runner happens to be: a slow machine simply takes longer in wall-clock to
+ * reach the same simulated state. It still fails for every reason it is meant
+ * to — no turn, a turn the wrong way, or one too slow to be usable — because the
+ * wait times out and the delta is asserted afterwards either way.
+ */
+async function holdUntilMoved(
+  page: Page,
+  code: string,
+  name: string,
+  from: number,
+  minimum: number,
+): Promise<number> {
+  await page.keyboard.down(code);
+  try {
+    await page
+      .waitForFunction(
+        ([field, start, target]) => {
+          const element = document.querySelector<HTMLElement>("#status");
+          if (element === null) return false;
+          const raw = element.dataset[field];
+          if (raw === undefined) return false;
+          return Math.abs(Number(raw) - start) >= target;
+        },
+        [name, from, minimum] as const,
+        { timeout: LOOK_HOLD_TIMEOUT_SECONDS * 1000 },
+      )
+      // A timeout is not the failure — the assertion that follows is, and it can
+      // name the value it saw. Swallowing it here keeps that message.
+      .catch(() => undefined);
+  } finally {
+    await page.keyboard.up(code);
+  }
+  return await readNumber(page, name);
+}
+
 async function readNumber(page: Page, name: string): Promise<number> {
   const value = await page.locator("#status").getAttribute(`data-${name}`);
   expect(value, `#status has no data-${name}`).not.toBeNull();
@@ -521,10 +588,7 @@ test.describe("§12: the character-controller family in the browser", () => {
     const before = await grab(canvas);
     const yaw0 = await readNumber(page, "yaw");
 
-    await page.keyboard.down("ArrowRight");
-    await page.waitForTimeout(LOOK_HOLD_SECONDS * 1000);
-    await page.keyboard.up("ArrowRight");
-    const yaw1 = await readNumber(page, "yaw");
+    const yaw1 = await holdUntilMoved(page, "ArrowRight", "yaw", yaw0, YAW_MINIMUM);
     // → is −yaw: yaw is measured from +Z towards +X (§7a), so turning right
     // swings the forward axis the other way — the sign is part of the claim.
     expect(
@@ -532,10 +596,14 @@ test.describe("§12: the character-controller family in the browser", () => {
       `yaw moved ${(yaw1 - yaw0).toFixed(3)} — → did not turn right`,
     ).toBeGreaterThanOrEqual(YAW_MINIMUM);
 
-    await page.keyboard.down("ArrowDown");
-    await page.waitForTimeout(LOOK_HOLD_SECONDS * 1000);
-    await page.keyboard.up("ArrowDown");
-    const pitch = await readNumber(page, "pitch");
+    const pitch0 = await readNumber(page, "pitch");
+    const pitch = await holdUntilMoved(
+      page,
+      "ArrowDown",
+      "pitch",
+      pitch0,
+      PITCH_MINIMUM,
+    );
     expect(
       -pitch,
       `pitch is ${pitch.toFixed(3)} — ↓ did not pitch the eye down`,

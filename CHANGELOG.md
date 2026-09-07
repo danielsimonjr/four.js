@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — the look gate measured the runner, not the controller
+
+`main` went red on a **docs-only** commit (run 34090671121), which is the tell that the gate
+was never testing our code:
+
+```
+Error: yaw moved -0.133 — → did not turn right      (YAW_MINIMUM = 0.35)
+```
+
+The message misled twice over. The camera turned the **right way** — `yaw0 - yaw1` was `+0.133`
+— it simply did not turn far enough, and "did not turn right" reads as a direction bug.
+
+Root cause: look is integrated in `fixedUpdate` as `rad/s × the injected fixed delta`, so it
+advances with SIMULATED time, while the gate held the key for 0.6 seconds of **wall-clock**.
+§10's dropped-time guard discards the backlog when the rAF loop is starved, so on a contended
+runner 0.6 real seconds bought about 0.12 simulated ones. The gate was measuring the
+container's spare capacity.
+
+`YAW_MINIMUM`'s own doc claimed "59 % margin on the measurement" — and the run came in at
+0.133, **6.4× under** the 0.853 reference. Margin is the wrong instrument for starvation: no
+threshold chosen against measurement noise survives a loop that barely ran.
+
+`holdUntilMoved` now holds each look key until the published value has moved far enough, capped
+by a 10 s timeout that exists to end a hung page rather than to time the turn. A slow runner
+takes longer in wall-clock to reach the same simulated state instead of failing. The gate still
+fails for every reason it should: no turn, too slow, or the wrong way — the wait is on the
+absolute delta, and the signed assertion that follows still owns the direction claim. Verified:
+5/5 character-controller specs pass.
+
 ## Unreleased — TODO audit against the code (2026-09-07)
 
 A verification pass over the 21 open items after #70-#78, to find any that the code had already

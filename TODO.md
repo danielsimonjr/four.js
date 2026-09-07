@@ -116,6 +116,18 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 ## Now
 
+- [x] **`character-controller.spec.ts:509` is a wall-clock race — `main` went RED on a
+      DOCS-ONLY commit.** Run 34090671121: `yaw moved -0.133 — → did not turn right`, against
+      `YAW_MINIMUM = 0.35`. The message misleads: the camera turned the RIGHT way
+      (`yaw0 - yaw1 = +0.133`), just not far enough. Root cause: look is integrated in
+      `fixedUpdate` as `rad/s × fixed delta`, but the gate holds the key for
+      `LOOK_HOLD_SECONDS` of **wall-clock**. §10's dropped-time guard discards the backlog
+      when the rAF loop is starved on a contended runner, so 0.6 real seconds bought only
+      ~0.12 simulated seconds. The constant's own doc says "0.35 leaves 59 % margin" — but
+      0.133 is 6.4× under the 0.853 reference, and no margin survives starvation.
+      Fix: wait on simulation progress, not on real time.
+
+
 - [x] **`motor-digital-twin.spec.ts:613` asserts a stale environment assumption — `main` is RED.**
       `expect(status["gpuframe"]).toBe("nan")` with the comment *"SwiftShader / CI has no
       `timestamp-query` / `EXT_disjoint_timer_query`, so `gpuFrameTime` stays the §84 'not
