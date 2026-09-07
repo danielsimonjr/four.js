@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — both described personas re-run against current main
+
+They were last exercised on 09-06, before ten commits landed. A scenario that passed yesterday
+says nothing about today's tree, so both were re-run rather than recalled. **Both pass, and the
+fixes they produced are holding.**
+
+**Flight simulator (indie studio).** Flown under real key input, not merely loaded: orientation
+composes from identity to `[-0.398, -0.138, 0.553, 0.719]`, position `[0,60,350]` →
+`[-237,176,746]` — rolled left, climbed, accelerated 120→157 — chase camera trailing, zero page
+errors. The `FollowRig` crash found on 09-06 stays fixed.
+
+**A drift bug I nearly reported, and did not.** The quaternion norm computed from the app's
+telemetry read `1.000062`, which looks exactly like normalisation drift a simulator cannot
+tolerate. The app's diagnostic rounds the quaternion to 4 decimals. Measured at full precision
+from the live value, the norm is **exactly 1**. The instrument was mine, and a rounded readout
+cannot measure a deviation smaller than its own rounding.
+
+**Two-cylinder boxer (engineering student).** The crank turns — θ swept a full revolution over
+400 samples — so the frozen-engine defect from 09-06 (a dynamic body with no collider has zero
+angular inertia) stays fixed. Against closed form: piston error **mean 0.46 %, max 0.99 %** of a
+1.0043 stroke; mirror invariant `|x_A + x_B|` mean 3.4 mm, max 9.5 mm; piston **y-drift exactly
+0**; zero errors.
+
+**One number left unexplained on purpose.** On 09-06 I recorded a mean piston error of 1.56 mm
+(0.16 %); today the same app measures 4.62 mm (0.46 %) — about 3×. Both are small and every
+invariant holds, but calling that "consistent" would be smoothing: the sample window, crank
+speed and Rapier version (0.20 landed 09-06) all differ, and no controlled comparison was run.
+Neither figure should be quoted as the engine's accuracy until one is.
+
 ## Unreleased — the duplicate "First publish" row is deleted, not pointed at
 
 Follow-up to the audit. Two verifiers independently recommended deleting the duplicate row
