@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — §62's renderer abstraction verified from outside: a two-line swap
+
+Dogfooding cycle 3c. The claim a renderer abstraction makes is that a consumer can change
+backends without changing their app; that had never been tested from a consumer's seat, only
+from inside the suite.
+
+Swapping `WebglRenderer` → `WebgpuRenderer` in the cycle-3 app is **two lines** — the import and
+the constructor — and nothing else moved. Measured side by side on the same app:
+
+| | WebGL | WebGPU |
+|---|---|---|
+| glTF | loaded | loaded |
+| particles alive | 245 | 247 |
+| tween range | 1.025–1.550 | 1.050–1.575 |
+| lit pixels | 9,462 | 10,903 |
+| console errors | 0 | 0 |
+
+Assets, particles, animation, UI and §42 authority all behaved identically across backends.
+
+The single WebGPU-only message is §10's dropped-time guard on the slower first frame — *"dropped
+0.0666s of simulation time this frame (maximumSubSteps=5) … TimeState.droppedTime is now
+0.0666s"*. That is the documented guard doing its job, and it names the field to inspect. It is
+also the same mechanism behind the look-key gate fixed earlier today, which is a useful
+consistency: the engine reports the thing that bit that test.
+
+Recorded as a **strength**, not a finding — the coverage map now carries it, and the surfaces
+still unexercised are text/§56, browser §34 round-trip, and the 2D↔3D story.
+
 ## Unreleased — §78 glTF is demonstrated, not just tested
 
 Cycle 3's fourth finding, fixed. `examples/gltf-model` is the fourteenth example: it builds a

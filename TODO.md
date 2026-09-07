@@ -514,9 +514,17 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       errors, no §42 interaction (particle transforms are not node transforms). The only
       friction was guessing `aliveCount` for what is `particleCount` — discoverable, and
       not worth filing.
-      STILL not exercised: WebGPU from a consumer seat, text/§56, serialization/§34
-      round-trip in the browser, and the 2D↔3D mixed-scene story. Those are where the
-      next findings are.
+      **WebGPU exercised 2026-09-07 (cycle 3c) — CLEAN, and the strongest positive result so
+      far.** §62's renderer abstraction holds from outside: swapping `WebglRenderer` →
+      `WebgpuRenderer` is a **two-line change** — the import and the constructor — and the
+      whole app kept working on the other backend with nothing else touched. Measured side
+      by side: glTF loaded / loaded, particles 245 / 247 alive, tween 1.025–1.550 /
+      1.050–1.575, lit pixels 9,462 / 10,903, console errors 0 / 0. The only WebGPU-only
+      message is §10's dropped-time guard on the slower first frame — *"dropped 0.0666s
+      … TimeState.droppedTime is now 0.0666s"* — which is the documented behaviour and names
+      the field to inspect, not a defect.
+      STILL not exercised: text/§56, serialization/§34 round-trip in the browser, and the
+      2D↔3D mixed-scene story. Those are where the next findings are.
 
 - [x] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
       one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`
