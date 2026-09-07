@@ -1,6 +1,6 @@
 # Fixed-step simulation
 
-Simulation in four.js advances in **fixed steps**; rendering runs at whatever
+Simulation in fourJS advances in **fixed steps**; rendering runs at whatever
 rate the display refreshes and draws **interpolated** poses. This guide covers
 the §10 loop, the §9 time domains, §39 system ordering, and the §43
 interpolation that ties them together. It is the single most load-bearing

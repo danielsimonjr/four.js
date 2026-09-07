@@ -10,7 +10,7 @@
  *
  * ## The mapping, precisely
  *
- * | four.js (3D-typed)                    | Rapier 2D                       |
+ * | fourJS (3D-typed)                    | Rapier 2D                       |
  * | ------------------------------------- | ------------------------------- |
  * | `Vector3(x, y, z)` with `z === 0`     | `{ x, y }`                      |
  * | `Vector2(x, y)`                       | `{ x, y }`                      |

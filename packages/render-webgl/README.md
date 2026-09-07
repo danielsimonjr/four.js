@@ -1,6 +1,6 @@
 # @four/render-webgl
 
-WebGL 2 backend — the MVP renderer (§120). Part of [four.js](../../README.md).
+WebGL 2 backend — the MVP renderer (§120). Part of [fourJS](../../README.md).
 
 Implements §62 backend 2 of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped across Phases 3, 3a, and 9. Applications select a backend at the edge — nothing in `@four/scene`, `@four/motion`, or `@four/physics` may name anything in this package.
 

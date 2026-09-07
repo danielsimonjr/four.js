@@ -1,4 +1,4 @@
-# four.js guides
+# fourJS guides
 
 The prose half of the §93 Documentation Plan. §93 lists nineteen documentation
 items; the first six — installation and quick start, and the five worked

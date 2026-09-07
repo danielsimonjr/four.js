@@ -1,4 +1,4 @@
-# Contributing to four.js
+# Contributing to fourJS
 
 Thanks for your interest. This document describes how work happens in this repository
 today. Please read it before opening a pull request — the process here is unusual, because

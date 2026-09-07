@@ -7,7 +7,7 @@
  * motorized shaft, vibration simulation, temperature indicators, waveform
  * charts, fault injection, a PID speed controller, pause and replay, and force
  * and torque vector overlays — and states its purpose rather than a success
- * criterion: *"This example establishes four.js as useful for engineering,
+ * criterion: *"This example establishes fourJS as useful for engineering,
  * education, simulation, and digital twins."*
  *
  * "Useful for engineering" is not a feeling, which makes §119 easier to gate

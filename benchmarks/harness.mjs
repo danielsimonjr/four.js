@@ -394,7 +394,7 @@ export function hostLines(host, caveat) {
 function usage() {
   const width = Math.max(...SUITE.map((entry) => entry.file.length));
   return [
-    "four.js benchmark harness (§92 performance tests, §86 targets; plan §6j, WP-11.4)",
+    "fourJS benchmark harness (§92 performance tests, §86 targets; plan §6j, WP-11.4)",
     "",
     "  This file is a library, not a runner: it has no scheduler and runs nothing.",
     "  Each benchmark is a standalone Node script that imports it.",

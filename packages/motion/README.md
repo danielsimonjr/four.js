@@ -1,6 +1,6 @@
 # @four/motion
 
-Motion system — time, the fixed-step loop, kinematics, and controllers. Part of [four.js](../../README.md).
+Motion system — time, the fixed-step loop, kinematics, and controllers. Part of [fourJS](../../README.md).
 
 Implements §9–§13, §38–§39, and the §111 advanced-motion tier (§99, Parts II & VI) of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped across Phases 1, 2, and 8. All times are seconds.
 

@@ -357,7 +357,7 @@ const path = writeResult("animation-sampling", record);
 // --- the report --------------------------------------------------------------
 
 printReport([
-  "four.js — AnimationMixer sampling cost (§17, §16, §42, §92; plan §6j P11-4)",
+  "fourJS — AnimationMixer sampling cost (§17, §16, §42, §92; plan §6j P11-4)",
   `  clip                    ${TRACKS.length} tracks, ${KEYS_PER_TRACK} linear keys over ${CLIP_DURATION_SECONDS} s, shared by every instance`,
   `  iteration               advance(${round(FIXED_DELTA_TIME, 6)} s) over every mixer — one frame of AnimationSystem's work`,
   `  steps                   ${MEASURED_STEPS} measured, ${WARMUP_STEPS} warm-up`,

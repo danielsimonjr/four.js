@@ -1,6 +1,6 @@
 # @four/core
 
-Shared foundation infrastructure — the dependency-free base of every other package. Part of [four.js](../../README.md).
+Shared foundation infrastructure — the dependency-free base of every other package. Part of [fourJS](../../README.md).
 
 Implements §6a (component model), §6b (eventing), and the §83/§85 error model from [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 1 (§104), with later hoists of shared utilities.
 

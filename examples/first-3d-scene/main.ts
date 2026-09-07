@@ -1,5 +1,5 @@
 /**
- * four.js — the first **3D** scene of §93: a perspective camera, lit meshes,
+ * fourJS — the first **3D** scene of §93: a perspective camera, lit meshes,
  * and one directional light over the same scene graph every other example uses.
  *
  * `first-2d-scene` shows the pillars cooperating through an *orthographic*
@@ -109,7 +109,7 @@ import {
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (element === null) {
-    throw new Error(`four.js example: no ${selector} in the document.`);
+    throw new Error(`fourJS example: no ${selector} in the document.`);
   }
   return element;
 }
@@ -144,7 +144,7 @@ const CAMERA_POSITION = new Vector3(0, 1.35, 6.4);
  */
 const CAMERA_TARGET = new Vector3(0, 0.25, 0);
 
-// The first perspective camera in any four.js example. `aspect` is the
+// The first perspective camera in any fourJS example. `aspect` is the
 // viewport's width ÷ height and the application does not guess it: §61 makes it
 // the application's to set, and `Application.resize` maintains it afterwards
 // for full-surface viewports.
@@ -452,5 +452,5 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   status.dataset["state"] = "error";
   status.textContent = "failed to start — see the console";
-  console.error("four.js example: failed to start.", error);
+  console.error("fourJS example: failed to start.", error);
 });

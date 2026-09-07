@@ -41,7 +41,7 @@ import { AssetManager, jsonLoader } from "four/assets";
 
 const assets = new AssetManager({
   maximumBytes: 8 * 1024 * 1024, // default: 64 MiB
-  timeoutSeconds: 10, // default: 30 s — seconds, like every four.js duration
+  timeoutSeconds: 10, // default: 30 s — seconds, like every fourJS duration
 });
 
 try {
@@ -120,7 +120,7 @@ authored scene and far short of the recursion depth at which a validator dies.
 
 ## CSP posture
 
-four.js is designed to run under a strict Content-Security-Policy with **no
+fourJS is designed to run under a strict Content-Security-Policy with **no
 `'unsafe-eval'` and no `'unsafe-inline'`**. Concretely, no package in this
 repository:
 
@@ -134,7 +134,7 @@ repository:
   a canvas the application supplies; `@four/ui` is a scene-graph widget tier
   that renders through that same canvas, not a DOM component library.
 
-A workable starting policy for an application built on four.js:
+A workable starting policy for an application built on fourJS:
 
 ```
 Content-Security-Policy:
@@ -227,7 +227,7 @@ that has already begun still runs to its end — no signal reaches inside a
 loader — but its result is discarded and its cache slot freed.)
 
 Beyond §96's list, two ordinary web-application responsibilities remain the
-application's, not the engine's: four.js never validates that a URL points
+application's, not the engine's: fourJS never validates that a URL points
 somewhere you meant (do that before calling `load`), and it never sets response
 headers — `Content-Type`, `X-Content-Type-Options: nosniff`, and CORS policy
 are your server's.

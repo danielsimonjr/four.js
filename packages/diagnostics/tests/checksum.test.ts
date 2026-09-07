@@ -5,7 +5,7 @@ import { createChecksum, hashFloats } from "../src/checksum.js";
 /**
  * Committed known-answer vectors (§33, D6).
  *
- * These uint32 values are the *truth* for the four.js checksum: they were
+ * These uint32 values are the *truth* for the fourJS checksum: they were
  * computed once from the D6 definition and cross-checked against an independent
  * reference implementation, and any change to `checksum.ts` that moves them is
  * a breaking change to every committed golden hash (phase exits, §92

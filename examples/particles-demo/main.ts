@@ -1,5 +1,5 @@
 /**
- * four.js — the §36 particle demonstration (Phase 9, §112; plan §6h, WP-9.4).
+ * fourJS — the §36 particle demonstration (Phase 9, §112; plan §6h, WP-9.4).
  *
  * The smallest program that shows a particle system doing all four things §36
  * asks of the MVP tier, and shows them *in a browser*, on a real WebGL 2
@@ -112,7 +112,7 @@ import { OrthographicCamera, createFullscreenViewport } from "four/scene";
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (element === null) {
-    throw new Error(`four.js example: no ${selector} in the document.`);
+    throw new Error(`fourJS example: no ${selector} in the document.`);
   }
   return element;
 }
@@ -351,5 +351,5 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   status.dataset["state"] = "error";
   status.textContent = "failed to start — see the console";
-  console.error("four.js example: failed to start.", error);
+  console.error("fourJS example: failed to start.", error);
 });

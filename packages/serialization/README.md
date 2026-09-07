@@ -1,6 +1,6 @@
 # @four/serialization
 
-Scene serialization and migrations. Part of [four.js](../../README.md).
+Scene serialization and migrations. Part of [fourJS](../../README.md).
 
 Implements §79–80 of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 11 (§113a). Documents are versioned (`SCENE_FORMAT_VERSION` = 1), canonical, and diff-friendly; round trips are byte-identical.
 

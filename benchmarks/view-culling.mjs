@@ -304,7 +304,7 @@ const path = writeResult("view-culling", record);
 // --- the report --------------------------------------------------------------
 
 const lines = [
-  "four.js — §64 per-view render lists and §87 frustum culling (R-8)",
+  "fourJS — §64 per-view render lists and §87 frustum culling (R-8)",
   "",
   `  iteration               one frame's list work for N views: derive vs. rebuild`,
   `  frames                  ${String(MEASURED_FRAMES)} measured, ${String(

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository State
 
-four.js is a unified JS/TS framework combining 2D/2.5D/3D graphics, animation, motion, and
+fourJS is a unified JS/TS framework combining 2D/2.5D/3D graphics, animation, motion, and
 physics in one shared scene model. **The implementation plan (§103–§113a) is complete**
 (2026-08-02; this section was stale "scaffold only" text until 2026-08-05): all 24
 `packages/*` packages build, test, and lint — ~3,000 unit tests with a tooling-enforced

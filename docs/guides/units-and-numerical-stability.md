@@ -1,6 +1,6 @@
 # Units and numerical stability
 
-four.js has one set of unit conventions, enforced everywhere, and a body of
+fourJS has one set of unit conventions, enforced everywhere, and a body of
 stability guidance (§41) that exists because floating-point simulation
 punishes casual numbers. This guide states both, with the measured facts
 behind the advice.
@@ -43,7 +43,7 @@ hinge.setMotor({
 
 ## Fixed timesteps are the foundation (§10, §41)
 
-A variable-step solver trades stability for convenience and loses. four.js
+A variable-step solver trades stability for convenience and loses. fourJS
 steps physics at a fixed `fixedTimeStep` (default 1/60 s) and renders by
 interpolation — see the [fixed-step guide](fixed-step-simulation.md). Do not
 shrink `maximumSubSteps` to "catch up" a slow machine; dropped time

@@ -563,7 +563,7 @@ const path = writeResult("ui-layout", record);
 // --- the report --------------------------------------------------------------
 
 printReport([
-  "four.js — retained-UI layout cost (§86 retained UI nodes, CPU half; §73, §74, §56, §92)",
+  "fourJS — retained-UI layout cost (§86 retained UI nodes, CPU half; §73, §74, §56, §92)",
   `  iteration               root.layout() — §74 measure + arrange over the whole tree`,
   `  passes                  ${MEASURED_PASSES} measured, ${WARMUP_PASSES} warm-up, per pass kind`,
   `  60 Hz frame budget      ${round(FRAME_BUDGET_MS, 3)} ms (this file's reading; §86 states a count, not a rate)`,

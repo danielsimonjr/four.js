@@ -1,8 +1,8 @@
-# four.js
+# fourJS
 
 **One scene. Every dimension. Everything moves.**
 
-four.js is a unified JavaScript/TypeScript framework for building interactive
+fourJS is a unified JavaScript/TypeScript framework for building interactive
 applications that combine 2D, 2.5D, and 3D graphics with animation, motion systems, and
 physics in a single shared scene model. 2D shapes, 3D meshes, sprites, text, UI widgets,
 rigid bodies, joints, and particle emitters are all nodes and components in one scene

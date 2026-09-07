@@ -98,7 +98,7 @@ function assertSuiteCoversTree() {
 function usage() {
   const width = Math.max(...SUITE.map((entry) => entry.file.length));
   return [
-    "four.js benchmark suite runner (§86 targets, §92 performance tests)",
+    "fourJS benchmark suite runner (§86 targets, §92 performance tests)",
     "",
     "  pnpm run build          # required: every script imports the built dist",
     "  pnpm bench              # the whole suite, in this order:",
@@ -181,7 +181,7 @@ try {
 }
 
 printReport([
-  `four.js — running ${entries.length} benchmark${entries.length === 1 ? "" : "s"}, one process each.`,
+  `fourJS — running ${entries.length} benchmark${entries.length === 1 ? "" : "s"}, one process each.`,
   "Recorded, never gated: no timing below is asserted on. See benchmarks/README.md.",
   "",
 ]);
@@ -252,7 +252,7 @@ const path = writeResult("suite", record);
 
 const width = Math.max(...results.map((result) => result.script.length));
 printReport([
-  "four.js — benchmark suite summary (§86 targets, §92 performance tests)",
+  "fourJS — benchmark suite summary (§86 targets, §92 performance tests)",
   "",
   ...results.map((result) =>
     [

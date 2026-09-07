@@ -77,7 +77,7 @@ describe("§78: a .gltf with a separate .bin becomes a renderable scene", () => 
     const asset = await assets.load(`${FIXTURES}quad.gltf`, gltfLoader);
 
     // The parse tier carried the file's content faithfully.
-    expect(asset.extras).toEqual({ fixture: "four.js §78 integration quad" });
+    expect(asset.extras).toEqual({ fixture: "fourJS §78 integration quad" });
     const primitive = asset.meshes[0].primitives[0];
     expect(primitive.positions).toHaveLength(12);
     // The fixture authors v top-down (image convention); the loader flips it

@@ -19,7 +19,7 @@ import type { EditorToolRegistry } from "./editor-tools.js";
  * §81's *"editor tools"*: a named {@link EditorToolRegistry} of tool
  * factories.
  *
- * **Host-side.** four.js ships no editor; a host that wants a tool palette
+ * **Host-side.** fourJS ships no editor; a host that wants a tool palette
  * constructs the registry and provides this token. `Application` does not
  * hold one — see `editor-tools.ts`.
  *

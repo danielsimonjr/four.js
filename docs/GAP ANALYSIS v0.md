@@ -1,4 +1,4 @@
-# four.js — Gap Analysis v0
+# fourJS — Gap Analysis v0
 
 > **SUPERSEDED 2026-08-08 by `docs/GAP ANALYSIS v1.md`** (which re-analyses the tree at
 > `e0ddd3b`, after the 2026-08-07 closure campaign). This document is kept unchanged as the
@@ -255,7 +255,7 @@ _Dependencies:_ A-5 (memory counters), A-6 (surface), and the render/physics ana
 
 _What exists:_ `packages/core/src/conventions.ts` holds exactly one constant, `DEFAULT_GRAVITY_Y`. `docs/guides/units-and-numerical-stability.md:23` states the absence honestly ("no `UnitSystem` API has shipped … today the conversion layer is yours").
 
-_What's missing:_ the `UnitSystem` interface, its `scale.lengthToMeters`/`massToKilograms` factors, and §101's "unit application in simulation". `grep -rn "UnitSystem|lengthToMeters|massToKilograms" packages/*/src` returns **nothing**. §40 opens with "four.js should not silently assume that one world unit is always one meter" — today it silently does, everywhere.
+_What's missing:_ the `UnitSystem` interface, its `scale.lengthToMeters`/`massToKilograms` factors, and §101's "unit application in simulation". `grep -rn "UnitSystem|lengthToMeters|massToKilograms" packages/*/src` returns **nothing**. §40 opens with "fourJS should not silently assume that one world unit is always one meter" — today it silently does, everywhere.
 
 _Why the record is inadequate:_ the only note lives in a guide. Nothing in `TODO.md`, `MEMORY.md`, or `AUDIT-120.md` names §40, so it is not on any backlog. §40 is also not a §120 row, which is precisely why the §120-scoped audit could not catch it.
 
@@ -1790,7 +1790,7 @@ The setter (`rigid-body.ts:601-604`) validates mass and writes `#type` unconditi
 | **Severity / Effort** | **major** / **M**                                                                                                                                                                                                                    |
 | **Provenance**        | **recorded as a boundary** — MEMORY 2026-08-02, Phase 11: _"known boundaries: unregistered components silently unsaved"_; reference serializers live at `tests/integration/helpers/roundtrip-scenarios.ts:19-20`, i.e. in test code. |
 
-`@four/serialization` may depend on `scene` only (`serializer.ts:15`: _"it can never name `RigidBody`, an animation component, or an …"_), so the registry is empty by construction. Every four.js scene containing physics or motion components therefore round-trips through §79 **losing them silently** unless the application hand-writes and registers serializers copied out of a test helper.
+`@four/serialization` may depend on `scene` only (`serializer.ts:15`: _"it can never name `RigidBody`, an animation component, or an …"_), so the registry is empty by construction. Every fourJS scene containing physics or motion components therefore round-trips through §79 **losing them silently** unless the application hand-writes and registers serializers copied out of a test helper.
 
 **Closure plan.** Ship the serializers from the package that owns each component — `@four/physics` exports `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`, `@four/motion` exports `MOTION_COMPONENT_SERIALIZER` — each typed against a structural `ComponentSerializer` shape so no new dependency edge is needed (the same duck-typing pattern as `ParticleDrawable` and `collectSceneLights`). Separately, make an _unregistered_ component a warning rather than a silent drop in `@four/serialization`.
 **Note:** the §79↔§34 boundary itself is already proven and documented (MEMORY WP-11.5: contact-free saves round-trip bit-identically; in-contact saves diverge through warm-start state) — that part is not a gap.

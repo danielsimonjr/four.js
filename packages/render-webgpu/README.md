@@ -1,6 +1,6 @@
 # @four/render-webgpu
 
-WebGPU backend — §62 backend 1. Part of [four.js](../../README.md).
+WebGPU backend — §62 backend 1. Part of [fourJS](../../README.md).
 
 Implements `@four/render`'s `Renderer` over WebGPU (WP-R1.1–R1.9, 2026-08-21…29; the R-1 plan is complete). Applications select a backend at the edge — nothing in `@four/scene`, `@four/motion`, or `@four/physics` may name anything in this package. **Calling `registerWebgpuRenderer()` moves an application off WebGL 2**, because `AUTO_RENDERER_ORDER` prefers WebGPU.
 

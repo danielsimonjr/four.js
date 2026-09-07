@@ -218,7 +218,7 @@ function inline(text) {
 /** First ATX heading, used as `<title>` and the page H1 we keep from the body. */
 function firstHeading(markdown) {
   const m = /^#\s+(.+)$/m.exec(markdown);
-  return m ? m[1].trim() : "four.js guide";
+  return m ? m[1].trim() : "fourJS guide";
 }
 
 /** A very small CommonMark-ish subset: ATX headings, fences, lists, tables. */
@@ -356,14 +356,14 @@ function page({ title, sourceRel, body }) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(title)} — four.js</title>
+    <title>${escapeHtml(title)} — fourJS</title>
     <style>
       ${SITE_CSS}
     </style>
   </head>
   <body>
     <nav>
-      <a href="../">four.js</a>
+      <a href="../">fourJS</a>
       <a href="./">Guides</a>
       <a href="${GITHUB_BLOB}/${sourceRel}">Markdown source</a>
     </nav>

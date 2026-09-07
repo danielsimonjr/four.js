@@ -1,5 +1,5 @@
 /**
- * four.js — the physics playground, and the §108 demonstration.
+ * fourJS — the physics playground, and the §108 demonstration.
  *
  * §108 asks for one thing and this file is that thing:
  *
@@ -154,7 +154,7 @@ import {
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (element === null) {
-    throw new Error(`four.js playground: no ${selector} in the document.`);
+    throw new Error(`fourJS playground: no ${selector} in the document.`);
   }
   return element;
 }
@@ -987,7 +987,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  status.textContent = "four.js playground: failed to start — see the console.";
+  status.textContent = "fourJS playground: failed to start — see the console.";
   status.dataset["state"] = "error";
-  console.error("four.js playground: failed to start.", error);
+  console.error("fourJS playground: failed to start.", error);
 });

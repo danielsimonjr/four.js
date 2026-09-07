@@ -1,5 +1,5 @@
 /**
- * Draws four.js scenes with WebGPU (§61, §62 backend 1).
+ * Draws fourJS scenes with WebGPU (§61, §62 backend 1).
  *
  * ```ts
  * const renderer = new WebgpuRenderer();

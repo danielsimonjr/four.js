@@ -1,5 +1,5 @@
 /**
- * four.js — the §12 character-controller example: a first-person walk through
+ * fourJS — the §12 character-controller example: a first-person walk through
  * a small arena, exercising the whole §12 controller family at once.
  *
  * `PH-11` (2026-08-21) shipped `CharacterController` + `FirstPersonLook` in
@@ -113,7 +113,7 @@ function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (element === null) {
     throw new Error(
-      `four.js character example: no ${selector} in the document.`,
+      `fourJS character example: no ${selector} in the document.`,
     );
   }
   return element;
@@ -676,7 +676,7 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   status.textContent =
-    "four.js character example: failed to start — see the console.";
+    "fourJS character example: failed to start — see the console.";
   status.dataset["state"] = "error";
-  console.error("four.js character example: failed to start.", error);
+  console.error("fourJS character example: failed to start.", error);
 });

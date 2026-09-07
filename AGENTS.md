@@ -8,7 +8,7 @@ the detailed reference.
 
 ## 1. What this repository is
 
-four.js — "One scene. Every dimension. Everything moves." — is a unified
+fourJS — "One scene. Every dimension. Everything moves." — is a unified
 JavaScript/TypeScript framework combining 2D, 2.5D, and 3D graphics with animation, motion
 systems, and physics (rigid-body and particles shipped; soft-body reserved) in a single
 shared scene model.
@@ -215,7 +215,7 @@ physically. Render everywhere."*
   `drainEvents` (events pulled after `step`, never callbacks from inside it),
   `syncSceneToSolver`/`syncSolverToScene`, the §30 query set (`raycast`/`shapeCast`/
   `overlap`/`pointQuery`), optional `createSnapshot`/`restoreSnapshot`, `dispose`. The
-  stable four.js API sits **above** adapters (Rapier, Box2D, Matter.js, Cannon-es, Ammo.js,
+  stable fourJS API sits **above** adapters (Rapier, Box2D, Matter.js, Cannon-es, Ammo.js,
   custom solvers are candidates).
 
 ### Part V — Numerical Integration and Simulation (§38–41)

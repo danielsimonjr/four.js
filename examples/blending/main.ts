@@ -1,5 +1,5 @@
 /**
- * four.js — the blending example, and the §110 demonstration.
+ * fourJS — the blending example, and the §110 demonstration.
  *
  * §110 asks that
  *
@@ -203,7 +203,7 @@ import {
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (element === null) {
-    throw new Error(`four.js blending: no ${selector} in the document.`);
+    throw new Error(`fourJS blending: no ${selector} in the document.`);
   }
   return element;
 }
@@ -1104,7 +1104,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  status.textContent = "four.js blending: failed to start — see the console.";
+  status.textContent = "fourJS blending: failed to start — see the console.";
   status.dataset["state"] = "error";
-  console.error("four.js blending: failed to start.", error);
+  console.error("fourJS blending: failed to start.", error);
 });

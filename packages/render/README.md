@@ -1,6 +1,6 @@
 # @four/render
 
-Backend-independent renderer interface and render preparation. Part of [four.js](../../README.md).
+Backend-independent renderer interface and render preparation. Part of [fourJS](../../README.md).
 
 Implements the MVP tier of §61–66 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped across Phases 3, 3a, and 9. The logical scene never depends on a concrete backend — backends (`render-webgl`, …) implement the `Renderer` interface defined here.
 

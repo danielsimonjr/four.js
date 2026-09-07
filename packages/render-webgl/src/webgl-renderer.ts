@@ -1172,7 +1172,7 @@ function applyItemScissor(
 }
 
 /**
- * Draws four.js scenes with WebGL 2 (§61, §62, §120).
+ * Draws fourJS scenes with WebGL 2 (§61, §62, §120).
  *
  * ```ts
  * const renderer = new WebglRenderer();

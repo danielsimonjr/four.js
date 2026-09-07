@@ -116,6 +116,41 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 ## Now
 
+### 🔧 "fourJS" is the library name — rebrand, staged (2026-09-07)
+
+Daniel: *"fourJS is the library name; not four or four.js. Refactor codebase to reflect
+this reality."* Staged deliberately, because the three layers have very different costs
+and only the first is unambiguous.
+
+- [x] **Stage 1 — BRANDING (done).** 220 replacements across 128 tracked files: every place
+      the *library* was called `four.js` now reads **fourJS**. Surgical, not a blanket
+      replace — verified the pattern leaves `four.js-monorepo`, `four.json`, `four.js/`
+      paths and `@four/*` untouched, and never touches bare `four`, which is overwhelmingly
+      the numeral (130 "all four", 34 "four of", 11 "four packages").
+      Generated docs were NOT hand-edited: the 31 occurrences in `duplicate-symbols.md` came
+      from `tools/create-dependency-graph/duplicate-allowlist.json`, so the generator's INPUT
+      was rebranded and the docs regenerated. `CHANGELOG.md` is left alone on purpose — it is
+      a dated record, and rewriting what past entries said is not rebranding.
+      Gates: check-docs OK, check-spec OK, graph:check OK, lint clean, **24/24 packages,
+      7,520 tests passing**.
+
+- [ ] **Stage 2 — PACKAGE IDENTIFIERS (needs Daniel's call, not mine).** `four` → `fourjs`
+      and `@four/*` → `@fourjs/*`. Both are npm-legal (lowercase) and would match the
+      already-chosen publish target `@danielsimonjr/fourjs`. **Why this is not a drive-by:**
+      it rewrites every import specifier in the repo, the workspace map, the lockfile and
+      `apply-publish-names.mjs`'s mapping — and Daniel has already fixed the *published*
+      identity as `@danielsimonjr/fourjs`, so the internal scope is a naming decision with
+      publish consequences, taken once. Cheap to do before first publish, expensive after.
+
+- [ ] **Stage 3 — REPO AND DIRECTORY (`four.js` → `fourJS`) — Daniel's call.** Renaming the
+      GitHub repo and the local directory breaks every existing clone's remote and every
+      absolute path in the agent trackers. Reversible, but it is an outward-facing change,
+      so it is his to make, not mine.
+
+> **npm forbids capitals in package names**, so "fourJS" can only ever be branding at the
+> identifier layer — `@danielsimonjr/fourjs` stays lowercase however far stages 2 and 3 go.
+
+
 ### 🔧 Tech-lead decisions on the four dogfooding findings (authorised 2026-09-07)
 
 Daniel delegated all four. Ordered by value-over-risk, not by how annoying each felt.
@@ -466,7 +501,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       run dies before a single test executes:
 
       ```text
-      ENOENT: no such file or directory, scandir '\C:\Users\danie\Github\four.js\packages'
+      ENOENT: no such file or directory, scandir '\C:\Users\danie\Github\fourJS\packages'
       ```
 
       It is the **only** tool in `tools/` with this bug — `apply-publish-names`,
@@ -686,7 +721,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       perpetuity. That is the wrong trade.
       Reopening this needs one of two things to change: `ui-demo`'s §86 budget rising for a
       reason of its own, or a home for the check outside the simulation envelope.
-- [x] **Publish path was broken — `apply-publish-names` exited 1, so four.js could not be
+- [x] **Publish path was broken — `apply-publish-names` exited 1, so fourJS could not be
       published at all.** Found by dogfooding the publish path rather than the API. Rewriter did
       not match subpath specifiers while the validator flagged them; two renderer error messages
       also named `@four/*` to consumers who would have `@danielsimonjr/fourjs-*`. Both fixed;
@@ -755,7 +790,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       same branch and commit, and re-measured at **0 files / +0-0** against current `main`.
       #63 MERGED (rapier bump, later reverted on `main`); #62 MERGED then reverted — the
       vitest-4 / eslint-10 blocker is fixed separately (spy restore, 2026-09-06).
-- [x] **four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.**
+- [x] **fourJS #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.**
       DONE 2026-09-06 with the spy-restore fix above. #62 can be retried once
       typedoc supports TS 7 (the vitest/eslint pin remains).
 

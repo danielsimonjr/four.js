@@ -1,5 +1,5 @@
 /**
- * four.js — first 2D scene, the interaction demo of §106a, and the authored
+ * fourJS — first 2D scene, the interaction demo of §106a, and the authored
  * animation of §107.
  *
  * The smallest program that shows three of the four pillars cooperating over
@@ -145,12 +145,12 @@ import { Text } from "four";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#scene");
 if (canvas === null) {
-  throw new Error('four.js example: no <canvas id="scene"> in the document.');
+  throw new Error('fourJS example: no <canvas id="scene"> in the document.');
 }
 
 const statusOrNull = document.querySelector<HTMLParagraphElement>("#status");
 if (statusOrNull === null) {
-  throw new Error('four.js example: no <p id="status"> in the document.');
+  throw new Error('fourJS example: no <p id="status"> in the document.');
 }
 const status: HTMLParagraphElement = statusOrNull;
 
@@ -613,7 +613,7 @@ const LABEL_TINT: readonly [number, number, number, number] = [
  * The label. ASCII only: the built-in 6 × 12 face covers U+0020…U+007E, and
  * anything else — an em dash, say — would draw the missing-glyph box.
  */
-const LABEL_TEXT = "four.js - click a shape, drag the box";
+const LABEL_TEXT = "fourJS - click a shape, drag the box";
 
 // The font, packed once into one RGBA8 buffer with a uv rectangle per glyph.
 // White everywhere, alpha as coverage, so a filtered edge fades to transparent
@@ -765,5 +765,5 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error("four.js example: failed to start.", error);
+  console.error("fourJS example: failed to start.", error);
 });

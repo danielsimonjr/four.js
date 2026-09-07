@@ -1,6 +1,6 @@
 # @four/render-svg
 
-SVG backend — **interface reserved; not yet implemented.** Part of [four.js](../../README.md).
+SVG backend — **interface reserved; not yet implemented.** Part of [fourJS](../../README.md).
 
 Reserved for the SVG rendering backend (vector output and 2D fallback) per §62 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md). The §120 MVP renders with WebGL 2 only (`@four/render-webgl`).
 

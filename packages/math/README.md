@@ -1,6 +1,6 @@
 # @four/math
 
-Math primitives. Part of [four.js](../../README.md).
+Math primitives. Part of [fourJS](../../README.md).
 
 Implements §7 and the §7b math conventions of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 1 (§104). Mutable types with `out`-parameter hot paths (`out?` optional-allocation policy), radians everywhere, right-handed Y-up.
 

@@ -1,6 +1,6 @@
 # @four/physics-rapier
 
-Rapier solver adapters (2D and 3D, WebAssembly). Part of [four.js](../../README.md).
+Rapier solver adapters (2D and 3D, WebAssembly). Part of [fourJS](../../README.md).
 
 Implements §37 and §102 of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); the first adapter per Phase 5 (§108). This package sits _below_ `@four/physics`: it implements `PhysicsSolverAdapter` and depends on nothing else in the engine, which is what makes the solver swappable. Application code should target `@four/physics` and hand it an adapter instance.
 

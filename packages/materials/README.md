@@ -1,6 +1,6 @@
 # @four/materials
 
-Materials and shading. Part of [four.js](../../README.md).
+Materials and shading. Part of [fourJS](../../README.md).
 
 Implements the MVP tier of §57–60 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phases 3 and 3a.
 

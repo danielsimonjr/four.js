@@ -1,6 +1,6 @@
 # Workers and cross-origin isolation
 
-§88 defines three operating modes for four.js applications. This guide states
+§88 defines three operating modes for fourJS applications. This guide states
 what each mode is, **what actually ships today**, and the deployment
 requirement (COOP/COEP headers) that §88 obliges the documentation to cover.
 

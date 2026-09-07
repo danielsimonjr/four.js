@@ -493,7 +493,7 @@ export interface Renderer extends Disposable {
    * This renderer's event channel (§6b) — `contextlost` and `contextrestored`.
    *
    * Composition rather than inheritance: see the module header. Use it exactly
-   * like any other four.js emitter, including the returned unsubscriber:
+   * like any other fourJS emitter, including the returned unsubscriber:
    *
    * ```ts
    * const off = renderer.events.on("contextlost", (event) => {

@@ -1,6 +1,6 @@
 # @four/geometry
 
-Geometry primitives and buffers. Part of [four.js](../../README.md).
+Geometry primitives and buffers. Part of [fourJS](../../README.md).
 
 Implements the MVP tier of §50–53 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 3 (§106). Coordinates follow the §7a right-handed Y-up convention.
 

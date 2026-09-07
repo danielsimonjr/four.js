@@ -1,6 +1,6 @@
 # @four/particles
 
-Particle systems — deterministic CPU simulation with force fields. Part of [four.js](../../README.md).
+Particle systems — deterministic CPU simulation with force fields. Part of [fourJS](../../README.md).
 
 Implements §27 and §36 of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 9 (§112). Simulation is seeded and deterministic: emitters burn a fixed `PARTICLE_DRAWS_PER_SPAWN` RNG draws per spawn slot, so the stream is a function of history.
 

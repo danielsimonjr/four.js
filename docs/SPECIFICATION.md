@@ -1,4 +1,4 @@
-# four.js - Complete Specification and Implementation Plan
+# fourJS - Complete Specification and Implementation Plan
 
 > **Corrected rendering.** This Markdown was extracted from `archive/four-js-specification.pdf`
 > (65 pages) and then corrected by decision of the specification's author: the duplicated
@@ -53,7 +53,7 @@
 - [Appendix B - Glossary](#appendix-b---glossary)
 <!-- /toc -->
 
-four.js - Unified 2D, 3D, Motion, Animation, and Physics Framework
+fourJS - Unified 2D, 3D, Motion, Animation, and Physics Framework
 Tagline: One scene. Every dimension. Everything moves.
 Status: Revised architectural specification and implementation plan
 Primary language: TypeScript
@@ -61,7 +61,7 @@ Proposed license: MIT
 Target platforms: Web browsers, Web Workers, Node-compatible headless
 environments, and future native runtimes
 ### 1. Vision
-four.js is a unified JavaScript and TypeScript framework for building interactive
+fourJS is a unified JavaScript and TypeScript framework for building interactive
 applications that combine:
 - 2D graphics
 - 2.5D scenes
@@ -76,7 +76,7 @@ applications that combine:
 - constraints and joints
 - engineering and scientific simulation
 - GPU computation
-The name four.js represents more than “the library after Three.js. ” It represents
+The name fourJS represents more than “the library after Three.js. ” It represents
 a fourth layer that brings time, motion, animation, and physical behavior
 into a unified 2D/3D scene model.
 A scene is not merely a collection of objects in space. It is a system
@@ -107,7 +107,7 @@ Scene
 A 2D circle, 3D mesh, text label, rigid body, spring, motor, particle emitter,
 animation controller, and sensor visualization can participate in the same application lifecycle.
 ### 3. Four Architectural Pillars
-four.js is organized around four coequal pillars.
+fourJS is organized around four coequal pillars.
 3.1 Scene
 The scene graph defines hierarchy, transforms, visibility, grouping, and ownership.
 3.2 Render
@@ -121,7 +121,7 @@ The physics system models forces, mass, collisions, constraints, impulses, joint
 fields, and numerical integration.
 
 ```text
-four.js
+fourJS
 +------------+------------+
 | | |
 Scene Render Motion
@@ -136,16 +136,16 @@ Motion and physics are related but not identical:
 - Physics calculates how something must move under physical rules.
 - Kinematics moves objects directly without solving forces.
 - Dynamics derives motion from forces, mass, and constraints.
-four.js must support all four approaches and allow controlled blending between
+fourJS must support all four approaches and allow controlled blending between
 them.
 ### 4. Goals
-four.js shall:
+fourJS shall:
 1. unify 2D and 3D objects under one scene graph;
 2. make animation and motion first-class engine systems;
 3. provide a common physics API for both 2D and 3D;
 4. support deterministic fixed-step simulation;
 5. separate logical physics state from rendering backends;
-6. permit pluggable physics solvers while maintaining a stable four.js API;
+6. permit pluggable physics solvers while maintaining a stable fourJS API;
 7. support rigid bodies, colliders, forces, impulses, constraints, joints, and
 sensors;
 8. support keyframe, procedural, skeletal, morph, path, and physics-driven
@@ -336,7 +336,7 @@ should not automatically participate in physical simulation unless explicitly
 mapped to a simulation plane.
 ## Part II - Time and Motion Architecture
 ### 9. Clock and Time Domains
-four.js must distinguish multiple time concepts.
+fourJS must distinguish multiple time concepts.
 
 ```ts
 interface TimeState {
@@ -514,7 +514,7 @@ This is useful for:
 - animation paths.
 ## Part III - Animation Architecture
 ### 14. Animation System Requirements
-four.js shall support:
+fourJS shall support:
 - property animation;
 - keyframe animation;
 - timelines;
@@ -545,7 +545,7 @@ animate(node.position)
 ```
 
 Durations and times throughout the animation API are seconds, matching the
-engine-wide convention (§7a); nothing in four.js takes implicit milliseconds.
+engine-wide convention (§7a); nothing in fourJS takes implicit milliseconds.
 Required easing families:
 - linear;
 - quadratic;
@@ -740,7 +740,7 @@ Recommended rule:
 5. optional blending combines animated and physical poses.
 ## Part IV - Physics Architecture
 ### 20. Physics as a First-Class System
-four.js should expose a stable, renderer-independent physics API.
+fourJS should expose a stable, renderer-independent physics API.
 The core framework may use adapter-backed solvers, but users should not need
 to write solver-specific application code for common tasks.
 
@@ -1061,7 +1061,7 @@ In `"2d"` worlds the overlap queries operate in the XY plane (`overlapSphere` as
 circle, `overlapBox` as a rectangle), preserving §21's parallel-naming rule without
 a second API surface.
 ### 31. Continuous Collision Detection
-Fast objects may tunnel through thin geometry. four.js shall provide optional
+Fast objects may tunnel through thin geometry. fourJS shall provide optional
 continuous collision detection.
 
 ```ts
@@ -1091,7 +1091,7 @@ world.sleeping = {
 
 Users should be able to wake bodies explicitly.
 ### 33. Determinism
-four.js should define determinism tiers.
+fourJS should define determinism tiers.
 
 ```ts
 type DeterminismLevel =
@@ -1266,10 +1266,10 @@ Potential adapters:
 - Cannon-es;
 - Ammo.js;
 - custom engineering solvers.
-The stable four.js API should sit above these adapters.
+The stable fourJS API should sit above these adapters.
 ## Part V - Numerical Integration and Simulation
 ### 38. Integrators
-For built-in lightweight motion, four.js should provide:
+For built-in lightweight motion, fourJS should provide:
 
 ```ts
 type Integrator =
@@ -1310,7 +1310,7 @@ Example system order:
 11. Render interpolation
 The ordering must be explicit and configurable.
 ### 40. Units
-four.js should not silently assume that one world unit is always one meter.
+fourJS should not silently assume that one world unit is always one meter.
 
 ```ts
 interface UnitSystem {
@@ -3694,7 +3694,7 @@ Features:
 - PID speed controller;
 - pause and replay;
 - force and torque vector overlays.
-This example establishes four.js as useful for engineering, education, simulation,
+This example establishes fourJS as useful for engineering, education, simulation,
 and digital twins.
 ## Part XII - Revised MVP
 ### 120. MVP Requirements
@@ -3750,7 +3750,7 @@ Tooling
 - benchmark harness;
 - deterministic simulation tests.
 ## Part XIII - Final Design Statement
-four.js should not merely answer:
+fourJS should not merely answer:
 Where is this object, and how should it look?
 It must also answer:
 How does this object change through time, what controls its motion,

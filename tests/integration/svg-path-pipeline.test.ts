@@ -5,7 +5,7 @@
  * `R-26` shipped the SVG bridge, `R-24` the path model, `R-25` the
  * tessellator. Each is tested inside its own package against its own contract;
  * the claim the three make *together* — **"a shape authored in an illustrator
- * can be pasted into four.js and drawn today"** — belongs to none of them, so
+ * can be pasted into fourJS and drawn today"** — belongs to none of them, so
  * it is proved here, across the boundary, through the public exports:
  *
  * ```ts

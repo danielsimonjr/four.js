@@ -1,6 +1,6 @@
 # @four/physics-box2d
 
-Box2D solver adapter — **interface reserved; not yet implemented.** Part of [four.js](../../README.md).
+Box2D solver adapter — **interface reserved; not yet implemented.** Part of [fourJS](../../README.md).
 
 Reserved for the 2D solver adapter backed by Box2D, implementing `@four/physics`'s `PhysicsSolverAdapter` (§37) plus the `SolverBodyAccess`/`SolverJointAccess` seams, and declaring its capability differences per §102 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md).
 

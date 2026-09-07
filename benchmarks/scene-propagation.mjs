@@ -337,7 +337,7 @@ const path = writeResult("scene-propagation", record);
 
 const nameWidth = Math.max(...rows.map((row) => row.scenario.length));
 printReport([
-  "four.js — world-transform propagation (§7, §92; plan §6j P11-4)",
+  "fourJS — world-transform propagation (§7, §92; plan §6j P11-4)",
   `  passes                  ${MEASURED_PASSES} measured, ${WARMUP_PASSES} warm-up, per scenario per pass kind`,
   `  sparse pass             ${SPARSE_DIRTY_NODES} dirty leaves`,
   "",

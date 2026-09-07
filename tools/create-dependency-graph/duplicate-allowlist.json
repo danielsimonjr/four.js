@@ -598,7 +598,7 @@
     {
       "names": ["PACKAGE_NAME"],
       "filesGlob": ["packages/**"],
-      "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+      "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
     },
     {
       "names": [
@@ -608,22 +608,22 @@
         "PARTICLE_SOFTNESS_OFFSET"
       ],
       "filesGlob": ["packages/particles/src/particle-renderable.ts", "packages/render/src/particles.ts"],
-      "reason": "four.js: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride and the R-32 wide-layout offsets independently and the shared tests catch drift. 2026-08-04 gate wiring; R-32 offsets added 2026-09-06."
+      "reason": "fourJS: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride and the R-32 wide-layout offsets independently and the shared tests catch drift. 2026-08-04 gate wiring; R-32 offsets added 2026-09-06."
     },
     {
       "names": ["TRAIL_VERTEX_FLOATS"],
       "filesGlob": ["packages/particles/src/trail.ts", "packages/render/src/particles.ts"],
-      "reason": "four.js: deliberate duck-typed cross-package contract for CPU particle trail ribbon vertices (position xyz + rgba), same matrix constraint as PARTICLE_INSTANCE_FLOATS — @four/particles builds the mesh and @four/render types the render-item stride without a forbidden particles↔render dependency edge; drift is caught by shared tests. 2026-09-06 trail tier gate wiring."
+      "reason": "fourJS: deliberate duck-typed cross-package contract for CPU particle trail ribbon vertices (position xyz + rgba), same matrix constraint as PARTICLE_INSTANCE_FLOATS — @four/particles builds the mesh and @four/render types the render-item stride without a forbidden particles↔render dependency edge; drift is caught by shared tests. 2026-09-06 trail tier gate wiring."
     },
     {
       "names": ["requireNonNegative"],
       "filesGlob": ["packages/geometry/src/primitive-support.ts", "packages/ui/src/numbers.ts"],
-      "reason": "four.js: same name, different §85 contracts (distinct-by-domain, NOT a copy to consolidate): geometry's requireNonNegative(name, value) validates a primitive extent where zero is degenerate-but-meaningful (a cone's tip radius — R-20, 2026-08-07) with geometry's error-message shape; ui's requireNonNegative(owner, name, value) is A-12's control-value guard (2026-08-07) carrying the widget owner in Label's §85 message style. Different signatures, different message formats pinned by each package's tests; both are module-internal helpers (not in either barrel). Hoisting to core would flatten two deliberate message conventions into one and buy nothing — each is three lines. 2026-08-07 wave-3 gate wiring."
+      "reason": "fourJS: same name, different §85 contracts (distinct-by-domain, NOT a copy to consolidate): geometry's requireNonNegative(name, value) validates a primitive extent where zero is degenerate-but-meaningful (a cone's tip radius — R-20, 2026-08-07) with geometry's error-message shape; ui's requireNonNegative(owner, name, value) is A-12's control-value guard (2026-08-07) carrying the widget owner in Label's §85 message style. Different signatures, different message formats pinned by each package's tests; both are module-internal helpers (not in either barrel). Hoisting to core would flatten two deliberate message conventions into one and buy nothing — each is three lines. 2026-08-07 wave-3 gate wiring."
     },
     {
       "names": ["CacheableGeometry"],
       "filesGlob": ["packages/render-webgl/src/gl-geometry.ts", "packages/render-webgpu/src/wgpu-geometry.ts"],
-      "reason": "four.js: backend-local structural view of the geometry a resource cache consumes (types only, no runtime body) — the PARTICLE_INSTANCE_FLOATS class of deliberate per-backend duck typing. Each backend declares the narrowed shape it reads so the cache's requirements live in the file that enforces them and neither backend names the other; the shared render-list consumption harness catches drift. 2026-08-21, WP-R1.1 gate wiring."
+      "reason": "fourJS: backend-local structural view of the geometry a resource cache consumes (types only, no runtime body) — the PARTICLE_INSTANCE_FLOATS class of deliberate per-backend duck typing. Each backend declares the narrowed shape it reads so the cache's requirements live in the file that enforces them and neither backend names the other; the shared render-list consumption harness catches drift. 2026-08-21, WP-R1.1 gate wiring."
     }
   ]
 }

@@ -1,6 +1,6 @@
 # @four/diagnostics
 
-Diagnostics, determinism checksums, replay, and debug-draw data. Part of [four.js](../../README.md).
+Diagnostics, determinism checksums, replay, and debug-draw data. Part of [fourJS](../../README.md).
 
 Implements §33–34 (checksums, snapshots, replay) and the data side of §41/§84–85 (debug visualization) from [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phases 1 and 10.
 

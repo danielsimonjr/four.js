@@ -6,7 +6,7 @@
  * place that may name every other package, and a host (an application, an
  * editor shell, a test) is the one place that decides which tools exist.
  * This table is that host-side slot: a plugin can register `"translate"` →
- * a factory, and the host looks it up by name. four.js itself never
+ * a factory, and the host looks it up by name. fourJS itself never
  * constructs a tool from this table.
  *
  * Re-adding the **identical** factory under the same name is a no-op. A

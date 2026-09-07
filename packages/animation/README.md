@@ -1,6 +1,6 @@
 # @four/animation
 
-Animation system — the animation pillar (Part III). Part of [four.js](../../README.md).
+Animation system — the animation pillar (Part III). Part of [fourJS](../../README.md).
 
 Implements §14–§18 (§100, Part III) of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 4 (§107). All durations are in seconds; quaternion tracks interpolate by shortest-arc slerp.
 

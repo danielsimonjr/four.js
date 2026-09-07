@@ -1,5 +1,5 @@
 /**
- * four.js — the mechanism example, and the §109 demonstration.
+ * fourJS — the mechanism example, and the §109 demonstration.
  *
  * §109 asks for constraints that "remain stable under expected real-time
  * loads", and names the parts an engineering mechanism is made of:
@@ -159,7 +159,7 @@ import { OrthographicCamera, createFullscreenViewport } from "four/scene";
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (element === null) {
-    throw new Error(`four.js mechanism: no ${selector} in the document.`);
+    throw new Error(`fourJS mechanism: no ${selector} in the document.`);
   }
   return element;
 }
@@ -979,7 +979,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  status.textContent = "four.js mechanism: failed to start — see the console.";
+  status.textContent = "fourJS mechanism: failed to start — see the console.";
   status.dataset["state"] = "error";
-  console.error("four.js mechanism: failed to start.", error);
+  console.error("fourJS mechanism: failed to start.", error);
 });

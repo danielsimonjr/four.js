@@ -38,7 +38,7 @@
  *
  * ## The Y axis: this module **transcribes**, it does not flip (§7a)
  *
- * SVG user space has +Y **down**. four.js world space has +Y **up**, in 2D as
+ * SVG user space has +Y **down**. fourJS world space has +Y **up**, in 2D as
  * well as 3D (§7a). {@link parseSvgPathData} does **not** reconcile them: the
  * numbers in the `d` attribute are the numbers in the {@link Path}, so content
  * imported and drawn without further thought appears **mirrored about the X

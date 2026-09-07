@@ -1,4 +1,4 @@
-# four.js — Gap Analysis v1
+# fourJS — Gap Analysis v1
 
 > **SUPERSEDED 2026-08-29 by `docs/GAP ANALYSIS v2.md`** (the campaign-closing honesty pass,
 > which re-verified every row below against the tree at `df572c6` and ran the full house

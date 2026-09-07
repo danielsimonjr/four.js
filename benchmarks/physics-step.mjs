@@ -347,7 +347,7 @@ const path = writeResult("physics-step", record);
 // --- the report --------------------------------------------------------------
 
 printReport([
-  "four.js — Rapier 3D fixed-step cost vs §86's 5 000-active-body row (§20–32, §37, §92)",
+  "fourJS — Rapier 3D fixed-step cost vs §86's 5 000-active-body row (§20–32, §37, §92)",
   "  scenario                static floor + N dynamic boxes on a lattice, §32 sleeping DISABLED (all N awake)",
   `  steps                   ${MEASURED_STEPS} measured, ${WARMUP_STEPS} warm-up (the pile landing), per variant`,
   `  60 Hz budget            ${round(FIXED_STEP_BUDGET_MS, 3)} ms/step`,

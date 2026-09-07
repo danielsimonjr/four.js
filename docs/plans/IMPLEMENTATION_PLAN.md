@@ -1,4 +1,4 @@
-# four.js Implementation Plan — revision 2.1
+# fourJS Implementation Plan — revision 2.1
 
 Phase 0 deliverable per §103 of [`docs/SPECIFICATION.md`](../SPECIFICATION.md)
 (current revision: see the spec's amendments table). **Revision 2.1 (2026-07-29)** adds the "Phase −1" smoke-test corrections

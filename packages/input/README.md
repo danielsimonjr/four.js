@@ -1,6 +1,6 @@
 # @four/input
 
-Input, pointer events, and picking. Part of [four.js](../../README.md).
+Input, pointer events, and picking. Part of [fourJS](../../README.md).
 
 Implements §71 and the MVP subset of §72 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 3a (§106a), with the keyboard source added 2026-08-07 (gap A-10).
 

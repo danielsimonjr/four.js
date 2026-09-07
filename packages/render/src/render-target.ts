@@ -470,7 +470,7 @@ class RenderTargetColorTexture implements RenderTargetTexture {
  *
  * ## Version, not events
  *
- * `id` plus `version` is the cache contract every four.js GPU resource offers
+ * `id` plus `version` is the cache contract every fourJS GPU resource offers
  * (`BufferGeometry`, `Texture`), and a render target offers it for the same
  * reason: a backend keyed on the pair compares one number per frame instead of
  * holding a subscription per target. {@link RenderTarget.resize} and

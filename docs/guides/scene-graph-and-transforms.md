@@ -1,6 +1,6 @@
 # The scene graph and transforms
 
-Everything in four.js lives in one scene graph: 2D shapes, 3D meshes, cameras,
+Everything in fourJS lives in one scene graph: 2D shapes, 3D meshes, cameras,
 sprites, text glyphs, UI widgets, and the nodes that carry rigid bodies and
 particle emitters. There is no separate "2D layer" — a flat circle and a solid
 box are siblings in the same right-handed, Y-up world (§6, §7a).

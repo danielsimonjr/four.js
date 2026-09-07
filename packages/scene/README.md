@@ -1,6 +1,6 @@
 # @four/scene
 
-Scene graph — the shared model all four pillars act on. Part of [four.js](../../README.md).
+Scene graph — the shared model all four pillars act on. Part of [fourJS](../../README.md).
 
 Implements §6–8, §42–43, and §46–48 of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped across Phases 1–3 and 7. Right-handed Y-up transforms, radians.
 

@@ -10,7 +10,7 @@
  * public name — a type alias for {@link TimeState}, not a second record
  * (PH-22l). Behaviour is unchanged; the two names are the same type.
  *
- * All fields are **seconds** (§7a) — durations included; nothing in four.js
+ * All fields are **seconds** (§7a) — durations included; nothing in fourJS
  * takes milliseconds.
  *
  * Time domains and the fields that carry them (§9):

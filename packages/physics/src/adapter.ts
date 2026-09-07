@@ -259,7 +259,7 @@ export interface PhysicsCapabilities {
 }
 
 /**
- * A concrete physics engine, bound to the four.js API (§37).
+ * A concrete physics engine, bound to the fourJS API (§37).
  *
  * ```ts
  * const adapter: PhysicsSolverAdapter = new RapierAdapter2D();

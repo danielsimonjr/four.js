@@ -1,5 +1,5 @@
 /**
- * four.js — the §73–§75 retained-mode UI, composed into a rendered scene
+ * fourJS — the §73–§75 retained-mode UI, composed into a rendered scene
  * (post-plan backlog: the WP-11.5 packet-intent shortfall — "@four/ui has
  * node-level §72 coverage only; no example app imports it").
  *
@@ -52,7 +52,7 @@
  * | thing | numbers |
  * | ----- | ------- |
  * | panel top-left | world (−3.8, 1.6); flex column, padding 0.3, gap 0.3 |
- * | title label | "four.js - ui demo", size 0.28 → 2.38 × 0.28 |
+ * | title label | "fourJS - ui demo", size 0.28 → 2.38 × 0.28 |
  * | button row | flex row, gap 0.3; three buttons of 1.2 × 0.6 → 4.2 × 0.6 |
  * | status label | "swatch: coral", size 0.24 |
  * | panel resolved size | 4.8 × 2.32 (intrinsic: widest child + padding) |
@@ -115,7 +115,7 @@ import { Text } from "four";
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (element === null) {
-    throw new Error(`four.js example: no ${selector} in the document.`);
+    throw new Error(`fourJS example: no ${selector} in the document.`);
   }
   return element;
 }
@@ -427,7 +427,7 @@ uiRoot.transform.position.set(PANEL_LEFT, PANEL_TOP, 0);
 
 const title = new Label({
   name: "title",
-  text: "four.js - ui demo",
+  text: "fourJS - ui demo",
   atlas,
   size: TITLE_TEXT_SIZE,
 });
@@ -653,5 +653,5 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   status.dataset["state"] = "error";
   status.textContent = "failed to start — see the console";
-  console.error("four.js example: failed to start.", error);
+  console.error("fourJS example: failed to start.", error);
 });

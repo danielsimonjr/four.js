@@ -1,7 +1,7 @@
 /**
- * four.js — **"Electric Motor Digital Twin"**, the §119 flagship demonstration.
+ * fourJS — **"Electric Motor Digital Twin"**, the §119 flagship demonstration.
  *
- * §118 asks whether four.js *feels* like one engine. §119 asks a harder and more
+ * §118 asks whether fourJS *feels* like one engine. §119 asks a harder and more
  * checkable question: is it **useful for engineering** — "engineering,
  * education, simulation, and digital twins", the audience `docs/POSITIONING.md`
  * names first. An engineering audience does not want a nice picture of a motor.
@@ -79,7 +79,7 @@
  *   They are labelled as the twin's estimate, not as a measurement, because an
  *   overlay that quietly drew an application's own guess as if the solver had
  *   said it would be the worst kind of instrument.
- * - **No thermal domain, and there should not be one.** §5 says four.js is not a
+ * - **No thermal domain, and there should not be one.** §5 says fourJS is not a
  *   CAD/FEM kernel. The temperature here is application state integrated on the
  *   engine's fixed step — which is precisely the seam a twin needs, and is why
  *   it is stated rather than hidden.
@@ -303,7 +303,7 @@ import { Text, registerSceneNodeTypes, resourceCatalog } from "four";
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (element === null) {
-    throw new Error(`four.js motor twin: no ${selector} in the document.`);
+    throw new Error(`fourJS motor twin: no ${selector} in the document.`);
   }
   return element;
 }
@@ -3369,5 +3369,5 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   status.dataset["state"] = "error";
   status.textContent = "failed to start — see the console";
-  console.error("four.js motor twin: failed to start.", error);
+  console.error("fourJS motor twin: failed to start.", error);
 });

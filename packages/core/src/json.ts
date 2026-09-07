@@ -109,7 +109,7 @@ function cloneJson(
     for (const key of Object.keys(source)) {
       if (key === "__proto__") {
         throw new TypeError(
-          `${path} has a "__proto__" key, which no four.js document may carry (it would re-parent the object it was copied into).`,
+          `${path} has a "__proto__" key, which no fourJS document may carry (it would re-parent the object it was copied into).`,
         );
       }
       const entry = source[key];

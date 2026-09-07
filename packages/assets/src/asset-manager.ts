@@ -453,7 +453,7 @@ export interface ResponseHeadersLike {
  * unit test can expire a deadline without a wall clock and without fake global
  * timers. `globalThis` satisfies it structurally and is the default.
  *
- * **Milliseconds appear here and nowhere else.** Every four.js API is in
+ * **Milliseconds appear here and nowhere else.** Every fourJS API is in
  * seconds (§7a) — {@link AssetManagerOptions.timeoutSeconds} included — but
  * `setTimeout` is a platform primitive whose unit is fixed, so the conversion
  * happens at this boundary and the boundary says so in the parameter name.

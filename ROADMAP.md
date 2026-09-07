@@ -1,4 +1,4 @@
-# four.js Roadmap
+# fourJS Roadmap
 
 The release ladder below is **normative** — it reproduces §94 (Release Strategy) of
 [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md). Everything else on this page (phase

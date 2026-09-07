@@ -1,7 +1,7 @@
 /**
- * four.js — **"One Scene, Everything Moves"**, the §118 flagship demonstration.
+ * fourJS — **"One Scene, Everything Moves"**, the §118 flagship demonstration.
  *
- * §118 is not a feature list, it is a claim: that four.js is *one
+ * §118 is not a feature list, it is a claim: that fourJS is *one
  * motion-capable engine, not a graphics library with physics bolted on
  * afterward*. The way to prove that claim is to put everything the engine
  * pretends to be into **one scene graph, one fixed-step loop, and one frame** —
@@ -230,7 +230,7 @@ import { Text } from "four";
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (element === null) {
-    throw new Error(`four.js flagship: no ${selector} in the document.`);
+    throw new Error(`fourJS flagship: no ${selector} in the document.`);
   }
   return element;
 }
@@ -1338,7 +1338,7 @@ app.scene.add(uiRoot);
 
 const panelTitle = new Label({
   name: "panel-title",
-  text: "four.js flagship",
+  text: "fourJS flagship",
   atlas,
   size: TITLE_TEXT_SIZE,
 });
@@ -1896,5 +1896,5 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   status.dataset["state"] = "error";
   status.textContent = "failed to start — see the console";
-  console.error("four.js flagship: failed to start.", error);
+  console.error("fourJS flagship: failed to start.", error);
 });

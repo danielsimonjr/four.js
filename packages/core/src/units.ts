@@ -6,7 +6,7 @@
  * Declaring a {@link UnitSystem} **does not change what the engine computes**.
  * There is no unit mode. Nothing in `@four/scene`, `@four/motion`,
  * `@four/physics`, or any renderer reads a `UnitSystem`, and no engine
- * signature anywhere takes one. Internally and at every API boundary four.js is
+ * signature anywhere takes one. Internally and at every API boundary fourJS is
  * and stays:
  *
  * - **angles in radians** — always, no exceptions (§7a);

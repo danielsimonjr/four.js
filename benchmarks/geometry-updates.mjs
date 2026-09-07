@@ -190,7 +190,7 @@ const record = {
 };
 const path = writeResult("geometry-updates", record);
 printReport([
-  "four.js — dynamic geometry submission preparation (counting GL seam)",
+  "fourJS — dynamic geometry submission preparation (counting GL seam)",
   "implementation | geometry | dirty | API calls/geometry | upload bytes | median ms/1000 acquisitions",
   ...scenarios.map(
     (row) =>

@@ -530,7 +530,7 @@ const path = writeResult("text-layout", record);
 // --- the report --------------------------------------------------------------
 
 printReport([
-  "four.js — glyph layout throughput (§86 animated glyphs, CPU half; §56, §92)",
+  "fourJS — glyph layout throughput (§86 animated glyphs, CPU half; §56, §92)",
   `  iteration               one layoutText call per string — a frame where every string's content changed`,
   `  corpus                  ${HEADLINE_LENGTH}-character strings, no spaces, built-in 6 × 12 face at size ${TEXT_SIZE}`,
   `  frames                  ${MEASURED_FRAMES} measured, ${WARMUP_FRAMES} warm-up`,

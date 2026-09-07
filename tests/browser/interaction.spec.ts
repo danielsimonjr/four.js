@@ -296,7 +296,7 @@ const LABEL_SIZE = 0.26;
 const FONT_CELL_WIDTH = 6;
 const FONT_LINE_HEIGHT = 12;
 
-/** `LABEL_TEXT.length` — "four.js - click a shape, drag the box". */
+/** `LABEL_TEXT.length` — "fourJS - click a shape, drag the box". */
 const LABEL_CHARACTERS = 37;
 
 /**

@@ -584,7 +584,7 @@ controls and the only benefit the recipe genuinely cannot deliver.
 And the cost side is not zero. The specification chose retained mode deliberately and
 completely — §50–§52's vector stack exists so that 2D content is _scene data_, tessellated,
 batched (§65), picked analytically (§71), serialized (§79), and reproducible. A painting
-surface is the first sanctioned way to put content into a four.js scene that none of those
+surface is the first sanctioned way to put content into a fourJS scene that none of those
 apply to: it cannot be batched, cannot be picked, cannot be serialized, cannot be replayed,
 and cannot be checked. Every one of those is a documented limitation in this RFC, which is
 another way of saying the feature is an exception to five of the framework's properties. A

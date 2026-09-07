@@ -1,6 +1,6 @@
 /**
  * Browser gate for §93's **first 3D scene** — the first browser-level evidence
- * that four.js's 3D tier draws (2026-08-07, `docs/AUDIT-120.md` S-8).
+ * that fourJS's 3D tier draws (2026-08-07, `docs/AUDIT-120.md` S-8).
  *
  * Three things had shipped, been unit-tested against fake GL contexts, and never
  * been seen in a browser: the §47 `PerspectiveCamera`, the §68 lighting MVP

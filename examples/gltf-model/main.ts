@@ -30,9 +30,9 @@ import { WebglRenderer } from "four/render-webgl";
 
 /** The example's drawing surface. */
 const canvas = document.querySelector<HTMLCanvasElement>("#scene");
-if (canvas === null) throw new Error("four.js example: no #scene in the document.");
+if (canvas === null) throw new Error("fourJS example: no #scene in the document.");
 const status = document.querySelector<HTMLElement>("#status");
-if (status === null) throw new Error("four.js example: no #status in the document.");
+if (status === null) throw new Error("fourJS example: no #status in the document.");
 
 const renderer = new WebglRenderer();
 const camera = new PerspectiveCamera({ aspect: 640 / 400, near: 0.1, far: 100 });

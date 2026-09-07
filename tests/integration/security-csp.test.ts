@@ -2,7 +2,7 @@
  * §96's *"documented content-security-policy behavior"*, enforced rather than
  * asserted in prose.
  *
- * `docs/guides/security-and-untrusted-content.md` tells a deployer that four.js
+ * `docs/guides/security-and-untrusted-content.md` tells a deployer that fourJS
  * runs under a policy with **no `'unsafe-eval'` and no `'unsafe-inline'`**:
  * nothing in the engine calls `eval`, constructs a `Function` from a string,
  * writes markup into the document, or hands a string to a timer. That claim is
@@ -146,7 +146,7 @@ describe("content-security-policy posture (§96)", () => {
       }
       expect(
         offenders,
-        `four.js documents a CSP with no 'unsafe-eval' and no 'unsafe-inline' ` +
+        `fourJS documents a CSP with no 'unsafe-eval' and no 'unsafe-inline' ` +
           `(docs/guides/security-and-untrusted-content.md). Update that guide ` +
           `before introducing this construct.`,
       ).toEqual([]);

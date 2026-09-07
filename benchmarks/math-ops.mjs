@@ -440,7 +440,7 @@ const path = writeResult("math-ops", record);
 
 const nameWidth = Math.max(...rows.map((row) => row.operation.length));
 printReport([
-  "four.js — @four/math operation throughput and allocation (§7b, §83, §92)",
+  "fourJS — @four/math operation throughput and allocation (§7b, §83, §92)",
   `  batch                   ${OPERATIONS_PER_BATCH.toLocaleString("en-US")} operations over ${VARIANTS} operand sets; ${MEASURED_BATCHES} measured batches, ${WARMUP_BATCHES} warm-up`,
   "",
   `  ${"operation".padEnd(nameWidth)}   median ms/batch      ns/op     Mop/s   alloc/batch`,

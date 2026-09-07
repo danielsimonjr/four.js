@@ -1,6 +1,6 @@
 # @four/ui
 
-Retained-mode UI at §113a's MVP tier. Part of [four.js](../../README.md).
+Retained-mode UI at §113a's MVP tier. Part of [fourJS](../../README.md).
 
 Implements the MVP tier of §73–75 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 11. Widgets are scene nodes; **widgets do not draw themselves** — the dependency matrix gives this package `core`, `math`, `scene`, `input`, and `text` (no `render`, `materials`, or `geometry`), so a widget owns hierarchy, size, hit area, and state, and the application supplies the pixels through the `WidgetSkin` seam.
 

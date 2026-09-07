@@ -1,6 +1,6 @@
 # @four/physics
 
-Stable, solver-independent physics API. Part of [four.js](../../README.md).
+Stable, solver-independent physics API. Part of [fourJS](../../README.md).
 
 Implements §20–§34 and §37 (§101, Part IV) of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped across Phases 5–7. Application code targets this package, never a solver directly — a concrete engine plugs in through `PhysicsSolverAdapter` (see `@four/physics-rapier`). Y-up gravity, seconds, radians; 2D bodies sit on the z = 0 plane (§21).
 

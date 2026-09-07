@@ -1,6 +1,6 @@
 # @four/assets
 
-Asset system. Part of [four.js](../../README.md).
+Asset system. Part of [fourJS](../../README.md).
 
 Implements the MVP tier of §76–78 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 11 (§113a).
 

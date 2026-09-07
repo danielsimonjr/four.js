@@ -331,7 +331,7 @@ const budgetVerdict =
     : "over the 60 Hz fixed-step budget at p95 (recorded, not gated — see the header)";
 
 printReport([
-  `four.js — ${PARTICLE_COUNT.toLocaleString("en-US")} particles, CPU simulation (§112, plan §6h)`,
+  `fourJS — ${PARTICLE_COUNT.toLocaleString("en-US")} particles, CPU simulation (§112, plan §6h)`,
   `  fields                  ${FIELD_STACK}`,
   `  steps                   ${MEASURED_STEPS} measured, ${WARMUP_STEPS} warm-up (${record.warmupMeanMsPerStep} ms/step)`,
   "",

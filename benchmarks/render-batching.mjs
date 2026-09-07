@@ -299,7 +299,7 @@ const path = writeResult("render-batching", record);
 // --- the report --------------------------------------------------------------
 
 printReport([
-  "four.js — §65 batching throughput (§86 batched sprites and shapes, CPU half; §64, §92)",
+  "fourJS — §65 batching throughput (§86 batched sprites and shapes, CPU half; §64, §92)",
   `  iteration               resolveWorldTransforms + buildRenderList + RenderBatcher.next over the list`,
   `  frames                  ${MEASURED_FRAMES} measured, ${WARMUP_FRAMES} warm-up, per scenario`,
   `  60 Hz frame budget      ${round(FRAME_BUDGET_MS, 3)} ms (both rows state the rate themselves)`,

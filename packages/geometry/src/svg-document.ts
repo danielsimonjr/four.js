@@ -9,7 +9,7 @@
  * a comment — §96's "no external entities, no code from scene files".
  *
  * Coordinates are **transcribed**, matching {@link parseSvgPathData}. SVG
- * user space is Y-down; four.js is Y-up (§7a). The transform that would land
+ * user space is Y-down; fourJS is Y-up (§7a). The transform that would land
  * content in a Y-up world needs {@link SvgDocument.viewBox}; it is one
  * {@link Path.transform} at the caller, and this module does not apply half
  * of it silently. `viewBox` is returned so that line is writeable.

@@ -1,6 +1,6 @@
 # four
 
-Umbrella package and application composition root. Part of [four.js](../../README.md).
+Umbrella package and application composition root. Part of [fourJS](../../README.md).
 
 Implements §45 and §98 of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md). `import * as Four from "four"` exposes every workspace package as a namespace (`Four.scene`, `Four.physics`, `Four.animation`, …).
 

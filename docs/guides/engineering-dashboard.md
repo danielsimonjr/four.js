@@ -1,6 +1,6 @@
 # The engineering dashboard
 
-§119 positions four.js for engineering: mechanisms with motors, sensors,
+§119 positions fourJS for engineering: mechanisms with motors, sensors,
 controllers, and live instrumentation. This guide composes the shipped pieces
 into that shape — a motorized joint under PID control, limit switches, and a
 dashboard the outside world can read. `examples/mechanism` is the running

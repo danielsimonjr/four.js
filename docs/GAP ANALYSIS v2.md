@@ -1,4 +1,4 @@
-# four.js — Gap Analysis v2
+# fourJS — Gap Analysis v2
 
 **Date:** 2026-08-29
 **Tree ref:** `df572c6` on branch `claude/tools-integration-rji2sr` (working tree clean; this

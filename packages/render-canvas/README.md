@@ -1,6 +1,6 @@
 # @four/render-canvas
 
-Canvas 2D backend — **interface reserved; not yet implemented.** Part of [four.js](../../README.md).
+Canvas 2D backend — **interface reserved; not yet implemented.** Part of [fourJS](../../README.md).
 
 Reserved for the Canvas 2D rendering backend (2D scenes and fallback rendering) per §62 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md). The §120 MVP renders with WebGL 2 only (`@four/render-webgl`).
 

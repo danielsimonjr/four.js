@@ -95,7 +95,7 @@ ESLint, Prettier, TypeDoc, Vite, Changesets (choices recorded in `MEMORY.md`).
   accepted, shrinking consolidation backlog (seeded 2026-08-04: `cloneJsonValue`,
   `DEFAULT_GRAVITY_Y`, `SeededRandom`, `ColorRGBA`, `JsonValue`). Legitimately-independent
   duplicates are instead _allowlisted_ in `duplicate-allowlist.json` with a reason
-  (four.js entries: per-package `PACKAGE_NAME`; `PARTICLE_INSTANCE_FLOATS`, a deliberate
+  (fourJS entries: per-package `PACKAGE_NAME`; `PARTICLE_INSTANCE_FLOATS`, a deliberate
   duck-typed contract because the dependency matrix forbids the particles↔render edge).
   After consolidating a baselined name, shrink the baseline with:
 
@@ -120,7 +120,7 @@ ESLint, Prettier, TypeDoc, Vite, Changesets (choices recorded in `MEMORY.md`).
 
 ### Why `graph:check` gates CI
 
-four.js targets the browser. `graph:check` asserts that every package's `.` (main) entry
+fourJS targets the browser. `graph:check` asserts that every package's `.` (main) entry
 stays free of `node:` builtins. A `node:` import that reaches a main entry is a shipping
 bug — the package breaks in a browser — yet it is invisible to `tsc` and to unit tests,
 which run under Node and resolve `node:` happily. As of the initial run all 24 packages
@@ -137,5 +137,5 @@ same fix.
 
 The byte-identity rule covers the tool **code** only. `duplicate-allowlist.json` is
 per-repo _data_ (it ships with MathTS's entries, which are inert here because their file
-paths never match) — four.js appends its own entries to it and the two copies are expected
+paths never match) — fourJS appends its own entries to it and the two copies are expected
 to differ. Likewise `docs/Architecture/duplicate-baseline.json` is generated per repo.

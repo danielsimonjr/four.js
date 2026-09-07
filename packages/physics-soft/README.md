@@ -1,6 +1,6 @@
 # @four/physics-soft
 
-Soft bodies and deformables — **interface reserved; not yet implemented.** Part of [four.js](../../README.md).
+Soft bodies and deformables — **interface reserved; not yet implemented.** Part of [fourJS](../../README.md).
 
 Reserved for soft-body and deformable simulation (cloth, rope, pressure/volume models) per §35 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md). It is not a solver adapter — see ERRATA E-3; the §102 solver packages are `physics-rapier` and `physics-box2d`.
 
