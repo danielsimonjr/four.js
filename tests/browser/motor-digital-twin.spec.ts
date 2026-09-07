@@ -606,11 +606,31 @@ test.describe("examples/flagship/motor-digital-twin (§119)", () => {
     // (A-5 / #76). `NaN` would mean "not measured"; a finite count — including
     // zero — means the producer ran. The twin is joint-held, so this is often
     // 0, but CI has also seen a handful of resting contacts.
-    expect(Number.isFinite(Number(status["contacts"]))).toBe(true);
+    expect(
+      Number.isFinite(Number(status["contacts"])),
+      `contacts must be a finite count, got ${status["contacts"]}`,
+    ).toBe(true);
     expect(Number(status["contacts"])).toBeGreaterThanOrEqual(0);
-    // SwiftShader / CI has no `timestamp-query` / `EXT_disjoint_timer_query`,
-    // so `gpuFrameTime` stays the §84 "not measured" sentinel.
-    expect(status["gpuframe"]).toBe("nan");
+    // §84's GPU-frame row is a CAPABILITY, not a contract: it needs
+    // `timestamp-query` (WebGPU) or `EXT_disjoint_timer_query` (WebGL), and
+    // whether a runner offers them is not something this repo controls. This
+    // line used to assert the sentinel outright, on the assumption that
+    // SwiftShader/CI never has them — until CI returned `0.015531` on
+    // 2026-09-07 and turned `main` red for a working feature. `A-1 (c)` had
+    // shipped `Renderer.lastGpuFrameTimeSeconds` the day before; the driver
+    // simply started answering.
+    //
+    // So assert what §84 actually promises, the same shape as `contacts`
+    // above: either the "not measured" sentinel, or a real positive duration.
+    // What must never happen is a counter with no producer quietly reading 0.
+    const gpuFrame = status["gpuframe"];
+    if (gpuFrame !== "nan") {
+      expect(
+        Number.isFinite(Number(gpuFrame)),
+        `gpuframe must be "nan" or a finite duration, got ${gpuFrame}`,
+      ).toBe(true);
+      expect(Number(gpuFrame)).toBeGreaterThan(0);
+    }
 
     // §40: the declared display units, and the fixed step in the declared time
     // unit. The engine is still seconds — this is the conversion at the edge.

@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — browser gate: assert §84's contract, not the runner's GPU
+
+`main` went red on 2026-09-07 (run 34082373822, 104 passed / 1 failed) at
+`motor-digital-twin.spec.ts:613`:
+
+```
+expect(status["gpuframe"]).toBe("nan")   Expected: "nan"   Received: "0.015531"
+```
+
+**The code was right and the test was stale.** `A-1 (c)` shipped
+`Renderer.lastGpuFrameTimeSeconds` the day before; the runner's GL stack simply started
+answering `EXT_disjoint_timer_query`. The assertion had hard-coded the opposite, with a comment
+asserting it as fact: *"SwiftShader / CI has no `timestamp-query` / `EXT_disjoint_timer_query`."*
+
+§84's GPU-frame row is a **capability**, not a contract, and pinning a capability makes the gate
+flip with the runner's GPU rather than with our code — a test that fails for a feature *working*.
+It now asserts what §84 actually promises: the `nan` sentinel, or a finite positive duration,
+never a counter with no producer quietly reading `0`. Same shape as the `contacts` row three
+lines above, corrected in #76.
+
+Also: the `contacts` assertion now reports the value it received. Chasing this failure locally
+cost two wrong turns that a message would have shortened — the local `dist/` predated `#74`, so
+the example ran pre-`A-5` code and failed on a *different* line, which looked like a second bug
+and was only stale build output. Verified after `bun run build`: 9/9 twin specs pass.
+
 ## [Unreleased]
 
 ### 2026-09-06 — CI after #76

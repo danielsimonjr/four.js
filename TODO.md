@@ -116,6 +116,18 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 ## Now
 
+- [x] **`motor-digital-twin.spec.ts:613` asserts a stale environment assumption — `main` is RED.**
+      `expect(status["gpuframe"]).toBe("nan")` with the comment *"SwiftShader / CI has no
+      `timestamp-query` / `EXT_disjoint_timer_query`, so `gpuFrameTime` stays the §84 'not
+      measured' sentinel."* CI disproved that on 2026-09-07: it returned `0.015531`
+      (run 34082373822, 104 passed / 1 failed). The code is right — `A-1 (c)` shipped
+      `Renderer.lastGpuFrameTimeSeconds` on 2026-09-06 and the runner's GL stack now answers.
+      The TEST encodes the pre-feature world, and pins a **capability** as if it were a contract,
+      so it flips with the runner's GPU rather than with our code. Assert the §84 contract
+      instead — sentinel OR a finite measurement — exactly as the `contacts` row three lines
+      above was corrected in #76.
+
+
 - [x] **`smoothness.spec.ts` "frames are drawn between simulation states" aliases against
       its own virtual frame clock.** DONE 2026-09-06 — sampler is now
       frame-synchronised (`window.__fourVirtualFrames`, alternating odd/even
