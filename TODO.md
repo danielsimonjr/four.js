@@ -502,9 +502,15 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       (`Timeline` + `tween` + `AnimationSystem`, observed driving `scale.x`), UI
       (`Panel` + `Label` constructed into the scene), and §42 authority. **Five findings,
       all filed above.**
-      STILL not exercised: **particles** (dropped from the app, never wired), WebGPU from
-      a consumer seat, text/§56, serialization/§34 round-trip in the browser, and the
-      2D↔3D mixed-scene story. Those are where the next findings are.
+      **Particles exercised 2026-09-07 (cycle 3b) — CLEAN, no findings.** A 400-capacity
+      `ParticleEmitter` + `ParticleRenderable` + `ParticleSystem` with a §27 gravity field
+      ran in the browser beside the rest of the app: **245 particles alive**, zero console
+      errors, no §42 interaction (particle transforms are not node transforms). The only
+      friction was guessing `aliveCount` for what is `particleCount` — discoverable, and
+      not worth filing.
+      STILL not exercised: WebGPU from a consumer seat, text/§56, serialization/§34
+      round-trip in the browser, and the 2D↔3D mixed-scene story. Those are where the
+      next findings are.
 
 - [x] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
       one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`
