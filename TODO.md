@@ -116,6 +116,38 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 ## Now
 
+- [ ] **Error messages name MINIFIED classes in exactly the builds users ship.** Dogfooding
+      cycle 3d, §34 round-trip in the browser. `serializeScene(hero, registry)` threw:
+
+      > `Node node-3 is a **Ur**, which this scene format has no type name for; supply
+      > serializeScene's \`nodeTypeOf\` option and the matching \`nodeFactory\` on load (§79).`
+
+      `hero` is a `Renderable`. "Ur" is the minified class name. Proven with an A/B on the same
+      app — the only difference being `build.minify`:
+
+      | build | message |
+      |---|---|
+      | unminified | *"Node node-3 is a **Renderable**"* |
+      | minified (what every consumer ships) | *"Node node-3 is a **Ur**"* |
+
+      The message interpolates `constructor.name`, which minification destroys, and it does so
+      **twice** — in the prose and again in `context.nodeClass`, so the structured field a tool
+      would read is equally useless. **5 sites across 2 packages** do this
+      (`core/src/component.ts:136`, `serialization/src/serializer.ts:266/271/503/504`), and all
+      of them are §79 diagnostics — precisely the errors that fire while a consumer is still
+      wiring serialization up.
+
+      The fix is not to drop the name but to source it from something minification cannot
+      rewrite: the registry's own type names, or a `static readonly nodeType` on the class.
+
+      Second-order note, not a defect: this is also how I learned that **`serializeScene`
+      refuses any node it has no type name for**, which today means anything that is not a
+      `Group`. So a consumer's first "save my scene" fails on the most ordinary scene there is
+      — one containing a `Renderable`. It is documented and the error names the two options to
+      supply, but it is the same shape as the glTF-transport row above: the default path does
+      not cover the common case.
+
+
 - [x] **§42 `transformAuthority` is mandatory knowledge for animating anything, and the README
       never mentions it.** **FIXED 2026-09-07** — the quick start now
       carries the rule, placed in the blockquote that already sends readers on to "authored

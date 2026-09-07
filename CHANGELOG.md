@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — dogfooding cycle 3d: our error messages name minified classes
+
+Round-tripped a scene through §34/§79 in the browser — the "save my game" path — and the failure
+told me my node was **"a Ur"**.
+
+It is a `Renderable`. `Ur` is what the minifier called that class, and the message interpolates
+`constructor.name`. Proven by A/B on the same app with only `build.minify` changed: unminified
+says `Renderable`, minified says `Ur`. Minified is what every consumer ships, so the useful
+name exists only in the build where the error matters least.
+
+It happens **twice per site** — in the prose and again in the structured `context.nodeClass`, so
+a tool reading the context gets the mangled name too — across **5 sites in 2 packages**
+(`core/src/component.ts`, `serialization/src/serializer.ts`). Every one is a §79 diagnostic:
+the errors that fire while a consumer is still wiring serialization up. The fix is to source
+the name from something minification cannot rewrite — the registry's type names, or a
+`static readonly nodeType`.
+
+Learned alongside it, and worth stating because it shapes the first save a consumer attempts:
+`serializeScene` refuses any node it has no type name for, which today means anything that is
+not a `Group`. So "save my scene" fails on the most ordinary scene there is — one holding a
+`Renderable` — until `nodeTypeOf`/`nodeFactory` are supplied. Documented, clearly signposted by
+the error, and the same shape as the glTF transport gap: the default path does not cover the
+common case.
+
 ## Unreleased — §62's renderer abstraction verified from outside: a two-line swap
 
 Dogfooding cycle 3c. The claim a renderer abstraction makes is that a consumer can change
