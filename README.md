@@ -83,6 +83,20 @@ requestAnimationFrame(function frame(now) {
 > `examples/first-2d-scene/main.ts`, which adds picking, dragging, sprites, text, and
 > authored animation on top. Start there.
 
+**One rule to know before you animate anything (§42).** Exactly one system owns a node's
+transform. The snippet above writes `circle.position` by hand, which works because the default
+owner is `"manual"` — but the moment a tween, an `AnimationMixer` or a motion system should
+move that node instead, say so:
+
+```
+circle.transformAuthority = "animation";   // or "kinematic", "physics", "manual"
+```
+
+Without it the write is **refused, not applied**: the node simply does not move, and the engine
+explains why on the console (`a "animation" system tried to write the transform of node … owned
+by "manual" authority`). The refusal is deliberate — two systems writing one transform is how a
+replay stops reproducing (§33) — but it is easier to read here than to meet at runtime.
+
 ## Examples
 
 Each example is a small Vite app; build them all with `bun run examples:build` or serve one

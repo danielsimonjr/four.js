@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — the README now names the one rule that stops your animation working
+
+Cycle 3's fifth finding, fixed. §42's transform authority is mandatory knowledge for animating
+anything and appeared **0 times** in `README.md`. The note now sits in the blockquote that
+already sends readers on to *"authored animation"* — the precise step where the rule bites.
+
+The snippet is deliberately unchanged: it writes `circle.position` by hand, which is legal
+under the default `"manual"` owner, so it was never wrong. What was missing is the sentence
+after it — that handing the node to a tween or a motion system requires saying so, and that the
+engine **refuses** the write rather than applying it, so the symptom is a node that simply does
+not move.
+
+Gates re-run rather than assumed: `check-docs` OK, `check-spec` OK, and the README browser gate
+still passes 2/2 — which matters here, because that gate executes the snippet.
+
 ## Unreleased — dogfooding cycle 3: five findings, none of them a broken engine
 
 Built a character-select screen from a consumer's seat (`.dogfood/charselect`) to reach the

@@ -116,8 +116,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 ## Now
 
-- [ ] **§42 `transformAuthority` is mandatory knowledge for animating anything, and the README
-      never mentions it.** Dogfooding cycle 3: I built a scene from the README, added a tween
+- [x] **§42 `transformAuthority` is mandatory knowledge for animating anything, and the README
+      never mentions it.** **FIXED 2026-09-07** — the quick start now
+      carries the rule, placed in the blockquote that already sends readers on to "authored
+      animation", which is the exact step that breaks. Gates re-run: check-docs OK, check-spec
+      OK, and the README browser gate still passes 2/2 (the snippet itself is unchanged — it
+      writes by hand, which is legal under the default `"manual"` owner). Dogfooding cycle 3: I built a scene from the README, added a tween
       (the obvious next step, and what the examples showcase), and **nothing moved**. The
       timeline ran — `state: running`, `elapsed: 4.15 s`, `tracked: 1` — while
       `transform.scale.x` stayed exactly `1.000`.
