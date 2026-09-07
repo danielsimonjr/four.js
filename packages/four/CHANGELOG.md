@@ -1,5 +1,23 @@
 # four
 
+## 0.1.0
+
+### Minor Changes
+
+- b3ec9d6: §81 tokens for the five remaining extension points: `ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS` (host-side, umbrella), and `COMPUTE_WORKLOADS`, each with a named registry. The umbrella re-exports the same objects.
+
+### Patch Changes
+
+- Updated dependencies [b3ec9d6]
+  - @four/assets@0.1.0
+  - @four/materials@0.1.0
+  - @four/ui@0.1.0
+  - @four/render@0.1.0
+  - @four/render-canvas@0.1.0
+  - @four/render-svg@0.1.0
+  - @four/render-webgl@0.1.0
+  - @four/render-webgpu@0.1.0
+
 ## 0.0.2
 
 ### Patch Changes
