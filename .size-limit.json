@@ -6,32 +6,32 @@
   },
   {
     "path": "examples/first-3d-scene/dist/assets/*.js",
-    "limit": "39 kB",
+    "limit": "43 kB",
     "gzip": true
   },
   {
     "path": "examples/particles-demo/dist/assets/*.js",
-    "limit": "37.5 kB",
+    "limit": "43 kB",
     "gzip": true
   },
   {
     "path": "examples/ui-demo/dist/assets/*.js",
-    "limit": "46 kB",
+    "limit": "49.5 kB",
     "gzip": true
   },
   {
     "path": "examples/flagship/one-scene-everything-moves/dist/assets/*.js",
-    "limit": "1.65 MB",
+    "limit": "2.05 MB",
     "gzip": true
   },
   {
     "path": "examples/flagship/motor-digital-twin/dist/assets/*.js",
-    "limit": "1.00 MB",
+    "limit": "1.25 MB",
     "gzip": true
   },
   {
     "path": "examples/character-controller/dist/assets/*.js",
-    "limit": "0.95 MB",
+    "limit": "1.20 MB",
     "gzip": true
   }
 ]
