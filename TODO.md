@@ -48,7 +48,7 @@ Bounded work with a clear shape, but more than a single edit.
 
 - The browser gate on Windows — DONE 2026-09-06 (WebGPU 22/22 via platform argv; `animation.spec` simulation-bound `#status` sampling; Windows timeout 180 s; `smoothness.spec` uses `page.evaluate` parity wait per #72).
 - Unlit materials render with GL_BLEND off — DONE 2026-09-06 (alpha / `transparent` enables SRC_ALPHA blend).
-- Size budgets are thin after R-36 — DONE 2026-09-06 (`.size-limit.json` bumped; `tools/size-budgets.mjs` records A/B; branch limits 39/37.5/46 kB after trails).
+- Size budgets are thin after R-36 — DONE 2026-09-07 (re-measured after #76: 43 / 43 / 49.5 kB and 2.05 / 1.25 / 1.20 MB; rationale in `tools/size-budgets.mjs`).
 - Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` — DONE 2026-09-06 (package `moduleResolution: bundler`; upstream type aliases).
 - Extend `tools/check-docs.mjs` — DONE 2026-09-06 (24 packages, suite counts, AUDIT-120 census).
 
@@ -1492,6 +1492,14 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       pre-1.0 PDF.
 
 ## Done
+
+- [x] 2026-09-07 — **CI after #76.** Allowlisted R-32 wide particle offsets
+      (particles↔render duck-type); TypeDoc fixtures for NodeSpace,
+      PH-11c shape-cast `body`, and widget accessibility. Browser-gate
+      leftovers: twin contacts finite; playground 0.20 settle/impulse
+      bands; one-scene panel column for `panelLeft` (105/105). Size
+      budgets re-recorded after Rapier 0.20 wasm (43 / 43 / 49.5 kB,
+      2.05 / 1.25 / 1.20 MB).
 
 - [x] 2026-09-06 — **Open-TODO subagent pass (fourth landing).** Parallel
       packets: Rapier 0.20; `NodeSpace` + local-plane; PH-11c push; §40 units;

@@ -17,6 +17,16 @@ specification; until then, entries are grouped by date under **Unreleased**.
 - **Docs / TypeDoc.** `NodeSpaceSerializerShape.deserialize` takes an
   optional `node`; PH-11c shape-cast fixtures include `body`; widget
   accessibility fixture is typed as `WidgetAccessibility`.
+- **Browser gate.** Four leftover #76 assertions that never ran on that PR:
+  twin `contacts` is a finite `SolverStatistics.contactCount` (not `nan`);
+  playground settle/re-settle uses the existing ±0.25 band (Rapier 0.20
+  centroid ≈ −2.29); impulse rise threshold 1.0 → 0.5 (CI measured 0.85);
+  one-scene `panelLeft` only walks glyphs in the panel column. Chromium
+  `test:browser` is 105/105 on the retune.
+- **Size budgets.** `#76` never reached `bun run size`. CI measured
+  first-3d 42.1, particles 42.21, ui-demo 48.47 kB; flagship 1.98 MB,
+  twin 1.22 MB, character 1.15 MB (Rapier 0.20 wasm). Limits → 43 / 43 /
+  49.5 kB and 2.05 / 1.25 / 1.20 MB. Rationale in `tools/size-budgets.mjs`.
 
 ### 2026-09-06 — A-4 FinalizationRegistry leak tracking
 

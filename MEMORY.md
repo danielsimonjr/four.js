@@ -32,6 +32,23 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-07 — Size budgets after #76.** `bun run size` sits after
+  `test:browser`, so #76/#77 never measured the Rapier 0.20 wasm jump.
+  CI 34068239028: first-3d 42.1, particles 42.21, ui-demo 48.47 kB;
+  flagship 1.98, twin 1.22, character 1.15 MB. Limits 43 / 43 / 49.5 kB
+  and 2.05 / 1.25 / 1.20 MB. first-2d 56.23/150 unchanged. Browser gate
+  on that run was 105/105 after the assertion retune.
+
+- **2026-09-06 — Browser-gate leftovers from #76.** The four Chromium
+  failures on `cursor/ci-fix-after-merge-8caa` were #76-on-main fallout
+  (Docs / graph died first on that PR, so `test:browser` never ran). Twin
+  `contacts` is produced by `recordSolverStatistics` now — assert finite
+  ≥ 0, keep `gpuframe` as `nan` on SwiftShader. Playground settle keeps
+  `SETTLED_CENTROID_TOLERANCE` (0.25) and drops `toBeCloseTo(..., 1)`.
+  Impulse rise is 0.5 after a recorded 0.85 on 0.20. Flagship panel
+  chrome is glyphs with `x ≥ PANEL_LEFT_EDGE`; left-side HUD in the
+  lower 60 % is world glyphs.
+
 - **2026-09-06 — R-32 particle offsets are allowlisted duplicates.**
   `PARTICLE_WIDE_INSTANCE_FLOATS` / `PARTICLE_ROTATION_OFFSET` /
   `PARTICLE_SOFTNESS_OFFSET` sit in both `@four/particles` and
