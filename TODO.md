@@ -119,8 +119,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **Error messages name MINIFIED classes in exactly the builds users ship.** Dogfooding
       cycle 3d, §34 round-trip in the browser. `serializeScene(hero, registry)` threw:
 
-      > `Node node-3 is a **Ur**, which this scene format has no type name for; supply
-      > serializeScene's \`nodeTypeOf\` option and the matching \`nodeFactory\` on load (§79).`
+      > Node node-3 is a **Ur**, which this scene format has no type name for; supply
+      > serializeScene's `nodeTypeOf` option and the matching `nodeFactory` on load (§79).
 
       `hero` is a `Renderable`. "Ur" is the minified class name. Proven with an A/B on the same
       app — the only difference being `build.minify`:
