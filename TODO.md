@@ -116,6 +116,50 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 ## Now
 
+### 🔧 Tech-lead decisions on the four dogfooding findings (authorised 2026-09-07)
+
+Daniel delegated all four. Ordered by value-over-risk, not by how annoying each felt.
+
+- [x] **(A) Stop interpolating `constructor.name` into §79 diagnostics.** **DONE 2026-09-07.**
+      Kept the class name (in development it is exactly right) and added what survives
+      minification: the built-in type names, and an explicit caveat that the name may be
+      mangled. Context gains `nodeClassIsMinifiable` / `componentClassIsMinifiable` so a tool
+      can tell an authored `typeName` from a `constructor.name` fallback. 42/42 green. 5 sites,
+      2 packages. Highest value of the four: it is the only one that produces a WRONG
+      message at runtime in a shipped build, with no compiler help. Source the name from
+      the registry's own type names or a `static readonly nodeType`.
+- [ ] **(B) Default `createGltfLoader`'s transport to `globalThis.fetch`.** Mirrors
+      `AssetManager`'s own WP-11.2 decision, made for exactly this reason. Removes the
+      single most likely first-use failure. §96 bounds are unchanged — they are enforced
+      after the bytes arrive, not by withholding a transport.
+- [ ] **(C) Ship the polled key-state helper the library makes every consumer rewrite.**
+      `isDown`/`heldKeys`/`pressedKeys` return **zero** hits today, and
+      `examples/character-controller` hand-rolls a `Set<string>` off DOM listeners. ~20
+      lines the library should own. This also removes the CAUSE of the `KeyboardInput`
+      trap: once a "read the keyboard" API exists, that class stops being what people
+      reach for.
+- [ ] **(D) Rename `KeyboardInput` to say what it does.** It routes DOM key events to a
+      focused scene node; the name promises the opposite. Free to do pre-publish, and
+      cheap: 6 files reference it. Do it AFTER (C), so the replacement exists first.
+
+- [x] **(E) `TimeState.deltaTime` — DECIDED: do NOT rename. Document the unit instead.**
+      This is the one I came in expecting to change, and the measurement reversed it.
+      · **Cost:** `fixedDeltaTime` alone has **263** call sites (118 src / 132 tests / 13
+        examples); the three delta fields together ≈ **347**, much of it in §33
+        determinism-critical paths. A mechanical rename there buys a regression risk.
+      · **Benefit is smaller than it felt:** writing `time.deltaSeconds` is caught by the
+        type checker instantly. It is a five-second correction, not a silent defect —
+        unlike (A), which ships a wrong string to production with no compiler help.
+      · **And the convention argument cuts the other way.** `deltaTime` is the industry's
+        name — Unity `Time.deltaTime`, Unreal `DeltaTime`. Renaming to `deltaSeconds`
+        would make four MORE surprising to the game developers it is aimed at, in
+        exchange for internal tidiness. The inconsistency is real; the fix would cost
+        more than the flaw.
+      · **What is actually wrong is the DOCS:** `TimeState`'s fields say "frame delta"
+        and never say *seconds*. That is fixed with (E) below at no risk.
+- [ ] **(E1) Say "seconds" in `TimeState`'s docstrings** — the zero-risk 90% of (E).
+
+
 > **VERIFICATION RECORD — not a task, so deliberately not a checkbox.**
 > Re-ran BOTH described personas against current `main` (2026-09-07). They
 > were last exercised on 09-06, before ten commits landed; a passing scenario from
