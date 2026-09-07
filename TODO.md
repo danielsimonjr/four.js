@@ -169,7 +169,13 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       exactly as `AssetManager` already does, or widen the loader seam so the manager injects
       the transport it owns.
 
-- [ ] **§78 glTF ships tested but undemonstrated — no example loads a model.** Grepped every
+- [x] **§78 glTF ships tested but undemonstrated — no example loads a model.** **FIXED 2026-09-07** —
+      `examples/gltf-model` added: `createGltfLoader` → `AssetManager.load` → `instantiateGltf`,
+      with a header that names the two things a first attempt gets wrong. Gated like the other
+      authored sites (`tests/browser/gltf-model.spec.ts`, port 4183), which asserts BOTH halves
+      — that the external buffer assembled (`nodes > 1`, unreachable if `quad.bin` never loaded)
+      and that it reached the screen (13,340 lit pixels measured; floor 4,000). Counts updated
+      where the gates enforce them: AUDIT-120 13→14 examples, tests/README 30→31 specs. Grepped every
       example for `gltf`/`Gltf`/`GLTF`: **zero files**. It is covered
       (`tests/browser/gltf.spec.ts`, `packages/assets/tests/gltf.test.ts`), so this is not a
       correctness gap — it is an adoption one. "Load my model" is the first thing a user tries

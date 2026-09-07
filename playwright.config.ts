@@ -278,6 +278,19 @@ const TWIN_PORT = 4181;
  */
 const CHARACTER_PORT = 4182;
 
+/**
+ * Preview port for `examples/gltf-model` — §78's loader, demonstrated.
+ *
+ * An eleventh entry rather than an eleventh run, for {@link PLAYGROUND_PORT}'s
+ * reason: `vite preview` serves exactly one `dist`. 4183 is the next free port
+ * above the character controller's and is restated verbatim in
+ * `tests/browser/gltf-model.spec.ts`.
+ *
+ * No wasm image here — the page fetches `quad.gltf` and the `quad.bin` beside
+ * it, both a few hundred bytes — so this server needs no widened timeout.
+ */
+const GLTF_MODEL_PORT = 4183;
+
 export default defineConfig({
   testDir: "tests/browser",
   // Failure artifacts (traces, error context) live inside the already-ignored
@@ -465,6 +478,13 @@ export default defineConfig({
       // One Rapier wasm image, the mechanism's tier: ~2.5 MB raw, so the first
       // request is slower than the page's own start.
       timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: `npx vite preview examples/gltf-model --port ${String(GLTF_MODEL_PORT)} --strictPort`,
+      url: `http://localhost:${String(GLTF_MODEL_PORT)}`,
+      reuseExistingServer: false,
       stdout: "ignore",
       stderr: "pipe",
     },

@@ -22,7 +22,7 @@
     "coverage": "bun tools/run-in-packages.mjs --concurrency=4 vitest run --coverage --config ../../vitest.coverage.config.ts",
     "docs": "bunx typedoc",
     "example:build": "bunx vite build examples/first-2d-scene",
-    "examples:build": "bun run example:build && bun run first-3d-scene:build && bun run playground:build && bun run mechanism:build && bun run blending:build && bun run particles-demo:build && bun run ui-demo:build && bun run flagship:build && bun run twin:build && bun run character:build",
+    "examples:build": "bun run example:build && bun run first-3d-scene:build && bun run playground:build && bun run mechanism:build && bun run blending:build && bun run particles-demo:build && bun run ui-demo:build && bun run flagship:build && bun run twin:build && bun run character:build && bun run gltf-model:build",
     "first-3d-scene:build": "bunx vite build examples/first-3d-scene",
     "flagship:build": "bunx vite build examples/flagship/one-scene-everything-moves",
     "format": "bunx prettier --write .",
@@ -46,7 +46,8 @@
     "twin:build": "bunx vite build examples/flagship/motor-digital-twin",
     "typecheck:examples": "bunx tsc --noEmit -p examples",
     "typecheck:tests": "bunx tsc --noEmit -p tests",
-    "ui-demo:build": "bunx vite build examples/ui-demo"
+    "ui-demo:build": "bunx vite build examples/ui-demo",
+    "gltf-model:build": "bunx vite build examples/gltf-model"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.1",

@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — §78 glTF is demonstrated, not just tested
+
+Cycle 3's fourth finding, fixed. `examples/gltf-model` is the fourteenth example: it builds a
+loader with `createGltfLoader`, hands it to `AssetManager.load`, and assembles the result with
+`instantiateGltf`. "Load my model" is the first thing anyone tries with a 3D engine, and until
+now the only worked reference was a test.
+
+It is written around the two things a first attempt gets wrong — both found by doing exactly
+that in cycle 3: the entry point is `createGltfLoader`, not the `loadGltf` a newcomer reaches
+for, and a `.gltf` naming an external buffer needs `{ fetch }` or the load fails on the `.bin`
+the manager never sees.
+
+Gated like the other authored sites. `tests/browser/gltf-model.spec.ts` (port 4183) asserts
+**both** halves, because either alone can pass while the feature is broken: that the external
+buffer assembled (`nodes > 1`, which a document-only load cannot reach) and that the result
+reached the screen (13,340 lit pixels measured; floor 4,000).
+
+Two notes from building it:
+
+- **The docs gates earned their keep.** They refused the change twice on counts I had not
+  thought about — AUDIT-120's example count (it reads `git ls-files`, so it stayed red until
+  the files were staged) and `tests/README.md`'s spec count. Both now say 14 and 31.
+- **The readback in the new spec deliberately differs from its siblings.** Drawing a WebGL
+  canvas into a 2D context after compositing yields a blank image without
+  `preserveDrawingBuffer` — it measured 0 lit pixels while the model was plainly drawn. The
+  sibling specs decode the PNG with a local `decodePng`, a ~241-line block each carries its own
+  copy of; one assertion does not earn a sixth copy, so the page decodes its own screenshot.
+
 ## Unreleased — the README now names the one rule that stops your animation working
 
 Cycle 3's fifth finding, fixed. §42's transform authority is mandatory knowledge for animating

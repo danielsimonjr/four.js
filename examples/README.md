@@ -57,6 +57,13 @@ gates in `playwright.config.ts` do).
   buttons and labels laid out by the package and skinned by the application, driven by real
   pointer and keyboard input, with a drawn focus ring (`bun run ui-demo:build`). Listed
   here from 2026-08-05; it shipped earlier and this file had never mentioned it.
+- [`gltf-model/`](gltf-model/) — **Implemented.** §78's loader, end to end: `createGltfLoader`
+  handed to `AssetManager.load`, then `instantiateGltf` into live nodes
+  (`bun run gltf-model:build`). It exists because §78 shipped tested but undemonstrated, and it
+  shows the two things a first attempt gets wrong — the entry point is `createGltfLoader` rather
+  than a `loadGltf`, and a `.gltf` naming an external buffer needs `{ fetch }` or the load fails
+  on the `.bin` the manager never sees.
+
 - [`first-3d-scene/`](first-3d-scene/) — **Implemented (2026-08-07).** §93's first 3D
   scene, and the first example of any kind to use a `PerspectiveCamera`: two identical
   spheres at different depths (the projection measured in pixels, not asserted by class

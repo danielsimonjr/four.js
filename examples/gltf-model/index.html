@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>four.js — loading a glTF model (§78)</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #0d0f14;
+        color: #c8ccd4;
+        font: 13px/1.5 system-ui, sans-serif;
+      }
+      canvas {
+        display: block;
+      }
+      #status {
+        padding: 8px 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene" width="640" height="400"></canvas>
+    <div id="status" data-state="loading">loading…</div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
