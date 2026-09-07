@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — what the rebrand broke, and why local green was not CI green
+
+The rebrand turned `main` red twice. Both were mine, both are fixed, and the second one is
+the more useful failure.
+
+**1. A rendered string is pixel-coupled.** `examples/ui-demo`'s title label is drawn on the
+canvas, so changing it invalidated the §92 visual goldens. Those are `-visual-linux.png`
+because CI is ubuntu, and `--update-snapshots` on Windows writes `-visual-win32.png` beside
+them — leaving CI equally red plus two dead files. With no Docker here and no snapshot-update
+path in CI, that one label keeps its old spelling, with the reason at the call site and the
+exact Linux command filed as Stage 1b. Stray `-visual-win32/-darwin.png` are now gitignored so
+a local run cannot leak a golden that could never match CI.
+
+**2. The pass rewrote an assertion about a file it did not rewrite.**
+
+```
+- Expected: "fourJS §78 integration quad"     <- the test
++ Received: "four.js §78 integration quad"    <- the fixture file
+```
+
+That assertion is not branding. It checks the parse tier carried the DOCUMENT's own `extras`
+faithfully, so the string belongs to `tests/fixtures/gltf/quad.gltf`. The pass covered
+`.md/.ts/.mjs/.html/.json`; a glTF document is `.gltf`. The expectation moved, the data did
+not. Reverted, with the reason at the call site.
+
+**The lesson is about verification, not renaming.** I checked with `bun run test`, which runs
+the 24 PACKAGE suites — and `tests/integration` is not among them. My green was a smaller claim
+than CI's. Now verified the way CI verifies: typecheck:examples, typecheck:tests, check-compat,
+check-docs, check-spec, plus `tests/integration` (507) and `tests/determinism` (169).
+
+`docs/COMPATIBILITY.md` was regenerated too: correctly excluded from the pass as a generated
+file, but its SOURCE declarations were rebranded, so the committed output went stale.
+
 ## Unreleased — both described personas re-run against current main
 
 They were last exercised on 09-06, before ten commits landed. A scenario that passed yesterday
