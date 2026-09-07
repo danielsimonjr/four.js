@@ -116,6 +116,105 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 ## Now
 
+- [ ] **§42 `transformAuthority` is mandatory knowledge for animating anything, and the README
+      never mentions it.** Dogfooding cycle 3: I built a scene from the README, added a tween
+      (the obvious next step, and what the examples showcase), and **nothing moved**. The
+      timeline ran — `state: running`, `elapsed: 4.15 s`, `tracked: 1` — while
+      `transform.scale.x` stayed exactly `1.000`.
+
+      The engine was right and said so, unconditionally:
+
+      > `[four] A "animation" system tried to write the transform of node node-3, which is
+      > owned by "manual" authority; the write was refused (§42…). Set
+      > node.transformAuthority = "animation" if that system should own it.`
+
+      **The diagnostic is excellent** — names the writer, the owner, the rule and the fix, and
+      it is not DEV-gated, so production users get it too. The gap is upstream of it:
+      `transformAuthority` appears **0 times in README.md**, while the quick-start teaches
+      `app.poses.track()` and manual writes. The examples all declare it
+      (`first-2d-scene` even documents *"Both shapes declare `transformAuthority =
+      "animation"` (§42)"*) — so the knowledge exists everywhere except where a new user
+      starts. Two or three sentences in the README quick-start close it.
+
+      Verified fixed from the consumer's seat: setting `hero.transformAuthority = "animation"`
+      made the tween apply — `scale.x` 1.000 → 1.050 and the rendered box grew from 7,938 to
+      10,080 lit pixels.
+
+
+- [ ] **The first glTF a consumer loads fails, and nothing demonstrates the right way.**
+      Dogfooding cycle 3: `assets.load("/quad.gltf", createGltfLoader({}))` — the obvious call
+      — fails at runtime with
+
+      > `Cannot load glTF "/quad.gltf": buffers[0]: the document names external buffer
+      > "quad.bin" but this loader was built without a transport. Pass { fetch } to
+      > createGltfLoader.`
+
+      **The message is excellent** — it names the file, the missing capability and the exact
+      fix — so this is not an error-quality defect. It is an asymmetry:
+
+      · `AssetManager` **already defaults its transport to `globalThis.fetch`** (WP-11.2,
+        2026-08-02) precisely so a no-options constructor works.
+      · `createGltfLoader` has **no** such default, and `AssetLoader.load(response, url)` gives
+        the manager no seam to pass its transport down — though that interface's own comment
+        anticipates the case, saying `url` is there *"(once glTF lands) for resolving relative
+        dependencies"*.
+      · So the manager fetches the `.gltf` and then the loader cannot fetch the `.bin` beside
+        it. A user reasonably assumes the thing that fetched the document will fetch its buffer.
+
+      Two fixes, both design calls: default `createGltfLoader`'s `fetch` to `globalThis.fetch`
+      exactly as `AssetManager` already does, or widen the loader seam so the manager injects
+      the transport it owns.
+
+- [ ] **§78 glTF ships tested but undemonstrated — no example loads a model.** Grepped every
+      example for `gltf`/`Gltf`/`GLTF`: **zero files**. It is covered
+      (`tests/browser/gltf.spec.ts`, `packages/assets/tests/gltf.test.ts`), so this is not a
+      correctness gap — it is an adoption one. "Load my model" is the first thing a user tries
+      with a 3D engine, the entry point is `createGltfLoader` rather than the `loadGltf` a
+      newcomer reaches for, and the correct wiring (a transport for external buffers) is
+      exactly what the row above shows people get wrong. One small example would close both.
+
+
+- [ ] **`KeyboardInput` is a naming trap, and the DEV message did not fix it — I fell in twice.**
+      Dogfooding cycle 3 (2026-09-07, `.dogfood/charselect`): writing a character-select screen
+      from the README's shape, I wrote `new KeyboardInput({ target: window })` and then
+      `keys.isDown("ArrowRight")`. Both wrong. The constructor is
+      `(surface: KeySurface, options: KeyboardInputOptions)` and there is no `isDown`.
+
+      **What makes this worth filing rather than shrugging at: the class's own comment predicts
+      the exact mistake I made**, says the name invites it, and notes that
+      `examples/character-controller` uses plain DOM listeners *because* this class is not what
+      game code wants. A DEV-only error message was added for it on 2026-09-06 — and I still
+      made the mistake, from scratch, with the mitigation in place. **A better message does not
+      repair a misleading name; it only apologises after the fact.**
+
+      Two things are true at once and both need a decision:
+      · **The name.** In a package called `@four/input`, `KeyboardInput` reads as "the way to
+        read the keyboard". It routes DOM key events to a focused scene node. Something like
+        `SceneKeyRouter` / `FocusedKeyRouter` would not be reached for by a user wanting WASD.
+      · **The gap it hides.** Grepped for a polled key-state helper across every package:
+        `isDown` / `isKeyDown` / `heldKeys` / `pressedKeys` return **zero files**. So the
+        library ships no way to ask "is this key held", and `character-controller` maintains
+        its own `readonly held = new Set<string>()` off hand-written DOM listeners. Every
+        consumer writing game input reimplements that. It is ~20 lines, which is exactly the
+        size of thing a library should own.
+
+- [ ] **`TimeState` breaks the `*Seconds` convention the rest of the library teaches.**
+      Same cycle: I wrote `time.deltaSeconds` in the update loop without hesitating, because
+      that is what four taught me everywhere else. The field is `deltaTime`.
+
+      Measured, not impressionistic: **163** occurrences of `deltaSeconds` against **27** of
+      `deltaTime`, and **13 distinct `*Seconds` identifiers** in the public surface
+      (`durationSeconds`, `fixedDeltaSeconds`, `elapsedSeconds`, `localTimeSeconds`,
+      `lastGpuFrameTimeSeconds`, …). The README opens with *"radians and seconds everywhere"*.
+      Yet `TimeState` — the object **every** `app.on("update")` handler receives, so the most
+      touched surface in the library — uses `deltaTime` / `unscaledDeltaTime` /
+      `fixedDeltaTime`, and its docstrings say "frame delta" without naming the unit.
+
+      This is the one naming inconsistency positioned where every single user meets it.
+      Renaming is a breaking change, so it is a 0.1 decision: do it before the first publish or
+      keep it forever. A non-breaking half-step is to add `deltaSeconds` as a documented alias.
+
+
 - [x] **`character-controller.spec.ts:509` is a wall-clock race — `main` went RED on a
       DOCS-ONLY commit.** Run 34090671121: `yaw moved -0.133 — → did not turn right`, against
       `YAW_MINIMUM = 0.35`. The message misleads: the camera turned the RIGHT way
@@ -393,9 +492,15 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       control: JS runtime · TypeScript types (strict, `skipLibCheck: false`) · publish/staging
       path · all 25 umbrella subpaths · §33/§34 determinism · §34 snapshot round-trip · §7a
       Y-up in 2D. Evidence in MEMORY.md under 2026-09-06.
-      NOT yet exercised: the browser/render path (WebGL + WebGPU, all 10 browser examples are `index.html` + vite and
-      I have only run headless), animation/tweens (§93 timeline), assets/glTF loading, UI, input,
-      particles, and the 2D↔3D mixed-scene story. Those are where the next findings are.
+      **Cycle 3 (2026-09-07, `.dogfood/charselect`) exercised, from a consumer seat and
+      verified in a real browser:** the WebGL render path (7,938→10,080 lit pixels by
+      screenshot), assets/glTF (`AssetManager` + `createGltfLoader`, loaded), animation
+      (`Timeline` + `tween` + `AnimationSystem`, observed driving `scale.x`), UI
+      (`Panel` + `Label` constructed into the scene), and §42 authority. **Five findings,
+      all filed above.**
+      STILL not exercised: **particles** (dropped from the app, never wired), WebGPU from
+      a consumer seat, text/§56, serialization/§34 round-trip in the browser, and the
+      2D↔3D mixed-scene story. Those are where the next findings are.
 
 - [x] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
       one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`

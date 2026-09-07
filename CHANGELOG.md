@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — dogfooding cycle 3: five findings, none of them a broken engine
+
+Built a character-select screen from a consumer's seat (`.dogfood/charselect`) to reach the
+surfaces the coverage map listed as untouched, and ran it in a real browser rather than
+headless-only. **The engine did not misbehave once.** Every finding is about what a user is
+told, not about what the code does — which is its own signal at 0.1.
+
+- **`KeyboardInput` is a naming trap, and a DEV message did not fix it.** I wrote
+  `new KeyboardInput({ target: window })` and `keys.isDown(…)`; both wrong. The class's own
+  comment *predicts that exact mistake*, and a DEV error was added for it on 2026-09-06 — yet I
+  made it again from scratch with the mitigation in place. Worse, the gap it hides is real: a
+  grep for `isDown`/`heldKeys`/`pressedKeys` across every package returns **zero**, and
+  `examples/character-controller` hand-rolls `new Set<string>()` off DOM listeners. Every game
+  consumer reimplements ~20 lines the library should own.
+- **`TimeState` breaks the convention the library teaches.** 163 uses of `deltaSeconds`
+  against 27 of `deltaTime`, 13 distinct `*Seconds` identifiers, a README promising "radians
+  and seconds everywhere" — and the object every `update` handler receives calls it
+  `deltaTime`. I typed `deltaSeconds` without hesitating.
+- **The first glTF a consumer loads fails.** `createGltfLoader({})` cannot fetch an external
+  `.bin`, while `AssetManager` already defaults its transport to `globalThis.fetch` by explicit
+  decision (WP-11.2). The manager fetches the document and the loader cannot fetch the buffer
+  beside it. Proven both ways: failed with `{}`, loaded with `{ fetch }`.
+- **§78 glTF ships tested but undemonstrated** — zero examples mention glTF, so the first thing
+  a user tries with a 3D engine has no worked reference.
+- **§42 `transformAuthority` is mandatory to animate anything and appears 0 times in the
+  README.** A tween on a README-shaped scene moved nothing: timeline running, `scale.x` pinned
+  at 1.000, because "manual" owns the transform. Setting the authority fixed it — 1.000 → 1.050,
+  and the rendered box grew 7,938 → 10,080 lit pixels.
+
+**What went right, and is worth protecting:** every one of those failures announced itself with
+an actionable message naming the fix — `start()` before `initialize()`, the glTF transport, a
+mistyped tween path (`"t.s.nope"` throws with the path and key in context), and the §42 refusal.
+The §42 warning is unconditional, so production users get it too. Nothing failed silently.
+
+**Two corrections to my own measurements**, recorded because they nearly became findings:
+`readPixels` returned `0,0,0,0` and looked like "nothing rendered" — it is the
+after-composite trap, and a screenshot showed 7,938 lit pixels. And my browser probe captured
+only `console.error`, so it reported "0 errors" while the §42 warning was being emitted the
+whole time.
+
 ## Unreleased — A-4 closed: step 3 was never possible, and the item knew why
 
 `A-4 remainder` carried three sub-parts. Two were settled; the third contradicted the second,
