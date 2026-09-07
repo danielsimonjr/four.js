@@ -50,7 +50,7 @@
     "gltf-model:build": "bunx vite build examples/gltf-model"
   },
   "devDependencies": {
-    "@changesets/cli": "3.0.1",
+    "@changesets/cli": "3.0.2",
     "@four/animation": "workspace:*",
     "@four/assets": "workspace:*",
     "@four/core": "workspace:*",
@@ -74,7 +74,7 @@
     "@four/serialization": "workspace:*",
     "@four/text": "workspace:*",
     "@four/ui": "workspace:*",
-    "@playwright/test": "1.62.1",
+    "@playwright/test": "1.63.0",
     "@size-limit/preset-small-lib": "13.0.3",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.4.1",
