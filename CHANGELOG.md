@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — a red gate nobody was reading, and two docs that had gone false
+
+Closes (D) and (E1) of the four decisions delegated on 2026-09-07, and fixes a failing test
+gate found while running them.
+
+### Fixed
+
+- **`bun run test` was RED on `main`.** `SeededRandom > scales nextFloat01 exactly by 2^-32`
+  exceeded vitest's 5s deadline (5435ms) and failed as a timeout, which reads as a broken PRNG
+  rather than as a slow test. The cause was **60,000 `expect()` calls** (20,000 iterations x 3)
+  to prove one deterministic identity: the draws are free, the assertion machinery is not.
+
+  The proof sits in the same file — `is uniform enough` makes **80,000** draws in **17ms**, four
+  times the work, because it asserts nine times instead of a quarter of a million.
+
+  Both hot loops now compare in plain JS and assert once. Coverage is identical (every draw is
+  still checked against every condition) and the failure message gained the draw index and the
+  value, which `expect`-in-a-loop never gave. `nextRange` went **3774ms -> 4ms**; the suite now
+  reports no timeouts and no failing tests.
+
+  Verified by mutation, not by the green tick: dividing by `2^32 - 1` instead of `2^32` is caught
+  at draw 0. The first mutation attempt proved nothing — `@fourjs/core` resolves to the **built**
+  package, so a `src` edit stays invisible until that package is rebuilt.
+
+### Changed
+
+- **`KeyboardInput`'s dev error pointed at an answer that no longer exists.** It told callers
+  wanting raw game input to "listen to the DOM directly, as `examples/character-controller`
+  does" — untrue in both halves since `KeyboardState` shipped and that example adopted it. It
+  now names `KeyboardState`, and the two classes cross-reference each other.
+
+  The proposed **rename of `KeyboardInput` was deliberately not carried out.** `PointerInput` and
+  `KeyboardInput` are a symmetric pair of §72 event sources — platform events in, scene events
+  out, routed by picking and by focus respectively — and the name is accurate in that frame. The
+  real defect was that the package offered no polled-state option at all, so the one
+  keyboard-shaped class got reached for by people who wanted the other thing. `KeyboardState`
+  removed that cause; renaming would churn 100 references and break a documented pair to fix
+  something already fixed.
+
+- **`TimeState` now states its unit.** Six of its duration fields never said "seconds", and both
+  `performance.now()` and `requestAnimationFrame` hand out milliseconds — a substitution that
+  type-checks and produces motion 1000x too fast rather than an error.
 ## Unreleased — the two capability gaps dogfooding found are closed
 
 Decisions (B) and (C) of the four delegated on 2026-09-07. Both were found by building a
