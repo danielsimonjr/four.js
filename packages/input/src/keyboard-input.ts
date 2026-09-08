@@ -2,6 +2,11 @@
  * The keyboard source (§72, 2026-08-07, A-10): platform key events in, scene
  * key events out, routed to whatever holds the focus.
  *
+ * **Not the way to read the keyboard.** For "is W held right now" — movement,
+ * a flight stick, anything polled per frame — use {@link KeyboardState}, which
+ * is the sibling in this package. This class is the event SOURCE that feeds a
+ * focused node, exactly as {@link PointerInput} feeds a picked one.
+ *
  * ```ts
  * const keyboard = new KeyboardInput(window, {
  *   focusTarget: () => focusedWidget(scene) ?? uiRoot,   // @fourjs/ui answers
@@ -167,8 +172,12 @@ export class KeyboardInput {
      * The message also says what this class is for, because the *name* is what invites
      * the mistake: in a package called `@fourjs/input`, `KeyboardInput` reads like "the
      * way to read the keyboard", but it routes to a focused scene node and pairs with
-     * `@fourjs/ui`'s `keyboardFocusTarget(root)`. Game code reading WASD wants neither;
-     * `examples/character-controller` uses plain DOM listeners for exactly that reason.
+     * `@fourjs/ui`'s `keyboardFocusTarget(root)`. Game code reading WASD wants neither.
+     *
+     * Until 2026-09-07 the honest answer was "listen to the DOM yourself", and this
+     * message said so. It is now `KeyboardState`, in this package — which is the real
+     * fix for the mistake. A clearer error was never going to repair a missing
+     * capability; it could only apologise for one.
      */
     if (
       DEV &&
@@ -192,7 +201,8 @@ export class KeyboardInput {
           "Node or null — it is how key events are routed into the scene (§72). " +
           "For a widget tree, pass `keyboardFocusTarget(root)` from `@fourjs/ui`. " +
           "For raw game input (WASD and the like) this class is the wrong tool: " +
-          "listen to the DOM directly, as `examples/character-controller` does.",
+          "use `KeyboardState` from this package — `new KeyboardState(window)` then " +
+          "`keys.isDown(\"KeyW\")`.",
         { context: { received: typeof options } },
       );
     }
