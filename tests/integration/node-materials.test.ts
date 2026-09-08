@@ -1,8 +1,8 @@
 /**
  * §60 node materials across the packages that have to agree about them
- * (RFC 0001 — gap R-14, 2026-08-28): `@four/materials` carries the IR and the
- * material, `@four/render` the `"node"` item kind and the §70 graph effect,
- * `@four/render-webgl` the lazily registered emitter and program cache.
+ * (RFC 0001 — gap R-14, 2026-08-28): `@fourjs/materials` carries the IR and the
+ * material, `@fourjs/render` the `"node"` item kind and the §70 graph effect,
+ * `@fourjs/render-webgl` the lazily registered emitter and program cache.
  *
  * Three claims live only in the composition:
  *
@@ -22,26 +22,26 @@
  *    tier a scene document can carry as data (§96).
  */
 
-import { planeGeometry } from "@four/geometry";
+import { planeGeometry } from "@fourjs/geometry";
 import {
   NodeMaterial,
   NodeMaterialBuilder,
   ShaderGraphBuilder,
   UnlitMaterial,
-} from "@four/materials";
-import { RenderTarget, Renderable } from "@four/render";
+} from "@fourjs/materials";
+import { RenderTarget, Renderable } from "@fourjs/render";
 import {
   WebglRenderer,
   clearRegisteredNodeMaterialPipeline,
   registerNodeMaterialPipeline,
-} from "@four/render-webgl";
+} from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

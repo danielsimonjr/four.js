@@ -58,7 +58,7 @@ This is the crux, and it is forced rather than chosen. The §3.1 matrix gives `c
 A `PluginContext` interface in `core` that names `RendererRegistry` would invert five edges of a frozen matrix. A `PluginContext` whose members are `unknown` types nothing. The resolution is a **capability token** declared by the package that owns the registry, with `core` owning only the token machinery:
 
 ```ts
-// @four/core — knows nothing about what T is.
+// @fourjs/core — knows nothing about what T is.
 declare const capabilityBrand: unique symbol;
 export interface PluginCapability<T> {
   readonly name: string;
@@ -81,21 +81,21 @@ export interface PluginContext {
 Each owning package exports its token beside its registry — one line each, no new edge anywhere:
 
 ```ts
-// @four/render
+// @fourjs/render
 export const RENDERER_REGISTRY = defineCapability<RendererRegistry>(
   "four:renderer-registry",
 );
-// @four/physics
+// @fourjs/physics
 export const SOLVER_REGISTRY = defineCapability<SolverRegistry>(
   "four:solver-registry",
 );
-// @four/serialization
+// @fourjs/serialization
 export const COMPONENT_SERIALIZERS =
   defineCapability<ComponentSerializerRegistry>("four:component-serializers");
 export const SCENE_MIGRATIONS = defineCapability<SceneMigrationRegistry>(
   "four:scene-migrations",
 );
-// @four/motion
+// @fourjs/motion
 export const SIMULATION_SYSTEMS = defineCapability<SystemRegistry>(
   "four:simulation-systems",
 );
@@ -156,9 +156,9 @@ export function defineCapability<T>(
 
 ### 5. Compatibility ranges, and the §90 row they fill
 
-`@four/core` exports a `PLUGIN_API_VERSION` constant, versioned **independently of package semver**, in the way §80 makes the scene format version independent of it. `FourPlugin.engineRange` is matched against it at install; a mismatch refuses the plugin with both numbers in `context`.
+`@fourjs/core` exports a `PLUGIN_API_VERSION` constant, versioned **independently of package semver**, in the way §80 makes the scene format version independent of it. `FourPlugin.engineRange` is matched against it at install; a mismatch refuses the plugin with both numbers in `context`.
 
-The matcher is **deliberately restricted**: `^X.Y.Z`, `~X.Y.Z`, `>=X.Y.Z`, `X.Y.Z`, and `*`. Anything else is rejected at install with a message saying the grammar is restricted. Taking a semver dependency into `@four/core` — the package every other package depends on — to serve a feature nothing uses yet is not a trade worth making, and silently mis-parsing a range a user believed was supported is worse than refusing it. This is the same stance `A-23` took on limits (_"a limit defaulting to `Infinity` is documentation, not a limit"_): say what is enforced.
+The matcher is **deliberately restricted**: `^X.Y.Z`, `~X.Y.Z`, `>=X.Y.Z`, `X.Y.Z`, and `*`. Anything else is rejected at install with a message saying the grammar is restricted. Taking a semver dependency into `@fourjs/core` — the package every other package depends on — to serve a feature nothing uses yet is not a trade worth making, and silently mis-parsing a range a user believed was supported is worse than refusing it. This is the same stance `A-23` took on limits (_"a limit defaulting to `Infinity` is documentation, not a limit"_): say what is enforced.
 
 This closes `docs/COMPATIBILITY.md` §5, replacing _"n/a"_ with a real row: plugin API version, the packages that participate, and the restricted range grammar.
 
@@ -172,7 +172,7 @@ What §96 actually demands here is narrower and fully achievable, and it is the 
 
 Concretely: §79's _"components (§6a) serialize under registered type names; plugins register theirs (§81)"_ means a document names a **type name that is already registered**, and the unknown-component path stays data-only (`unknownComponents: "skip"` / preserve). A document that names an unregistered type gets the existing error; it does not trigger a load.
 
-This is mechanically enforceable and must be enforced, in the style `A-23` established for the CSP claim (_"the CSP claim is enforced, not asserted"_) and `A-2` for the units allowlist (a test that forbids any package outside `@four/core` from importing it). The packet ships `tests/integration/plugin-boundary.test.ts` asserting that no module reachable from `@four/serialization` or `@four/assets` imports the plugin host, and that `PluginHost.add`'s parameter type admits no string.
+This is mechanically enforceable and must be enforced, in the style `A-23` established for the CSP claim (_"the CSP claim is enforced, not asserted"_) and `A-2` for the units allowlist (a test that forbids any package outside `@fourjs/core` from importing it). The packet ships `tests/integration/plugin-boundary.test.ts` asserting that no module reachable from `@fourjs/serialization` or `@fourjs/assets` imports the plugin host, and that `PluginHost.add`'s parameter type admits no string.
 
 The second half of §96's phrase — _safe **shader** boundaries_ — is answered by RFC 0001, not here: shading is a graph of closed operators, so a plugin supplying shading supplies data, and a plugin supplying a _new operator_ is explicitly out of scope in both RFCs. That pairing is what lets `docs/GAP ANALYSIS v0.md`'s §96 table row move from _absent_ to _addressed_.
 
@@ -184,11 +184,11 @@ The second half of §96's phrase — _safe **shader** boundaries_ — is answere
 
 ## Alternatives
 
-**A. A fixed `PluginContext` interface in `@four/core` naming each registry.** The shape §81's own code block implies. It loses on §3.1: `core` has no dependencies and five of the six registries live downstream. Working around it (`unknown` members, structural duck types, or a `core`-side re-declaration of each registry's shape) either destroys the typing that makes a plugin worth writing or creates five duck-typed contracts to maintain — and the repository already tracks five such contracts as a known cost, deliberately, one at a time.
+**A. A fixed `PluginContext` interface in `@fourjs/core` naming each registry.** The shape §81's own code block implies. It loses on §3.1: `core` has no dependencies and five of the six registries live downstream. Working around it (`unknown` members, structural duck types, or a `core`-side re-declaration of each registry's shape) either destroys the typing that makes a plugin worth writing or creates five duck-typed contracts to maintain — and the repository already tracks five such contracts as a known cost, deliberately, one at a time.
 
-**B. Move the registries into `@four/core`.** Makes A work. It loses immediately: `RendererRegistry` exists to hold `RendererRegistration`s whose `create` returns a `Renderer` — a `render` type. Hoisting the registry hoists the type, and the whole §62 design (_"nothing here imports a backend, at type level or at runtime"_) depends on the registry living where the interface lives. The same argument holds for `SolverRegistry` and `PhysicsCapabilities`.
+**B. Move the registries into `@fourjs/core`.** Makes A work. It loses immediately: `RendererRegistry` exists to hold `RendererRegistration`s whose `create` returns a `Renderer` — a `render` type. Hoisting the registry hoists the type, and the whole §62 design (_"nothing here imports a backend, at type level or at runtime"_) depends on the registry living where the interface lives. The same argument holds for `SolverRegistry` and `PhysicsCapabilities`.
 
-**C. Side-effect registration: `import "@four/some-plugin/install"`.** Conventional and ergonomic. It is **unavailable**, not merely disfavoured: all 24 packages declare `"sideEffects": false`, so a side-effect module is _correctly_ deletable by any bundler that believes the manifest, and the plugin would fail at runtime with "nothing is registered". The two escapes — carving exceptions into every plugin's `sideEffects` field, or dropping the field — were both examined and rejected on 2026-08-07 for the §62 registry, and the reasoning transfers unchanged.
+**C. Side-effect registration: `import "@fourjs/some-plugin/install"`.** Conventional and ergonomic. It is **unavailable**, not merely disfavoured: all 24 packages declare `"sideEffects": false`, so a side-effect module is _correctly_ deletable by any bundler that believes the manifest, and the plugin would fail at runtime with "nothing is registered". The two escapes — carving exceptions into every plugin's `sideEffects` field, or dropping the field — were both examined and rejected on 2026-08-07 for the §62 registry, and the reasoning transfers unchanged.
 
 **D. Plugins named in the scene document (`"plugins": ["@vendor/thing"]`), resolved at load.** The feature users eventually ask for, and the thing §96 exists to forbid: it is arbitrary code execution from a scene file, in the plainest possible form. Rejected without a staging note, because staging it would imply it is coming.
 
@@ -200,14 +200,14 @@ The second half of §96's phrase — _safe **shader** boundaries_ — is answere
 
 **Easier.** `A-23`'s remaining §96 row gets an answer. `docs/COMPATIBILITY.md`'s one empty table gets content. §79's forward reference stops being a promise the repository cannot keep. A third-party backend or solver acquires a documented way to ship as one installable unit with a compatibility declaration, rather than as five call sites in an application's bootstrap.
 
-**Harder.** `@four/core` grows a module that every package transitively carries; the host must earn its bytes, and the packet must measure the delta for an application that installs no plugins (the target is that `PluginHost` tree-shakes entirely out of such a bundle, by the same discipline `resolveRenderer` uses — nothing on the hot path may statically reference it). The capability-token indirection is one more concept for a reader, and its payoff is invisible until the second capability. And the RFC commits to saying "absent" eleven times in a public table, which is the correct state and an awkward first impression.
+**Harder.** `@fourjs/core` grows a module that every package transitively carries; the host must earn its bytes, and the packet must measure the delta for an application that installs no plugins (the target is that `PluginHost` tree-shakes entirely out of such a bundle, by the same discipline `resolveRenderer` uses — nothing on the hot path may statically reference it). The capability-token indirection is one more concept for a reader, and its payoff is invisible until the second capability. And the RFC commits to saying "absent" eleven times in a public table, which is the correct state and an awkward first impression.
 
 **Committed to.** A plugin is a value; documents never name modules; registration happens during `install`; install order is deterministic; and a plugin whose registrations cannot be revoked cannot be uninstalled.
 
 ## Compatibility analysis
 
 - **Plugin API versions (§90/§81).** This RFC _creates_ the row. `PLUGIN_API_VERSION` starts at `1.0.0` and is versioned independently of the packages, like the §79 scene format.
-- **Public API (§90).** Additive: new exports from `@four/core` and one capability token from each of `render`, `physics`, `serialization`, `motion`. `ApplicationOptions` gains one optional member (Open question 1). No existing signature changes; **minor** throughout.
+- **Public API (§90).** Additive: new exports from `@fourjs/core` and one capability token from each of `render`, `physics`, `serialization`, `motion`. `ApplicationOptions` gains one optional member (Open question 1). No existing signature changes; **minor** throughout.
 - **Scene format versions (§79).** Unmoved, and deliberately: this RFC's §96 rule is precisely that the format gains nothing plugin-shaped.
 - **Solver adapters.** Untouched — `physics-rapier` continues to call `registerRapierSolver()`; whether it _also_ ships a `FourPlugin` wrapper is an application-facing convenience, not an adapter change. No regeneration of the generated block in `docs/COMPATIBILITY.md` is needed.
 - **Browser support / feature tiers.** Unmoved.

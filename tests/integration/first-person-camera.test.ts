@@ -7,8 +7,8 @@
  * rotation, so it collides with `LookAtConstraint` for §42's single authority
  * — it waits on §12's character controllers to settle aim-vs-free-look
  * arbitration"*. The settlement is a **decomposition**, and this file is its
- * proof, because the claim is one no unit test inside `@four/motion` can make:
- * it is about a *world* rotation composed by `@four/scene` from two nodes that
+ * proof, because the claim is one no unit test inside `@fourjs/motion` can make:
+ * it is about a *world* rotation composed by `@fourjs/scene` from two nodes that
  * two different components wrote.
  *
  * What is checked:
@@ -30,7 +30,7 @@
  *    is the ordinary authority refusal, warned about once and writing nothing.
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 import {
   CharacterController,
   ConstraintSystem,
@@ -40,8 +40,8 @@ import {
   LookAtConstraint,
   SystemRegistry,
   createTimeState,
-} from "@four/motion";
-import { Group, PerspectiveCamera, Scene } from "@four/scene";
+} from "@fourjs/motion";
+import { Group, PerspectiveCamera, Scene } from "@fourjs/scene";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 /** §45 `fixedTimeStep`, in seconds (§7a). */
@@ -118,7 +118,7 @@ describe("PH-11/R-36: §12's character owns yaw, §44's first-person eye owns pi
 
     for (let step = 1; step <= STEP_COUNT; step += 1) {
       // The application's parameter-driven input, exactly as a device layer
-      // would feed it — `@four/motion` never reads `@four/input` (§3.1).
+      // would feed it — `@fourjs/motion` never reads `@fourjs/input` (§3.1).
       character.turn(YAW_PER_STEP);
       character.setMoveIntent(1, 0);
       // A full sweep of the pitch channel: up, down, and back.

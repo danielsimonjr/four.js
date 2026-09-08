@@ -11,12 +11,12 @@
     {
       "file": "packages/animation/src/index.ts",
       "type": "main",
-      "description": "`@four/animation` — the public surface of the animation pillar (Part III)."
+      "description": "`@fourjs/animation` — the public surface of the animation pillar (Part III)."
     },
     {
       "file": "packages/assets/src/index.ts",
       "type": "main",
-      "description": "`@four/assets` — the asset system (§76–78)."
+      "description": "`@fourjs/assets` — the asset system (§76–78)."
     },
     {
       "file": "packages/core/src/index.ts",
@@ -29,7 +29,7 @@
       "description": "--- PH-20 (§33 rollback) ---------------------------------------------------"
     },
     {
-      "file": "packages/four/src/index.ts",
+      "file": "packages/fourJS/src/index.ts",
       "type": "main",
       "description": "The umbrella package (§98): one namespace per workspace package, plus the"
     },
@@ -66,7 +66,7 @@
     {
       "file": "packages/physics/src/index.ts",
       "type": "main",
-      "description": "`@four/physics` — the stable, solver-independent physics API (§101, Part IV)."
+      "description": "`@fourjs/physics` — the stable, solver-independent physics API (§101, Part IV)."
     },
     {
       "file": "packages/physics-box2d/src/index.ts",
@@ -76,7 +76,7 @@
     {
       "file": "packages/physics-rapier/src/index.ts",
       "type": "main",
-      "description": "`@four/physics-rapier` — the Rapier solver adapters (§37, §102, §108)."
+      "description": "`@fourjs/physics-rapier` — the Rapier solver adapters (§37, §102, §108)."
     },
     {
       "file": "packages/physics-soft/src/index.ts",
@@ -101,12 +101,12 @@
     {
       "file": "packages/render-webgl/src/index.ts",
       "type": "main",
-      "description": "`@four/render-webgl` — the WebGL 2 backend (§62 backend 2, §120's MVP tier)."
+      "description": "`@fourjs/render-webgl` — the WebGL 2 backend (§62 backend 2, §120's MVP tier)."
     },
     {
       "file": "packages/render-webgpu/src/index.ts",
       "type": "main",
-      "description": "`@four/render-webgpu` — the WebGPU backend (§62 backend 1)."
+      "description": "`@fourjs/render-webgpu` — the WebGPU backend (§62 backend 1)."
     },
     {
       "file": "packages/scene/src/index.ts",
@@ -116,17 +116,17 @@
     {
       "file": "packages/serialization/src/index.ts",
       "type": "main",
-      "description": "`@four/serialization` — the §79 scene document and its §80 migrations."
+      "description": "`@fourjs/serialization` — the §79 scene document and its §80 migrations."
     },
     {
       "file": "packages/text/src/index.ts",
       "type": "main",
-      "description": "`@four/text` — bitmap text at §56's MVP tier."
+      "description": "`@fourjs/text` — bitmap text at §56's MVP tier."
     },
     {
       "file": "packages/ui/src/index.ts",
       "type": "main",
-      "description": "`@four/ui` — retained-mode UI at §113a's MVP tier (§73–§75)."
+      "description": "`@fourjs/ui` — retained-mode UI at §113a's MVP tier (§73–§75)."
     }
   ],
   "modules": {
@@ -138,7 +138,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/motion",
+            "package": "@fourjs/motion",
             "directory": "packages/motion",
             "imports": [
               "PRIORITY_ANIMATION_TARGETS",
@@ -174,7 +174,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -240,7 +240,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -346,14 +346,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node",
@@ -361,7 +361,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "TransformAuthority"
@@ -408,7 +408,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -515,7 +515,7 @@
         ]
       },
       "packages/animation/src/index.ts": {
-        "description": "`@four/animation` — the public surface of the animation pillar (Part III).",
+        "description": "`@fourjs/animation` — the public surface of the animation pillar (Part III).",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -1109,14 +1109,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node",
@@ -1124,7 +1124,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "TransformAuthority"
@@ -1190,14 +1190,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -1205,7 +1205,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node",
@@ -1213,7 +1213,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "TransformAuthority"
@@ -1245,7 +1245,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -1280,14 +1280,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector2",
@@ -1338,14 +1338,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -1355,7 +1355,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node",
@@ -1363,7 +1363,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "TransformAuthority"
@@ -1402,7 +1402,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -1413,7 +1413,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorRGBA"
@@ -1470,7 +1470,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -1506,7 +1506,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -1564,7 +1564,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "defineCapability"
@@ -1632,7 +1632,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -1668,7 +1668,7 @@
         ]
       },
       "packages/assets/src/index.ts": {
-        "description": "`@four/assets` — the asset system (§76–78).",
+        "description": "`@fourjs/assets` — the asset system (§76–78).",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -1993,7 +1993,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -2066,7 +2066,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -2108,7 +2108,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -2876,7 +2876,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -2924,7 +2924,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -3488,13 +3488,13 @@
         ]
       },
       "packages/diagnostics/src/leak-registry.ts": {
-        "description": "Re-export of `@four/core`'s §83 FinalizationRegistry leak bookkeeping.",
+        "description": "Re-export of `@fourjs/core`'s §83 FinalizationRegistry leak bookkeeping.",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "auditFinalizedLeaks",
@@ -3545,7 +3545,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -3571,7 +3571,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -3582,21 +3582,21 @@
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "cloneJsonValue"
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "JsonValue"
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "UntrustedJsonLimits"
@@ -3672,7 +3672,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -3701,7 +3701,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -3740,7 +3740,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -3810,7 +3810,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -3861,15 +3861,15 @@
         ]
       }
     },
-    "packages/four": {
-      "packages/four/src/animation.ts": {
+    "packages/fourJS": {
+      "packages/fourJS/src/animation.ts": {
         "description": "animation module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/animation",
+            "package": "@fourjs/animation",
             "directory": "packages/animation",
             "imports": [
               "*"
@@ -3878,10 +3878,10 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/animation"
+          "* from @fourjs/animation"
         ]
       },
-      "packages/four/src/application.ts": {
+      "packages/fourJS/src/application.ts": {
         "description": "The `Application` composition root (§45, plan D4).",
         "externalDependencies": [],
         "nodeDependencies": [],
@@ -3896,7 +3896,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -3911,7 +3911,7 @@
             ]
           },
           {
-            "package": "@four/diagnostics",
+            "package": "@fourjs/diagnostics",
             "directory": "packages/diagnostics",
             "imports": [
               "auditFrameAllocations",
@@ -3927,14 +3927,14 @@
             ]
           },
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "geometryMemoryBytes"
             ]
           },
           {
-            "package": "@four/motion",
+            "package": "@fourjs/motion",
             "directory": "packages/motion",
             "imports": [
               "DEFAULT_FIXED_DELTA_TIME",
@@ -3948,7 +3948,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "constructionCount",
@@ -3956,21 +3956,21 @@
             ]
           },
           {
-            "package": "@four/assets",
+            "package": "@fourjs/assets",
             "directory": "packages/assets",
             "imports": [
               "AssetManager"
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "PhysicsWorld"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "PerspectiveCamera",
@@ -3985,7 +3985,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "RenderStatistics",
@@ -3998,7 +3998,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "resolveRenderer",
@@ -4018,14 +4018,14 @@
           "ApplicationOptions"
         ]
       },
-      "packages/four/src/assets.ts": {
+      "packages/fourJS/src/assets.ts": {
         "description": "assets module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/assets",
+            "package": "@fourjs/assets",
             "directory": "packages/assets",
             "imports": [
               "*"
@@ -4034,10 +4034,10 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/assets"
+          "* from @fourjs/assets"
         ]
       },
-      "packages/four/src/capabilities.ts": {
+      "packages/fourJS/src/capabilities.ts": {
         "description": "The umbrella's own §81 capability token (RFC 0002).",
         "externalDependencies": [],
         "nodeDependencies": [],
@@ -4052,7 +4052,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "defineCapability"
@@ -4066,14 +4066,14 @@
           "EDITOR_TOOLS"
         ]
       },
-      "packages/four/src/compute-pass.ts": {
-        "description": "§82's `Four.ComputePass` — the named-map sugar over `@four/render`'s",
+      "packages/fourJS/src/compute-pass.ts": {
+        "description": "§82's `Four.ComputePass` — the named-map sugar over `@fourjs/render`'s",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "ComputeBinding",
@@ -4092,14 +4092,14 @@
           "ComputePassOptions"
         ]
       },
-      "packages/four/src/core.ts": {
+      "packages/fourJS/src/core.ts": {
         "description": "core module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "*"
@@ -4108,17 +4108,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/core"
+          "* from @fourjs/core"
         ]
       },
-      "packages/four/src/diagnostics.ts": {
+      "packages/fourJS/src/diagnostics.ts": {
         "description": "diagnostics module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/diagnostics",
+            "package": "@fourjs/diagnostics",
             "directory": "packages/diagnostics",
             "imports": [
               "*"
@@ -4127,17 +4127,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/diagnostics"
+          "* from @fourjs/diagnostics"
         ]
       },
-      "packages/four/src/editor-tools.ts": {
+      "packages/fourJS/src/editor-tools.ts": {
         "description": "The §81 editor-tool registry — a named map of tool factories the **host**",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -4151,14 +4151,14 @@
           "EditorToolRegistry"
         ]
       },
-      "packages/four/src/geometry.ts": {
+      "packages/fourJS/src/geometry.ts": {
         "description": "geometry module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "*"
@@ -4167,24 +4167,24 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/geometry"
+          "* from @fourjs/geometry"
         ]
       },
-      "packages/four/src/gltf.ts": {
+      "packages/fourJS/src/gltf.ts": {
         "description": "§78 glTF assembly — `instantiateGltf` (A-19's closing packet, 2026-08-29).",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/assets",
+            "package": "@fourjs/assets",
             "directory": "packages/assets",
             "imports": [
               "GltfAsset"
             ]
           },
           {
-            "package": "@four/animation",
+            "package": "@fourjs/animation",
             "directory": "packages/animation",
             "imports": [
               "AnimationClip",
@@ -4195,7 +4195,7 @@
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -4203,21 +4203,21 @@
             ]
           },
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "BufferGeometry"
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "StandardMaterial"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -4226,7 +4226,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "Mesh",
@@ -4234,7 +4234,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Bone",
@@ -4254,7 +4254,7 @@
           "instantiateGltf"
         ]
       },
-      "packages/four/src/index.ts": {
+      "packages/fourJS/src/index.ts": {
         "description": "The umbrella package (§98): one namespace per workspace package, plus the",
         "externalDependencies": [],
         "nodeDependencies": [],
@@ -4591,14 +4591,14 @@
           "PreloadManifestIntoCatalogOptions"
         ]
       },
-      "packages/four/src/input.ts": {
+      "packages/fourJS/src/input.ts": {
         "description": "input module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/input",
+            "package": "@fourjs/input",
             "directory": "packages/input",
             "imports": [
               "*"
@@ -4607,24 +4607,24 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/input"
+          "* from @fourjs/input"
         ]
       },
-      "packages/four/src/live-resource-counts.ts": {
+      "packages/fourJS/src/live-resource-counts.ts": {
         "description": "Aggregates §83 live-resource counts for `auditResourceLeaks`.",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/diagnostics",
+            "package": "@fourjs/diagnostics",
             "directory": "packages/diagnostics",
             "imports": [
               "LiveResourceCounts"
             ]
           },
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "geometryMemoryBytes",
@@ -4632,14 +4632,14 @@
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "liveMaterialCount"
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "liveSolverBodyCount",
@@ -4649,7 +4649,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "liveRenderTargetCount",
@@ -4665,7 +4665,7 @@
           "readLiveResourceCounts"
         ]
       },
-      "packages/four/src/manifest-catalog.ts": {
+      "packages/fourJS/src/manifest-catalog.ts": {
         "description": "Preload a §79 manifest into a synchronous {@link SceneResourceCatalog}",
         "externalDependencies": [],
         "nodeDependencies": [],
@@ -4680,7 +4680,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/assets",
+            "package": "@fourjs/assets",
             "directory": "packages/assets",
             "imports": [
               "loadFromManifest",
@@ -4703,14 +4703,14 @@
           "preloadManifestIntoCatalog"
         ]
       },
-      "packages/four/src/materials.ts": {
+      "packages/fourJS/src/materials.ts": {
         "description": "materials module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "*"
@@ -4719,17 +4719,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/materials"
+          "* from @fourjs/materials"
         ]
       },
-      "packages/four/src/math.ts": {
+      "packages/fourJS/src/math.ts": {
         "description": "math module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "*"
@@ -4738,17 +4738,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/math"
+          "* from @fourjs/math"
         ]
       },
-      "packages/four/src/motion.ts": {
+      "packages/fourJS/src/motion.ts": {
         "description": "motion module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/motion",
+            "package": "@fourjs/motion",
             "directory": "packages/motion",
             "imports": [
               "*"
@@ -4757,17 +4757,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/motion"
+          "* from @fourjs/motion"
         ]
       },
-      "packages/four/src/particles.ts": {
+      "packages/fourJS/src/particles.ts": {
         "description": "particles module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/particles",
+            "package": "@fourjs/particles",
             "directory": "packages/particles",
             "imports": [
               "*"
@@ -4776,17 +4776,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/particles"
+          "* from @fourjs/particles"
         ]
       },
-      "packages/four/src/physics-box2d.ts": {
+      "packages/fourJS/src/physics-box2d.ts": {
         "description": "physics-box2d module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/physics-box2d",
+            "package": "@fourjs/physics-box2d",
             "directory": "packages/physics-box2d",
             "imports": [
               "*"
@@ -4795,17 +4795,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/physics-box2d"
+          "* from @fourjs/physics-box2d"
         ]
       },
-      "packages/four/src/physics-rapier.ts": {
+      "packages/fourJS/src/physics-rapier.ts": {
         "description": "physics-rapier module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/physics-rapier",
+            "package": "@fourjs/physics-rapier",
             "directory": "packages/physics-rapier",
             "imports": [
               "*"
@@ -4814,17 +4814,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/physics-rapier"
+          "* from @fourjs/physics-rapier"
         ]
       },
-      "packages/four/src/physics-soft.ts": {
+      "packages/fourJS/src/physics-soft.ts": {
         "description": "physics-soft module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/physics-soft",
+            "package": "@fourjs/physics-soft",
             "directory": "packages/physics-soft",
             "imports": [
               "*"
@@ -4833,17 +4833,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/physics-soft"
+          "* from @fourjs/physics-soft"
         ]
       },
-      "packages/four/src/physics.ts": {
+      "packages/fourJS/src/physics.ts": {
         "description": "physics module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "*"
@@ -4852,31 +4852,31 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/physics"
+          "* from @fourjs/physics"
         ]
       },
-      "packages/four/src/pick-provider.ts": {
+      "packages/fourJS/src/pick-provider.ts": {
         "description": "The four-line adapter RFC 0005 §2 promised (§71, §45; 2026-08-28): a",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/input",
+            "package": "@fourjs/input",
             "directory": "packages/input",
             "imports": [
               "PickProvider"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "PickingService"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Viewport"
@@ -4890,7 +4890,7 @@
           "createPickProvider"
         ]
       },
-      "packages/four/src/plugins.ts": {
+      "packages/fourJS/src/plugins.ts": {
         "description": "The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`) —",
         "externalDependencies": [],
         "nodeDependencies": [],
@@ -4920,35 +4920,35 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/assets",
+            "package": "@fourjs/assets",
             "directory": "packages/assets",
             "imports": [
               "ASSET_LOADERS"
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "SHADER_OPERATORS"
             ]
           },
           {
-            "package": "@four/motion",
+            "package": "@fourjs/motion",
             "directory": "packages/motion",
             "imports": [
               "SIMULATION_SYSTEMS"
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "SOLVER_REGISTRY"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "COMPUTE_WORKLOADS",
@@ -4957,7 +4957,7 @@
             ]
           },
           {
-            "package": "@four/serialization",
+            "package": "@fourjs/serialization",
             "directory": "packages/serialization",
             "imports": [
               "COMPONENT_SERIALIZERS",
@@ -4965,7 +4965,7 @@
             ]
           },
           {
-            "package": "@four/ui",
+            "package": "@fourjs/ui",
             "directory": "packages/ui",
             "imports": [
               "UI_CONTROLS"
@@ -5003,14 +5003,14 @@
           "EditorToolFactory"
         ]
       },
-      "packages/four/src/render-canvas.ts": {
+      "packages/fourJS/src/render-canvas.ts": {
         "description": "render-canvas module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/render-canvas",
+            "package": "@fourjs/render-canvas",
             "directory": "packages/render-canvas",
             "imports": [
               "*"
@@ -5019,17 +5019,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/render-canvas"
+          "* from @fourjs/render-canvas"
         ]
       },
-      "packages/four/src/render-svg.ts": {
+      "packages/fourJS/src/render-svg.ts": {
         "description": "render-svg module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/render-svg",
+            "package": "@fourjs/render-svg",
             "directory": "packages/render-svg",
             "imports": [
               "*"
@@ -5038,17 +5038,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/render-svg"
+          "* from @fourjs/render-svg"
         ]
       },
-      "packages/four/src/render-webgl.ts": {
+      "packages/fourJS/src/render-webgl.ts": {
         "description": "render-webgl module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/render-webgl",
+            "package": "@fourjs/render-webgl",
             "directory": "packages/render-webgl",
             "imports": [
               "*"
@@ -5057,17 +5057,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/render-webgl"
+          "* from @fourjs/render-webgl"
         ]
       },
-      "packages/four/src/render-webgpu.ts": {
+      "packages/fourJS/src/render-webgpu.ts": {
         "description": "render-webgpu module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/render-webgpu",
+            "package": "@fourjs/render-webgpu",
             "directory": "packages/render-webgpu",
             "imports": [
               "*"
@@ -5076,17 +5076,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/render-webgpu"
+          "* from @fourjs/render-webgpu"
         ]
       },
-      "packages/four/src/render.ts": {
+      "packages/fourJS/src/render.ts": {
         "description": "render module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "*"
@@ -5095,10 +5095,10 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/render"
+          "* from @fourjs/render"
         ]
       },
-      "packages/four/src/scene-serializers.ts": {
+      "packages/fourJS/src/scene-serializers.ts": {
         "description": "§79 node types and component serializers for the classes the engine itself",
         "externalDependencies": [],
         "nodeDependencies": [],
@@ -5112,7 +5112,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -5120,7 +5120,7 @@
             ]
           },
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "Path",
@@ -5129,7 +5129,7 @@
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "Material",
@@ -5139,7 +5139,7 @@
             ]
           },
           {
-            "package": "@four/motion",
+            "package": "@fourjs/motion",
             "directory": "packages/motion",
             "imports": [
               "CAMERA_SHAKE_SERIALIZER",
@@ -5161,7 +5161,7 @@
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "COLLIDER_SERIALIZER",
@@ -5173,7 +5173,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "Arc",
@@ -5197,7 +5197,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "GradientStop",
@@ -5209,7 +5209,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Bone",
@@ -5231,7 +5231,7 @@
             ]
           },
           {
-            "package": "@four/serialization",
+            "package": "@fourjs/serialization",
             "directory": "packages/serialization",
             "imports": [
               "ComponentSerializerRegistry",
@@ -5242,7 +5242,7 @@
             ]
           },
           {
-            "package": "@four/text",
+            "package": "@fourjs/text",
             "directory": "packages/text",
             "imports": [
               "GlyphAtlas",
@@ -5250,7 +5250,7 @@
             ]
           },
           {
-            "package": "@four/ui",
+            "package": "@fourjs/ui",
             "directory": "packages/ui",
             "imports": [
               "Button",
@@ -5366,14 +5366,14 @@
           "ARC_NODE_TYPE"
         ]
       },
-      "packages/four/src/scene.ts": {
+      "packages/fourJS/src/scene.ts": {
         "description": "scene module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "*"
@@ -5382,17 +5382,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/scene"
+          "* from @fourjs/scene"
         ]
       },
-      "packages/four/src/serialization.ts": {
+      "packages/fourJS/src/serialization.ts": {
         "description": "serialization module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/serialization",
+            "package": "@fourjs/serialization",
             "directory": "packages/serialization",
             "imports": [
               "*"
@@ -5401,31 +5401,31 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/serialization"
+          "* from @fourjs/serialization"
         ]
       },
-      "packages/four/src/text-node.ts": {
+      "packages/fourJS/src/text-node.ts": {
         "description": "`Text` (§49, §56) — a string, a font atlas and a material become **one** draw",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "BufferGeometry"
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "UnlitMaterial"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "Renderable",
@@ -5433,7 +5433,7 @@
             ]
           },
           {
-            "package": "@four/text",
+            "package": "@fourjs/text",
             "directory": "packages/text",
             "imports": [
               "layoutText",
@@ -5443,7 +5443,7 @@
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
@@ -5460,14 +5460,14 @@
           "TextOptions"
         ]
       },
-      "packages/four/src/text.ts": {
+      "packages/fourJS/src/text.ts": {
         "description": "text module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/text",
+            "package": "@fourjs/text",
             "directory": "packages/text",
             "imports": [
               "*"
@@ -5476,17 +5476,17 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/text"
+          "* from @fourjs/text"
         ]
       },
-      "packages/four/src/ui.ts": {
+      "packages/fourJS/src/ui.ts": {
         "description": "ui module",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/ui",
+            "package": "@fourjs/ui",
             "directory": "packages/ui",
             "imports": [
               "*"
@@ -5495,7 +5495,7 @@
         ],
         "exports": [],
         "reExported": [
-          "* from @four/ui"
+          "* from @fourjs/ui"
         ]
       }
     },
@@ -5524,7 +5524,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -5548,14 +5548,14 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -5995,7 +5995,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix3"
@@ -6183,7 +6183,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -6230,14 +6230,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix3"
@@ -6282,7 +6282,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -6379,14 +6379,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Unsubscribe"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3",
@@ -6394,7 +6394,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "resolveWorldTransform",
@@ -6414,7 +6414,7 @@
         ]
       },
       "packages/input/src/index.ts": {
-        "description": "Package entry point for @four/input (re-exports 38 symbols)",
+        "description": "Package entry point for @fourjs/input (re-exports 38 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -6642,7 +6642,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node"
@@ -6688,14 +6688,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node"
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -6722,14 +6722,14 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -6738,7 +6738,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "resolveWorldTransform",
@@ -6785,14 +6785,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node"
@@ -6848,7 +6848,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3",
@@ -6856,7 +6856,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Camera",
@@ -6888,7 +6888,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node",
@@ -6922,7 +6922,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "defineCapability"
@@ -7321,7 +7321,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
@@ -7430,7 +7430,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -7502,7 +7502,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -7576,7 +7576,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorRGB",
@@ -7584,7 +7584,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorRGB"
@@ -7632,7 +7632,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorSpace"
@@ -7666,14 +7666,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorRGBA"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorRGBA"
@@ -7770,7 +7770,7 @@
         ]
       },
       "packages/math/src/index.ts": {
-        "description": "Package entry point for @four/math (re-exports 22 symbols)",
+        "description": "Package entry point for @fourjs/math (re-exports 22 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -8117,7 +8117,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Component",
@@ -8125,14 +8125,14 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "resolveWorldTransform",
@@ -8180,7 +8180,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Component",
@@ -8188,7 +8188,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -8196,7 +8196,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node"
@@ -8228,7 +8228,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "defineCapability"
@@ -8249,7 +8249,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Component",
@@ -8257,7 +8257,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Transform"
@@ -8348,7 +8348,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Component",
@@ -8356,7 +8356,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -8364,7 +8364,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "resolveWorldTransform",
@@ -8393,14 +8393,14 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "resolveWorldTransform",
@@ -9168,7 +9168,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -9224,7 +9224,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Component",
@@ -9232,7 +9232,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -9240,7 +9240,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "warnAuthorityConflict",
@@ -9284,7 +9284,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Component",
@@ -9292,7 +9292,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -9300,7 +9300,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "warnAuthorityConflict",
@@ -9348,7 +9348,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -9378,13 +9378,13 @@
         ]
       },
       "packages/motion/src/random.ts": {
-        "description": "`SeededRandom`'s original home (WP-8.2), now a re-export of `@four/core`.",
+        "description": "`SeededRandom`'s original home (WP-8.2), now a re-export of `@fourjs/core`.",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "SeededRandom"
@@ -9405,7 +9405,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -9413,7 +9413,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "resolveWorldTransform",
@@ -9524,14 +9524,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "JsonValue"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -9586,7 +9586,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -9627,7 +9627,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -9738,7 +9738,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -9841,14 +9841,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3",
@@ -9899,21 +9899,21 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEFAULT_GRAVITY_Y"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEFAULT_GRAVITY_Y"
@@ -10289,7 +10289,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3",
@@ -10297,7 +10297,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node"
@@ -10356,7 +10356,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3",
@@ -10372,13 +10372,13 @@
         ]
       },
       "packages/particles/src/random.ts": {
-        "description": "`SeededRandom` for particles — a re-export of `@four/core`.",
+        "description": "`SeededRandom` for particles — a re-export of `@fourjs/core`.",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "SeededRandom"
@@ -10433,7 +10433,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -10513,7 +10513,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
@@ -10559,7 +10559,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix3",
@@ -10602,7 +10602,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "defineCapability"
@@ -10694,7 +10694,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "EventEmitter",
@@ -10704,7 +10704,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node",
@@ -10772,7 +10772,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEFAULT_GRAVITY_Y",
@@ -10781,7 +10781,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -10789,21 +10789,21 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix3"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Transform"
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEFAULT_GRAVITY_Y"
@@ -10877,7 +10877,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -10915,14 +10915,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
             ]
           },
           {
-            "package": "@four/motion",
+            "package": "@fourjs/motion",
             "directory": "packages/motion",
             "imports": [
               "PRIORITY_FORCES",
@@ -10945,7 +10945,7 @@
         ]
       },
       "packages/physics/src/index.ts": {
-        "description": "`@four/physics` — the stable, solver-independent physics API (§101, Part IV).",
+        "description": "`@fourjs/physics` — the stable, solver-independent physics API (§101, Part IV).",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -12086,7 +12086,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "EventEmitter",
@@ -12094,7 +12094,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -12173,14 +12173,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -12227,7 +12227,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -12288,14 +12288,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/motion",
+            "package": "@fourjs/motion",
             "directory": "packages/motion",
             "imports": [
               "PRIORITY_EVENT_DISPATCH",
@@ -12328,14 +12328,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/motion",
+            "package": "@fourjs/motion",
             "directory": "packages/motion",
             "imports": [
               "PRIORITY_PHYSICS_SOLVE",
@@ -12379,7 +12379,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -12494,7 +12494,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEFAULT_SPACE_MODE",
@@ -12506,7 +12506,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix3",
@@ -12632,7 +12632,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "SPACE_MODES",
@@ -12642,7 +12642,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix3",
@@ -12652,7 +12652,7 @@
             ]
           },
           {
-            "package": "@four/motion",
+            "package": "@fourjs/motion",
             "directory": "packages/motion",
             "imports": [
               "DEFAULT_CHARACTER_GRAVITY",
@@ -12660,7 +12660,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Transform"
@@ -12704,14 +12704,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector2",
@@ -12800,7 +12800,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -12836,7 +12836,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -12896,7 +12896,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Component",
@@ -12904,14 +12904,14 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
             ]
           },
           {
-            "package": "@four/motion",
+            "package": "@fourjs/motion",
             "directory": "packages/motion",
             "imports": [
               "CharacterController",
@@ -12921,7 +12921,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "warnAuthorityConflict",
@@ -12965,7 +12965,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -13062,14 +13062,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix3"
@@ -13354,7 +13354,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEFAULT_SPACE_MODE",
@@ -13363,7 +13363,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -13372,7 +13372,7 @@
             ]
           },
           {
-            "package": "@four/motion",
+            "package": "@fourjs/motion",
             "directory": "packages/motion",
             "imports": [
               "PRIORITY_ANIMATION_TARGETS",
@@ -13380,7 +13380,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "PoseTarget",
@@ -13441,14 +13441,14 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "DEFAULT_ENABLED_CCD_MODE"
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "CCDMode",
@@ -13486,14 +13486,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -13501,7 +13501,7 @@
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "ALL_COLLISION_GROUPS",
@@ -13510,7 +13510,7 @@
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "AngularVelocityInput",
@@ -13587,14 +13587,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix3",
@@ -13603,7 +13603,7 @@
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "ALL_COLLISION_GROUPS",
@@ -13612,7 +13612,7 @@
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "AngularVelocityInput",
@@ -13663,7 +13663,7 @@
         ]
       },
       "packages/physics-rapier/src/index.ts": {
-        "description": "`@four/physics-rapier` — the Rapier solver adapters (§37, §102, §108).",
+        "description": "`@fourjs/physics-rapier` — the Rapier solver adapters (§37, §102, §108).",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -14166,14 +14166,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -14181,14 +14181,14 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix3"
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "ALL_COLLISION_GROUPS",
@@ -14210,7 +14210,7 @@
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "AngularVelocityInput",
@@ -14318,14 +14318,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -14333,14 +14333,14 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix3"
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "ALL_COLLISION_GROUPS",
@@ -14362,7 +14362,7 @@
             ]
           },
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "AngularVelocityInput",
@@ -14427,7 +14427,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/physics",
+            "package": "@fourjs/physics",
             "directory": "packages/physics",
             "imports": [
               "registerSolver",
@@ -14503,14 +14503,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "BufferGeometry"
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "MaterialTexture",
@@ -14519,14 +14519,14 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorRGBA"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "ALL_LAYERS",
@@ -14556,14 +14556,14 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "BufferGeometry"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -14612,7 +14612,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "defineCapability"
@@ -14637,7 +14637,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -14645,7 +14645,7 @@
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "StencilFunc",
@@ -14684,7 +14684,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -14743,7 +14743,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "SHADER_VALUE_COMPONENTS",
@@ -15369,7 +15369,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "MAX_SHADER_GRAPH_NODES",
@@ -15381,7 +15381,7 @@
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "ShaderAttributeName",
@@ -15933,7 +15933,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -15941,7 +15941,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -15949,7 +15949,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node"
@@ -15998,21 +15998,21 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "Material"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Bone",
@@ -16044,14 +16044,14 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "BufferGeometry"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -16113,21 +16113,21 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node",
@@ -16181,7 +16181,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -16189,14 +16189,14 @@
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "MaterialTexture"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorSpace"
@@ -16229,7 +16229,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Rectangle2"
@@ -16286,14 +16286,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node",
@@ -16366,7 +16366,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -16374,14 +16374,14 @@
             ]
           },
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "BufferGeometry"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -16390,7 +16390,7 @@
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "LitMaterial",
@@ -16402,7 +16402,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "ALL_LAYERS",
@@ -16522,21 +16522,21 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "MaterialTexture"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorSpace"
@@ -16575,14 +16575,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "BufferGeometry"
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "LitMaterial",
@@ -16591,7 +16591,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node"
@@ -16626,7 +16626,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -16710,14 +16710,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "EventEmitter",
@@ -16725,14 +16725,14 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Rectangle2"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node",
@@ -16763,7 +16763,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -16798,7 +16798,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -16861,7 +16861,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "NodeMaterialBuilder",
@@ -16871,14 +16871,14 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorRGBA"
             ]
           },
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "Point2D"
@@ -16908,14 +16908,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
             ]
           },
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "BufferGeometry",
@@ -16933,7 +16933,7 @@
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "Material",
@@ -16941,7 +16941,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorRGBA"
@@ -17031,28 +17031,28 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
             ]
           },
           {
-            "package": "@four/geometry",
+            "package": "@fourjs/geometry",
             "directory": "packages/geometry",
             "imports": [
               "BufferGeometry"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector2"
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "SpriteMaterial"
@@ -17119,7 +17119,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -17127,7 +17127,7 @@
             ]
           },
           {
-            "package": "@four/materials",
+            "package": "@fourjs/materials",
             "directory": "packages/materials",
             "imports": [
               "MaterialTextureFilter",
@@ -17137,7 +17137,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorSpace"
@@ -17177,7 +17177,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Frustum",
@@ -17186,7 +17186,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "layersMatch",
@@ -17239,7 +17239,7 @@
     },
     "packages/render-webgl": {
       "packages/render-webgl/src/gl-batch.ts": {
-        "description": "§65 batching for the WebGL 2 backend — the GPU half of `@four/render`'s",
+        "description": "§65 batching for the WebGL 2 backend — the GPU half of `@fourjs/render`'s",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -17259,14 +17259,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "RenderBatcher",
@@ -17309,7 +17309,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
@@ -17358,14 +17358,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "RenderItem"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "warnDisposedInUse"
@@ -17436,7 +17436,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -17445,14 +17445,14 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "analyzeShaderGraph",
@@ -17508,21 +17508,21 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "PARTICLE_COLOR_OFFSET",
@@ -17600,7 +17600,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "PickingService"
@@ -17663,7 +17663,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -17672,7 +17672,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Frustum",
@@ -17680,7 +17680,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "RenderTarget",
@@ -17723,7 +17723,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -17731,7 +17731,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -17739,7 +17739,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "MAX_PUNCTUAL_LIGHTS",
@@ -17821,14 +17821,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "RenderTarget"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "warnDisposedInUse"
@@ -17864,14 +17864,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4"
@@ -17900,14 +17900,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "SceneLights"
@@ -17964,21 +17964,21 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "MAX_SKINNING_JOINTS",
@@ -18024,14 +18024,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -18039,7 +18039,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "SceneLights"
@@ -18069,14 +18069,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "SpriteRenderItem"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "warnDisposedInUse"
@@ -18094,7 +18094,7 @@
         ]
       },
       "packages/render-webgl/src/index.ts": {
-        "description": "`@four/render-webgl` — the WebGL 2 backend (§62 backend 2, §120's MVP tier).",
+        "description": "`@fourjs/render-webgl` — the WebGL 2 backend (§62 backend 2, §120's MVP tier).",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -18595,14 +18595,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "NodeRenderItem",
@@ -18644,7 +18644,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "registerRenderer",
@@ -18772,7 +18772,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -18782,7 +18782,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Frustum",
@@ -18791,7 +18791,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "MAX_SKINNING_JOINTS",
@@ -18842,7 +18842,7 @@
     },
     "packages/render-webgpu": {
       "packages/render-webgpu/src/index.ts": {
-        "description": "`@four/render-webgpu` — the WebGPU backend (§62 backend 1).",
+        "description": "`@fourjs/render-webgpu` — the WebGPU backend (§62 backend 1).",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -19797,7 +19797,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "registerRenderer",
@@ -20057,7 +20057,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -20067,7 +20067,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Frustum",
@@ -20076,7 +20076,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "COLOR_GRADE_DEFAULTS",
@@ -20102,7 +20102,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node",
@@ -20122,7 +20122,7 @@
         ]
       },
       "packages/render-webgpu/src/wgpu-batch.ts": {
-        "description": "§65 batching for the WebGPU backend — the GPU half of `@four/render`'s",
+        "description": "§65 batching for the WebGPU backend — the GPU half of `@fourjs/render`'s",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -20147,7 +20147,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "RenderBatcher",
@@ -20241,14 +20241,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "COMPUTE_ENTRY_POINT",
@@ -20359,14 +20359,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "RenderItem"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "warnDisposedInUse"
@@ -20431,7 +20431,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "MAX_PUNCTUAL_LIGHTS",
@@ -20633,7 +20633,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEV",
@@ -20642,7 +20642,7 @@
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "SHADER_VALUE_COMPONENTS",
@@ -20729,14 +20729,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "GraphEffect",
@@ -20793,7 +20793,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -20843,7 +20843,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "PARTICLE_COLOR_OFFSET",
@@ -20981,7 +20981,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "RenderItemStencil"
@@ -21025,7 +21025,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Rectangle2"
@@ -21072,14 +21072,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "RenderTarget"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "warnDisposedInUse"
@@ -21150,7 +21150,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "SceneLights"
@@ -21328,7 +21328,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "RenderItem",
@@ -21391,14 +21391,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "RenderItem"
             ]
           },
           {
-            "package": "@four/render",
+            "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
               "warnDisposedInUse"
@@ -21531,7 +21531,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -21573,7 +21573,7 @@
         ]
       },
       "packages/scene/src/index.ts": {
-        "description": "Package entry point for @four/scene (re-exports 84 symbols)",
+        "description": "Package entry point for @fourjs/scene (re-exports 84 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -22035,7 +22035,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -22069,7 +22069,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -22140,7 +22140,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -22151,7 +22151,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "ColorRGB"
@@ -22188,7 +22188,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "DEFAULT_SPACE_MODE",
@@ -22200,7 +22200,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
@@ -22256,7 +22256,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "ComponentRegistry",
@@ -22268,7 +22268,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -22303,7 +22303,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Component",
@@ -22311,7 +22311,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -22348,7 +22348,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Component",
@@ -22377,14 +22377,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "DepthRange"
@@ -22436,7 +22436,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -22446,7 +22446,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4"
@@ -22499,7 +22499,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -22528,7 +22528,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -22597,7 +22597,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4"
@@ -22640,7 +22640,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "defineCapability"
@@ -22663,7 +22663,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -22674,7 +22674,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "DEFAULT_TRANSFORM_AUTHORITY",
@@ -22683,21 +22683,21 @@
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "cloneJsonValue"
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "JsonValue"
             ]
           },
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "UntrustedJsonLimits"
@@ -22746,7 +22746,7 @@
         ]
       },
       "packages/serialization/src/index.ts": {
-        "description": "`@four/serialization` — the §79 scene document and its §80 migrations.",
+        "description": "`@fourjs/serialization` — the §79 scene document and its §80 migrations.",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -22947,7 +22947,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -22998,7 +22998,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError",
@@ -23007,7 +23007,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Quaternion",
@@ -23015,7 +23015,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Group",
@@ -23124,7 +23124,7 @@
         ]
       },
       "packages/text/src/index.ts": {
-        "description": "`@four/text` — bitmap text at §56's MVP tier.",
+        "description": "`@fourjs/text` — bitmap text at §56's MVP tier.",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -23305,7 +23305,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable",
@@ -23313,7 +23313,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node"
@@ -23360,7 +23360,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/input",
+            "package": "@fourjs/input",
             "directory": "packages/input",
             "imports": [
               "ScenePointerEvent",
@@ -23420,7 +23420,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "defineCapability"
@@ -23475,7 +23475,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "FourError"
@@ -23510,7 +23510,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector2"
@@ -23528,7 +23528,7 @@
         ]
       },
       "packages/ui/src/index.ts": {
-        "description": "`@four/ui` — retained-mode UI at §113a's MVP tier (§73–§75).",
+        "description": "`@fourjs/ui` — retained-mode UI at §113a's MVP tier (§73–§75).",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -23931,21 +23931,21 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Unsubscribe"
             ]
           },
           {
-            "package": "@four/input",
+            "package": "@fourjs/input",
             "directory": "packages/input",
             "imports": [
               "SceneKeyEvent"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node"
@@ -23981,14 +23981,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector2"
             ]
           },
           {
-            "package": "@four/text",
+            "package": "@fourjs/text",
             "directory": "packages/text",
             "imports": [
               "layoutText",
@@ -24043,7 +24043,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector2"
@@ -24107,14 +24107,14 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/input",
+            "package": "@fourjs/input",
             "directory": "packages/input",
             "imports": [
               "SceneKeyEvent"
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node"
@@ -24160,7 +24160,7 @@
         ],
         "workspaceDependencies": [
           {
-            "package": "@four/input",
+            "package": "@fourjs/input",
             "directory": "packages/input",
             "imports": [
               "ScenePointerEvent",
@@ -24168,7 +24168,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Matrix4",
@@ -24176,7 +24176,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "resolveWorldTransform"
@@ -24200,7 +24200,7 @@
         "internalDependencies": [],
         "workspaceDependencies": [
           {
-            "package": "@four/core",
+            "package": "@fourjs/core",
             "directory": "packages/core",
             "imports": [
               "Disposable",
@@ -24208,7 +24208,7 @@
             ]
           },
           {
-            "package": "@four/input",
+            "package": "@fourjs/input",
             "directory": "packages/input",
             "imports": [
               "Pickable",
@@ -24216,7 +24216,7 @@
             ]
           },
           {
-            "package": "@four/math",
+            "package": "@fourjs/math",
             "directory": "packages/math",
             "imports": [
               "Vector2",
@@ -24224,7 +24224,7 @@
             ]
           },
           {
-            "package": "@four/scene",
+            "package": "@fourjs/scene",
             "directory": "packages/scene",
             "imports": [
               "Node",
@@ -24382,41 +24382,41 @@
       {
         "name": "Packages/four",
         "files": [
-          "packages/four/src/animation.ts",
-          "packages/four/src/application.ts",
-          "packages/four/src/assets.ts",
-          "packages/four/src/capabilities.ts",
-          "packages/four/src/compute-pass.ts",
-          "packages/four/src/core.ts",
-          "packages/four/src/diagnostics.ts",
-          "packages/four/src/editor-tools.ts",
-          "packages/four/src/geometry.ts",
-          "packages/four/src/gltf.ts",
-          "packages/four/src/index.ts",
-          "packages/four/src/input.ts",
-          "packages/four/src/live-resource-counts.ts",
-          "packages/four/src/manifest-catalog.ts",
-          "packages/four/src/materials.ts",
-          "packages/four/src/math.ts",
-          "packages/four/src/motion.ts",
-          "packages/four/src/particles.ts",
-          "packages/four/src/physics-box2d.ts",
-          "packages/four/src/physics-rapier.ts",
-          "packages/four/src/physics-soft.ts",
-          "packages/four/src/physics.ts",
-          "packages/four/src/pick-provider.ts",
-          "packages/four/src/plugins.ts",
-          "packages/four/src/render-canvas.ts",
-          "packages/four/src/render-svg.ts",
-          "packages/four/src/render-webgl.ts",
-          "packages/four/src/render-webgpu.ts",
-          "packages/four/src/render.ts",
-          "packages/four/src/scene-serializers.ts",
-          "packages/four/src/scene.ts",
-          "packages/four/src/serialization.ts",
-          "packages/four/src/text-node.ts",
-          "packages/four/src/text.ts",
-          "packages/four/src/ui.ts"
+          "packages/fourJS/src/animation.ts",
+          "packages/fourJS/src/application.ts",
+          "packages/fourJS/src/assets.ts",
+          "packages/fourJS/src/capabilities.ts",
+          "packages/fourJS/src/compute-pass.ts",
+          "packages/fourJS/src/core.ts",
+          "packages/fourJS/src/diagnostics.ts",
+          "packages/fourJS/src/editor-tools.ts",
+          "packages/fourJS/src/geometry.ts",
+          "packages/fourJS/src/gltf.ts",
+          "packages/fourJS/src/index.ts",
+          "packages/fourJS/src/input.ts",
+          "packages/fourJS/src/live-resource-counts.ts",
+          "packages/fourJS/src/manifest-catalog.ts",
+          "packages/fourJS/src/materials.ts",
+          "packages/fourJS/src/math.ts",
+          "packages/fourJS/src/motion.ts",
+          "packages/fourJS/src/particles.ts",
+          "packages/fourJS/src/physics-box2d.ts",
+          "packages/fourJS/src/physics-rapier.ts",
+          "packages/fourJS/src/physics-soft.ts",
+          "packages/fourJS/src/physics.ts",
+          "packages/fourJS/src/pick-provider.ts",
+          "packages/fourJS/src/plugins.ts",
+          "packages/fourJS/src/render-canvas.ts",
+          "packages/fourJS/src/render-svg.ts",
+          "packages/fourJS/src/render-webgl.ts",
+          "packages/fourJS/src/render-webgpu.ts",
+          "packages/fourJS/src/render.ts",
+          "packages/fourJS/src/scene-serializers.ts",
+          "packages/fourJS/src/scene.ts",
+          "packages/fourJS/src/serialization.ts",
+          "packages/fourJS/src/text-node.ts",
+          "packages/fourJS/src/text.ts",
+          "packages/fourJS/src/ui.ts"
         ]
       },
       {

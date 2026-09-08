@@ -2,11 +2,11 @@
  * WP-R1.7 — §69's shadow tier and §57's stencil parity on the WebGPU backend,
  * across the packages that have to agree on them (2026-08-29).
  *
- * The cross-package half of the packet: `@four/scene` owns the light and the
- * volume (`DirectionalLight`, `DirectionalLightShadow`), `@four/render` owns
+ * The cross-package half of the packet: `@fourjs/scene` owns the light and the
+ * volume (`DirectionalLight`, `DirectionalLightShadow`), `@fourjs/render` owns
  * the collection and §49's item flags — the *same* collector and the same
- * flags the GL backend consumes — `@four/materials` owns §57's `StencilState`,
- * and `@four/render-webgpu` is where the record becomes a depth-only pass,
+ * flags the GL backend consumes — `@fourjs/materials` owns §57's `StencilState`,
+ * and `@fourjs/render-webgpu` is where the record becomes a depth-only pass,
  * a `depth32float` map, and a `sampler_comparison` binding. The intra-package
  * halves live in `packages/render-webgpu/tests`.
  *
@@ -31,20 +31,20 @@
  *    has none, deliberately) and no clip.
  */
 
-import { boxGeometry, planeGeometry } from "@four/geometry";
+import { boxGeometry, planeGeometry } from "@fourjs/geometry";
 import {
   LitMaterial,
   SpriteMaterial,
   StencilState,
   UnlitMaterial,
-} from "@four/materials";
-import { Matrix4 } from "@four/math";
-import { Renderable, Sprite, Texture } from "@four/render";
-import { WebgpuRenderer } from "@four/render-webgpu";
+} from "@fourjs/materials";
+import { Matrix4 } from "@fourjs/math";
+import { Renderable, Sprite, Texture } from "@fourjs/render";
+import { WebgpuRenderer } from "@fourjs/render-webgpu";
 import {
   SHADOW_MATRIX_OFFSET,
   SHADOW_PARAMS_OFFSET,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import {
   DirectionalLight,
   OrthographicCamera,
@@ -52,7 +52,7 @@ import {
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

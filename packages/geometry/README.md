@@ -1,4 +1,4 @@
-# @four/geometry
+# @fourjs/geometry
 
 Geometry primitives and buffers. Part of [fourJS](../../README.md).
 
@@ -24,4 +24,4 @@ _Corrected 2026-08-09 (gap `R-26`): this section listed only `BufferGeometry` an
 
 Unit tests are colocated in `tests/` per §92.
 
-Workspace name `@four/geometry`; publishes as `@danielsimonjr/fourjs-geometry`.
+Workspace name `@fourjs/geometry`; publishes as `@danielsimonjr/fourjs-geometry`.

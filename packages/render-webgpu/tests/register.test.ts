@@ -9,12 +9,12 @@
  * moving between them.
  */
 
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import {
   NullRenderer,
   RendererRegistry,
   registeredRenderers,
-} from "@four/render";
+} from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 import {

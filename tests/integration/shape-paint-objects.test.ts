@@ -1,8 +1,8 @@
 /**
  * §58's paint-object tier across the packages that have to agree about it
- * (2026-08-29; R-16's follow-up, unblocked by RFC 0001): `@four/render`
- * accepts and lowers the paints, `@four/materials` carries the derived
- * `NodeMaterial`, `@four/render-webgl` draws it through the registered node
+ * (2026-08-29; R-16's follow-up, unblocked by RFC 0001): `@fourjs/render`
+ * accepts and lowers the paints, `@fourjs/materials` carries the derived
+ * `NodeMaterial`, `@fourjs/render-webgl` draws it through the registered node
  * pipeline.
  *
  * Four claims live only in the composition:
@@ -25,7 +25,7 @@
  *    scene's transcript matches the original's.
  */
 
-import { UnlitMaterial } from "@four/materials";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   Circle,
   Rectangle,
@@ -33,19 +33,19 @@ import {
   clearRegisteredShapePaints,
   registerShapePaints,
   type RadialGradientPaint,
-} from "@four/render";
+} from "@fourjs/render";
 import {
   WebglRenderer,
   clearRegisteredNodeMaterialPipeline,
   registerNodeMaterialPipeline,
-} from "@four/render-webgl";
+} from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

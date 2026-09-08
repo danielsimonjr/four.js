@@ -48,7 +48,7 @@ Not imported cross-file, but referenced within their own module — they type or
 support exports that ARE used, so they cannot be deleted in isolation. Mostly
 interfaces typing live guards and per-package API completeness, not rot.
 
-### `packages/four/src/scene-serializers.ts`
+### `packages/fourJS/src/scene-serializers.ts`
 
 - `CANVAS_VIEW_NODE_TYPE` (constant) — 3 in-file refs
 

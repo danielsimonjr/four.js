@@ -40,7 +40,7 @@ import {
   PARTICLE_SHADER_SOURCE,
   PARTICLE_UNIFORM_BYTES,
   particleIntegratorWorkgroups,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */

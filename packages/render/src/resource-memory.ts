@@ -2,7 +2,7 @@
  * §83 resource accounting for textures and render targets — how many are live,
  * and how many bytes they hold (A-5, 2026-08-07).
  *
- * The twin of `@four/geometry`'s `resource-memory.ts`, which documents the
+ * The twin of `@fourjs/geometry`'s `resource-memory.ts`, which documents the
  * design in full: **numbers, not references**, so the tracker cannot itself
  * become the leak it reports; process-wide rather than per-application, because
  * a texture belongs to whoever created it (§83) and two applications sharing an
@@ -11,7 +11,7 @@
  * because §83's contract is that lifetimes are *explicit* and a total that
  * forgave a missing `dispose()` would hide the leak it exists to reveal.
  *
- * `@four/diagnostics` bridges {@link textureMemoryBytes} into §84's
+ * `@fourjs/diagnostics` bridges {@link textureMemoryBytes} into §84's
  * `app.stats.textureMemory` through `recordResourceMemory`.
  *
  * ## Why targets are counted with textures
@@ -35,7 +35,7 @@
  * about, and it is exact rather than approximate.
  */
 
-import { DEV, disposeTracked, trackDisposable } from "@four/core";
+import { DEV, disposeTracked, trackDisposable } from "@fourjs/core";
 
 /** Live (constructed, undisposed) `Texture` instances. */
 let liveTextures = 0;
@@ -54,8 +54,8 @@ let liveRenderTargetBytes = 0;
  * construction, `-1` at disposal, and `0` for a mutation; `bytes` is the signed
  * change in described bytes.
  *
- * Internal to `@four/render` — exported so `texture.ts` can reach it,
- * deliberately absent from the package index, exactly as `@four/math`'s
+ * Internal to `@fourjs/render` — exported so `texture.ts` can reach it,
+ * deliberately absent from the package index, exactly as `@fourjs/math`'s
  * `noteConstruction` is.
  */
 export function noteTexture(instances: number, bytes: number): void {
@@ -65,7 +65,7 @@ export function noteTexture(instances: number, bytes: number): void {
 
 /**
  * Records a change to the live render-target accounting. See
- * {@link noteTexture}; internal to `@four/render`, reached by
+ * {@link noteTexture}; internal to `@fourjs/render`, reached by
  * `render-target.ts`.
  */
 export function noteRenderTarget(instances: number, bytes: number): void {

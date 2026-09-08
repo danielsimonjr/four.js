@@ -7,8 +7,8 @@
  * *positional* ones — `PointLight` and `SpotLight` — as scene nodes, collects
  * them into a bounded uniform-array light set, and teaches both shaded
  * pipelines to loop over it. No unit test inside one package can check that
- * agreement: `@four/scene` owns the nodes, `@four/render` owns the packing and
- * the ordering rule, and `@four/render-webgl` is the only place any of it
+ * agreement: `@fourjs/scene` owns the nodes, `@fourjs/render` owns the packing and
+ * the ordering rule, and `@fourjs/render-webgl` is the only place any of it
  * becomes GL.
  *
  * Four claims:
@@ -31,14 +31,14 @@
  *    placement intact.
  */
 
-import { boxGeometry, planeGeometry } from "@four/geometry";
-import { Vector3 } from "@four/math";
+import { boxGeometry, planeGeometry } from "@fourjs/geometry";
+import { Vector3 } from "@fourjs/math";
 import {
   LitMaterial,
   SpriteMaterial,
   StandardMaterial,
   UnlitMaterial,
-} from "@four/materials";
+} from "@fourjs/materials";
 import {
   MAX_PUNCTUAL_LIGHTS,
   Renderable,
@@ -46,8 +46,8 @@ import {
   Texture,
   collectSceneLights,
   createSceneLights,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   DirectionalLight,
   OrthographicCamera,
@@ -57,14 +57,14 @@ import {
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import {
   decodeSceneDocument,
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
-} from "@four/serialization";
-import { registerSceneNodeTypes } from "four";
+} from "@fourjs/serialization";
+import { registerSceneNodeTypes } from "fourJS";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

@@ -7,7 +7,7 @@
  * This is the WGSL port of `gl-shadow.ts` plus the shadow half of
  * `gl-program.ts` (`SHADOW_GLSL`, `ShadowUniforms`), and the same single tier
  * ships: one directional light's map, rendered depth-only and sampled back
- * with a 3×3 percentage-closer filter. `@four/scene`'s
+ * with a 3×3 percentage-closer filter. `@fourjs/scene`'s
  * `DirectionalLightShadow` owns the list of what is staged; this module owns
  * how the shipped tier becomes WebGPU.
  *
@@ -100,7 +100,7 @@
  * the node tier itself.
  */
 
-import type { SceneLights } from "@four/render";
+import type { SceneLights } from "@fourjs/render";
 
 import {
   GPU_SHADER_STAGE,

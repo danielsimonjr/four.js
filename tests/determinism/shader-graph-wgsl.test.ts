@@ -29,7 +29,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, test } from "vitest";
 
-import { emitShaderGraphWgsl } from "@four/render-webgpu";
+import { emitShaderGraphWgsl } from "@fourjs/render-webgpu";
 
 import {
   screenScenario,

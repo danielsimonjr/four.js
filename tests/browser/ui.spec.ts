@@ -1,12 +1,12 @@
 /**
  * Post-plan browser gate: §73–§75's retained-mode UI, proven in a browser
- * (closing the WP-11.5 packet-intent shortfall — "@four/ui has node-level §72
+ * (closing the WP-11.5 packet-intent shortfall — "@fourjs/ui has node-level §72
  * coverage only; no example app imports it").
  *
  * `packages/ui/tests` pins the layout arithmetic, the state machines, and the
  * event contracts against synthetic pointer events. What none of that can
  * prove is the assembled claim of §73: that widgets are *scene nodes* — that a
- * `@four/ui` tree, skinned by an application, laid out by the package, reaches
+ * `@fourjs/ui` tree, skinned by an application, laid out by the package, reaches
  * a real framebuffer, and that a real mouse aimed at a button's pixels reaches
  * that button's `uiactivate`. This suite drives `examples/ui-demo` with
  * Playwright's CDP-level mouse and keyboard and checks both accounts:
@@ -18,7 +18,7 @@
  *   → application listener → skin (WidgetSkin.onStateChange) → renderer → pixels
  *
  * Chromium keyboard → window keydown → KeyboardInput (normalize + route to the
- *   focused node) → §72 three-phase dispatch → @four/ui traversal (Tab) or
+ *   focused node) → §72 three-phase dispatch → @fourjs/ui traversal (Tab) or
  *   Button's Enter/Space → the same listener, source: "keyboard"
  * ```
  *
@@ -605,7 +605,7 @@ async function clickWorld(
 // Tests
 // ---------------------------------------------------------------------------
 
-test.describe("examples/ui-demo (§73–§75): @four/ui in a rendered scene", () => {
+test.describe("examples/ui-demo (§73–§75): @fourjs/ui in a rendered scene", () => {
   test("loads: the package-laid-out, application-skinned UI reaches the framebuffer", async ({
     page,
   }) => {

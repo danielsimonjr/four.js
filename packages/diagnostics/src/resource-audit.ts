@@ -6,7 +6,7 @@
  * they would have to read — process-wide live-instance counts and byte totals
  * for `BufferGeometry`, `Texture`, and `RenderTarget` — and warned about
  * nothing, because there was no build-mode flag to make a warning free in
- * production. A-4 added `@four/core`'s {@link @four/core!DEV | DEV}, and this
+ * production. A-4 added `@fourjs/core`'s {@link @fourjs/core!DEV | DEV}, and this
  * module is the first §83 warning to sit behind it.
  *
  * ## Why an audit you call, and not a watcher that runs
@@ -31,16 +31,16 @@
  * unless you call it, and the question it answers is the one you asked.
  *
  * ```ts
- * import { liveGeometryCount, geometryMemoryBytes } from "@four/geometry";
- * import { liveMaterialCount } from "@four/materials";
+ * import { liveGeometryCount, geometryMemoryBytes } from "@fourjs/geometry";
+ * import { liveMaterialCount } from "@fourjs/materials";
  * import {
  *   liveSolverBodyCount,
  *   liveSolverColliderCount,
  *   liveSolverHandleCount,
  *   liveSolverJointCount,
- * } from "@four/physics";
- * import { liveTextureCount, liveRenderTargetCount, textureMemoryBytes } from "@four/render";
- * import { auditResourceLeaks, type LiveResourceCounts } from "@four/diagnostics";
+ * } from "@fourjs/physics";
+ * import { liveTextureCount, liveRenderTargetCount, textureMemoryBytes } from "@fourjs/render";
+ * import { auditResourceLeaks, type LiveResourceCounts } from "@fourjs/diagnostics";
  *
  * const read = (): LiveResourceCounts => ({
  *   geometries: liveGeometryCount(),
@@ -64,8 +64,8 @@
  *
  * ## Why the counts arrive as plain numbers
  *
- * `@four/diagnostics` may depend on `core`, `math`, and `scene` only (plan
- * §3.1, frozen), so it cannot import `@four/geometry` or `@four/render` to read
+ * `@fourjs/diagnostics` may depend on `core`, `math`, and `scene` only (plan
+ * §3.1, frozen), so it cannot import `@fourjs/geometry` or `@fourjs/render` to read
  * their totals. Everywhere else in this package that gap is bridged by a
  * *locally declared shape satisfied structurally* (`RenderStatisticsLike`,
  * `DebugBodyAccess`); here, as with `recordResourceMemory`, there is no foreign
@@ -83,18 +83,18 @@
  * for every `dev*` helper.
  */
 
-import { DEV, devWarnOnce } from "@four/core";
+import { DEV, devWarnOnce } from "@fourjs/core";
 
 /**
  * A reading of §83's live-resource accounting, as the caller's packages report
  * it.
  *
  * The first five fields are exactly the five zero-argument readers
- * `@four/geometry` and `@four/render` export, in that order:
+ * `@fourjs/geometry` and `@fourjs/render` export, in that order:
  * `liveGeometryCount()`, `geometryMemoryBytes()`, `liveTextureCount()`,
  * `liveRenderTargetCount()`, `textureMemoryBytes()`. The optional material
- * and solver-handle fields are filled the same way from `@four/materials`
- * and `@four/physics` when the caller can see those packages.
+ * and solver-handle fields are filled the same way from `@fourjs/materials`
+ * and `@fourjs/physics` when the caller can see those packages.
  *
  * `bufferBytes` and `textureBytes` are **byte totals, not per-population
  * splits**: `textureBytes` covers textures *and* render targets together,
@@ -114,7 +114,7 @@ export interface LiveResourceCounts {
   /** Bytes described by textures **and** targets — §84's `textureMemory`. */
   readonly textureBytes: number;
   /**
-   * Live, undisposed materials. Optional: `@four/materials` is outside this
+   * Live, undisposed materials. Optional: `@fourjs/materials` is outside this
    * package's dependency set, so the caller passes the count it already has.
    */
   readonly materials?: number;
@@ -125,18 +125,18 @@ export interface LiveResourceCounts {
    */
   readonly solverBodies?: number;
   /**
-   * Live solver collider handles. Optional: `@four/physics` is outside this
+   * Live solver collider handles. Optional: `@fourjs/physics` is outside this
    * package's dependency set.
    */
   readonly solverColliders?: number;
   /**
-   * Live solver joint handles. Optional: `@four/physics` is outside this
+   * Live solver joint handles. Optional: `@fourjs/physics` is outside this
    * package's dependency set.
    */
   readonly solverJoints?: number;
   /**
    * Live solver handles (bodies + colliders + joints, or whatever the caller
-   * accounts as one population). Optional: `@four/physics` is outside this
+   * accounts as one population). Optional: `@fourjs/physics` is outside this
    * package's dependency set (A-5 follow-up: materials + solver handles).
    */
   readonly solverHandles?: number;

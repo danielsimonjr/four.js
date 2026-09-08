@@ -3,8 +3,8 @@
  * a small arena, exercising the whole §12 controller family at once.
  *
  * `PH-11` (2026-08-21) shipped `CharacterController` + `FirstPersonLook` in
- * `@four/motion` and `PH-11b` shipped `SweptCharacterController` +
- * `SweptCharacterSystem` in `@four/physics`, and until this page the only
+ * `@fourjs/motion` and `PH-11b` shipped `SweptCharacterController` +
+ * `SweptCharacterSystem` in `@fourjs/physics`, and until this page the only
  * first-person camera and the only swept capsule in the repository lived in
  * tests. This example is the recorded follow-up: one page that exercises all
  * three components and the §39 ordering they depend on.
@@ -13,9 +13,9 @@
  *
  * | thing | component | what it shows |
  * | ----- | --------- | ------------- |
- * | **you** | `SweptCharacterController` (`@four/physics`) | a capsule swept through `PhysicsWorld.shapeCast` (§30): walls stop you by *sliding* you along them, three stair risers are climbed by the step-up (each under its `stepHeight`), jumping and landing are casts, not a plane |
+ * | **you** | `SweptCharacterController` (`@fourjs/physics`) | a capsule swept through `PhysicsWorld.shapeCast` (§30): walls stop you by *sliding* you along them, three stair risers are climbed by the step-up (each under its `stepHeight`), jumping and landing are casts, not a plane |
  * | **your eye** | `FirstPersonLook` on a **child** node | §44's first-person decomposition: the character owns yaw (its heading), the eye adds pitch and nothing else, and the camera's world orientation is `yaw ∘ pitch` by ordinary parent-child composition — two nodes, one §42 writer each |
- * | **the patroller** | `CharacterController` (`@four/motion`) | the plane-tier kinematic controller, walking a circle with **no physics body and no world**: its ground is `groundHeight`, its driver is two lines of intent per step, and it needs nothing from the solver |
+ * | **the patroller** | `CharacterController` (`@fourjs/motion`) | the plane-tier kinematic controller, walking a circle with **no physics body and no world**: its ground is `groundHeight`, its driver is two lines of intent per step, and it needs nothing from the solver |
  * | **the balls** | `RigidBody` (`"dynamic"`) | ordinary §22 dynamics in the same world your capsule sweeps through — they fall, bounce and settle, and your kinematic-position body is real geometry to them |
  *
  * ## Controls
@@ -66,15 +66,15 @@
  * the balls hit and the shape the sweeps cast are the same shape.
  */
 
-import { Application } from "four/application";
+import { Application } from "fourJS/application";
 import {
   boxGeometry,
   capsuleGeometry,
   sphereGeometry,
   type BufferGeometry,
-} from "four/geometry";
-import { LitMaterial } from "four/materials";
-import { Vector3 } from "four/math";
+} from "fourJS/geometry";
+import { LitMaterial } from "fourJS/materials";
+import { Vector3 } from "fourJS/math";
 import {
   CharacterController,
   FirstPersonLook,
@@ -83,7 +83,7 @@ import {
   PRIORITY_INPUT,
   type FixedUpdateContext,
   type SimulationSystem,
-} from "four/motion";
+} from "fourJS/motion";
 import {
   Collider,
   PhysicsSystem,
@@ -91,16 +91,16 @@ import {
   RigidBody,
   SweptCharacterController,
   SweptCharacterSystem,
-} from "four/physics";
-import { Rapier3dAdapter } from "four/physics-rapier";
-import { Renderable } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
+} from "fourJS/physics";
+import { Rapier3dAdapter } from "fourJS/physics-rapier";
+import { Renderable } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
 import {
   DirectionalLight,
   Group,
   PerspectiveCamera,
   createFullscreenViewport,
-} from "four/scene";
+} from "fourJS/scene";
 
 // --- surface -----------------------------------------------------------------
 

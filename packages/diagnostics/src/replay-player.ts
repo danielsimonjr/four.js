@@ -14,8 +14,8 @@
  * ## The stepping seam (decision, WP-10.2)
  *
  * The player does **not** own a scheduler, and it does not import one:
- * `@four/diagnostics` may depend on `core`, `math`, and `scene` only, so
- * `@four/motion`'s `Scheduler` and `four`'s `Application` are both out of reach
+ * `@fourjs/diagnostics` may depend on `core`, `math`, and `scene` only, so
+ * `@fourjs/motion`'s `Scheduler` and `four`'s `Application` are both out of reach
  * (the same dispatch-wave constraint that made {@link ReplayTarget} a duck-typed
  * contract in `recorder.ts`). That constraint turns out to describe the right
  * design anyway, so it is worth stating as a decision rather than an excuse:
@@ -58,7 +58,7 @@
  * interchangeable and the player is free to pick the cheaper one.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import type { ReplaySnapshot, ReplayTarget } from "./recorder.js";
 import {
@@ -74,7 +74,7 @@ import {
  * The same number as §10's `maximumSubSteps` (Appendix A default 5) and for the
  * same reason: a long real-time gap must not turn into an unbounded burst of
  * simulation. It is re-declared here rather than imported because
- * `@four/diagnostics` cannot depend on `@four/motion`; if the Appendix A default
+ * `@fourjs/diagnostics` cannot depend on `@fourjs/motion`; if the Appendix A default
  * ever changes, this literal has to change with it, and nothing but this comment
  * says so.
  */

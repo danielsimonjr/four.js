@@ -1,5 +1,5 @@
 {
-  "name": "@four/animation",
+  "name": "@fourjs/animation",
   "version": "0.0.1",
   "type": "module",
   "license": "MIT",
@@ -13,9 +13,9 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@four/core": "workspace:*",
-    "@four/math": "workspace:*",
-    "@four/scene": "workspace:*",
-    "@four/motion": "workspace:*"
+    "@fourjs/core": "workspace:*",
+    "@fourjs/math": "workspace:*",
+    "@fourjs/scene": "workspace:*",
+    "@fourjs/motion": "workspace:*"
   }
 }

@@ -7,7 +7,7 @@
  * registry for the compiler.
  */
 
-import { bindCapability } from "@four/core";
+import { bindCapability } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import { SIMULATION_SYSTEMS, SystemRegistry } from "../src/index.js";

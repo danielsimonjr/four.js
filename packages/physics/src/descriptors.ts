@@ -43,10 +43,10 @@
  * degrees.
  */
 
-import { DEFAULT_GRAVITY_Y, FourError, type SpaceMode } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
-import type { Matrix3 } from "@four/math";
-import type { Transform } from "@four/scene";
+import { DEFAULT_GRAVITY_Y, FourError, type SpaceMode } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import type { Matrix3 } from "@fourjs/math";
+import type { Transform } from "@fourjs/scene";
 
 import type { PhysicsMaterial } from "./material.js";
 import type { CollisionShape } from "./shapes.js";
@@ -69,11 +69,11 @@ const DESCRIPTOR_ERROR_CODE = "INVALID_APPLICATION_STATE";
 
 /**
  * Appendix A: gravity is `(0, -9.81, 0)` m/s² in a 3D world and `(0, -9.81)` in
- * a 2D one — the same vector, because §7a puts +Y up in both. `@four/core`'s
- * constant (hoisted 2026-08-04 — `@four/particles` needs the same number and
+ * a 2D one — the same vector, because §7a puts +Y up in both. `@fourjs/core`'s
+ * constant (hoisted 2026-08-04 — `@fourjs/particles` needs the same number and
  * §3.1 has no edge between the two), re-exported.
  */
-export { DEFAULT_GRAVITY_Y } from "@four/core";
+export { DEFAULT_GRAVITY_Y } from "@fourjs/core";
 
 /**
  * How a body is created in a solver (§37 `createBody`), carrying §23's state
@@ -740,7 +740,7 @@ export interface PhysicsWorldOptions {
   /**
    * §40 scale factors for authored numbers (§40, §101).
    *
-   * Structurally the `scale` half of `@four/core`'s unit-system record
+   * Structurally the `scale` half of `@fourjs/core`'s unit-system record
    * (`lengthToMeters`, `massToKilograms`); pass that record through. When
    * set, authored gravity / poses / masses are converted **into SI** for the
    * solver and converted back on publish. Internal solver state is SI.

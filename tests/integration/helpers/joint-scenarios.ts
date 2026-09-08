@@ -1,7 +1,7 @@
 /**
  * Shared builders for the §28 joints integration suite (WP-6.4): mechanisms
- * assembled from the **public** joint API — `four/application` + `@four/physics`
- * + `@four/physics-rapier` — plus the measurement helpers the analytic
+ * assembled from the **public** joint API — `four/application` + `@fourjs/physics`
+ * + `@fourjs/physics-rapier` — plus the measurement helpers the analytic
  * assertions in `../physics-joints.test.ts` are written against.
  *
  * This file is the joint half of what `physics-scenarios.ts` (WP-5.6) is for
@@ -34,7 +34,7 @@
  * `reportsJointReactions: false` (Rapier 0.19.3 exposes no joint reaction at
  * all — verified three ways by WP-6.2/6.3), so a breakable joint on Rapier is
  * *refused*, and §28's break path can never run on the solver this repository
- * ships. `@four/physics` has its own `FakeJointSolverAdapter`, but it is
+ * ships. `@fourjs/physics` has its own `FakeJointSolverAdapter`, but it is
  * test-internal to that package and unreachable from here.
  *
  * So this double is the local, minimal equivalent: monotonic ids in creation
@@ -46,8 +46,8 @@
  * through direct `world.step()` calls.
  */
 
-import { FourError } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
 import {
   Collider,
   HingeJoint,
@@ -84,9 +84,9 @@ import {
   type SolverJointAccess,
   type SolverJointMotor,
   type Vector3Input,
-} from "@four/physics";
-import { Group, type Node } from "@four/scene";
-import type { Application } from "four/application";
+} from "@fourjs/physics";
+import { Group, type Node } from "@fourjs/scene";
+import type { Application } from "fourJS/application";
 
 import {
   DT,

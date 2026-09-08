@@ -8,13 +8,13 @@
  *
  * ## Placement (hoisted 2026-08-04)
  *
- * Plan P8-3 asked for the seeded RNG in `@four/core` "else a small xorshift
+ * Plan P8-3 asked for the seeded RNG in `@fourjs/core` "else a small xorshift
  * utility in motion with a documented seed contract". It was born in
- * `@four/motion` (WP-8.2) while §111's wander was its only consumer, then
- * copied verbatim into `@four/particles` (WP-9.1) because the §3.1 dependency
+ * `@fourjs/motion` (WP-8.2) while §111's wander was its only consumer, then
+ * copied verbatim into `@fourjs/particles` (WP-9.1) because the §3.1 dependency
  * matrix has no particles → motion edge. Two consumers was exactly the
  * dated hoist trigger both copies carried, so the module now lives here — the
- * one package below every consumer — and `@four/motion` and `@four/particles`
+ * one package below every consumer — and `@fourjs/motion` and `@fourjs/particles`
  * re-export it unchanged. The module imports nothing, the class is
  * byte-for-byte the WP-8.2 original, and every seed produces the same stream
  * it always has (the known-answer pins moved here with it).

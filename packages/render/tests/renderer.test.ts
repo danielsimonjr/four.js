@@ -3,14 +3,14 @@ import {
   disposeAll,
   isFourError,
   type Disposable,
-} from "@four/core";
+} from "@fourjs/core";
 import {
   PerspectiveCamera,
   PoseBuffer,
   Scene,
   createFullscreenViewport,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it, vi } from "vitest";
 
 import {

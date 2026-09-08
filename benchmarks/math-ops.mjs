@@ -1,5 +1,5 @@
 /**
- * `@four/math` operation throughput and per-operation allocation (§7b, §83;
+ * `@fourjs/math` operation throughput and per-operation allocation (§7b, §83;
  * §92's *"CPU time … allocations"* metrics; plan §6j P11-4, WP-11.4).
  *
  * ```sh
@@ -15,7 +15,7 @@
  * 1. **They are fast enough to be called per node per frame.** The reported
  *    figure per operation is **nanoseconds per operation**, derived from the
  *    measured milliseconds per batch of {@link OPERATIONS_PER_BATCH}.
- * 2. **They do not allocate in steady state.** `@four/math`'s own
+ * 2. **They do not allocate in steady state.** `@fourjs/math`'s own
  *    `constructionCount()` (§83's allocation instrumentation — every math
  *    constructor reports itself) is read across one extra batch per operation,
  *    so `allocationsPerOperation` is a *measured* zero rather than a claimed
@@ -81,7 +81,7 @@ import {
   Vector3,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
+} from "@fourjs/math";
 
 import {
   MEASUREMENT_NOTE,
@@ -424,7 +424,7 @@ const record = {
   copyResetNote:
     "Rows with includesCopyReset=true time `out.copy(src).<op>(...)`; subtract the same type's copy row for the operation alone. §7b types mutate in place, so a repeated in-place op would otherwise measure a drifting receiver. Unprefixed rows take an explicit out parameter (or are pure queries); subtract the baseline row instead.",
   allocationNote:
-    "allocationsPerBatch is @four/math's own constructionCount() (§83) across one extra batch run after the timed batches. Zero is the §7b requirement; any non-zero row is a hot-path defect, not a performance opinion.",
+    "allocationsPerBatch is @fourjs/math's own constructionCount() (§83) across one extra batch run after the timed batches. Zero is the §7b requirement; any non-zero row is a hot-path defect, not a performance opinion.",
   allocatingOperations: allocatingRows.map((row) => row.operation),
   baselineNanosecondsPerOperation: baselineRow.nanosecondsPerOperation,
   operations: rows,
@@ -440,7 +440,7 @@ const path = writeResult("math-ops", record);
 
 const nameWidth = Math.max(...rows.map((row) => row.operation.length));
 printReport([
-  "fourJS — @four/math operation throughput and allocation (§7b, §83, §92)",
+  "fourJS — @fourjs/math operation throughput and allocation (§7b, §83, §92)",
   `  batch                   ${OPERATIONS_PER_BATCH.toLocaleString("en-US")} operations over ${VARIANTS} operand sets; ${MEASURED_BATCHES} measured batches, ${WARMUP_BATCHES} warm-up`,
   "",
   `  ${"operation".padEnd(nameWidth)}   median ms/batch      ns/op     Mop/s   alloc/batch`,

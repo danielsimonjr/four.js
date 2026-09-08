@@ -1,4 +1,4 @@
-export const PACKAGE_NAME = "@four/render";
+export const PACKAGE_NAME = "@fourjs/render";
 
 export type {
   BatchableItem,
@@ -15,7 +15,7 @@ export {
 } from "./bounds.js";
 
 // §81's render-side capability tokens (RFC 0002), declared by the package
-// that owns each registry; `@four/four`'s `plugins.ts` re-exports the same
+// that owns each registry; `@fourjs/four`'s `plugins.ts` re-exports the same
 // objects, so both import paths hand out one identity.
 export {
   COMPUTE_WORKLOADS,
@@ -118,12 +118,12 @@ export {
   viewLayerMask,
 } from "./render-list.js";
 
-// §60's shader-graph IR (RFC 0001), re-exported from `@four/materials` so a
+// §60's shader-graph IR (RFC 0001), re-exported from `@fourjs/materials` so a
 // backend reads it through the package it already depends on — `render-webgl`'s
 // frozen §3.1 row is `core, math, render`, and this re-export is what keeps a
 // GLSL emitter legal there without a new edge (the RFC's own legality
 // argument, and the §62-registry precedent). Types and the pure analysis
-// functions only; `NodeMaterial` itself stays a `@four/materials` export, and
+// functions only; `NodeMaterial` itself stays a `@fourjs/materials` export, and
 // backends meet it through the `NodeRenderItem` union member.
 export type {
   ShaderAttributeName,
@@ -138,7 +138,7 @@ export type {
   ShaderUnaryOp,
   ShaderUniformReflection,
   ShaderValueType,
-} from "@four/materials";
+} from "@fourjs/materials";
 export {
   MAX_SHADER_GRAPH_NODES,
   MAX_SHADER_GRAPH_TEXTURES,
@@ -146,7 +146,7 @@ export {
   SHADER_VALUE_COMPONENTS,
   analyzeShaderGraph,
   forEachShaderNodeReference,
-} from "@four/materials";
+} from "@fourjs/materials";
 export type {
   AddPassOptions,
   CustomRenderPass,

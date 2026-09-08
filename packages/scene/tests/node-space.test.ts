@@ -1,5 +1,5 @@
-import { ComponentRegistry } from "@four/core";
-import { Vector3 } from "@four/math";
+import { ComponentRegistry } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import { Group, NODE_SPACE_SERIALIZER, NodeSpace } from "../src/index.js";

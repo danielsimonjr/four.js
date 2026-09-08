@@ -1,4 +1,4 @@
-# @four/physics-box2d
+# @fourjs/physics-box2d
 
 ## 0.1.0
 
@@ -6,4 +6,4 @@
 
 - Updated dependencies [13748d1]
 - Updated dependencies [13748d1]
-  - @four/physics@0.1.0
+  - @fourjs/physics@0.1.0

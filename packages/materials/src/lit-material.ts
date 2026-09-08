@@ -32,12 +32,12 @@
  * **Superseded 2026-08-08 by R-15.** This block used to say the components had
  * "no color space attached" and that "the working/output space policy, transfer
  * functions, and tone mapping are a later packet". That packet landed: §60a's
- * policy is written down in `@four/math`'s `color.ts`, and it names these four
+ * policy is written down in `@fourjs/math`'s `color.ts`, and it names these four
  * components **linear-light** — which is what the lit pipeline was already
  * doing with them, multiplying them as-is under §68's light. Nothing about the
  * arithmetic changed; the space is named instead of deferred, the conversion
  * into it ships (`srgbToLinearRGBA`, `parseColor`), and the encode out of it is
- * §60a's final render-graph pass (`@four/render`'s `OutputTransformEffect`),
+ * §60a's final render-graph pass (`@fourjs/render`'s `OutputTransformEffect`),
  * not a step in this material.
  *
  * Values outside 0…1 pass through rather than clamp (the WP-3.3 decision

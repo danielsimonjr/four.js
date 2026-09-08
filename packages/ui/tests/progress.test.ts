@@ -3,8 +3,8 @@
  * the skin, and no interaction at all.
  */
 
-import { ScenePointerEvent, buildPropagationPath } from "@four/input";
-import { dispatchPointerEvent } from "@four/input";
+import { ScenePointerEvent, buildPropagationPath } from "@fourjs/input";
+import { dispatchPointerEvent } from "@fourjs/input";
 import { describe, expect, it } from "vitest";
 
 import { ProgressIndicator } from "../src/progress.js";

@@ -94,7 +94,7 @@ declare global {
  * Use it as a plain `if` condition around author-facing work:
  *
  * ```ts
- * import { DEV, devWarn } from "@four/core";
+ * import { DEV, devWarn } from "@fourjs/core";
  *
  * if (DEV && !Number.isFinite(mass)) {
  *   devWarn(`mass must be finite; got ${String(mass)} (§85).`);

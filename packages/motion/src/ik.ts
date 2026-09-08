@@ -12,7 +12,7 @@
  * - **Two-bone analytic** — {@link solveTwoBoneIK}. Closed form, no iteration.
  * - **CCD** and **FABRIK** — {@link solveCCD} / {@link solveFABRIK}. The
  *   limits / ownership / convergence contract this header used to wait on
- *   is the one below. The `@four/scene` `Bone`/`Skeleton` (RFC 0003) is a
+ *   is the one below. The `@fourjs/scene` `Bone`/`Skeleton` (RFC 0003) is a
  *   valid chain: bones are ordinary nodes, and a node chain is read, never
  *   retained.
  * - **Full-body / multi-effector IK, twist limits, path-planning adapters**
@@ -72,8 +72,8 @@
  * scratch cannot be re-entered.
  */
 
-import { Vector3 } from "@four/math";
-import { resolveWorldTransform, type Node } from "@four/scene";
+import { Vector3 } from "@fourjs/math";
+import { resolveWorldTransform, type Node } from "@fourjs/scene";
 
 /**
  * Below this length a direction is treated as undefined rather than normalized

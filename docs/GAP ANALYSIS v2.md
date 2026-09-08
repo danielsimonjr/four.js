@@ -110,7 +110,7 @@ per-row arguments live in v1 and in the dated source notes.
 | `A-15` | 79, 6a           | 2026-08-07    | Throw-by-default on unserializable components                                                                                                                        |
 | `A-17` | 79               | 2026-08-07    | Duplicate-id refusal                                                                                                                                                 |
 | `A-19` | 77, 78           | 2026-08-29    | Loader tier: `createTextureLoader` (08-21) + §78 glTF 2.0 core (`createGltfLoader`/`instantiateGltf`, 08-29). Renderer-side §77 residue re-owned under `R-30`'s row; four unsampleable material texture slots wait on the multi-unit widening (R-13 follow-up). **Status change this pass** — see §7.2 |
-| `A-20` | 82               | 2026-08-29    | §82 is no longer silent in either sense: `ComputePass` descriptor in `@four/render` (the Q3 promotion), `compute()`/buffers on WebGPU (WP-R1.8), browser-proven; structurally absent on WebGL 2 by §62 tier, stated in source. **Status change this pass** — see §7.2 |
+| `A-20` | 82               | 2026-08-29    | §82 is no longer silent in either sense: `ComputePass` descriptor in `@fourjs/render` (the Q3 promotion), `compute()`/buffers on WebGPU (WP-R1.8), browser-proven; structurally absent on WebGL 2 by §62 tier, stated in source. **Status change this pass** — see §7.2 |
 | `A-22` | 97, 114–117, 97a | 2026-08-06    | Spec revision 1.7                                                                                                                                                    |
 | `A-23` | 96               | 2026-08-07    | Limits, `parseUntrustedJson`, CSP grep test                                                                                                                          |
 | `A-26` | 90               | 2026-08-07    | Five tables, solver block generated; §2 truth-swept to the tip 08-29, `check-compat` green                                                                           |
@@ -163,7 +163,7 @@ per-row arguments live in v1 and in the dated source notes.
 | `PH-5`  | 24, 37  | 2026-08-07 | Runtime collider add/remove                                                                                 |
 | `PH-6`  | 34      | 2026-08-07 | `worldConfiguration` in replay format                                                                       |
 | `PH-7`  | 34, 37  | 2026-08-06 | 3D registry rebuild parity                                                                                  |
-| `PH-8`  | 26, 27  | 2026-08-09 | `ForceField`/`ForceFieldSystem` at §39 step 5; structural contract with `@four/particles`                   |
+| `PH-8`  | 26, 27  | 2026-08-09 | `ForceField`/`ForceFieldSystem` at §39 step 5; structural contract with `@fourjs/particles`                   |
 | `PH-10` | 54, 17  | 2026-08-28 | RFC 0003 implemented (with `R-22`'s skinning rows); spec revision 1.10; `skinned-pose.json` golden          |
 | `PH-11` | 12, 44  | 2026-08-21 | Kinematic tier + `PH-11b` swept tier (same day); `PH-11c` push policy is the one owner-gated residue (§6)   |
 | `PH-13` | 40      | 2026-08-07 | With `A-2`                                                                                                  |
@@ -205,11 +205,11 @@ from the newest version of each v1 row and re-checked against source.
 | `R-12`  | §57 base **7 of 7 members** (stencil 08-21); of the eight family members: `StandardMaterial` shipped (08-08), `NodeMaterial` shipped (08-28), `ShaderMaterial` permanently withdrawn (rev 1.11), `ShapeMaterial` settled unshipped; `RenderItemKind` widened (`"node"`, skinned kinds) with lazily-registered pipelines behind `registerNodeMaterialPipeline()` and its WGSL twin | `TextMaterial`, `LineMaterial`, `PhysicalMaterial`, `ComputeMaterial`; a fully general pipeline registry beyond the node/skinned registrations (RFC 0001 residue)                        | `material.ts`, RFC 0001; v1's row is stale here (§7.1) |
 | `R-22`  | Skinning rows end-to-end (08-28, RFC 0003)                                            | GPU morph path, material groups (`R-12`), **instancing** (the §86 blocker), indirect, dynamic buffers, LOD/impostors/merging, CPU skinning, bone textures, dual-quaternion, skinned shadow caster, skinned bounds/picking; WebGPU skinned kinds (successor filing) | `mesh.ts`, §54 rev 1.10                                |
 | `R-27`  | `Shape2D` + twelve §50 nodes; `Text` (08-13); `Mesh` (08-28); `frustumCulled` (08-09) | `depthMode`; `material: Material[]` (wanted for §54 submeshes); `Line3D`, `PointCloud`, `CustomRenderable`                                                                              | `renderable.ts`; v1's second copy of this row is stale (§7.1) |
-| `R-29`  | The `frame` half (08-08); §55 at 5 of 11                                              | Named-frame atlas (→ `@four/assets`); sprite animation clips (→ §14/§17 step tracks)                                                                                                   | v1 §4's row                                            |
+| `R-29`  | The `frame` half (08-08); §55 at 5 of 11                                              | Named-frame atlas (→ `@fourjs/assets`); sprite animation clips (→ §14/§17 step tracks)                                                                                                   | v1 §4's row                                            |
 | `R-30`  | Sampler-state tier (08-13) + mipmaps/anisotropy/`minFilter` (`R-30b`, 08-21); WebGPU parity (WP-R1.2) | Cube/array/3D targets (pipeline-entangled), compressed containers, §77 map roles, video + `ImageBitmap`/canvas sources, async upload + residency diagnostics — now also carrying `A-19`'s renderer-side residue | `TODO.md` "A-19 remainder", `R-30b` row                |
 | `R-39`  | `half`-row discipline; eleven scripts; animated-glyph row measured (08-13)            | CI integration + trend reporting; mesh-instance row (`R-22`); the §112 present-half measurement (`R-33`)                                                                               | `benchmarks/README.md`, `TODO.md`                      |
 | `PH-9`  | §18 state-machine tier                                                                 | Blend trees; layered + additive animation; clip events from a controller; "any state" transitions                                                                                      | `controller.ts` dated notes, `TODO.md`                 |
-| `PH-12` | Physics tier (`RigidBody.space` + refusals, 08-09); §8 vocabulary in `@four/core`     | The node-level `NodeSpace` component packet (its render-side consumer exists since `R-37`); §21's `"local-plane"` mapping (refused loudly meanwhile)                                    | v1 §4's row                                            |
+| `PH-12` | Physics tier (`RigidBody.space` + refusals, 08-09); §8 vocabulary in `@fourjs/core`     | The node-level `NodeSpace` component packet (its render-side consumer exists since `R-37`); §21's `"local-plane"` mapping (refused loudly meanwhile)                                    | v1 §4's row                                            |
 | `PH-22` | Roll-up: `22a`/`22e` closed; `22n` half; `22i` advanced twice (skeleton blocker fell 08-28) | `22f` anchors (owner which-pose decision); `22b/c/d` blocked on Rapier 0.19.3; `22g/h/k/m` cross-tier; `22i` limits/ownership/convergence contract; `22j` §102 scope (owner); `22l` naming-only (owner) | v1 §4's row, `ik.ts`, `TODO.md`                        |
 
 ---
@@ -236,7 +236,7 @@ IMPLEMENTED 2026-08-29; §77a + revision 1.12, `ALLOWED_LETTERED`, split colour-
 defaults, `PickingService`/`PickProvider`/Alternative D all verified in source. Rows 21–22
 (the R-1 plan's questions) — recommendations adopted in the implementation: registration
 stayed an explicit opt-in, the capability record widened once (WP-R1.1), and `ComputePass`
-landed in `@four/render` exactly as row 22 recommended (the Q3 promotion, 08-29).
+landed in `@fourjs/render` exactly as row 22 recommended (the Q3 promotion, 08-29).
 
 **The owner-only remainder (5 register rows + 6 recorded off-register decisions):**
 
@@ -265,7 +265,7 @@ Every staged-with-owner or staged-with-named-packet item at the tip, and where i
 note lives. (Owner-gated items also appear in §5; this is the complete map.)
 
 - **Owner decisions:** the eleven §5 items above.
-- **`@four/render` / backends:** RFC 0005 residue — instanced-particle id arm + two §86
+- **`@fourjs/render` / backends:** RFC 0005 residue — instanced-particle id arm + two §86
   picking rows (`TODO.md` "RFC 0005 residue"); WebGPU skinned kinds (`R-1` successor filing,
   v1's R-1 row); canvas2d/svg stub tiers (stubs **by decision**, RFC 0004 §6 + `TODO.md`);
   `R-32`'s staged design (v1's row); `R-30` remainder incl. `A-19`'s renderer half
@@ -275,11 +275,11 @@ note lives. (Owner-gated items also appear in §5; this is the complete map.)
   (waits on float targets — `effect-pass.ts` §70 table); `R-10`'s comparator design (v1's
   row); values-as-uniforms lowering for animated gradient stops (`shape-paint.ts`
   determinism section).
-- **`@four/assets` / umbrella:** `A-18` remainder (streaming, dependency tracking, progress,
+- **`@fourjs/assets` / umbrella:** `A-18` remainder (streaming, dependency tracking, progress,
   worker decoding, hot reload — `TODO.md`); `A-16`'s preload-then-catalog wiring + §80
-  (v1's row); glTF refusal list widening (CUBICSPLINE → `@four/animation` tangent decision,
+  (v1's row); glTF refusal list widening (CUBICSPLINE → `@fourjs/animation` tangent decision,
   morph targets → RFC 0003 GPU-morph staging — `TODO.md` "A-19 remainder").
-- **`@four/ui` / input:** `A-12`'s six remaining widgets, `A-13`'s DOM-gated set
+- **`@fourjs/ui` / input:** `A-12`'s six remaining widgets, `A-13`'s DOM-gated set
   (`UI_STAGED`, `TODO.md`); §72 dispatch on `PickProvider` results (input packet,
   `TODO.md`).
 - **Animation/motion/physics:** `PH-9` residue (`controller.ts`); `PH-12`'s `NodeSpace`
@@ -331,7 +331,7 @@ are why v2 exists as a clean restatement.
 ### 7.2 Rows whose status v2 itself changes (verified in source first)
 
 - **`A-20` → CLOSED 2026-08-29.** v1's row still reads "still literally silent"; the tree
-  disagrees: `ComputePass` is a `@four/render` descriptor (the Q3 promotion), WebGPU
+  disagrees: `ComputePass` is a `@fourjs/render` descriptor (the Q3 promotion), WebGPU
   implements `compute()` with exact browser-proven readback (WP-R1.8), WebGL 2's answer is
   the structural absence §62's capability record reports, and `CHANGELOG.md` carries two
   dated entries. Silent in neither code nor record.

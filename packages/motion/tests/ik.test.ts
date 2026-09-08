@@ -1,7 +1,7 @@
-import { Vector3, constructionCount, resetConstructionCount } from "@four/math";
+import { Vector3, constructionCount, resetConstructionCount } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
-import { Group } from "@four/scene";
+import { Group } from "@fourjs/scene";
 
 import {
   DEFAULT_IK_MAX_ITERATIONS,

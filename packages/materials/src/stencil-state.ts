@@ -28,7 +28,7 @@
  * nesting level owns, and what happens when the eight planes of an 8-bit buffer
  * run out (§67's "diagnostics when backend limits are exceeded"). That packet
  * needs a node-level API, a render-list pass that assigns bit planes, and a
- * `@four/scene` edit. Landing this record without it is the honest half: with
+ * `@fourjs/scene` edit. Landing this record without it is the honest half: with
  * it, an application can compose a mask by hand today — write with one
  * material, test with another — and the clip API, when it comes, will be
  * *expressed* in these records rather than inventing a second stencil path.

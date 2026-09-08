@@ -32,7 +32,7 @@
  * - **`uvs`** are 2 floats per vertex (`uvs[2 * i]` is vertex `i`'s u), the
  *   texture coordinate §53 names and §55/§57's `map` samples with. `v = 0` is
  *   the bottom edge, matching §7a's Y-up world and the bottom-row-first texel
- *   order `@four/render`'s `TextureSource` documents — so a textured quad needs
+ *   order `@fourjs/render`'s `TextureSource` documents — so a textured quad needs
  *   no flip anywhere. Values outside 0…1 are legal (they tile or clamp
  *   according to the sampler, which is backend state, not geometry state).
  * - **`colors`** are 4 floats per vertex (`colors[4 * i]` is vertex `i`'s red),
@@ -54,7 +54,7 @@
  * - **`joints`** are **4 joint indices per vertex** (`joints[4 * i]` is vertex
  *   `i`'s first influence), as a `Uint16Array`. This package cannot name a
  *   bone — its §3.1 row is `core, math` — so a joint is an *index*, and what
- *   it indexes is somebody else's problem: `@four/scene`'s `Skeleton.bones`,
+ *   it indexes is somebody else's problem: `@fourjs/scene`'s `Skeleton.bones`,
  *   whose insertion order is the ABI (§33). Indices are **not** range-checked
  *   here, because the geometry cannot see the skeleton; the backend's joint
  *   limit and the skeleton's own length are checked where each is known.
@@ -99,7 +99,7 @@
  * the draw path would be the most expensive thing the renderer does. Failures
  * throw `RangeError`/`TypeError` rather than `FourError`: §89's code union has
  * no argument-validation member today, and extending it belongs to the packet
- * that owns `@four/core` (reported as a WP-3.3 decision).
+ * that owns `@fourjs/core` (reported as a WP-3.3 decision).
  *
  * In-place edits followed by {@link BufferGeometry.markDirty} are *not*
  * re-validated. That is the fast path, and re-validating it would defeat the
@@ -115,7 +115,7 @@
  * never runs on a draw path. `resource-memory.ts` documents the design.
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 
 import {
   Geometry,
@@ -457,7 +457,7 @@ export class BufferGeometry extends Geometry {
    * {@link BufferGeometry.markDirty}. Assigning `undefined` drops the
    * attribute — the geometry draws unlit-only from then on (a lit draw of a
    * normal-less geometry shades from its ambient term alone; see
-   * `@four/render-webgl`).
+   * `@fourjs/render-webgl`).
    *
    * Replacing `positions` with an array of a different vertex count while
    * normals are present therefore throws: drop or replace the normals first.

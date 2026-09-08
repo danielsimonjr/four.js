@@ -4,7 +4,7 @@
  *
  * §113 asks Phase 10 for "collision visualization; constraint visualization;
  * center-of-mass display; velocity and force vectors; solver statistics". This
- * module produces exactly those, in the only form `@four/diagnostics` is allowed
+ * module produces exactly those, in the only form `@fourjs/diagnostics` is allowed
  * to produce them: a line list of world-space segments in a growable
  * `Float32Array` ({@link DebugDrawBuffer}), filled by small provider functions
  * that read a solver through **duck-typed seams**, plus statistics as plain
@@ -34,7 +34,7 @@
  * Until 2026-08-07 the verdict above carried a stated cost — **one colour per
  * draw** — because `BufferGeometry` had no colour attribute and `UnlitMaterial`
  * was one flat RGBA. R-19 landed `BufferGeometry.colors` and
- * `UnlitMaterial.vertexColors`, and `@four/render-webgl` uploads the colour
+ * `UnlitMaterial.vertexColors`, and `@fourjs/render-webgl` uploads the colour
  * stream at a fixed attribute slot, so the whole overlay now draws in **one
  * call at any segment count**.
  *
@@ -85,7 +85,7 @@
  * shrinks**, including across `clear()`, so a steady-state overlay allocates
  * nothing after the first few frames. The providers hold their scratch
  * `Vector3`/`Quaternion` at module scope and allocate no math objects at all
- * (the tests assert this with `constructionCount()` from `@four/math`). The one
+ * (the tests assert this with `constructionCount()` from `@fourjs/math`). The one
  * honest caveat: iterating a caller-supplied `Iterable` costs whatever iterator
  * that container mints — an `Array` allocates one per `for…of` — which is the
  * caller's choice of container, not this module's.
@@ -106,9 +106,9 @@
  *
  * ## The seams (plan §6h/§6i pattern)
  *
- * `@four/diagnostics` may depend on `core`, `math`, and `scene` only; it cannot
- * import `@four/physics`. So, exactly as `recorder.ts` does for `ReplayTarget`
- * and `@four/render`'s `particles.ts` does for `ParticleDrawable`, the shapes
+ * `@fourjs/diagnostics` may depend on `core`, `math`, and `scene` only; it cannot
+ * import `@fourjs/physics`. So, exactly as `recorder.ts` does for `ReplayTarget`
+ * and `@fourjs/render`'s `particles.ts` does for `ParticleDrawable`, the shapes
  * this module reads are **declared locally and satisfied structurally**:
  *
  * - {@link DebugBodyAccess} transcribes the five members of `SolverBodyAccess`
@@ -137,7 +137,7 @@
  * it ships as {@link collectCentersOfMass}.
  */
 
-import { Quaternion, Vector3 } from "@four/math";
+import { Quaternion, Vector3 } from "@fourjs/math";
 
 /** Floats per vertex: `x, y, z, r, g, b, a`. See the module header's table. */
 export const DEBUG_VERTEX_FLOATS = 7;
@@ -162,7 +162,7 @@ export const DEBUG_COLOR_FLOATS_PER_SEGMENT = 8;
 export const DEFAULT_DEBUG_BUFFER_CAPACITY = 64;
 
 /**
- * Any readable 3-vector — `@four/math`'s `Vector3` satisfies it, and so does a
+ * Any readable 3-vector — `@fourjs/math`'s `Vector3` satisfies it, and so does a
  * plain `{ x, y, z }`, which is what keeps the providers testable without a
  * solver.
  */
@@ -174,7 +174,7 @@ export interface Vector3Like {
 
 /**
  * Straight (non-premultiplied) RGBA, matching `UnlitMaterial.color`'s
- * convention in `@four/materials`. Components are not clamped or validated:
+ * convention in `@fourjs/materials`. Components are not clamped or validated:
  * §60a owns colour policy, and this module stores what it is given.
  *
  * Pass a module-level constant rather than a fresh literal per frame if you
@@ -696,7 +696,7 @@ export interface DebugDrawStreams {
  *
  * ## Why this returns arrays and not a `BufferGeometry` (decision, R-35)
  *
- * The §3.1 dependency matrix gives `@four/diagnostics` exactly three edges —
+ * The §3.1 dependency matrix gives `@fourjs/diagnostics` exactly three edges —
  * `core`, `math`, `scene` — and `geometry` is not among them; the matrix is
  * frozen, so this package cannot import `BufferGeometry` and must not pretend
  * to. What it can do is emit the two arrays in the exact shape `BufferGeometry`
@@ -782,7 +782,7 @@ export function debugDrawStreams(
 
 /**
  * The part of `BufferGeometry` {@link applyDebugDrawStreams} touches, declared
- * locally because `@four/diagnostics` has no `geometry` edge in the frozen §3.1
+ * locally because `@fourjs/diagnostics` has no `geometry` edge in the frozen §3.1
  * matrix — the same structural-seam rule as {@link DebugBodyAccess}, and the
  * same honest cost: **nothing type-checks this declaration against
  * `BufferGeometry`**; a change to those three members fails this package's
@@ -842,7 +842,7 @@ export function applyDebugDrawStreams(
 
 /**
  * The members of `SolverBodyAccess` this module reads, declared locally because
- * `@four/diagnostics` cannot import `@four/physics` (module header, plan §6h).
+ * `@fourjs/diagnostics` cannot import `@fourjs/physics` (module header, plan §6h).
  * Transcribed from `packages/physics/src/body-access.ts`; an adapter satisfies
  * it structurally, and `THandle` is inferred from the caller because §37's
  * handles are unforgeable brands.
@@ -1286,7 +1286,7 @@ export interface CollectContactImpulsesOptions {
  * `applyForceAtPoint`, `applyTorque`, `applyImpulse`, `applyImpulseAtPoint`,
  * `applyAngularImpulse`, and `resetForces` — seven **writes** and no getter; the
  * seam is write-only for the force channel, and §26's command buffers live in
- * `@four/physics`, which this package cannot import. What *is* readable is the
+ * `@fourjs/physics`, which this package cannot import. What *is* readable is the
  * impulse the solver actually applied at each contact, which is the force
  * quantity a collision overlay wants anyway. Divide by the fixed delta for
  * newtons — the same conversion `PhysicsWorld` does for §28 break thresholds —
@@ -1404,7 +1404,7 @@ export interface SolverJointStatistics {
  * {@link DEBUG_DRAW_STAGED}.
  *
  * `out` follows the same convention as
- * {@link @four/diagnostics!solverStatistics | solverStatistics}.
+ * {@link @fourjs/diagnostics!solverStatistics | solverStatistics}.
  */
 export function solverJointStatistics<THandle>(
   access: DebugJointAccess<THandle>,
@@ -1466,7 +1466,7 @@ export const DEBUG_DRAW_STAGED: readonly StagedVisualization[] = Object.freeze([
       "getJointId, forEachJoint (setJointAnchors landed 2026-09-06, " +
       "PH-22f). A joint's anchors can be written through the seam but " +
       "are not readable from it, and its connected bodies and type are " +
-      "held by @four/physics's Joint descriptors, which @four/diagnostics " +
+      "held by @fourjs/physics's Joint descriptors, which @fourjs/diagnostics " +
       "may not import — so there is no point in space to draw. " +
       "getJointReaction is additionally unusable on both Rapier adapters, " +
       "which declare reportsJointReactions false (Rapier 0.19.3 exposes no " +
@@ -1476,7 +1476,7 @@ export const DEBUG_DRAW_STAGED: readonly StagedVisualization[] = Object.freeze([
     unblockedBy:
       "either anchor accessors on SolverJointAccess " +
       "(getJointAnchors(handle, outLocalA, outLocalB) plus the connected body " +
-      "handles), or a debug-draw provider inside @four/physics that reads its " +
+      "handles), or a debug-draw provider inside @fourjs/physics that reads its " +
       "own Joint registry and writes into a DebugDrawBuffer-shaped sink.",
     staged: "2026-08-02",
   }),
@@ -1487,7 +1487,7 @@ export const DEBUG_DRAW_STAGED: readonly StagedVisualization[] = Object.freeze([
       "The force channel of SolverBodyAccess is write-only: applyForce, " +
       "applyForceAtPoint, applyTorque, applyImpulse, applyImpulseAtPoint, " +
       "applyAngularImpulse, resetForces — seven writes, no getter. §26's " +
-      "per-step command buffers live in @four/physics, which this package " +
+      "per-step command buffers live in @fourjs/physics, which this package " +
       "cannot import.",
     shippedInstead:
       "collectContactImpulses — per-contact normal impulses from §29 events, " +

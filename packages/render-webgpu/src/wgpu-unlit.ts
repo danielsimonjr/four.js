@@ -14,7 +14,7 @@
  * ### 1. The depth remap lives here
  *
  * WebGL's clip space maps visible depth onto `z ∈ [-w, w]`; WebGPU's maps it
- * onto `z ∈ [0, w]`. `@four/math`'s projections are written to the WebGL
+ * onto `z ∈ [0, w]`. `@fourjs/math`'s projections are written to the WebGL
  * convention (D8), and they must stay that way: the math package may not learn
  * which backend is drawing (§3.1). So the remap
  *

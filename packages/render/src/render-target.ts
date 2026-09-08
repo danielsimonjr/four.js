@@ -31,7 +31,7 @@
  * §61 hands render targets out through the *renderer*. That shape means an
  * application cannot describe a target before it has a renderer, must build a
  * second one to render the same view with a second renderer, and must re-create
- * every one of them by hand after a §61 context loss. `@four/render`'s
+ * every one of them by hand after a §61 context loss. `@fourjs/render`'s
  * `texture.ts` rejected exactly that trade for textures and left
  * `createTexture` deferred; the WebGL backend's `TextureCache` and
  * `GeometryCache` are the proof that the alternative works. So a
@@ -50,8 +50,8 @@
  *
  * ## Render-to-texture is the point (R-4 → R-5, R-6)
  *
- * {@link RenderTarget.colorTexture} satisfies `@four/materials`'
- * `MaterialTexture` — the *same* contract `@four/render`'s `Texture` satisfies
+ * {@link RenderTarget.colorTexture} satisfies `@fourjs/materials`'
+ * `MaterialTexture` — the *same* contract `@fourjs/render`'s `Texture` satisfies
  * — so the result of an off-screen pass is assignable to `UnlitMaterial.map`,
  * `LitMaterial.map`, or `SpriteMaterial.texture` with no adapter and no new
  * material type. That single property is what unblocks §48's minimaps,
@@ -64,7 +64,7 @@
  * {@link isRenderTargetTexture} is that seam: a marker-property guard, the same
  * duck-typed contract pattern as `isParticleDrawable` and
  * `isDirectionalLightSource`, so no backend needs to name this class and
- * `@four/render` needs no backend type.
+ * `@fourjs/render` needs no backend type.
  *
  * ## Staged, with the dates (2026-08-07, R-4)
  *
@@ -97,16 +97,16 @@
  *   gets would make it incomplete. Both arrive with the packet that wants a
  *   depth buffer on screen — a debug view, §70's depth-of-field.
  * - ~~**`readPixels`**~~ — **landed 2026-08-29** (§61, §92): `Rectangle2`
- *   arrived in `@four/math` (RFC 0005's recorded prerequisite) and
+ *   arrived in `@fourjs/math` (RFC 0005's recorded prerequisite) and
  *   `Renderer.readPixels?(target, region?)` left `renderer.ts`'s typed TODO
  *   for the interface itself; `read-pixels.ts` carries the shared §85 region
  *   check and the structural guard. The WebGPU and WebGL 2 backends both
  *   implement it.
  */
 
-import type { Disposable } from "@four/core";
-import type { MaterialTexture } from "@four/materials";
-import type { ColorSpace } from "@four/math";
+import type { Disposable } from "@fourjs/core";
+import type { MaterialTexture } from "@fourjs/materials";
+import type { ColorSpace } from "@fourjs/math";
 
 import { renderTargetByteLength } from "./render-target-bytes.js";
 import {
@@ -195,7 +195,7 @@ export interface RenderTargetOptions {
    * {@link RenderTarget.byteLength} reports.
    *
    * Sampling it from a *material* is not part of this tier — see the module
-   * header for what that would additionally need. Within `@four/render-webgl`
+   * header for what that would additionally need. Within `@fourjs/render-webgl`
    * the attachment is reached through the backend's own render-target record,
    * which is how the shadow pipeline binds it.
    */
@@ -257,8 +257,8 @@ export interface RenderTargetOptions {
 /**
  * A {@link RenderTarget}'s colour attachment, seen as a texture (§77, §61).
  *
- * Extends `MaterialTexture` — the contract `@four/materials` declares and
- * `@four/render`'s `Texture` implements — so this is assignable to any material
+ * Extends `MaterialTexture` — the contract `@fourjs/materials` declares and
+ * `@fourjs/render`'s `Texture` implements — so this is assignable to any material
  * slot that takes a texture, which is the whole point of the type. Two things
  * distinguish it, and both are load-bearing for a backend:
  *
@@ -621,7 +621,7 @@ export class RenderTarget implements Disposable {
    * the packed `DEPTH24_STENCIL8` renderbuffer {@link RenderTarget.stencil}
    * asks for (R-7 — 24 bits of depth and 8 of stencil in one 32-bit texel, so
    * a stencil is two bytes per texel on top of the plain depth buffer, not
-   * one). All three formats are quoted from what `@four/render-webgl`'s
+   * one). All three formats are quoted from what `@fourjs/render-webgl`'s
    * `gl-render-target.ts` actually allocates, which is the difference between
    * accounting and guessing. The constants move together when §62's
    * floating-point formats widen {@link RenderTargetFormat}.

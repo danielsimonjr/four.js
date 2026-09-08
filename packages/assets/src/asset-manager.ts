@@ -147,7 +147,7 @@
  * and — where there is one — `context.observed`. Like every other failure it is
  * not cached, so retrying is calling {@link AssetManager.load} again. An aborted
  * load rejects with the same code and `context.reason = "aborted"`: §89's list
- * has no cancellation code, and inventing one in `@four/core` to say what a
+ * has no cancellation code, and inventing one in `@fourjs/core` to say what a
  * discriminating `context` already says would widen the engine's error
  * vocabulary for one caller.
  *
@@ -276,7 +276,7 @@ import {
   disposeAll,
   isFourError,
   type Disposable,
-} from "@four/core";
+} from "@fourjs/core";
 
 import {
   resolveGlobalDigest,
@@ -288,7 +288,7 @@ import {
 /**
  * The subset of a `fetch` response this package reads.
  *
- * Structural on purpose, exactly as `@four/input` declares its pointer events:
+ * Structural on purpose, exactly as `@fourjs/input` declares its pointer events:
  * the DOM/undici `Response` satisfies it, and so does `{ ok: true, status: 200,
  * … }` in a test. Naming `Response` would drag a DOM lib into a package that
  * must build under plain `lib.es2022`.

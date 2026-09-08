@@ -2,10 +2,10 @@
  * R-38 — §46 symbolic layers, end to end across `scene`, `render`, and
  * `render-webgl` (2026-08-08).
  *
- * The layer model is one fact spread over three packages: `@four/scene` owns
+ * The layer model is one fact spread over three packages: `@fourjs/scene` owns
  * the registry and the three masks (`Node.layers`, §47's `Camera.layers`, §48's
- * `Viewport.layerMask`), `@four/render` filters during §64 traversal and
- * snapshots each node's mask onto its item, and `@four/render-webgl` resolves
+ * `Viewport.layerMask`), `@fourjs/render` filters during §64 traversal and
+ * snapshots each node's mask onto its item, and `@fourjs/render-webgl` resolves
  * the per-view mask and skips what it does not want. No unit test inside any
  * one of them can check the agreement, which is what this file is for.
  *
@@ -39,13 +39,13 @@
  * `render-graph.test.ts` gives at length.
  */
 
-import { BufferGeometry, boxGeometry, planeGeometry } from "@four/geometry";
+import { BufferGeometry, boxGeometry, planeGeometry } from "@fourjs/geometry";
 import {
   LitMaterial,
   SpriteMaterial,
   StandardMaterial,
   UnlitMaterial,
-} from "@four/materials";
+} from "@fourjs/materials";
 import {
   Renderable,
   Sprite,
@@ -53,8 +53,8 @@ import {
   buildRenderList,
   viewLayerMask,
   type RenderItem,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   ALL_LAYERS,
   DEFAULT_LAYER_MASK,
@@ -71,7 +71,7 @@ import {
   resetLayers,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {

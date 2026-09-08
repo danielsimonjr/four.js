@@ -30,7 +30,7 @@
 //     and no wasm image is loaded until initialization);
 //   - the solver build column comes from the package's own `dependencies`;
 //   - the `SolverBodyAccess` / `SolverJointAccess` rows are **structural**:
-//     the member names are parsed out of `@four/physics`'s emitted
+//     the member names are parsed out of `@fourjs/physics`'s emitted
 //     `body-access.d.ts` and probed on the instance, because those two seams
 //     are detected structurally rather than declared (see §37's note on
 //     `PhysicsCapabilities.jointTypes`);
@@ -71,7 +71,7 @@ function fail(message) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. The seam member lists, parsed from @four/physics's emitted declarations.
+// 1. The seam member lists, parsed from @fourjs/physics's emitted declarations.
 //
 //    `SolverBodyAccess` and `SolverJointAccess` are structural: an adapter
 //    implements them by having the methods, and `PhysicsWorld` narrows to them
@@ -366,12 +366,12 @@ const reservedRenderers = [];
 const renderBarrel = join(packagesDir, "render", "dist", "index.js");
 if (!existsSync(renderBarrel)) {
   fail(
-    "@four/render is not built (render/dist/index.js is missing) — run `bun run build`",
+    "@fourjs/render is not built (render/dist/index.js is missing) — run `bun run build`",
   );
 }
 const renderModule = await import(pathToFileURL(renderBarrel).href);
 if (typeof renderModule.NullRenderer !== "function") {
-  fail("@four/render does not export NullRenderer — the headless §62 tier is missing");
+  fail("@fourjs/render does not export NullRenderer — the headless §62 tier is missing");
 }
 {
   const instance = new renderModule.NullRenderer();
@@ -381,7 +381,7 @@ if (typeof renderModule.NullRenderer !== "function") {
   }
   renderers.push({
     exportName: "NullRenderer",
-    package: "@four/render",
+    package: "@fourjs/render",
     capabilities,
   });
 }

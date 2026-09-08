@@ -3,7 +3,7 @@
  * outline, optionally with holes, into an indexed triangle set.
  *
  * §52 asks for a tessellation subsystem that is *"an isolated module of
- * `@four/geometry` with a stable interface so implementations can be replaced
+ * `@fourjs/geometry` with a stable interface so implementations can be replaced
  * without changing the scene API"*. That is this file, and
  * {@link PolygonTessellator} is that interface: one method, taking rings of
  * points and returning indices, with {@link earClippingTessellator} as the
@@ -1190,7 +1190,7 @@ export interface Polyline2D {
  * The geometric half of §58's `StrokeStyle`: everything about a stroke that
  * decides where its triangles are, and nothing about what colour they are.
  *
- * `@four/render`'s `StrokeStyle` is this record plus a §58 `Paint`, which is
+ * `@fourjs/render`'s `StrokeStyle` is this record plus a §58 `Paint`, which is
  * why the two halves have one name each rather than one type with a hole in
  * it.
  */

@@ -1,11 +1,11 @@
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import {
   Quaternion,
   Vector3,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
-import { Group } from "@four/scene";
+} from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { createArrayElementBinding, createBinding } from "../src/binding.js";

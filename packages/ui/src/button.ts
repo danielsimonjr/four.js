@@ -35,7 +35,7 @@
  *
  * ## Activation is exactly one event per click
  *
- * The `click` @four/input synthesizes is already the right predicate: a press
+ * The `click` @fourjs/input synthesizes is already the right predicate: a press
  * and a release on the same node with no drag between them (§72). So this class
  * listens for it once and emits `uiactivate` once — it does not re-derive the
  * gesture from `pointerdown`/`pointerup`, which would double-fire and would
@@ -47,7 +47,7 @@
  *
  * ## Keyboard activation (2026-08-07, A-13)
  *
- * §75's other activation path, staged from 2026-08-02 until `@four/input`
+ * §75's other activation path, staged from 2026-08-02 until `@fourjs/input`
  * gained the key source (A-10) that was its only blocker: **Enter or Space on
  * the focused button emits the same `uiactivate`**, with
  * `source: "keyboard"`. It is one listener, next to the click listener it
@@ -83,7 +83,7 @@
  * version. Recorded as the deviation it is rather than mimicked halfway.
  */
 
-import type { ScenePointerEvent, SceneKeyEvent } from "@four/input";
+import type { ScenePointerEvent, SceneKeyEvent } from "@fourjs/input";
 
 import { Panel, type PanelOptions } from "./panel.js";
 import type { WidgetActivationSource } from "./widget.js";

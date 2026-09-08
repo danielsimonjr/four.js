@@ -1,8 +1,8 @@
 ---
-"@four/assets": minor
-"@four/materials": minor
-"@four/ui": minor
-"@four/render": minor
+"@fourjs/assets": minor
+"@fourjs/materials": minor
+"@fourjs/ui": minor
+"@fourjs/render": minor
 "four": minor
 ---
 

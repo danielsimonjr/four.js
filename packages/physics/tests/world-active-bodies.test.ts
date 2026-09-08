@@ -9,8 +9,8 @@
  * registration order), and the shared-vector contract on the centre of mass.
  */
 
-import { Vector3, constructionCount, resetConstructionCount } from "@four/math";
-import { Group, type Node } from "@four/scene";
+import { Vector3, constructionCount, resetConstructionCount } from "@fourjs/math";
+import { Group, type Node } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import type { RigidBody as RigidBodyComponent } from "../src/index.js";

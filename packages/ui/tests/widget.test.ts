@@ -2,7 +2,7 @@
  * The widget base (§73–§75): box model, layout plumbing, hit areas, the §72
  * interaction state machine, focus, skins, and disposal.
  *
- * Pointer events are synthesized exactly as `@four/input`'s own suite does —
+ * Pointer events are synthesized exactly as `@fourjs/input`'s own suite does —
  * a real {@link ScenePointerEvent} pushed through `dispatchPointerEvent` along
  * a real propagation path — so the state machines are exercised against §72's
  * dispatch, not against a stand-in for it.
@@ -13,9 +13,9 @@ import {
   buildPropagationPath,
   dispatchPointerEvent,
   type ScenePointerEventType,
-} from "@four/input";
-import { Vector2, constructionCount, resetConstructionCount } from "@four/math";
-import { Group, type Node } from "@four/scene";
+} from "@fourjs/input";
+import { Vector2, constructionCount, resetConstructionCount } from "@fourjs/math";
+import { Group, type Node } from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

@@ -5,15 +5,15 @@
  * localise to. The renderer-level behaviour — the instanced draw, the
  * three-matrix block, byte identity for particle-less scenes — lives in
  * `webgpu-renderer.test.ts`, and the cross-package path through the real
- * `@four/particles` node in `tests/integration/webgpu-particles.test.ts`.
+ * `@fourjs/particles` node in `tests/integration/webgpu-particles.test.ts`.
  */
 
 import {
   PARTICLE_INSTANCE_FLOATS,
   particleQuadGeometry,
   type ParticleRenderItem,
-} from "@four/render";
-import { Matrix4 } from "@four/math";
+} from "@fourjs/render";
+import { Matrix4 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import { createRecordingGpu } from "../../../tests/integration/helpers/recording-gpu.js";
@@ -93,7 +93,7 @@ describe("the particle uniform block (§36, WP-R1.8)", () => {
 });
 
 describe("the particle vertex layouts", () => {
-  it("interleaves centre, size and colour at @four/render's stride", () => {
+  it("interleaves centre, size and colour at @fourjs/render's stride", () => {
     expect(PARTICLE_INSTANCE_STRIDE_BYTES).toBe(
       PARTICLE_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT,
     );

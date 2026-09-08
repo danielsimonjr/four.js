@@ -1,4 +1,4 @@
-export const PACKAGE_NAME = "@four/particles";
+export const PACKAGE_NAME = "@fourjs/particles";
 
 export type { ParticleEmitterOptions } from "./emitter.js";
 export {

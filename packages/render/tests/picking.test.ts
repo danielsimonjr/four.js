@@ -4,11 +4,11 @@
  * `supportsPicking` capability test.
  */
 
-import { FourError } from "@four/core";
-import { planeGeometry } from "@four/geometry";
-import type { Matrix4 } from "@four/math";
-import { UnlitMaterial } from "@four/materials";
-import { Group, Scene } from "@four/scene";
+import { FourError } from "@fourjs/core";
+import { planeGeometry } from "@fourjs/geometry";
+import type { Matrix4 } from "@fourjs/math";
+import { UnlitMaterial } from "@fourjs/materials";
+import { Group, Scene } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

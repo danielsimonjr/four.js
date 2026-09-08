@@ -3,7 +3,7 @@
  * §112; plan P9-3).
  *
  * One particle system is **one draw call**: `drawArraysInstanced` over the six
- * vertices of `@four/render`'s shared unit quad, with `count` instances fed from
+ * vertices of `@fourjs/render`'s shared unit quad, with `count` instances fed from
  * a per-system dynamic vertex buffer that is re-uploaded once per frame. That is
  * what makes §112's "≥100 000 simple particles … rendered at interactive rates"
  * a question about fill rate rather than about draw-call overhead: the CPU cost
@@ -74,7 +74,7 @@
  * The blend *function* is the one this backend fixes once at initialization:
  * `SRC_ALPHA` / `ONE_MINUS_SRC_ALPHA`, i.e. **straight (non-premultiplied)
  * alpha**, which is §66's stated policy for every colour this tier touches. The
- * per-instance RGBA is therefore used exactly as `@four/particles` authored it,
+ * per-instance RGBA is therefore used exactly as `@fourjs/particles` authored it,
  * with no premultiply step anywhere.
  *
  * Two consequences, stated rather than hidden:
@@ -89,8 +89,8 @@
  *   which is not in this backend's GL budget.
  */
 
-import type { Disposable } from "@four/core";
-import type { Matrix4 } from "@four/math";
+import type { Disposable } from "@fourjs/core";
+import type { Matrix4 } from "@fourjs/math";
 import {
   PARTICLE_COLOR_OFFSET,
   PARTICLE_INSTANCE_FLOATS,
@@ -103,7 +103,7 @@ import {
   TRAIL_POSITION_OFFSET,
   TRAIL_VERTEX_FLOATS,
   type ParticleRenderItem,
-} from "@four/render";
+} from "@fourjs/render";
 
 import {
   GL,
@@ -315,7 +315,7 @@ export class ParticleProgram implements Disposable {
   /**
    * Compiles and links the particle program on `gl`.
    *
-   * Throws a {@link @four/core!FourError | FourError} carrying `SHADER_COMPILATION_FAILED` (§89) with
+   * Throws a {@link @fourjs/core!FourError | FourError} carrying `SHADER_COMPILATION_FAILED` (§89) with
    * the driver's info log in `context.log` when a stage fails to compile, when
    * linking fails, when GL refuses to allocate an object, or when a uniform this
    * backend wrote is missing from the linked program — the contract
@@ -854,7 +854,7 @@ export class ParticleBatchCache {
   }
 }
 
-/** Bytes per trail vertex — `@four/render`'s interleaved stride. */
+/** Bytes per trail vertex — `@fourjs/render`'s interleaved stride. */
 const TRAIL_STRIDE_BYTES = TRAIL_VERTEX_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 
 const TRAIL_VERTEX_SHADER_SOURCE = `#version 300 es

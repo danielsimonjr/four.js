@@ -1,6 +1,6 @@
 /**
  * GPU-side render targets for the WebGPU backend: one colour (and optional
- * depth) allocation per `@four/render` `RenderTarget`, cached and invalidated
+ * depth) allocation per `@fourjs/render` `RenderTarget`, cached and invalidated
  * by version (§61, §48, §63; WP-R1.6).
  *
  * The fourth member of the family `wgpu-geometry.ts` and `wgpu-texture.ts`
@@ -83,8 +83,8 @@
  *    layout, and no bind group at all (the lazy-everything discipline).
  */
 
-import type { RenderTarget } from "@four/render";
-import { warnDisposedInUse } from "@four/render";
+import type { RenderTarget } from "@fourjs/render";
+import { warnDisposedInUse } from "@fourjs/render";
 
 import {
   GPU_TEXTURE_USAGE,

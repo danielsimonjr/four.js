@@ -5,10 +5,10 @@
  * `initializeRapier3d()` — there is no mock Rapier anywhere in this package.
  */
 
-import { FourError } from "@four/core";
-import { Matrix3, Quaternion, Vector2, Vector3 } from "@four/math";
-import { ALL_COLLISION_GROUPS } from "@four/physics";
-import type { CollisionShape } from "@four/physics";
+import { FourError } from "@fourjs/core";
+import { Matrix3, Quaternion, Vector2, Vector3 } from "@fourjs/math";
+import { ALL_COLLISION_GROUPS } from "@fourjs/physics";
+import type { CollisionShape } from "@fourjs/physics";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -276,7 +276,7 @@ describe("quaternion point rotation", () => {
     expect(out.z).toBeCloseTo(0, 12);
   });
 
-  it("agrees with @four/math's own quaternion for a random rotation", () => {
+  it("agrees with @fourjs/math's own quaternion for a random rotation", () => {
     const rotation = new Quaternion()
       .setFromAxisAngle(new Vector3(0.3, -0.5, 0.81).normalize(), 2.2)
       .normalize();
@@ -284,7 +284,7 @@ describe("quaternion point rotation", () => {
     const out = createRapierVector3();
     rotateVectorByRotation3(rotation, point, out);
 
-    // The reference: q * (0, p) * q⁻¹, computed with @four/math's multiply.
+    // The reference: q * (0, p) * q⁻¹, computed with @fourjs/math's multiply.
     const conjugate = rotation.clone().conjugate();
     const expected = rotation
       .clone()

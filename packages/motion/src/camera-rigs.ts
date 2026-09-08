@@ -26,9 +26,9 @@
  *
  * `orbit`, `dolly` and the `offset` vector are the whole input surface, and they
  * take **numbers the application feeds in**. The §3.1 dependency matrix is
- * frozen and gives `@four/motion` `core`, `math` and `scene` only — there is no
+ * frozen and gives `@fourjs/motion` `core`, `math` and `scene` only — there is no
  * motion → input edge and adding one would invert the layering — so a rig
- * *cannot* read `@four/input` even if it wanted to. That constraint turns out to
+ * *cannot* read `@fourjs/input` even if it wanted to. That constraint turns out to
  * be the right design: a rig whose only inputs are numbers is replayable
  * (§34) and testable without a device, and the mapping from a pointer delta to
  * radians is an application policy (sensitivity, inversion, acceleration) that
@@ -44,8 +44,8 @@
  * | stereo / XR | an extension point on the camera, not a rig that writes a transform |
  *
  * **Trackball shipped elsewhere (R-37, 2026-08-21):** it is `TrackballRig` in
- * `@four/scene`, not here and not a component — it is defined over a viewport in
- * **screen space**, which `@four/motion` may not see (§3.1 gives it `core`,
+ * `@fourjs/scene`, not here and not a component — it is defined over a viewport in
+ * **screen space**, which `@fourjs/motion` may not see (§3.1 gives it `core`,
  * `math` and `scene` only), and it writes on demand from a drag rather than once
  * per fixed step, so the application calls it under §42's `"manual"` authority.
  * This table listed it as unshipped until that date.
@@ -73,9 +73,9 @@
  * than `Math.hypot` because only `sqrt` is specified exactly rounded.
  */
 
-import type { Component, ComponentHost } from "@four/core";
-import { Vector3 } from "@four/math";
-import { resolveWorldTransform, type Node } from "@four/scene";
+import type { Component, ComponentHost } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
+import { resolveWorldTransform, type Node } from "@fourjs/scene";
 
 import {
   placeAtWorldPosition,

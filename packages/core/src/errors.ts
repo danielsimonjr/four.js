@@ -32,7 +32,7 @@ export type FourErrorCode =
    * Distinct from `"INVALID_APPLICATION_STATE"` so a host can tell a graph
    * authoring mistake from a lifecycle one without parsing the message
    * (R-5 follow-up, 2026-08-30). The code lives here because §89's vocabulary
-   * is one union in this file; `@four/render` is the only thrower.
+   * is one union in this file; `@fourjs/render` is the only thrower.
    */
   | "INVALID_RENDER_GRAPH"
   | "PHYSICS_SOLVER_FAILED"

@@ -1,4 +1,4 @@
-# @four/assets
+# @fourjs/assets
 
 ## 0.0.1
 

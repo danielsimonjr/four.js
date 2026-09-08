@@ -34,15 +34,15 @@
  * skipped upload) — any of those renders the same picture at both angles.
  */
 
-import { BufferGeometry } from "@four/geometry";
-import { Vector3 } from "@four/math";
-import { UnlitMaterial } from "@four/materials";
+import { BufferGeometry } from "@fourjs/geometry";
+import { Vector3 } from "@fourjs/math";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   Mesh,
   createRenderStatistics,
   resetRenderStatistics,
-} from "@four/render";
-import { WebglRenderer, registerSkinningPipeline } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer, registerSkinningPipeline } from "@fourjs/render-webgl";
 import {
   Bone,
   OrthographicCamera,
@@ -51,7 +51,7 @@ import {
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /** Canvas size the spec creates and this file reads back. */
 const WIDTH = 320;

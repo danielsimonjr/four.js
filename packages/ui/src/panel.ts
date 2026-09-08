@@ -55,7 +55,7 @@
  * None. Three index loops over `children`, all arithmetic in locals.
  */
 
-import type { Vector2 } from "@four/math";
+import type { Vector2 } from "@fourjs/math";
 
 import {
   UIWidget,

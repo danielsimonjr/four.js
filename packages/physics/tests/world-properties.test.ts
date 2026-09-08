@@ -18,8 +18,8 @@
  *    rule, applied to a seam).
  */
 
-import { Matrix3, Vector3 } from "@four/math";
-import { Group } from "@four/scene";
+import { Matrix3, Vector3 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

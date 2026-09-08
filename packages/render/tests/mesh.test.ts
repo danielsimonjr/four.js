@@ -11,9 +11,9 @@
  * bones on first read.
  */
 
-import { isFourError, resetDevWarnings } from "@four/core";
-import { planeGeometry } from "@four/geometry";
-import { LitMaterial, StandardMaterial, UnlitMaterial } from "@four/materials";
+import { isFourError, resetDevWarnings } from "@fourjs/core";
+import { planeGeometry } from "@fourjs/geometry";
+import { LitMaterial, StandardMaterial, UnlitMaterial } from "@fourjs/materials";
 import {
   Bone,
   Group,
@@ -21,7 +21,7 @@ import {
   Scene,
   Skeleton,
   resolveWorldTransforms,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

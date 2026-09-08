@@ -24,164 +24,164 @@
       "definers": [
         {
           "file": "packages/animation/src/index.ts",
-          "package": "@four/animation",
+          "package": "@fourjs/animation",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/assets/src/index.ts",
-          "package": "@four/assets",
+          "package": "@fourjs/assets",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/core/src/index.ts",
-          "package": "@four/core",
+          "package": "@fourjs/core",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/diagnostics/src/index.ts",
-          "package": "@four/diagnostics",
+          "package": "@fourjs/diagnostics",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/geometry/src/index.ts",
-          "package": "@four/geometry",
+          "package": "@fourjs/geometry",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/input/src/index.ts",
-          "package": "@four/input",
+          "package": "@fourjs/input",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/materials/src/index.ts",
-          "package": "@four/materials",
+          "package": "@fourjs/materials",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/math/src/index.ts",
-          "package": "@four/math",
+          "package": "@fourjs/math",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/motion/src/index.ts",
-          "package": "@four/motion",
+          "package": "@fourjs/motion",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/particles/src/index.ts",
-          "package": "@four/particles",
+          "package": "@fourjs/particles",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/physics-box2d/src/index.ts",
-          "package": "@four/physics-box2d",
+          "package": "@fourjs/physics-box2d",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/physics-rapier/src/index.ts",
-          "package": "@four/physics-rapier",
+          "package": "@fourjs/physics-rapier",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/physics-soft/src/index.ts",
-          "package": "@four/physics-soft",
+          "package": "@fourjs/physics-soft",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/physics/src/index.ts",
-          "package": "@four/physics",
+          "package": "@fourjs/physics",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/render-canvas/src/index.ts",
-          "package": "@four/render-canvas",
+          "package": "@fourjs/render-canvas",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/render-svg/src/index.ts",
-          "package": "@four/render-svg",
+          "package": "@fourjs/render-svg",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/render-webgl/src/index.ts",
-          "package": "@four/render-webgl",
+          "package": "@fourjs/render-webgl",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/render-webgpu/src/index.ts",
-          "package": "@four/render-webgpu",
+          "package": "@fourjs/render-webgpu",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/render/src/index.ts",
-          "package": "@four/render",
+          "package": "@fourjs/render",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/scene/src/index.ts",
-          "package": "@four/scene",
+          "package": "@fourjs/scene",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/serialization/src/index.ts",
-          "package": "@four/serialization",
+          "package": "@fourjs/serialization",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/text/src/index.ts",
-          "package": "@four/text",
+          "package": "@fourjs/text",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         },
         {
           "file": "packages/ui/src/index.ts",
-          "package": "@four/ui",
+          "package": "@fourjs/ui",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+          "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
         }
       ],
       "canonicalHint": "AMBIGUOUS",
@@ -193,14 +193,14 @@
       "definers": [
         {
           "file": "packages/particles/src/particle-renderable.ts",
-          "package": "@four/particles",
+          "package": "@fourjs/particles",
           "public": true,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride and the R-32 wide-layout offsets independently and the shared tests catch drift. 2026-08-04 gate wiring; R-32 offsets added 2026-09-06."
         },
         {
           "file": "packages/render/src/particles.ts",
-          "package": "@four/render",
+          "package": "@fourjs/render",
           "public": true,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride and the R-32 wide-layout offsets independently and the shared tests catch drift. 2026-08-04 gate wiring; R-32 offsets added 2026-09-06."
@@ -215,14 +215,14 @@
       "definers": [
         {
           "file": "packages/particles/src/particle-renderable.ts",
-          "package": "@four/particles",
+          "package": "@fourjs/particles",
           "public": true,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride and the R-32 wide-layout offsets independently and the shared tests catch drift. 2026-08-04 gate wiring; R-32 offsets added 2026-09-06."
         },
         {
           "file": "packages/render/src/particles.ts",
-          "package": "@four/render",
+          "package": "@fourjs/render",
           "public": true,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride and the R-32 wide-layout offsets independently and the shared tests catch drift. 2026-08-04 gate wiring; R-32 offsets added 2026-09-06."
@@ -237,14 +237,14 @@
       "definers": [
         {
           "file": "packages/particles/src/particle-renderable.ts",
-          "package": "@four/particles",
+          "package": "@fourjs/particles",
           "public": true,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride and the R-32 wide-layout offsets independently and the shared tests catch drift. 2026-08-04 gate wiring; R-32 offsets added 2026-09-06."
         },
         {
           "file": "packages/render/src/particles.ts",
-          "package": "@four/render",
+          "package": "@fourjs/render",
           "public": true,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride and the R-32 wide-layout offsets independently and the shared tests catch drift. 2026-08-04 gate wiring; R-32 offsets added 2026-09-06."
@@ -259,14 +259,14 @@
       "definers": [
         {
           "file": "packages/particles/src/particle-renderable.ts",
-          "package": "@four/particles",
+          "package": "@fourjs/particles",
           "public": true,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride and the R-32 wide-layout offsets independently and the shared tests catch drift. 2026-08-04 gate wiring; R-32 offsets added 2026-09-06."
         },
         {
           "file": "packages/render/src/particles.ts",
-          "package": "@four/render",
+          "package": "@fourjs/render",
           "public": true,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride and the R-32 wide-layout offsets independently and the shared tests catch drift. 2026-08-04 gate wiring; R-32 offsets added 2026-09-06."
@@ -281,14 +281,14 @@
       "definers": [
         {
           "file": "packages/geometry/src/primitive-support.ts",
-          "package": "@four/geometry",
+          "package": "@fourjs/geometry",
           "public": false,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: same name, different §85 contracts (distinct-by-domain, NOT a copy to consolidate): geometry's requireNonNegative(name, value) validates a primitive extent where zero is degenerate-but-meaningful (a cone's tip radius — R-20, 2026-08-07) with geometry's error-message shape; ui's requireNonNegative(owner, name, value) is A-12's control-value guard (2026-08-07) carrying the widget owner in Label's §85 message style. Different signatures, different message formats pinned by each package's tests; both are module-internal helpers (not in either barrel). Hoisting to core would flatten two deliberate message conventions into one and buy nothing — each is three lines. 2026-08-07 wave-3 gate wiring."
         },
         {
           "file": "packages/ui/src/numbers.ts",
-          "package": "@four/ui",
+          "package": "@fourjs/ui",
           "public": false,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: same name, different §85 contracts (distinct-by-domain, NOT a copy to consolidate): geometry's requireNonNegative(name, value) validates a primitive extent where zero is degenerate-but-meaningful (a cone's tip radius — R-20, 2026-08-07) with geometry's error-message shape; ui's requireNonNegative(owner, name, value) is A-12's control-value guard (2026-08-07) carrying the widget owner in Label's §85 message style. Different signatures, different message formats pinned by each package's tests; both are module-internal helpers (not in either barrel). Hoisting to core would flatten two deliberate message conventions into one and buy nothing — each is three lines. 2026-08-07 wave-3 gate wiring."
@@ -303,17 +303,17 @@
       "definers": [
         {
           "file": "packages/particles/src/trail.ts",
-          "package": "@four/particles",
+          "package": "@fourjs/particles",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: deliberate duck-typed cross-package contract for CPU particle trail ribbon vertices (position xyz + rgba), same matrix constraint as PARTICLE_INSTANCE_FLOATS — @four/particles builds the mesh and @four/render types the render-item stride without a forbidden particles↔render dependency edge; drift is caught by shared tests. 2026-09-06 trail tier gate wiring."
+          "reason": "fourJS: deliberate duck-typed cross-package contract for CPU particle trail ribbon vertices (position xyz + rgba), same matrix constraint as PARTICLE_INSTANCE_FLOATS — @fourjs/particles builds the mesh and @fourjs/render types the render-item stride without a forbidden particles↔render dependency edge; drift is caught by shared tests. 2026-09-06 trail tier gate wiring."
         },
         {
           "file": "packages/render/src/particles.ts",
-          "package": "@four/render",
+          "package": "@fourjs/render",
           "public": true,
           "tag": "ALLOWLISTED",
-          "reason": "fourJS: deliberate duck-typed cross-package contract for CPU particle trail ribbon vertices (position xyz + rgba), same matrix constraint as PARTICLE_INSTANCE_FLOATS — @four/particles builds the mesh and @four/render types the render-item stride without a forbidden particles↔render dependency edge; drift is caught by shared tests. 2026-09-06 trail tier gate wiring."
+          "reason": "fourJS: deliberate duck-typed cross-package contract for CPU particle trail ribbon vertices (position xyz + rgba), same matrix constraint as PARTICLE_INSTANCE_FLOATS — @fourjs/particles builds the mesh and @fourjs/render types the render-item stride without a forbidden particles↔render dependency edge; drift is caught by shared tests. 2026-09-06 trail tier gate wiring."
         }
       ],
       "canonicalHint": "AMBIGUOUS",
@@ -327,14 +327,14 @@
       "definers": [
         {
           "file": "packages/render-webgl/src/gl-geometry.ts",
-          "package": "@four/render-webgl",
+          "package": "@fourjs/render-webgl",
           "public": true,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: backend-local structural view of the geometry a resource cache consumes (types only, no runtime body) — the PARTICLE_INSTANCE_FLOATS class of deliberate per-backend duck typing. Each backend declares the narrowed shape it reads so the cache's requirements live in the file that enforces them and neither backend names the other; the shared render-list consumption harness catches drift. 2026-08-21, WP-R1.1 gate wiring."
         },
         {
           "file": "packages/render-webgpu/src/wgpu-geometry.ts",
-          "package": "@four/render-webgpu",
+          "package": "@fourjs/render-webgpu",
           "public": true,
           "tag": "ALLOWLISTED",
           "reason": "fourJS: backend-local structural view of the geometry a resource cache consumes (types only, no runtime body) — the PARTICLE_INSTANCE_FLOATS class of deliberate per-backend duck typing. Each backend declares the narrowed shape it reads so the cache's requirements live in the file that enforces them and neither backend names the other; the shared render-list consumption harness catches drift. 2026-08-21, WP-R1.1 gate wiring."

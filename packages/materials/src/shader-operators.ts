@@ -23,7 +23,7 @@
  * No `unregister`. The capability token is therefore not revocable.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import type { ShaderNode, ShaderNodeId } from "./shader-graph.js";
 

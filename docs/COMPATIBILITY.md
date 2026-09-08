@@ -57,7 +57,7 @@ engineering judgement with no gate behind it.
 | Headless Chromium, ANGLE over SwiftShader | verified           | `playwright.config.ts` launches with `--use-gl=angle --use-angle=swiftshader` and drives six built example sites (`pnpm test:browser`); the `visual` project additionally compares committed SwiftShader goldens.                                                                              |
 | Chromium on a real GPU                    | expected           | The same code path with a different rasteriser. No gate runs it, which is why the browser suite asserts thresholds rather than pixels in the `chromium` project.                                                                                                                               |
 | Firefox, Safari, other evergreen browsers | expected, untested | Nothing in the engine is Chromium-specific and the requirements below are all standard, but there is no Playwright project and no CI job for them. Do not read this row as support.                                                                                                            |
-| Browsers with WebGL 1 only                | not supported      | §120 fixes the MVP renderer tier at WebGL 2, and neither shipped GPU backend (section 2) has a WebGL 1 path. There is no WebGL 1 fallback and none is planned. (This row called `@four/render-webgl` "the only backend" until 2026-08-29 — stale since WP-R1.1 shipped `@four/render-webgpu`.) |
+| Browsers with WebGL 1 only                | not supported      | §120 fixes the MVP renderer tier at WebGL 2, and neither shipped GPU backend (section 2) has a WebGL 1 path. There is no WebGL 1 fallback and none is planned. (This row called `@fourjs/render-webgl` "the only backend" until 2026-08-29 — stale since WP-R1.1 shipped `@fourjs/render-webgpu`.) |
 | Deno, Bun, other non-Node runtimes        | untested           | The packages are plain ESM with no Node built-ins in the browser-safe set, so they are likely to work; nothing checks it.                                                                                                                                                                      |
 
 What an application needs at runtime:
@@ -91,11 +91,11 @@ with the date it stopped being true.)
 
 | §62 backend | `RendererBackend` | Package               | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ----------- | ----------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| WebGPU      | `"webgpu"`        | `@four/render-webgpu` | **shipped (WP-R1.1–R1.9, 2026-08-21…29; the R-1 plan is complete)** — `WebgpuRenderer` behind `registerWebgpuRenderer()`: unlit/sprite/lit/standard families, opt-in §65 batching, textures + samplers, §67 clips + §57 stencil parity, render targets / §70 effects / `readPixels`, the §69 directional shadow tier, §36 instanced particles, §82 compute, and §60 node materials + §70 graph effects behind `registerWebgpuNodeMaterialPipeline()`. Absent, not stubbed: RFC 0003's skinned pipelines and §71 picking (`createPickingService` is not declared) |
-| WebGL 2     | `"webgl2"`        | `@four/render-webgl`  | **shipped** — `WebglRenderer` behind `registerWebglRenderer()`; the §120 MVP tier, feature table below                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| headless    | `"null"`          | `@four/render`        | **shipped** — `NullRenderer`, alongside the `Renderer` interface                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Canvas 2D   | `"canvas2d"`      | `@four/render-canvas` | reserved stub — the package builds and exports `PACKAGE_NAME`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| SVG         | `"svg"`           | `@four/render-svg`    | reserved stub — the package builds and exports `PACKAGE_NAME`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| WebGPU      | `"webgpu"`        | `@fourjs/render-webgpu` | **shipped (WP-R1.1–R1.9, 2026-08-21…29; the R-1 plan is complete)** — `WebgpuRenderer` behind `registerWebgpuRenderer()`: unlit/sprite/lit/standard families, opt-in §65 batching, textures + samplers, §67 clips + §57 stencil parity, render targets / §70 effects / `readPixels`, the §69 directional shadow tier, §36 instanced particles, §82 compute, and §60 node materials + §70 graph effects behind `registerWebgpuNodeMaterialPipeline()`. Absent, not stubbed: RFC 0003's skinned pipelines and §71 picking (`createPickingService` is not declared) |
+| WebGL 2     | `"webgl2"`        | `@fourjs/render-webgl`  | **shipped** — `WebglRenderer` behind `registerWebglRenderer()`; the §120 MVP tier, feature table below                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| headless    | `"null"`          | `@fourjs/render`        | **shipped** — `NullRenderer`, alongside the `Renderer` interface                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Canvas 2D   | `"canvas2d"`      | `@fourjs/render-canvas` | reserved stub — the package builds and exports `PACKAGE_NAME`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| SVG         | `"svg"`           | `@fourjs/render-svg`    | reserved stub — the package builds and exports `PACKAGE_NAME`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 Registering the WebGPU backend is a real decision, not a free upgrade:
 `AUTO_RENDERER_ORDER` prefers WebGPU, so an application that calls
@@ -112,7 +112,7 @@ What the WebGL 2 tier actually carries:
 | Clip depth                     | `"negative-one-to-one"` (plan D8) — the WebGL convention, not WebGPU's                                                                                                                                                                                                                                                                                                                                                                                   |
 | Context loss and restore (§61) | implemented; `contextlost`/`contextrestored` are emitted on `Renderer.events`                                                                                                                                                                                                                                                                                                                                                                            |
 | Lighting (§68)                 | one directional light plus scene ambient, first light in scene-graph DFS order (§33-deterministic) — **plus up to `MAX_PUNCTUAL_LIGHTS = 8` point and spot lights** (R-17, 2026-08-09; overflow keeps the first eight in traversal order, deterministically, and warns once). This row stopped at the directional light until 2026-08-29                                                                                                                 |
-| Shadows (§69)                  | one tier: the directional light's shadow map — a depth-only caster pass into a `DEPTH_COMPONENT24` target, 3×3 percentage-closer filtering on receivers (R-18, 2026-08-09). §69's remaining features are staged with reasons in `@four/scene`'s `DirectionalLightShadow`                                                                                                                                                                                 |
+| Shadows (§69)                  | one tier: the directional light's shadow map — a depth-only caster pass into a `DEPTH_COMPONENT24` target, 3×3 percentage-closer filtering on receivers (R-18, 2026-08-09). §69's remaining features are staged with reasons in `@fourjs/scene`'s `DirectionalLightShadow`                                                                                                                                                                                 |
 | Sprite batching (§65)          | **shipped, opt-in** (R-9, 2026-08-09): `renderer.batching = createGlBatching()` merges consecutive items sharing a pipeline and a material instance into one draw through the unlit program; without the opt-in it stays one draw call per sprite. Opt-in by measured decision — the batcher costs bundle bytes every non-batching application would otherwise carry (`gl-batch.ts`). This row said "absent — one draw call per sprite" until 2026-08-29 |
 | Post-processing (§70)          | copy, colour grade, the sRGB output transform (R-15), and §60 graph effects — driven as `RenderGraph` effect passes (R-6, 2026-08-07; RFC 0001, 2026-08-28)                                                                                                                                                                                                                                                                                              |
 | Anti-aliasing                  | `RendererOptions.antialias` is a hint; a backend that cannot honour it never fails initialization                                                                                                                                                                                                                                                                                                                                                        |
@@ -156,30 +156,30 @@ generator change, not a prose edit.
      WebGPU fields) stay at the construction-time floor until a context
      exists. Those floors mean "not yet queried", not "this backend cannot". -->
 
-| Declaration                | `null`         | `webgl2`             | `webgpu`              |
-| -------------------------- | -------------- | -------------------- | --------------------- |
-| Package (§98)              | `@four/render` | `@four/render-webgl` | `@four/render-webgpu` |
-| Exported class             | `NullRenderer` | `WebglRenderer`      | `WebgpuRenderer`      |
-| `backend`                  | `null`         | `webgl2`             | `webgpu`              |
-| `maxTextureSize`           | 0              | 0                    | 0                     |
-| `maxAnisotropy`            | 1              | not reported         | not reported          |
-| `textureFormats`           | none           | `rgba8`              | none                  |
-| `multisampling`            | no             | yes                  | no                    |
-| `floatRenderTargets`       | no             | no                   | no                    |
-| `timestampQueries`         | no             | no                   | no                    |
-| `storageBuffers`           | no             | no                   | no                    |
-| `computeShaders`           | no             | no                   | no                    |
-| `indirectDraw`             | no             | no                   | no                    |
-| `compressedTextureFormats` | none           | none                 | none                  |
-| `shaderPrecision`          | `none`         | `highp`              | `none`                |
-| `maxUniformBufferBytes`    | 0              | not reported         | 0                     |
-| `maxBindings`              | 0              | not reported         | 0                     |
-| `maximumSkinningJoints`    | 0              | 48                   | not reported          |
+| Declaration                | `null`           | `webgl2`               | `webgpu`                |
+| -------------------------- | ---------------- | ---------------------- | ----------------------- |
+| Package (§98)              | `@fourjs/render` | `@fourjs/render-webgl` | `@fourjs/render-webgpu` |
+| Exported class             | `NullRenderer`   | `WebglRenderer`        | `WebgpuRenderer`        |
+| `backend`                  | `null`           | `webgl2`               | `webgpu`                |
+| `maxTextureSize`           | 0                | 0                      | 0                       |
+| `maxAnisotropy`            | 1                | not reported           | not reported            |
+| `textureFormats`           | none             | `rgba8`                | none                    |
+| `multisampling`            | no               | yes                    | no                      |
+| `floatRenderTargets`       | no               | no                     | no                      |
+| `timestampQueries`         | no               | no                     | no                      |
+| `storageBuffers`           | no               | no                     | no                      |
+| `computeShaders`           | no               | no                     | no                      |
+| `indirectDraw`             | no               | no                     | no                      |
+| `compressedTextureFormats` | none             | none                   | none                    |
+| `shaderPrecision`          | `none`           | `highp`                | `none`                  |
+| `maxUniformBufferBytes`    | 0                | not reported           | 0                       |
+| `maxBindings`              | 0                | not reported           | 0                       |
+| `maximumSkinningJoints`    | 0                | 48                     | not reported            |
 
 Renderer packages that declare no renderer class:
 
-- `@four/render-canvas` — reserved stub (§62): the package builds and exports `PACKAGE_NAME` only.
-- `@four/render-svg` — reserved stub (§62): the package builds and exports `PACKAGE_NAME` only.
+- `@fourjs/render-canvas` — reserved stub (§62): the package builds and exports `PACKAGE_NAME` only.
+- `@fourjs/render-svg` — reserved stub (§62): the package builds and exports `PACKAGE_NAME` only.
 
 <!-- END GENERATED: renderer-backends -->
 
@@ -212,18 +212,18 @@ one skipped through the `onFallback` callback — §62's diagnostics event; a
 named backend that cannot start fails fast with
 `RENDERER_INITIALIZATION_FAILED` (§89) rather than silently downgrading. An
 application still chooses its backends by importing them: nothing in
-`@four/render` or the umbrella package imports a backend, and a bundle that
+`@fourjs/render` or the umbrella package imports a backend, and a bundle that
 hands `Application` a constructed instance carries no registry at all.
 
 ## 3. Physics solver adapters (§37, §102)
 
-§102 defines the solver package set as `@four/physics-rapier` and
-`@four/physics-box2d`; `@four/physics-soft` is §35's soft-body package on the
+§102 defines the solver package set as `@fourjs/physics-rapier` and
+`@fourjs/physics-box2d`; `@fourjs/physics-soft` is §35's soft-body package on the
 same seam. The table below is generated from the adapters' own
 `PhysicsCapabilities` records, read off constructed instances before
 `initialize`, plus the two structural access seams
 (`SolverBodyAccess`, `SolverJointAccess`) probed member by member against
-`@four/physics`'s emitted declarations. Regenerate with
+`@fourjs/physics`'s emitted declarations. Regenerate with
 `node tools/generate-compatibility.mjs` after any adapter change.
 
 <!-- BEGIN GENERATED: solver-adapters -->
@@ -235,7 +235,7 @@ same seam. The table below is generated from the adapters' own
 
 | Declaration                     | `rapier2d`                                         | `rapier3d`                                                      |
 | ------------------------------- | -------------------------------------------------- | --------------------------------------------------------------- |
-| Package (§98)                   | `@four/physics-rapier`                             | `@four/physics-rapier`                                          |
+| Package (§98)                   | `@fourjs/physics-rapier`                           | `@fourjs/physics-rapier`                                        |
 | Exported class                  | `Rapier2dAdapter`                                  | `Rapier3dAdapter`                                               |
 | Underlying solver               | `@dimforge/rapier2d-compat` 0.20.0                 | `@dimforge/rapier3d-compat` 0.20.0                              |
 | `dimensions` (§21)              | `2d`                                               | `3d`                                                            |
@@ -256,8 +256,8 @@ same seam. The table below is generated from the adapters' own
 
 Solver packages that declare no adapter:
 
-- `@four/physics-box2d` — reserved stub (§102): the package builds and exports `PACKAGE_NAME` only.
-- `@four/physics-soft` — reserved stub (§102): the package builds and exports `PACKAGE_NAME` only.
+- `@fourjs/physics-box2d` — reserved stub (§102): the package builds and exports `PACKAGE_NAME` only.
+- `@fourjs/physics-soft` — reserved stub (§102): the package builds and exports `PACKAGE_NAME` only.
 
 <!-- END GENERATED: solver-adapters -->
 
@@ -268,7 +268,7 @@ create/destroy, `step`, `drainEvents`, the two `sync*` hooks, the §30 query
 set, optional snapshots, `dispose`. That is a contract about the **step**. It
 has no per-body read and no per-joint command, so it cannot move a solved pose
 onto a node or drive a motor. The engine therefore requires two further
-interfaces, defined in `@four/physics` and detected structurally (the
+interfaces, defined in `@fourjs/physics` and detected structurally (the
 generated table's `SolverBodyAccess implemented` / `SolverJointAccess
 implemented` rows are member-by-member probes against the emitted
 declarations, not a capability flag):
@@ -322,7 +322,7 @@ its source in `packages/physics-rapier/src`):
   | ------------------ | ------------------------------------------------------------- |
   | `rapier2d`         | force-based gain                                              |
   | `rapier3d`         | force-based gain                                              |
-  | `box2d` (reserved) | — (capping adapter; column when `@four/physics-box2d` ships) |
+  | `box2d` (reserved) | — (capping adapter; column when `@fourjs/physics-box2d` ships) |
 - **`inheritVelocityFrom` is nearly a no-op on both Rapier adapters.** Rapier
   derives kinematic velocity itself from the pose it is given, so seeding
   velocities from a `PoseTarget` does not change what the solver already
@@ -354,9 +354,9 @@ package released.
 
 | Format                         | Constant                                                            | Writes | Reads    | Where                  |
 | ------------------------------ | ------------------------------------------------------------------- | ------ | -------- | ---------------------- |
-| Scene document (§79)           | `SCENE_FORMAT_VERSION`                                              | `1`    | `1`      | `@four/serialization`  |
-| Replay recording (§34)         | `LATEST_REPLAY_FORMAT_VERSION` / `SUPPORTED_REPLAY_FORMAT_VERSIONS` | `2`    | `1`, `2` | `@four/diagnostics`    |
-| Rapier snapshot envelope (§34) | `SNAPSHOT_FORMAT_VERSION` (module-private, not exported)            | `2`    | `2`      | `@four/physics-rapier` |
+| Scene document (§79)           | `SCENE_FORMAT_VERSION`                                              | `1`    | `1`      | `@fourjs/serialization`  |
+| Replay recording (§34)         | `LATEST_REPLAY_FORMAT_VERSION` / `SUPPORTED_REPLAY_FORMAT_VERSIONS` | `2`    | `1`, `2` | `@fourjs/diagnostics`    |
+| Rapier snapshot envelope (§34) | `SNAPSHOT_FORMAT_VERSION` (module-private, not exported)            | `2`    | `2`      | `@fourjs/physics-rapier` |
 | `.four` binary package (§79)   | —                                                                   | —      | —        | not implemented (A-16) |
 
 **The versioning rule, decided 2026-08-06 (PH-6): a document declares the
@@ -395,7 +395,7 @@ Notes per row:
 ## 5. Plugin API versions (§81)
 
 **Implemented 2026-08-28 (RFC 0002, gap A-3 closed).** The §81 plugin host lives
-in `@four/core` (`FourPlugin`, `PluginContext`, `PluginHost`, `installPlugins`),
+in `@fourjs/core` (`FourPlugin`, `PluginContext`, `PluginHost`, `installPlugins`),
 and the umbrella package `four` declares the six capability tokens
 (`SIMULATION_SYSTEMS`, `RENDERER_REGISTRY`, `SOLVER_REGISTRY`,
 `COMPONENT_SERIALIZERS`, `SCENE_MIGRATIONS`, `RENDER_GRAPH`).
@@ -438,7 +438,7 @@ shapes behind the tokens.
 All 24 workspace packages are at `0.0.0` and none is published. §98 fixes the
 publish naming: the umbrella package publishes as `@danielsimonjr/fourjs` and
 the sub-packages as `@danielsimonjr/fourjs-<name>`, while the workspace names
-stay `four` and `@four/*`. Changesets is the configured release tool (§91);
+stay `four` and `@fourjs/*`. Changesets is the configured release tool (§91);
 `docs/GAP ANALYSIS v0.md` A-25 records that the release machinery around it
 does not exist yet.
 

@@ -4,7 +4,7 @@
  * pins the token, the non-revocable disposition, and the registry.
  */
 
-import { bindCapability, isFourError } from "@four/core";
+import { bindCapability, isFourError } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import {

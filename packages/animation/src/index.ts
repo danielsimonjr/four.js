@@ -1,5 +1,5 @@
 /**
- * `@four/animation` — the public surface of the animation pillar (Part III).
+ * `@fourjs/animation` — the public surface of the animation pillar (Part III).
  *
  * Named exports only (plan §1 rule 7), listed explicitly rather than re-exported
  * with `export *` so the package's API is readable in one file and a new symbol
@@ -12,7 +12,7 @@
  * They are cross-module plumbing inside this package, not API.
  */
 
-export const PACKAGE_NAME = "@four/animation";
+export const PACKAGE_NAME = "@fourjs/animation";
 
 export type {
   Advanceable,

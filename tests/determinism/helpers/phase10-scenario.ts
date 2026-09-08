@@ -20,7 +20,7 @@
  *
  * ### How a text digest is taken with a float hasher (decision, WP-10.4)
  *
- * `@four/diagnostics`'s `checksum.ts` offers exactly two primitives —
+ * `@fourjs/diagnostics`'s `checksum.ts` offers exactly two primitives —
  * `createChecksum()` and `hashFloats(xs)` — and **neither takes a string or a
  * byte array**; there is no string/bytes entry point to reuse. So
  * {@link digestText} encodes the document to UTF-8 with `TextEncoder` and feeds
@@ -77,8 +77,8 @@ import {
   type ReplayRecording,
   type ReplaySnapshot,
   type ReplayTarget,
-} from "@four/diagnostics";
-import { Vector2, Vector3 } from "@four/math";
+} from "@fourjs/diagnostics";
+import { Vector2, Vector3 } from "@fourjs/math";
 import {
   Collider,
   PhysicsSystem,
@@ -87,17 +87,17 @@ import {
   type CollisionShape,
   type PhysicsSnapshot,
   type WorldPhysicsEvent,
-} from "@four/physics";
-import { Rapier2dAdapter } from "@four/physics-rapier";
-import { Group, type Node } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/physics";
+import { Rapier2dAdapter } from "@fourjs/physics-rapier";
+import { Group, type Node } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 
 /**
  * The one narrowing the §34 snapshot round trip needs, and why it is a named
  * helper rather than an inline cast.
  *
  * `ReplaySnapshot.configuration` is `unknown` **by design**:
- * `@four/diagnostics` may not import `@four/physics`, so it cannot name
+ * `@fourjs/diagnostics` may not import `@fourjs/physics`, so it cannot name
  * `PhysicsSnapshotConfiguration` (`packages/diagnostics/src/recorder.ts`
  * says so at the field). `PhysicsSnapshot.configuration` *is* that type. The
  * two declarations are therefore assignable in the **produce** direction
@@ -350,7 +350,7 @@ function addBody(
  * the fixed registration order §33's checksum visits.
  *
  * Nothing is cached at module scope (the *wasm image* is, inside
- * `@four/physics-rapier`, which is a decoded module and not solver state), so
+ * `@fourjs/physics-rapier`, which is a decoded module and not solver state), so
  * calling this twice in one process is a genuine second world.
  */
 async function createRig(): Promise<Rig> {

@@ -50,7 +50,7 @@
  *
  * What `PRIORITY_CONSTRAINTS` and `PRIORITY_SENSOR_UPDATE` legitimately hold is
  * *engine-side* work at those points in the order: `ConstraintSystem`
- * (`@four/motion`, §42's `"constraint"` authority) occupies step 7, and step 8
+ * (`@fourjs/motion`, §42's `"constraint"` authority) occupies step 7, and step 8
  * is where an application's own sensor bookkeeping belongs — reading the
  * §30 queries and the poses the solve just produced, before the listeners at
  * step 9 see either. Step 9 is the last of the four that was structurally
@@ -70,8 +70,8 @@
  * @see {@link PhysicsSystem} — the step-6 occupant, and this system's source.
  */
 
-import { FourError } from "@four/core";
-import { PRIORITY_EVENT_DISPATCH, type SimulationSystem } from "@four/motion";
+import { FourError } from "@fourjs/core";
+import { PRIORITY_EVENT_DISPATCH, type SimulationSystem } from "@fourjs/motion";
 
 import type { PhysicsSystem } from "./physics-system.js";
 import type { PhysicsWorld } from "./world.js";

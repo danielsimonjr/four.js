@@ -62,9 +62,9 @@
  * cameras §47 requires later.
  */
 
-import type { Unsubscribe } from "@four/core";
-import { Vector3, type DepthRange } from "@four/math";
-import { resolveWorldTransform, type Camera, type Node } from "@four/scene";
+import type { Unsubscribe } from "@fourjs/core";
+import { Vector3, type DepthRange } from "@fourjs/math";
+import { resolveWorldTransform, type Camera, type Node } from "@fourjs/scene";
 
 import { createPickRay } from "./pick.js";
 import type { ScenePointerEvent } from "./pointer-events.js";

@@ -57,7 +57,7 @@ hardware. The distinction matters when planning work — a **hardware** row beco
 benchmark the day it runs on a workstation; a **feature** row needs a packet first.
 
 **Amended 2026-08-08 (A-27).** Two rows below moved. _Retained UI nodes_ read
-_"`@four/ui` ships and lays out; the row is a rendering-throughput number, so it needs a
+_"`@fourjs/ui` ships and lays out; the row is a rendering-throughput number, so it needs a
 real GPU rather than SwiftShader"_ and was filed under **hardware**; that was right about
 the drawing and wrong about the layout, which is pure CPU work and is now measured by
 [`ui-layout.mjs`](#ui-layoutmjs--86s-5-000-retained-ui-nodes-cpu-half). _Animated glyphs_
@@ -75,7 +75,7 @@ of the row is GPU submission. Both rows are
 | mesh instances          | **feature** | Instancing exists **only** in the particle path (`drawArraysInstanced`, one call per system). No instanced draw path exists for `Renderable`s, so there is no instance count to sweep                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | animated glyphs         | **half**    | **Amended 2026-08-13 (R-28).** Read _"the draw half stays **feature**-blocked — §56 ships a bitmap tier whose atlas cannot be addressed per glyph"_ until then; §55's `frame` (R-29) and §49's `Text` node closed that, and 20 000 glyphs are now **one** `drawElements` over one atlas material instead of 20 000 texture binds. Both CPU halves are measured by `text-layout.mjs` — `layoutText` producing the quads, and the `Text` geometry rebuild that turns them into vertex buffers; the **submission** half needs a GPU, exactly as the two batching rows say of theirs. Shaping and SDF are staged (S-6) |
 | 100 000+ GPU particles  | hardware    | The CPU path is measured by `particles-100k.mjs`. A GPU/compute path is not implemented **and** would need a GPU to measure; count it as blocked twice                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| retained UI nodes       | **half**    | The **layout-and-state** half is measured (`ui-layout.mjs`): `@four/ui` has no renderer dependency by design, so §74's two passes over the tree are the whole of what the package does per frame. The **draw** half needs a real GPU rather than SwiftShader. It no longer pays the per-glyph texture cut the row above used to (R-28, 2026-08-13), though a `WidgetSkin` has to be rewritten onto `Text` to stop paying it                                                                                                                                                                                        |
+| retained UI nodes       | **half**    | The **layout-and-state** half is measured (`ui-layout.mjs`): `@fourjs/ui` has no renderer dependency by design, so §74's two passes over the tree are the whole of what the package does per frame. The **draw** half needs a real GPU rather than SwiftShader. It no longer pays the per-glyph texture cut the row above used to (R-28, 2026-08-13), though a `WidgetSkin` has to be rewritten onto `Text` to stop paying it                                                                                                                                                                                        |
 | bundle payload          | —           | Not unmeasured: gated by `pnpm size` (size-limit) in CI, the one §86 row that _is_ enforced                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | idle scene / near-zero  | —           | Not unmeasured: `scene-propagation.mjs` covers the scene-graph half                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | §86 row                 | blocked by  | detail                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -85,7 +85,7 @@ of the row is GPU submission. Both rows are
 | mesh instances          | **feature** | Instancing exists **only** in the particle path (`drawArraysInstanced`, one call per system). No instanced draw path exists for `Renderable`s, so there is no instance count to sweep                                                                                                                                                                                                                                                                 |
 | animated glyphs         | **half**    | The **layout** half is measured (`text-layout.mjs`): `layoutText` produces the quads on the CPU. The **draw** half stays **feature**-blocked — §56 ships a bitmap tier whose atlas cannot be addressed per glyph, so drawing one cell means cutting it into its own `Texture` (the documented workaround in `examples/first-2d-scene` and `examples/ui-demo`) and a glyph is a texture bind and a draw call. Shaping and SDF are staged (S-6)         |
 | 100 000+ GPU particles  | hardware    | The CPU path is measured by `particles-100k.mjs`. A GPU/compute path is not implemented **and** would need a GPU to measure; count it as blocked twice                                                                                                                                                                                                                                                                                                |
-| retained UI nodes       | **half**    | The **layout-and-state** half is measured (`ui-layout.mjs`): `@four/ui` has no renderer dependency by design, so §74's two passes over the tree are the whole of what the package does per frame. The **draw** half needs a real GPU rather than SwiftShader, and pays the same per-glyph texture cut as the row above                                                                                                                                |
+| retained UI nodes       | **half**    | The **layout-and-state** half is measured (`ui-layout.mjs`): `@fourjs/ui` has no renderer dependency by design, so §74's two passes over the tree are the whole of what the package does per frame. The **draw** half needs a real GPU rather than SwiftShader, and pays the same per-glyph texture cut as the row above                                                                                                                                |
 | bundle payload          | —           | Not unmeasured: gated by `pnpm size` (size-limit) in CI, the one §86 row that _is_ enforced                                                                                                                                                                                                                                                                                                                                                           |
 | idle scene / near-zero  | —           | Not unmeasured: `scene-propagation.mjs` covers the scene-graph half                                                                                                                                                                                                                                                                                                                                                                                   |
 
@@ -219,7 +219,7 @@ node benchmarks/math-ops.mjs
 
 Sixteen rows — a `baseline (no op)` floor plus fifteen `Vector3`/`Quaternion`/`Matrix4`
 operations — each run as 40 measured batches of 100 000 calls over 8 rotating operand sets.
-Reports median ms/batch, ns/op, Mop/s, **and allocations per batch** from `@four/math`'s own
+Reports median ms/batch, ns/op, Mop/s, **and allocations per batch** from `@fourjs/math`'s own
 `constructionCount()` (§83).
 
 **The durable finding is the allocation column: zero, on every row, across 1.6 million
@@ -355,7 +355,7 @@ splits it three ways, because no single artefact can honestly carry it:
 | half of §112                      | where the evidence is                                                                                                 |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | 100 000 particles **simulated**   | this script — recorded ms/step, no CI assertion                                                                       |
-| **rendered** in one draw call     | `@four/render`'s `particles.ts` contract and `@four/render-webgl`'s instanced path, pinned by their unit suites       |
+| **rendered** in one draw call     | `@fourjs/render`'s `particles.ts` contract and `@fourjs/render-webgl`'s instanced path, pinned by their unit suites       |
 | at **interactive rates**, visibly | `examples/particles-demo` + `tests/browser/particles.spec.ts`, at ~1 800 particles — the size SwiftShader can sustain |
 | **deterministically** (P9-4)      | `tests/determinism/phase9-particles.test.ts` + `golden/phase9.json`                                                   |
 
@@ -387,7 +387,7 @@ node benchmarks/ui-layout.mjs
 ```
 
 §86 asks for **5 000 retained UI nodes**. That frame costs two things — laying the tree out
-and drawing it — and `@four/ui`'s frozen dependency matrix (`core`, `math`, `scene`,
+and drawing it — and `@fourjs/ui`'s frozen dependency matrix (`core`, `math`, `scene`,
 `input`, `text`; no renderer) separates them in the engine, not merely in this file. This
 script measures the layout, which is the whole of what the package does per frame; the draw
 is the application's, goes through a `WidgetSkin`, and is not measurable here.
@@ -441,7 +441,7 @@ run under record, and its host block before quoting it):
 node benchmarks/text-layout.mjs
 ```
 
-§86 asks for **20 000 animated glyphs**. Producing the quads is CPU work `@four/text` does;
+§86 asks for **20 000 animated glyphs**. Producing the quads is CPU work `@fourjs/text` does;
 turning them into vertex buffers is CPU work §49's `Text` node does; submitting the draw is
 the GPU's. This script measures the first two.
 

@@ -1,17 +1,17 @@
-import { boxGeometry, planeGeometry } from "@four/geometry";
+import { boxGeometry, planeGeometry } from "@fourjs/geometry";
 import {
   Matrix4,
   Quaternion,
   Vector3,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
+} from "@fourjs/math";
 import {
   LitMaterial,
   StandardMaterial,
   UnlitMaterial,
   type Material,
-} from "@four/materials";
+} from "@fourjs/materials";
 import {
   ALL_LAYERS,
   DEFAULT_LAYER_MASK,
@@ -27,7 +27,7 @@ import {
   type Camera,
   type Node,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -877,7 +877,7 @@ describe("§46 layer filtering (R-38)", () => {
     const scene = new Scene();
     const legacy = renderable("legacy");
     // A structurally typed drawable predating §46 — the shape a package outside
-    // `@four/scene` can implement (`ParticleDrawable`), or a host's own node.
+    // `@fourjs/scene` can implement (`ParticleDrawable`), or a host's own node.
     (legacy as unknown as { layers: number | undefined }).layers = undefined;
     scene.add(legacy);
     resolveWorldTransforms(scene);
@@ -926,7 +926,7 @@ describe("§47/§48 — viewLayerMask (R-38)", () => {
 
   it("reads a camera double that predates the field as ALL_LAYERS", () => {
     // A structurally typed camera built before §46 landed — the case
-    // `@four/render-webgl`'s own test double is, and the reason the fallback
+    // `@fourjs/render-webgl`'s own test double is, and the reason the fallback
     // is not dead code.
     const legacy = { ...createFullscreenViewport(camera) };
     legacy.camera = { ...camera, layers: undefined } as unknown as Camera;

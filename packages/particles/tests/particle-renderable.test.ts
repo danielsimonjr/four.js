@@ -4,17 +4,17 @@
  *
  * Three things are pinned here, and they are worth naming because nothing in
  * the type system can pin them for us — the frozen §3.1 dependency matrix keeps
- * `@four/particles` and `@four/render` from ever seeing each other's
+ * `@fourjs/particles` and `@fourjs/render` from ever seeing each other's
  * declarations (see `src/particle-renderable.ts`):
  *
  * 1. **The shape.** Brand, id, sort keys, count, instance array, repack method:
- *    the member names and types `@four/render`'s `ParticleDrawable` declares.
- *    `@four/render`'s `tests/particles.test.ts` asserts the same list from the
+ *    the member names and types `@fourjs/render`'s `ParticleDrawable` declares.
+ *    `@fourjs/render`'s `tests/particles.test.ts` asserts the same list from the
  *    consuming side, against a double that `implements ParticleDrawable` for
  *    real.
  * 2. **The layout.** Stride 8: centre (3), current size (1), straight-alpha
  *    RGBA (4). Asserted here as floats at offsets, and by
- *    `@four/render-webgl`'s attribute pointers at the far end.
+ *    `@fourjs/render-webgl`'s attribute pointers at the far end.
  * 3. **The values.** The drawn size and colour must be the pool's own ramp
  *    evaluation, bit for bit — so they are asserted against
  *    `ParticlePool.getSize` and `ParticlePool.getColor` rather than against a
@@ -27,8 +27,8 @@ import {
   Vector4,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
-import { Group, Scene } from "@four/scene";
+} from "@fourjs/math";
+import { Group, Scene } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { ParticleEmitter } from "../src/emitter.js";
@@ -38,7 +38,7 @@ import {
 } from "../src/particle-renderable.js";
 import { ParticlePool } from "../src/pool.js";
 
-/** Offsets within one instance, mirroring `@four/render`'s exported constants. */
+/** Offsets within one instance, mirroring `@fourjs/render`'s exported constants. */
 const POSITION_OFFSET = 0;
 const SIZE_OFFSET = 3;
 const COLOR_OFFSET = 4;
@@ -137,7 +137,7 @@ describe("ParticleRenderable — construction", () => {
   });
 });
 
-describe("ParticleRenderable — the ParticleDrawable contract (@four/render)", () => {
+describe("ParticleRenderable — the ParticleDrawable contract (@fourjs/render)", () => {
   it("carries the brand and the whole member list, with the right types", () => {
     const node = new ParticleRenderable(emitter());
 
@@ -153,7 +153,7 @@ describe("ParticleRenderable — the ParticleDrawable contract (@four/render)", 
     expect(node.updateParticleInstances()).toBeUndefined();
   });
 
-  it("satisfies the guard `@four/render` recognises it with", () => {
+  it("satisfies the guard `@fourjs/render` recognises it with", () => {
     // The guard, transcribed: brand identity plus the repack method. Written
     // out rather than imported because the dependency matrix forbids the edge —
     // if this drifts from `isParticleDrawable`, one of the two suites fails.

@@ -16,7 +16,7 @@
  *    refused rather than written as `null`; `-0` normalizes to `0`.
  */
 
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import {

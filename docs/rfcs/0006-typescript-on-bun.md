@@ -16,7 +16,7 @@ package surface.
 
 This change is architecturally significant under §95: it rewrites the monorepo's
 install/CI contract and the Phase 0 deliverable list (§103), and it amends the
-§91 recommended baseline. It does **not** change the public `@four/*` API, scene
+§91 recommended baseline. It does **not** change the public `@fourjs/*` API, scene
 format, solver adapters, or plugin surface.
 
 ## Proposed decision

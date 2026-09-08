@@ -5,7 +5,7 @@
  * §69 lists ten shadow features. **One tier ships**: a single directional
  * light's shadow map, rendered depth-only into an off-screen
  * `DEPTH_COMPONENT24` texture and sampled back with a 3×3 percentage-closer
- * filter. `@four/scene`'s `DirectionalLightShadow` owns the list of what is
+ * filter. `@fourjs/scene`'s `DirectionalLightShadow` owns the list of what is
  * staged and why; this module and `gl-program.ts`'s `SHADOW_GLSL` /
  * `ShadowUniforms` own how the shipped tier becomes GL.
  *
@@ -37,8 +37,8 @@
  * re-walking the scene.
  */
 
-import type { Disposable } from "@four/core";
-import type { Matrix4 } from "@four/math";
+import type { Disposable } from "@fourjs/core";
+import type { Matrix4 } from "@fourjs/math";
 
 import {
   createLinkedProgram,

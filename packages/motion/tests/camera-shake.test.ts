@@ -3,8 +3,8 @@
  * the `ConstraintSystem` hook (R-36/R-37 residue).
  */
 
-import { Quaternion, Vector3 } from "@four/math";
-import { Group } from "@four/scene";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { describe, expect, it, vi } from "vitest";
 
 import { OrbitRig } from "../src/camera-rigs.js";

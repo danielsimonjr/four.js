@@ -27,7 +27,7 @@
  * exactly; masked box x 72…119, y 64…127.
  */
 
-import { unlitShaderSource } from "@four/render-webgpu";
+import { unlitShaderSource } from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */

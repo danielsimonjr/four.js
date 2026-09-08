@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resetDevWarnings } from "@four/core";
+import { resetDevWarnings } from "@fourjs/core";
 
 import { warnDisposedInUse } from "../src/resource-warnings.js";
 

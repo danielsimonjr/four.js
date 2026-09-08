@@ -133,9 +133,9 @@
  * meaningful), so a trajectory must not be mutated while it is being followed.
  */
 
-import type { Component, ComponentHost } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
-import { warnAuthorityConflict, type Node, type Transform } from "@four/scene";
+import type { Component, ComponentHost } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import { warnAuthorityConflict, type Node, type Transform } from "@fourjs/scene";
 
 import {
   CharacterController,
@@ -363,7 +363,7 @@ export class KinematicController implements Component {
    * any active rotation command. Does not touch the translation channel.
    *
    * `rotation` is copied and assumed to be a unit quaternion (as everywhere in
-   * `@four/math`). Interpolation is spherical along the **shortest arc** (plan
+   * `@fourjs/math`). Interpolation is spherical along the **shortest arc** (plan
    * D8 — `Quaternion.slerp` negates the target when the dot product is
    * negative), from the node's rotation at the first fixed step after this call;
    * the completing step writes `rotation`'s components exactly, so the node

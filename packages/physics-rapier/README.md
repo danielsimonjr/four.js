@@ -1,8 +1,8 @@
-# @four/physics-rapier
+# @fourjs/physics-rapier
 
 Rapier solver adapters (2D and 3D, WebAssembly). Part of [fourJS](../../README.md).
 
-Implements §37 and §102 of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); the first adapter per Phase 5 (§108). This package sits _below_ `@four/physics`: it implements `PhysicsSolverAdapter` and depends on nothing else in the engine, which is what makes the solver swappable. Application code should target `@four/physics` and hand it an adapter instance.
+Implements §37 and §102 of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); the first adapter per Phase 5 (§108). This package sits _below_ `@fourjs/physics`: it implements `PhysicsSolverAdapter` and depends on nothing else in the engine, which is what makes the solver swappable. Application code should target `@fourjs/physics` and hand it an adapter instance.
 
 ## What's here
 
@@ -18,4 +18,4 @@ Implements §37 and §102 of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.
 
 Unit tests are colocated in `tests/` per §92.
 
-Workspace name `@four/physics-rapier`; publishes as `@danielsimonjr/fourjs-physics-rapier`.
+Workspace name `@fourjs/physics-rapier`; publishes as `@danielsimonjr/fourjs-physics-rapier`.

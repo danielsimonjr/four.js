@@ -2,11 +2,11 @@
  * WP-R1.5 — §68's light set and §59's standard surface on the WebGPU backend,
  * across the packages that have to agree on them (2026-08-28).
  *
- * The cross-package half of the packet: `@four/scene` owns the light nodes,
- * `@four/render` owns `collectSceneLights` — the *same* collector, selection
+ * The cross-package half of the packet: `@fourjs/scene` owns the light nodes,
+ * `@fourjs/render` owns `collectSceneLights` — the *same* collector, selection
  * rule and packed arrays the GL backend consumes, which is what makes the two
  * backends' light sets §84-consistent by construction — and
- * `@four/render-webgpu` is where the record becomes one uniform buffer
+ * `@fourjs/render-webgpu` is where the record becomes one uniform buffer
  * instead of five `uniform3fv`/`uniform4fv` calls.
  *
  * Four claims:
@@ -31,8 +31,8 @@
  *    `tests/browser/webgpu/webgpu-lit.spec.ts`).
  */
 
-import { boxGeometry, planeGeometry } from "@four/geometry";
-import { LitMaterial, StandardMaterial, UnlitMaterial } from "@four/materials";
+import { boxGeometry, planeGeometry } from "@fourjs/geometry";
+import { LitMaterial, StandardMaterial, UnlitMaterial } from "@fourjs/materials";
 import {
   MAX_PUNCTUAL_LIGHTS,
   Mesh,
@@ -40,8 +40,8 @@ import {
   Texture,
   collectSceneLights,
   createSceneLights,
-} from "@four/render";
-import { WebgpuRenderer } from "@four/render-webgpu";
+} from "@fourjs/render";
+import { WebgpuRenderer } from "@fourjs/render-webgpu";
 import {
   LIGHT_CAMERA_OFFSET,
   LIGHT_COLOR_OFFSET,
@@ -50,7 +50,7 @@ import {
   LIGHT_PUNCTUAL_COLOR_OFFSET,
   LIGHT_PUNCTUAL_PARAMS_OFFSET,
   LIGHT_PUNCTUAL_POSITION_OFFSET,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import {
   Bone,
   DirectionalLight,
@@ -62,7 +62,7 @@ import {
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it, vi } from "vitest";
 
 import {

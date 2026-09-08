@@ -74,8 +74,8 @@
  * | fixed-step loop (§10) | 600 injected frames through `Application.step` |
  */
 
-import { createChecksum } from "@four/diagnostics";
-import { Quaternion, Vector3 } from "@four/math";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Quaternion, Vector3 } from "@fourjs/math";
 import {
   CatmullRomTrajectory,
   CircularTrajectory,
@@ -84,14 +84,14 @@ import {
   KinematicSystem,
   MotionComponent,
   MotionSystem,
-} from "@four/motion";
+} from "@fourjs/motion";
 import {
   Group,
   PoseBuffer,
   createSnapshotSystem,
   type Node,
-} from "@four/scene";
-import { Application } from "four";
+} from "@fourjs/scene";
+import { Application } from "fourJS";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 export const FIXED_TIME_STEP = 1 / 60;

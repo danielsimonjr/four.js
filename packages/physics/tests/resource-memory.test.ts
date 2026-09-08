@@ -9,7 +9,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { Group } from "@four/scene";
+import { Group } from "@fourjs/scene";
 
 import { Collider } from "../src/collider.js";
 import { FixedJoint } from "../src/joints.js";
@@ -213,7 +213,7 @@ describe("§83 solver-handle resource accounting (A-5)", () => {
     const { FakeSolverAdapter: ProductionFake } = await import(
       "./fake-adapter.js"
     );
-    const { Group: ProductionGroup } = await import("@four/scene");
+    const { Group: ProductionGroup } = await import("@fourjs/scene");
 
     const before = productionBodies();
     const adapter = new ProductionFake();

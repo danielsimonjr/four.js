@@ -14,7 +14,7 @@
  * property of a *tree* (or a forest of trees), it needs a host document this
  * package may not name, and it must stay **opt-in**. An application that never
  * imports this module never pays for it — `package.json` sets `sideEffects:
- * false`, so a bundler that tree-shakes unused `@four/ui` exports drops this
+ * false`, so a bundler that tree-shakes unused `@fourjs/ui` exports drops this
  * file entirely. That is the payload-budget half of the DOM integration policy.
  *
  * ## DOM integration policy (decision, A-13 remainder)
@@ -23,7 +23,7 @@
  * forbids naming host types. The document is therefore a duck-typed
  * {@link DocumentLike}: `createElement`, `body`, `getElementById`. Tests inject
  * a tiny fake; browsers pass `window.document`. Nothing here touches a canvas,
- * a renderer, or `@four/four`'s `Application` — reduced motion is an option
+ * a renderer, or `@fourjs/four`'s `Application` — reduced motion is an option
  * the caller copies from `app.reducedMotion` when they have one.
  *
  * The container is the accessibility tree, so it is **not** `aria-hidden`.
@@ -47,8 +47,8 @@
  * {@link UIWidget.accessibilityVersion}.
  */
 
-import type { Disposable, Unsubscribe } from "@four/core";
-import type { Node } from "@four/scene";
+import type { Disposable, Unsubscribe } from "@fourjs/core";
+import type { Node } from "@fourjs/scene";
 
 import { Button } from "./button.js";
 import { Checkbox, Toggle } from "./checkable.js";

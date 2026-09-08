@@ -1,5 +1,5 @@
-import { isFourError } from "@four/core";
-import { SolverRegistry, registeredSolvers } from "@four/physics";
+import { isFourError } from "@fourjs/core";
+import { SolverRegistry, registeredSolvers } from "@fourjs/physics";
 import { describe, expect, it } from "vitest";
 
 import {

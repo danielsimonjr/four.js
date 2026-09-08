@@ -7,7 +7,7 @@
  *    §83 disposal — which is the same contract `Texture` and `BufferGeometry`
  *    offer, so a backend cache written for any one of them works for this.
  * 2. **The texture seam.** `RenderTarget.colorTexture` has to satisfy
- *    `@four/materials`' `MaterialTexture` — the contract `Texture` satisfies —
+ *    `@fourjs/materials`' `MaterialTexture` — the contract `Texture` satisfies —
  *    or render-to-texture needs an adapter and R-5/R-6 inherit it. The typed
  *    `const asMaterialTexture: MaterialTexture = target.colorTexture`
  *    assignment below is a *compile-time* assertion of exactly that, checked
@@ -19,7 +19,7 @@
  *    than a double.
  */
 
-import type { MaterialTexture } from "@four/materials";
+import type { MaterialTexture } from "@fourjs/materials";
 import { describe, expect, it } from "vitest";
 
 import {

@@ -11,15 +11,15 @@
  * 3. the cull's every failure mode keeps the item.
  */
 
-import { BufferGeometry, boxGeometry, planeGeometry } from "@four/geometry";
-import { SpriteMaterial, UnlitMaterial } from "@four/materials";
+import { BufferGeometry, boxGeometry, planeGeometry } from "@fourjs/geometry";
+import { SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
 import {
   Frustum,
   Matrix4,
   Vector3,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
+} from "@fourjs/math";
 import {
   ALL_LAYERS,
   Group,
@@ -32,7 +32,7 @@ import {
   resetLayers,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {

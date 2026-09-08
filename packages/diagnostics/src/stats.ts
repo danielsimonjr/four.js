@@ -34,7 +34,7 @@
  * list reports `drawCalls: 0` ("counted; nothing was drawn"). Filling an
  * unmeasured counter with `0` would be a confident wrong answer, which is the
  * failure mode §84 exists to prevent — the same stance
- * {@link @four/render!RendererCapabilities | RendererCapabilities} takes on
+ * {@link @fourjs/render!RendererCapabilities | RendererCapabilities} takes on
  * limits a backend has not queried.
  *
  * Read the fields with `Number.isNaN` in mind, and render them as `—` rather
@@ -58,15 +58,15 @@
  *
  * ## Producers, and the seams they arrive through
  *
- * `@four/diagnostics` may depend on `core`, `math`, and `scene` only (plan
- * §3.1, frozen), so it cannot import `@four/render`, `@four/geometry`, or
- * `@four/physics` to receive their numbers. Producers therefore reach this
+ * `@fourjs/diagnostics` may depend on `core`, `math`, and `scene` only (plan
+ * §3.1, frozen), so it cannot import `@fourjs/render`, `@fourjs/geometry`, or
+ * `@fourjs/physics` to receive their numbers. Producers therefore reach this
  * record without being named — usually the way `debug-draw.ts` reaches a
  * solver, through a **locally declared shape satisfied structurally**, and
  * once (A-5) through plain numbers, where there was no foreign shape to
  * describe:
  *
- * - {@link RenderStatisticsLike} transcribes `@four/render`'s
+ * - {@link RenderStatisticsLike} transcribes `@fourjs/render`'s
  *   `RenderStatistics` (`drawCalls`, `triangles`, `instances`), which a backend
  *   accumulates into and {@link recordRenderStatistics} copies across. The
  *   WebGL 2 backend counts real `drawArrays`/`drawElements`/
@@ -75,7 +75,7 @@
  *   package already produces from a §113 `DebugBodyAccess`, so `activeBodies`
  *   is reachable today by anything that can already draw a collider overlay.
  * - {@link recordResourceMemory} takes §83's live-resource totals as two plain
- *   numbers — `@four/render`'s `textureMemoryBytes()` and `@four/geometry`'s
+ *   numbers — `@fourjs/render`'s `textureMemoryBytes()` and `@fourjs/geometry`'s
  *   `geometryMemoryBytes()` (A-5, 2026-08-07). No transcribed shape here,
  *   unlike every other seam in this package: the producers own no record to
  *   describe, only two accumulators, so a duck-typed interface would be
@@ -303,13 +303,13 @@ export function copyFrameStats(
 }
 
 /**
- * The three §84 counters a renderer produces — `@four/render`'s
+ * The three §84 counters a renderer produces — `@fourjs/render`'s
  * `RenderStatistics`, transcribed.
  *
  * Declared here and satisfied structurally, because this package may not import
- * `@four/render` (plan §3.1). The fourth instance of the duck-typed-contract
+ * `@fourjs/render` (plan §3.1). The fourth instance of the duck-typed-contract
  * pattern this repository uses across a frozen dependency matrix, after
- * `ParticleDrawable`, `ReplayTarget`, and `DebugGeometrySink`; `@four/render`'s
+ * `ParticleDrawable`, `ReplayTarget`, and `DebugGeometrySink`; `@fourjs/render`'s
  * own tests pin the drift by assigning the real type to a matching shape.
  */
 export interface RenderStatisticsLike {
@@ -344,8 +344,8 @@ export function recordRenderStatistics(
  * ```ts
  * recordResourceMemory(
  *   app.stats,
- *   textureMemoryBytes(),    // @four/render
- *   geometryMemoryBytes(),   // @four/geometry
+ *   textureMemoryBytes(),    // @fourjs/render
+ *   geometryMemoryBytes(),   // @fourjs/geometry
  * );
  * ```
  *
@@ -377,7 +377,7 @@ export function recordResourceMemory(
 }
 
 /**
- * Counts {@link @four/diagnostics!SolverStatistics | SolverStatistics} in one
+ * Counts {@link @fourjs/diagnostics!SolverStatistics | SolverStatistics} in one
  * pass per collection, from §113's `DebugBodyAccess` — which every
  * `PhysicsSolverAdapter` satisfies structurally, so `world.adapter` is what you
  * pass.
@@ -495,7 +495,7 @@ const UNMEASURABLE_CLOCK = (): number => Number.NaN;
  *
  * `Date.now` is **banned repository-wide** by an ESLint rule whose message is
  * "Determinism (§33): no wall clock in simulation code — inject time via
- * `TimeState`", and `@four/animation`, `@four/particles`, and `@four/motion`
+ * `TimeState`", and `@fourjs/animation`, `@fourjs/particles`, and `@fourjs/motion`
  * each state in their headers that they touch neither it nor
  * `performance.now`. The obvious fallback is therefore not available, and that
  * is the right answer rather than an inconvenience: `Date.now` is not

@@ -1,4 +1,4 @@
-import { EventEmitter, isFourError } from "@four/core";
+import { EventEmitter, isFourError } from "@fourjs/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

@@ -1,4 +1,4 @@
-# @four/materials
+# @fourjs/materials
 
 Materials and shading. Part of [fourJS](../../README.md).
 
@@ -6,8 +6,8 @@ Implements the MVP tier of §57–60 in [`docs/SPECIFICATION.md`](../../docs/SPE
 
 ## What's here
 
-- **`UnlitMaterial`** — flat-color material (`ColorRGBA`, re-exported from `@four/math`); color is read per draw, so in-place tuple animation works.
-- **`SpriteMaterial`** — textured-quad material over the `SpriteTexture` contract (§55/§77 MVP tier), used by `@four/render`'s `Sprite`.
+- **`UnlitMaterial`** — flat-color material (`ColorRGBA`, re-exported from `@fourjs/math`); color is read per draw, so in-place tuple animation works.
+- **`SpriteMaterial`** — textured-quad material over the `SpriteTexture` contract (§55/§77 MVP tier), used by `@fourjs/render`'s `Sprite`.
 
 ## Staged / not yet implemented
 
@@ -17,4 +17,4 @@ Implements the MVP tier of §57–60 in [`docs/SPECIFICATION.md`](../../docs/SPE
 
 Unit tests are colocated in `tests/` per §92.
 
-Workspace name `@four/materials`; publishes as `@danielsimonjr/fourjs-materials`.
+Workspace name `@fourjs/materials`; publishes as `@danielsimonjr/fourjs-materials`.

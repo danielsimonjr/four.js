@@ -3,15 +3,15 @@
  *
  * Extracted (2026-08-05) from the two byte-identical module-private copies in
  * `rapier2d-adapter.ts` and `rapier3d-adapter.ts`: the rule is written once in
- * terms of `@four/physics` types alone, so the two adapters cannot drift apart
+ * terms of `@fourjs/physics` types alone, so the two adapters cannot drift apart
  * on which §31 mode a descriptor selects. How the resolved mode is *applied*
  * stays with each adapter (`setCcdEnabled` for `"swept"`,
  * `setSoftCcdPrediction` for `"speculative"`), because that is where the
  * dimension-specific Rapier surface lives.
  */
 
-import { DEFAULT_ENABLED_CCD_MODE } from "@four/physics";
-import type { CCDMode, RigidBodyDescriptor } from "@four/physics";
+import { DEFAULT_ENABLED_CCD_MODE } from "@fourjs/physics";
+import type { CCDMode, RigidBodyDescriptor } from "@fourjs/physics";
 
 /**
  * Reconciles §23's `continuousCollisionDetection` switch with §31's mode —

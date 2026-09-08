@@ -26,9 +26,9 @@ The canonical actuation cascade on a motorized hinge: **PID output becomes
 the motor's `targetVelocity`; `maxTorque` stays fixed as the effort bound.**
 
 ```ts
-import { PIDController } from "four/motion";
-import { HingeJoint } from "four/physics";
-import { Quaternion } from "four/math";
+import { PIDController } from "fourJS/motion";
+import { HingeJoint } from "fourJS/physics";
+import { Quaternion } from "fourJS/math";
 
 // A crank position controller: drive the crank to a commanded ANGLE by
 // commanding a shaft SPEED. Radians and seconds, as everywhere (§7a).
@@ -99,7 +99,7 @@ function syncDashboard(): void {
 For waveform charts (§119 names them), keep a ring buffer of samples in the
 `fixedUpdate` listener and draw it however you like — a DOM canvas beside the
 scene, or quads in the scene itself. Honest state: no chart widget ships;
-`@four/ui` provides panels, labels, buttons, and layout (§73–§74), with
+`@fourjs/ui` provides panels, labels, buttons, and layout (§73–§74), with
 visuals supplied by your `WidgetSkin` (see `examples/ui-demo`), so a chart is
 application code either way.
 

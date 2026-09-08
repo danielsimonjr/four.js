@@ -108,7 +108,7 @@
  * but a weighted combination of the two. A run whose blend regressed to "publish
  * the solver pose" would leave every solver checksum untouched.
  *
- * So each step's digest is the D6 hash (`@four/diagnostics`'s `createChecksum`,
+ * So each step's digest is the D6 hash (`@fourjs/diagnostics`'s `createChecksum`,
  * the same hasher phases 1, 2, 4, 5 and 6 use) of, in this fixed order:
  *
  * 1. `world.checksum()` — §33's own uint32 over the solver state;
@@ -207,9 +207,9 @@ import {
   quaternionAdapter,
   vector3Adapter,
   type AnimationTrackLike,
-} from "@four/animation";
-import { createChecksum } from "@four/diagnostics";
-import { Quaternion, Vector2, Vector3 } from "@four/math";
+} from "@fourjs/animation";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Quaternion, Vector2, Vector3 } from "@fourjs/math";
 import {
   Collider,
   HingeJoint,
@@ -217,10 +217,10 @@ import {
   PhysicsWorld,
   RigidBody,
   createPoseTargetCaptureSystem,
-} from "@four/physics";
-import { Rapier2dAdapter } from "@four/physics-rapier";
-import { Group, PoseTarget, type Node } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/physics";
+import { Rapier2dAdapter } from "@fourjs/physics-rapier";
+import { Group, PoseTarget, type Node } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 export const FIXED_TIME_STEP = 1 / 60;
@@ -870,7 +870,7 @@ function positionOf(link: Link): Triple {
  * Every call in any process is independent: it builds its own `Application`, its
  * own world on its own fresh Rapier adapter, and disposes both before returning.
  * Nothing is cached at module scope (the *wasm image* is, inside
- * `@four/physics-rapier`, which is a decoded module and not solver state), so
+ * `@fourjs/physics-rapier`, which is a decoded module and not solver state), so
  * calling it twice in one process is a genuine second run rather than a replay.
  *
  * ## What the host script does between frames

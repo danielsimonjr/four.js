@@ -15,7 +15,7 @@
  *
  * {@link SpaceMode} is that union transcribed member-for-member and
  * {@link isSimulationSpaceMode} is the first sentence as a predicate. Nothing
- * here has behaviour: it is vocabulary, and it lives in `@four/core` because
+ * here has behaviour: it is vocabulary, and it lives in `@fourjs/core` because
  * §8's two halves belong to two pillars that may not import each other.
  * `"world"` and `"local-plane"` are physics's business (§21 maps a local plane
  * onto a `"2d"` world's XY frame); `"screen"`, `"viewport"`, `"camera"` and
@@ -28,15 +28,15 @@
  *
  * | Consumer | State |
  * | --- | --- |
- * | `@four/physics` | **ships** (PH-8/PH-12): `RigidBody.space` declares the frame a body is solved in, and `PhysicsWorld.addBody` refuses every value it cannot honour — which is §8's second sentence, enforced. |
- * | renderer / camera / UI | **declaration shipped** (`NodeSpace` in `@four/scene`, 2026-09-06). Presentation modes persist; a render/UI consumer still has to *place* by them. Screen-space presentation remains §47/§48/§74's business. |
+ * | `@fourjs/physics` | **ships** (PH-8/PH-12): `RigidBody.space` declares the frame a body is solved in, and `PhysicsWorld.addBody` refuses every value it cannot honour — which is §8's second sentence, enforced. |
+ * | renderer / camera / UI | **declaration shipped** (`NodeSpace` in `@fourjs/scene`, 2026-09-06). Presentation modes persist; a render/UI consumer still has to *place* by them. Screen-space presentation remains §47/§48/§74's business. |
  *
  * So this module makes §8 *sayable* everywhere and makes the physics half of it
  * *true*. It does not by itself make anything render in screen space.
  *
  * ## The node-level declaration shipped 2026-09-06
  *
- * `NodeSpace` (`@four/scene`) plus `NODE_SPACE_SERIALIZER`, registered by
+ * `NodeSpace` (`@fourjs/scene`) plus `NODE_SPACE_SERIALIZER`, registered by
  * `registerSceneNodeTypes`. `"local-plane"` is accepted by `PhysicsWorld.addBody`
  * when the world has a plane (or the default XY plane).
  */

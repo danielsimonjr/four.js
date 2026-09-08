@@ -1,4 +1,4 @@
-export const PACKAGE_NAME = "@four/geometry";
+export const PACKAGE_NAME = "@fourjs/geometry";
 
 export type {
   BufferGeometryOptions,

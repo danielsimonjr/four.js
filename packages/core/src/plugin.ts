@@ -2,7 +2,7 @@
  * The §81 plugin system (RFC 0002, accepted 2026-08-21; gap `A-3`).
  *
  * §81 promises a `FourPlugin` with an `install(context: PluginContext)` and
- * eleven extension points. This module is the whole of what `@four/core` owns
+ * eleven extension points. This module is the whole of what `@fourjs/core` owns
  * of that promise: the plugin value, the capability token, the context, the
  * host, the API version, and the restricted range grammar. It knows nothing
  * about *what* a plugin extends — every registry §81 wants to hand over lives
@@ -256,7 +256,7 @@ function compareTriples(a: Triple, b: Triple): number {
  * `*`, `X.Y.Z`, `^X.Y.Z`, `~X.Y.Z`, `>=X.Y.Z`.
  *
  * Anything else is refused rather than approximated. Taking a semver dependency
- * into `@four/core` — the package every other package depends on — to serve a
+ * into `@fourjs/core` — the package every other package depends on — to serve a
  * feature nothing uses yet is not a trade worth making, and silently
  * mis-parsing a range a user believed was supported is worse than refusing it
  * (RFC 0002 §5; the same stance A-23 took on limits).

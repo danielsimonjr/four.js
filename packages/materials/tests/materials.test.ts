@@ -226,7 +226,7 @@ describe("LitMaterial", () => {
 /**
  * A `SpriteTexture` built by hand.
  *
- * `@four/materials` sits *below* `@four/render` in the frozen dependency matrix
+ * `@fourjs/materials` sits *below* `@fourjs/render` in the frozen dependency matrix
  * (plan §3.1), so the concrete `Texture` class is not importable here — which is
  * the whole point of the `SpriteTexture` structural contract this package
  * declares. Building one by hand is therefore not a shortcut but the exact thing
@@ -531,7 +531,7 @@ describe("Material — §57's shared render state", () => {
 
   it("accepts a consumer's own family member, with no edit to this package", () => {
     // The extensibility R-12 was about: a fourth material, declared outside
-    // `@four/materials`, carrying the shared state and its own discriminant.
+    // `@fourjs/materials`, carrying the shared state and its own discriminant.
     class GlowMaterial extends Material {
       readonly kind = "glow" as const;
 

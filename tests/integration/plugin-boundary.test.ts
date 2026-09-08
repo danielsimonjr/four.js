@@ -22,7 +22,7 @@
  * list:
  *
  * 1. **No deserializing package can reach the host.** Nothing under
- *    `@four/serialization` or `@four/assets` — the two packages that turn
+ *    `@fourjs/serialization` or `@fourjs/assets` — the two packages that turn
  *    external bytes into engine objects — names the plugin host at all. The
  *    allowlist is visible below and editing it is deliberately a visible act.
  * 2. **`add` admits no string.** The parameter type is `FourPlugin`, so a
@@ -39,7 +39,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-import { PluginHost, installPlugins, type FourPlugin } from "@four/core";
+import { PluginHost, installPlugins, type FourPlugin } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 const repositoryRoot = join(import.meta.dirname, "..", "..");
@@ -49,11 +49,11 @@ const packagesRoot = join(repositoryRoot, "packages");
  * The names that only the plugin host and its declarers may mention.
  *
  * A package appearing here has been confirmed *not* to be on a deserialization
- * path: `core` declares the machinery, `four` re-exports the capability tokens
+ * path: `core` declares the machinery, `fourJS` re-exports the capability tokens
  * and installs from §45's option. Adding a third entry means someone has
  * decided that package may host plugins — write the reason and the date.
  */
-const ALLOWED = new Set(["core", "four"]);
+const ALLOWED = new Set(["core", "fourJS"]);
 
 /**
  * The packages that may additionally *declare* capability tokens
@@ -70,7 +70,7 @@ const ALLOWED = new Set(["core", "four"]);
  */
 const TOKEN_DECLARERS = new Set([
   "core",
-  "four",
+  "fourJS",
   "motion",
   "physics",
   "render",

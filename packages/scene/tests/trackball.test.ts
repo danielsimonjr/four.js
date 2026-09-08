@@ -7,7 +7,7 @@
  * and its reverse cancel exactly, and there is no pole.
  */
 
-import { Quaternion, Vector3 } from "@four/math";
+import { Quaternion, Vector3 } from "@fourjs/math";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_TRACKBALL_RADIUS, Group, TrackballRig } from "../src/index.js";

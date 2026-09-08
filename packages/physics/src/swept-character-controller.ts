@@ -2,15 +2,15 @@
  * §12's **solver-backed** character controller — {@link SweptCharacterController}
  * and the {@link SweptCharacterSystem} that advances it (`PH-11b`, 2026-08-21).
  *
- * `PH-11` shipped the kinematic half in `@four/motion`: a `CharacterController`
+ * `PH-11` shipped the kinematic half in `@fourjs/motion`: a `CharacterController`
  * whose ground is a horizontal *plane*, which needs no collision query at all.
  * Its module note named what it staged and where the staged half had to live:
  *
  * > What is **staged, with its seam named**: capsule sweeps, slide-along-wall,
  * > step height, slope limits and moving platforms. Every one of them needs a
- * > shape cast against the collision world. `@four/physics` already has one —
+ * > shape cast against the collision world. `@fourjs/physics` already has one —
  * > `PhysicsWorld.shapeCast` (§30) — but §3.1's frozen dependency matrix gives
- * > `@four/motion` only `core`, `math` and `scene`, and the edge runs the other
+ * > `@fourjs/motion` only `core`, `math` and `scene`, and the edge runs the other
  * > way: **`physics` depends on `motion`.**
  *
  * This module is that packet. §30 promises the cast in as many words —
@@ -166,10 +166,10 @@
  * The `PH-11` rule stands: "one authority means one system, even when the
  * components are unrelated". This packet is the exception the rule's own
  * argument permits, and the reason is §3.1 rather than preference —
- * `KinematicSystem` lives in `@four/motion`, which may not name
+ * `KinematicSystem` lives in `@fourjs/motion`, which may not name
  * `PhysicsWorld`, so it *cannot* advance a solver-backed controller no matter
- * how much one would prefer it to. `@four/physics` publishing a
- * `SimulationSystem` at a `@four/motion` priority is the established shape here
+ * how much one would prefer it to. `@fourjs/physics` publishing a
+ * `SimulationSystem` at a `@fourjs/motion` priority is the established shape here
  * (`ForceFieldSystem` at 500, `createPoseTargetCaptureSystem` before 300).
  *
  * What the rule was protecting against — *a second writer of one node that
@@ -236,15 +236,15 @@
  * `tests/determinism/swept-character.test.ts` is the golden, on real Rapier 3D.
  */
 
-import type { Component, ComponentHost } from "@four/core";
-import { Vector3 } from "@four/math";
+import type { Component, ComponentHost } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
 import {
   CharacterController,
   PRIORITY_KINEMATICS,
   type FixedUpdateContext,
   type SimulationSystem,
-} from "@four/motion";
-import { warnAuthorityConflict, type Node } from "@four/scene";
+} from "@fourjs/motion";
+import { warnAuthorityConflict, type Node } from "@fourjs/scene";
 
 import { ALL_COLLISION_GROUPS } from "./queries.js";
 import type { RigidBody } from "./rigid-body.js";
@@ -677,7 +677,7 @@ export class SweptCharacterController implements Component {
     );
     if (options.world !== undefined && options.world.dimension !== "3d") {
       throw new RangeError(
-        "SweptCharacterControllerOptions.world must be a \"3d\" PhysicsWorld (§21, §85): this controller's planar model is a heading about +Y, which a 2D character does not have. Drive a 2D character with @four/motion's CharacterController.",
+        "SweptCharacterControllerOptions.world must be a \"3d\" PhysicsWorld (§21, §85): this controller's planar model is a heading about +Y, which a 2D character does not have. Drive a 2D character with @fourjs/motion's CharacterController.",
       );
     }
 

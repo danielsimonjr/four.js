@@ -4,7 +4,7 @@
  * The unit suite in `packages/assets/tests/a18-remainder.test.ts` drives the
  * policy with hand-rolled fakes. This one exists for the property those fakes
  * cannot prove: a real `Headers`, a real `content-length`, and (where the
- * runtime has one) a real `ReadableStream` satisfy `@four/assets`'s seams
+ * runtime has one) a real `ReadableStream` satisfy `@fourjs/assets`'s seams
  * with **no adapter**.
  */
 
@@ -13,7 +13,7 @@ import {
   type AssetLoader,
   type AssetProgressEvent,
   type FetchResponse,
-} from "@four/assets";
+} from "@fourjs/assets";
 import { describe, expect, it } from "vitest";
 
 const textLoader: AssetLoader<string> = {

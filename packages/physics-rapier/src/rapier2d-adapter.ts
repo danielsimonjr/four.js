@@ -3,7 +3,7 @@
  *
  * `Rapier2dAdapter` is a `PhysicsSolverAdapter` backed by
  * `@dimforge/rapier2d-compat` (pinned at `0.20.0`). It is the first
- * concrete solver behind `@four/physics`'s stable API, and it may import
+ * concrete solver behind `@fourjs/physics`'s stable API, and it may import
  * *nothing* from scene, motion, or render — the whole point of §37's seam is
  * that a solver knows about bodies and colliders and not about nodes.
  *
@@ -44,7 +44,7 @@
  * write immediately — `setTranslation`, `setLinvel`, `applyImpulse` and friends
  * mutate solver state at the moment they are called — so there is no queue for
  * a flush point to flush. The adapter also cannot know what a "scene" is
- * (dependency rule: `physics-rapier` may not import `@four/scene`).
+ * (dependency rule: `physics-rapier` may not import `@fourjs/scene`).
  *
  * What the physics package (WP-5.3) needs instead is a *per-handle* accessor
  * seam, and that is {@link RapierBodyAccess}: `PhysicsSystem` reads a body's
@@ -89,9 +89,9 @@
  * ordering and carries it through the snapshot envelope.
  */
 
-import { FourError } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
-import type { Matrix3 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import type { Matrix3 } from "@fourjs/math";
 import {
   ALL_COLLISION_GROUPS,
   DEFAULT_FRICTION,
@@ -109,7 +109,7 @@ import {
   validateQueryShape,
   validateRigidBodyDescriptor,
   rejectStalePhysicsHandle,
-} from "@four/physics";
+} from "@fourjs/physics";
 import type {
   AngularVelocityInput,
   BodyType,
@@ -143,7 +143,7 @@ import type {
   ShapeCastQuery,
   SleepingConfig,
   Vector3Input,
-} from "@four/physics";
+} from "@fourjs/physics";
 
 import { resolveCcdMode } from "./ccd.js";
 import {
@@ -175,7 +175,7 @@ import type {
   RapierWorld,
 } from "./init.js";
 
-/** See `@four/physics`: §89 has no physics-input code, so misuse is this. */
+/** See `@fourjs/physics`: §89 has no physics-input code, so misuse is this. */
 const ADAPTER_ERROR_CODE = "INVALID_APPLICATION_STATE";
 
 /** §37 `name`. Recorded in snapshots and replays, which refuse other solvers. */
@@ -514,10 +514,10 @@ interface SnapshotMeta {
  *
  * `PhysicsSolverAdapter` deliberately says nothing about reading or writing an
  * individual body: §37's contract is about the *step*, and the transform
- * exchange with the scene is `@four/physics`'s business. That leaves the
+ * exchange with the scene is `@fourjs/physics`'s business. That leaves the
  * physics package needing an interface it can call per body per step, which is
  * this one. It is declared here, in the adapter package, rather than added to
- * `@four/physics` — the plan reserves that as an allowed extension point, and a
+ * `@fourjs/physics` — the plan reserves that as an allowed extension point, and a
  * WP-5.1 amendment can promote it later once the 3D adapter (WP-5.5) has
  * confirmed the shape is dimension-independent.
  *
@@ -793,7 +793,7 @@ export class Rapier2dAdapter
    *
    * Loads the wasm module (once per process — see `init.ts`), then builds a
    * `World` with the §21-resolved gravity. Options are validated with
-   * `@four/physics`'s own validators, so this adapter accepts exactly what the
+   * `@fourjs/physics`'s own validators, so this adapter accepts exactly what the
    * engine accepts and no more.
    *
    * ## §32 sleeping: what maps, and what does not
@@ -1036,7 +1036,7 @@ export class Rapier2dAdapter
    * one body, which needs nothing here (PH-22a).
    *
    * Friction and restitution come from the explicit fields, then the material,
-   * then `@four/physics`'s defaults. Their **combine rules** are set to
+   * then `@fourjs/physics`'s defaults. Their **combine rules** are set to
    * Appendix A's — friction `Average`, restitution `Max` — because Rapier's own
    * default for restitution is `Average`, which would quietly contradict §25 for
    * every contact in the world. §25's `rollingFriction` and `spinningFriction`
@@ -1340,7 +1340,7 @@ export class Rapier2dAdapter
    * Rapier reports only *started* and *stopped*. §29 names three collision
    * phases, so somebody has to derive the middle one, and this adapter does it
    * rather than leaving each caller to reinvent the bookkeeping (decision,
-   * WP-5.4 — the alternative, "the adapter emits start/end only and `@four/physics`
+   * WP-5.4 — the alternative, "the adapter emits start/end only and `@fourjs/physics`
    * derives stay", was rejected because the contact manifold a `collisionstay`
    * payload needs is only readable *here*, immediately after the solve).
    *
@@ -1392,7 +1392,7 @@ export class Rapier2dAdapter
    *
    * Rapier applies every write the moment it is made — there is no staging
    * buffer for this call to flush. Scene-authored state reaches the solver
-   * through {@link RapierBodyAccess}, which `@four/physics` calls from inside
+   * through {@link RapierBodyAccess}, which `@fourjs/physics` calls from inside
    * its own `syncSceneToSolver` phase; see the module header.
    */
   syncSceneToSolver(): void {
@@ -1416,7 +1416,7 @@ export class Rapier2dAdapter
    * which is measured in units of the ray direction's length — equals the
    * distance in world units that `RaycastHit.distance` promises.
    *
-   * Filtering is done **entirely** by `@four/physics`'s `passesQueryFilter`
+   * Filtering is done **entirely** by `@fourjs/physics`'s `passesQueryFilter`
    * rather than by Rapier's own group words: one implementation of §30's filter
    * semantics means Rapier and every future adapter answer a query identically,
    * which is exactly the portability the §37 seam exists for.

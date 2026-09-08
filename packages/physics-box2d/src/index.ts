@@ -1,1 +1,1 @@
-export const PACKAGE_NAME = "@four/physics-box2d";
+export const PACKAGE_NAME = "@fourjs/physics-box2d";

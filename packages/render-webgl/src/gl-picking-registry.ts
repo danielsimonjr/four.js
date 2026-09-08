@@ -10,7 +10,7 @@
  * in with
  *
  * ```ts
- * import { registerPickingPipeline } from "@four/render-webgl";
+ * import { registerPickingPipeline } from "@fourjs/render-webgl";
  * registerPickingPipeline();
  * ```
  *
@@ -20,7 +20,7 @@
  * throwing, service creation is an explicit call that can see the mistake.
  */
 
-import type { PickingService } from "@four/render";
+import type { PickingService } from "@fourjs/render";
 
 import type { GeometryCache } from "./gl-geometry.js";
 import type { WebglContext } from "./gl-program.js";

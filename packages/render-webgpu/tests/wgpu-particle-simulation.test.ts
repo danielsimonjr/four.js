@@ -9,8 +9,8 @@
  * claim against a real adapter.
  */
 
-import { isFourError, type FourError } from "@four/core";
-import type { ComputeBuffer } from "@four/render";
+import { isFourError, type FourError } from "@fourjs/core";
+import type { ComputeBuffer } from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 import {

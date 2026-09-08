@@ -12,7 +12,7 @@
  * attribute is not a rendering concern and not an asset concern — it is the
  * *serialized form of the path model*, so it belongs beside the model.
  * `render-svg` (§62) is a **backend** that draws a whole scene into SVG markup;
- * `@four/assets` (§76) owns SVG as a *file* to fetch and cache. Neither of them
+ * `@fourjs/assets` (§76) owns SVG as a *file* to fetch and cache. Neither of them
  * is this, and this needs neither of them.
  *
  * ## What ships here, and what is staged
@@ -32,7 +32,7 @@
  * | `fill-rule`                                           | ships | written onto {@link Path.fillRule}          |
  *
  * The document tier is a **small XML tokenizer in this package**, not
- * `DOMParser`. `@four/geometry` stays node-safe; `<!DOCTYPE` and external
+ * `DOMParser`. `@fourjs/geometry` stays node-safe; `<!DOCTYPE` and external
  * entities are refused (§96). Everything below (the `d` grammar) is still
  * pure string arithmetic and runs identically in both environments.
  *
@@ -264,7 +264,7 @@
  * separate, lossless, and independently testable transformation.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import {
   Path,

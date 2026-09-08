@@ -92,7 +92,7 @@
  * dependence, no hashing, no clock, and no randomness in this module.
  */
 
-import type { Vector3, Vector4 } from "@four/math";
+import type { Vector3, Vector4 } from "@fourjs/math";
 
 /** Components per particle in {@link ParticlePool.positions} / `velocities`. */
 const VECTOR_STRIDE = 3;

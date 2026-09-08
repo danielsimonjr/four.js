@@ -11,8 +11,8 @@
  * component policy, unknown node types, and the registry's own refusals.
  */
 
-import { FourError, isFourError, type ComponentHost } from "@four/core";
-import { Group, PoseTarget, Scene, type Node } from "@four/scene";
+import { FourError, isFourError, type ComponentHost } from "@fourjs/core";
+import { Group, PoseTarget, Scene, type Node } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -734,7 +734,7 @@ describe("instantiateSceneNodes", () => {
 });
 
 /**
- * A-17 (2026-08-06): restored ids used to be written past `@four/scene`'s
+ * A-17 (2026-08-06): restored ids used to be written past `@fourjs/scene`'s
  * counter without advancing it, so the next node constructed in the process
  * could be handed an id a loaded node already held.
  */

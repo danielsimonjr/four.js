@@ -325,7 +325,7 @@ const RETIRED = [
       "docs/Architecture/COMPONENTS.md",
       "docs/Architecture/OVERVIEW.md",
     ],
-    why: "R-1 closed 2026-08-29; @four/render-webgpu is a shipped backend (WP-R1.1–R1.9)",
+    why: "R-1 closed 2026-08-29; @fourjs/render-webgpu is a shipped backend (WP-R1.1–R1.9)",
   },
 ];
 

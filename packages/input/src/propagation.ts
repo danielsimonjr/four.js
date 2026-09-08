@@ -44,7 +44,7 @@
  * handles its own targeted-only types before calling in here.
  */
 
-import type { Node, NodeEventMap } from "@four/scene";
+import type { Node, NodeEventMap } from "@fourjs/scene";
 
 /**
  * The state and behaviour every propagating input event carries: the node the

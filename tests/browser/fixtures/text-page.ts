@@ -38,22 +38,22 @@
  *    produce different pixels.
  */
 
-import { UnlitMaterial } from "@four/materials";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   Texture,
   createRenderStatistics,
   resetRenderStatistics,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   type Viewport,
   resolveWorldTransforms,
-} from "@four/scene";
-import { buildGlyphAtlas } from "@four/text";
-import { Text } from "four";
+} from "@fourjs/scene";
+import { buildGlyphAtlas } from "@fourjs/text";
+import { Text } from "fourJS";
 
 /** Canvas size the spec restates and this file reads back. */
 const WIDTH = 320;

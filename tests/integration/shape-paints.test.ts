@@ -22,7 +22,7 @@
  * Only the GL context is a double, for `shape-rendering.test.ts`'s reason.
  */
 
-import { UnlitMaterial } from "@four/materials";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   Circle,
   Line,
@@ -34,23 +34,23 @@ import {
   type RenderItem,
   type Shape2D,
   type SolidPaint,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
-import { registerSceneNodeTypes, resourceCatalog } from "four";
+} from "@fourjs/scene";
+import { registerSceneNodeTypes, resourceCatalog } from "fourJS";
 import {
   decodeSceneDocument,
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
-} from "@four/serialization";
-import { Group } from "@four/scene";
+} from "@fourjs/serialization";
+import { Group } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

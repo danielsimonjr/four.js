@@ -1,6 +1,6 @@
 /**
  * GPU-side textures for the WebGL 2 backend: one `WebGLTexture` per
- * `@four/render` `Texture`, cached and invalidated by version (§77, §61, §55).
+ * `@fourjs/render` `Texture`, cached and invalidated by version (§77, §61, §55).
  *
  * The twin of `gl-geometry.ts`, and deliberately so — same key (`id`), same
  * validator (`version`), same lazy eviction, same loss-aware
@@ -11,7 +11,7 @@
  * ## Why there is no `Renderer.createTexture` (decision, WP-3a.3)
  *
  * §61's interface declares `createTexture(source: TextureSource): Texture`, and
- * `@four/render`'s `renderer.ts` records it as a typed TODO. This packet leaves
+ * `@fourjs/render`'s `renderer.ts` records it as a typed TODO. This packet leaves
  * it deferred and discovers textures from the render list instead: every sprite
  * item carries a `SpriteMaterial`, every sprite material names a texture, and
  * this cache uploads it the first time it is drawn.
@@ -23,7 +23,7 @@
  * be true of textures either. `createTexture` remains the right entry point for
  * the tier that has no CPU-side source to discover — render targets (§63),
  * compressed and GPU-only formats — and it lands with that tier. The deferral is
- * documented in `@four/render`'s `texture.ts` as well, on the class it concerns.
+ * documented in `@fourjs/render`'s `texture.ts` as well, on the class it concerns.
  *
  * ## What one entry holds
  *
@@ -42,7 +42,7 @@
  * wants `NEAREST`, because a 5 × 7 letterform blurred across its neighbours is
  * exactly the soft, dirty look bitmap text is accused of, and a tiling ground
  * texture wants `REPEAT`. So the four `texParameteri` arguments are now read off
- * `texture.filter` / `texture.wrap` (§77, `@four/render`'s `Texture`).
+ * `texture.filter` / `texture.wrap` (§77, `@fourjs/render`'s `Texture`).
  *
  * **Byte-identity is structural, not numerical**: both fields resolve to the
  * previously hard-coded value when a source names neither, so a texture written
@@ -95,21 +95,21 @@
  *   invalid and the context must not be touched (§61).
  */
 
-import type { SpriteRenderItem } from "@four/render";
-import { warnDisposedInUse } from "@four/render";
+import type { SpriteRenderItem } from "@fourjs/render";
+import { warnDisposedInUse } from "@fourjs/render";
 
 import { GL, type GlTexture, type WebglContext } from "./gl-program.js";
 
 /**
- * The texture type this cache stores, taken from `@four/render`'s sprite render
+ * The texture type this cache stores, taken from `@fourjs/render`'s sprite render
  * item rather than imported by name.
  *
- * `@four/render-webgl`'s dependencies are `core`, `math`, and `render` (plan
- * §3.1, frozen), so `@four/render`'s `Texture` *could* be imported directly.
+ * `@fourjs/render-webgl`'s dependencies are `core`, `math`, and `render` (plan
+ * §3.1, frozen), so `@fourjs/render`'s `Texture` *could* be imported directly.
  * Deriving it from `SpriteRenderItem["material"]["texture"]` instead is the
  * choice `CacheableGeometry` already makes in `gl-geometry.ts`: it types the
  * cache against **what the render list actually hands it**, which is
- * `@four/materials`' `SpriteTexture` read contract — so this module keeps
+ * `@fourjs/materials`' `SpriteTexture` read contract — so this module keeps
  * working unchanged if a second texture implementation ever satisfies that
  * contract, and it cannot accidentally reach for state a render item does not
  * carry.
@@ -318,7 +318,7 @@ export class TextureCache {
    * may be unable to fill, which is §62's capability tiering and not §85's
    * invalid value. The frame draws with the sharpness the device has. §85 still
    * refuses a request that no device could fill — a non-integer, or one below 1
-   * — and it does so in `@four/render`'s `Texture`, at authoring time.
+   * — and it does so in `@fourjs/render`'s `Texture`, at authoring time.
    *
    * `getExtension` itself is optional on `WebglContext`, so a double that does
    * not declare it reports a ceiling of 1 and every anisotropy request is

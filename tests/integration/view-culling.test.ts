@@ -10,8 +10,8 @@
  * was nothing for it to switch off; §66's key 4 was blocked because a depth
  * measured along one camera would have misordered every other view of the same
  * list. All four are one structural change, and no unit test inside one package
- * can check it: `@four/math` owns the planes, `@four/geometry` the local box,
- * `@four/render` the derivation, `@four/render-webgl` the only place it becomes
+ * can check it: `@fourjs/math` owns the planes, `@fourjs/geometry` the local box,
+ * `@fourjs/render` the derivation, `@fourjs/render-webgl` the only place it becomes
  * GL, and `four` the §79 document.
  *
  * Six claims:
@@ -33,14 +33,14 @@
  * 6. **`frustumCulled` survives §79.**
  */
 
-import { boxGeometry, planeGeometry } from "@four/geometry";
-import { Frustum, Matrix4 } from "@four/math";
+import { boxGeometry, planeGeometry } from "@fourjs/geometry";
+import { Frustum, Matrix4 } from "@fourjs/math";
 import {
   LitMaterial,
   SpriteMaterial,
   StandardMaterial,
   UnlitMaterial,
-} from "@four/materials";
+} from "@fourjs/materials";
 import {
   Renderable,
   Sprite,
@@ -49,8 +49,8 @@ import {
   buildViewRenderList,
   sortRenderListByDepth,
   type RenderItem,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   DirectionalLight,
   OrthographicCamera,
@@ -58,15 +58,15 @@ import {
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import {
   decodeSceneDocument,
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
   type SceneDocument,
-} from "@four/serialization";
-import { registerSceneNodeTypes } from "four";
+} from "@fourjs/serialization";
+import { registerSceneNodeTypes } from "fourJS";
 import { describe, expect, it } from "vitest";
 
 import {

@@ -55,7 +55,7 @@
  * The throw is a plain {@link RangeError}, not a `FourError` (§89): §89's code
  * list has no validation/argument code, `INVALID_SCENE_GRAPH` would be a lie
  * here (the hasher never sees a scene graph), and this packet may not extend the
- * `FourErrorCode` union in `@four/core`. A domain violation on a numeric
+ * `FourErrorCode` union in `@fourjs/core`. A domain violation on a numeric
  * argument is exactly what `RangeError` means in JS. (Decision recorded for
  * WP-1.13; revisit if §89 ever gains an `INVALID_ARGUMENT` code.)
  */

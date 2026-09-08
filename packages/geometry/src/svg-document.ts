@@ -3,7 +3,7 @@
  * markup into {@link Path}s, without `DOMParser`.
  *
  * The owner decision (R-26, 2026-09-06) is to ship the tokenizer here so
- * `@four/geometry` stays node-safe (`pnpm graph:check`). There is no
+ * `@fourjs/geometry` stays node-safe (`pnpm graph:check`). There is no
  * environment seam and no DOM. Hostile input is refused before anything is
  * built: `<!DOCTYPE`, `<!ENTITY`, and any other `<!` declaration that is not
  * a comment — §96's "no external entities, no code from scene files".
@@ -22,8 +22,8 @@
  * / `desc` / `metadata` / `style` / `script` are skipped whole.
  */
 
-import { FourError } from "@four/core";
-import { Matrix3 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import { Matrix3 } from "@fourjs/math";
 
 import { Path, type FillRule } from "./path.js";
 import {

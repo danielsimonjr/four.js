@@ -12,8 +12,8 @@
  * It follows the four forms WP-1.14, WP-2.7, WP-4.8, WP-5.8, WP-6.6 and WP-7.7
  * established:
  *
- * 1. **Headless.** The scenario imports `@four/particles`, `@four/motion`,
- *    `@four/math`, `@four/diagnostics` and `four/application` — no renderer
+ * 1. **Headless.** The scenario imports `@fourjs/particles`, `@fourjs/motion`,
+ *    `@fourjs/math`, `@fourjs/diagnostics` and `four/application` — no renderer
  *    package, no canvas, no DOM. As in the phases before it the application
  *    comes from the `four/application` subpath, so "nothing renderer-shaped is
  *    loaded" is a property of the import graph and not only of behaviour. The
@@ -34,10 +34,10 @@
  *
  * ## The cross-package check only this file can make
  *
- * `@four/particles` may not import `@four/motion` (the §3.1 matrix), so
+ * `@fourjs/particles` may not import `@fourjs/motion` (the §3.1 matrix), so
  * `ParticleSystem` implements §39's `SimulationSystem` **structurally** and
  * restates `PRIORITY_FORCES` as its own `PRIORITY_PARTICLES` — the same
- * arrangement `ParticleRenderable` has with `@four/render`'s `ParticleDrawable`.
+ * arrangement `ParticleRenderable` has with `@fourjs/render`'s `ParticleDrawable`.
  * Nothing type-checks those declarations against each other, in either
  * direction. This suite is the one place in the repository that can, because the
  * root `tests/` project sees every package:
@@ -81,8 +81,8 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { PRIORITY_FORCES } from "@four/motion";
-import { PARTICLE_DRAWS_PER_SPAWN, PRIORITY_PARTICLES } from "@four/particles";
+import { PRIORITY_FORCES } from "@fourjs/motion";
+import { PARTICLE_DRAWS_PER_SPAWN, PRIORITY_PARTICLES } from "@fourjs/particles";
 import { beforeAll, describe, expect, test } from "vitest";
 
 import {
@@ -225,8 +225,8 @@ describe("Phase 9: particle simulation is deterministic (§112, §36, §33)", ()
 
   test("ParticleSystem is a real §39 system at PRIORITY_FORCES (cross-package)", () => {
     // The check the packages cannot make about each other — see this file's
-    // header. `PRIORITY_PARTICLES` is `@four/particles`'s restatement of
-    // `@four/motion`'s `PRIORITY_FORCES`; if the original ever moves, this
+    // header. `PRIORITY_PARTICLES` is `@fourjs/particles`'s restatement of
+    // `@fourjs/motion`'s `PRIORITY_FORCES`; if the original ever moves, this
     // fails here rather than silently reordering a simulation.
     expect(PRIORITY_PARTICLES).toBe(PRIORITY_FORCES);
     expect(first.particlePriority).toBe(PRIORITY_FORCES);

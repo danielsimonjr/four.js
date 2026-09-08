@@ -9,7 +9,7 @@
  *
  * ## Why this is not the core display record
  *
- * `@four/core`'s unit-system helpers are display/authoring conversion and are
+ * `@fourjs/core`'s unit-system helpers are display/authoring conversion and are
  * inexact in the last bits by construction — an integration gate forbids the
  * identifier on any simulation path. This record is the two §40 *scale*
  * factors only, which are exact multiplies when they are 1 and otherwise a
@@ -20,7 +20,7 @@
 
 /**
  * The two §40 scale factors a world reads. Structurally compatible with
- * `@four/core`'s frozen unit-system record.
+ * `@fourjs/core`'s frozen unit-system record.
  */
 export interface PhysicsWorldUnits {
   readonly scale: {

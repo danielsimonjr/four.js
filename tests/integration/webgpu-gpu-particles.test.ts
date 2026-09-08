@@ -1,6 +1,6 @@
 /**
  * §36 `simulation: "gpu"` end to end on the WebGPU backend (R-31 wiring,
- * 2026-08-29) — the real `@four/particles` emitter bound to a real
+ * 2026-08-29) — the real `@fourjs/particles` emitter bound to a real
  * `WgpuParticleSimulation`, drawn by `WebgpuRenderer` from the simulation's
  * own position buffer.
  *
@@ -19,23 +19,23 @@
  * dispatch in insertion order.
  */
 
-import { Vector3 } from "@four/math";
-import { ParticleEmitter, ParticleRenderable } from "@four/particles";
-import { PARTICLE_INSTANCE_FLOATS, supportsCompute } from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+import { Vector3 } from "@fourjs/math";
+import { ParticleEmitter, ParticleRenderable } from "@fourjs/particles";
+import { PARTICLE_INSTANCE_FLOATS, supportsCompute } from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   WebgpuRenderer,
   type WgpuParticleSimulation,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
-import { isFourError } from "@four/core";
-import { ComputePass } from "four";
+} from "@fourjs/scene";
+import { isFourError } from "@fourjs/core";
+import { ComputePass } from "fourJS";
 import { describe, expect, it } from "vitest";
 
 import {

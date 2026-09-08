@@ -1,7 +1,7 @@
 /**
  * R-5 — §63's render graph, driving the real WebGL 2 backend (2026-08-07).
  *
- * `RenderGraph` lives in `@four/render` and knows nothing about GL; the claim
+ * `RenderGraph` lives in `@fourjs/render` and knows nothing about GL; the claim
  * that makes it worth having is a claim about three packages agreeing, and no
  * unit test inside any one of them can check it:
  *
@@ -28,17 +28,17 @@
  * length. What a real driver adds is checked by the Playwright gate.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { SpriteMaterial, UnlitMaterial } from "@four/materials";
-import { RenderGraph, RenderTarget, Renderable, Sprite } from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+import { planeGeometry } from "@fourjs/geometry";
+import { SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
+import { RenderGraph, RenderTarget, Renderable, Sprite } from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

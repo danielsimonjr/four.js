@@ -1,7 +1,7 @@
 /**
  * §55 sprites, §56 text and §65 batching on the WebGPU backend (WP-R1.3),
- * composed from the real packages — `@four/render`'s `Sprite` and `Texture`,
- * `@four/materials`' `SpriteMaterial`, `@four/text`'s atlas, `four`'s `Text`.
+ * composed from the real packages — `@fourjs/render`'s `Sprite` and `Texture`,
+ * `@fourjs/materials`' `SpriteMaterial`, `@fourjs/text`'s atlas, `four`'s `Text`.
  *
  * Three families of claims:
  *
@@ -18,23 +18,23 @@
  *    glyph runs collapse to one `drawIndexed`, and §84's counters show it.
  */
 
-import { UnlitMaterial, SpriteMaterial } from "@four/materials";
+import { UnlitMaterial, SpriteMaterial } from "@fourjs/materials";
 import {
   Renderable,
   Sprite,
   Texture,
   createRenderStatistics,
-} from "@four/render";
-import { WebgpuRenderer, createWgpuBatching } from "@four/render-webgpu";
+} from "@fourjs/render";
+import { WebgpuRenderer, createWgpuBatching } from "@fourjs/render-webgpu";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
-import { buildGlyphAtlas } from "@four/text";
-import { Text } from "four";
+} from "@fourjs/scene";
+import { buildGlyphAtlas } from "@fourjs/text";
+import { Text } from "fourJS";
 import { describe, expect, it } from "vitest";
 
 import {

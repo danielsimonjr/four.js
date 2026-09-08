@@ -25,9 +25,9 @@
  *    stream twice.
  */
 
-import { Vector3 } from "@four/math";
-import { Collider, RigidBody, type PhysicsWorld } from "@four/physics";
-import { Group, type Node } from "@four/scene";
+import { Vector3 } from "@fourjs/math";
+import { Collider, RigidBody, type PhysicsWorld } from "@fourjs/physics";
+import { Group, type Node } from "@fourjs/scene";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {

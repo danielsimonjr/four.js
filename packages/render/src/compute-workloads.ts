@@ -3,7 +3,7 @@
  * {@link ComputePassDescriptor} factories a host (or a plugin the host
  * installed) can register into.
  *
- * Lives here, not in `@four/render-webgpu`, because §82's descriptor is
+ * Lives here, not in `@fourjs/render-webgpu`, because §82's descriptor is
  * already backend-independent (`compute.ts`) and a host that has no WebGPU
  * device still needs a place to *name* a workload. Presence of
  * `Renderer.compute?()` is how a backend says it can dispatch; this table
@@ -16,7 +16,7 @@
  * No `unregister`. The capability token is therefore not revocable.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import type { ComputePassDescriptor } from "./compute.js";
 

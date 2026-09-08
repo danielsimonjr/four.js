@@ -18,8 +18,8 @@
  *    It is also the boundary this tier draws: the character does **not** push
  *    anything; the solver does, because the character's collider moved.
  * 2. **§79 through the umbrella.** `registerPhysicsSerializers` is in
- *    `@four/four`, the component is in `@four/physics`, and the registry is in
- *    `@four/serialization` — three packages that only meet here.
+ *    `@fourjs/four`, the component is in `@fourjs/physics`, and the registry is in
+ *    `@fourjs/serialization` — three packages that only meet here.
  * 3. **`groundBody`, the moving-platform seam.** A character standing on a body
  *    reports which body, which is what an application differences to carry
  *    itself. Carry itself is staged; the handle is not.
@@ -27,13 +27,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 import {
   PRIORITY_KINEMATICS,
   PRIORITY_PHYSICS_SOLVE,
   SystemRegistry,
   createTimeState,
-} from "@four/motion";
+} from "@fourjs/motion";
 import {
   Collider,
   PhysicsSystem,
@@ -41,17 +41,17 @@ import {
   RigidBody,
   SweptCharacterController,
   SweptCharacterSystem,
-} from "@four/physics";
-import { Rapier3dAdapter } from "@four/physics-rapier";
-import { Group } from "@four/scene";
+} from "@fourjs/physics";
+import { Rapier3dAdapter } from "@fourjs/physics-rapier";
+import { Group } from "@fourjs/scene";
 import {
   createDefaultComponentSerializers,
   decodeSceneDocument,
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
-} from "@four/serialization";
-import { registerPhysicsSerializers, registerSceneNodeTypes } from "four";
+} from "@fourjs/serialization";
+import { registerPhysicsSerializers, registerSceneNodeTypes } from "fourJS";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 const DT = 1 / 60;
@@ -389,9 +389,9 @@ describe("SweptCharacterController round-trips through §79", () => {
   });
 
   it("registers with the physics family, at §39's step-4 priority", () => {
-    // The split is by package: the component lives in `@four/physics`, so its
+    // The split is by package: the component lives in `@fourjs/physics`, so its
     // serializer goes in with `RigidBody` and `Collider` rather than beside
-    // `@four/motion`'s plain `CharacterController`.
+    // `@fourjs/motion`'s plain `CharacterController`.
     const components = registerPhysicsSerializers(
       createDefaultComponentSerializers(),
     );

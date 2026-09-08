@@ -94,7 +94,7 @@
  *
  * ## Known visual approximations
  *
- * - **The 3D sphere is drawn as a disc.** `@four/geometry` ships
+ * - **The 3D sphere is drawn as a disc.** `@fourjs/geometry` ships
  *   `boxGeometry`, `planeGeometry` and `circleGeometry2D` and no sphere
  *   primitive yet, so the sphere *body* (a real §24 `sphere` collider) is drawn
  *   with a 40-segment circle. Under this orthographic camera a shaded sphere's
@@ -110,17 +110,17 @@
  *   pixels per world unit, `px = (x + 8) × 60`, `py = (4.5 − y) × 60`.
  */
 
-import { Application } from "four/application";
+import { Application } from "fourJS/application";
 import {
   boxGeometry,
   circleGeometry2D,
   planeGeometry,
   type BufferGeometry,
-} from "four/geometry";
-import { PointerInput, type Pickable } from "four/input";
-import { UnlitMaterial } from "four/materials";
-import { Vector2, Vector3 } from "four/math";
-import { PRIORITY_SENSOR_UPDATE, type SimulationSystem } from "four/motion";
+} from "fourJS/geometry";
+import { PointerInput, type Pickable } from "fourJS/input";
+import { UnlitMaterial } from "fourJS/materials";
+import { Vector2, Vector3 } from "fourJS/math";
+import { PRIORITY_SENSOR_UPDATE, type SimulationSystem } from "fourJS/motion";
 import {
   Collider,
   PhysicsEventSystem,
@@ -130,15 +130,15 @@ import {
   type CollisionShape,
   type PhysicsDimension,
   type PhysicsWorldAdapter,
-} from "four/physics";
-import { Rapier2dAdapter, Rapier3dAdapter } from "four/physics-rapier";
-import { Renderable } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
+} from "fourJS/physics";
+import { Rapier2dAdapter, Rapier3dAdapter } from "fourJS/physics-rapier";
+import { Renderable } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
 import {
   Group,
   OrthographicCamera,
   createFullscreenViewport,
-} from "four/scene";
+} from "fourJS/scene";
 
 // --- surface -----------------------------------------------------------------
 
@@ -908,7 +908,7 @@ function buildScene(): readonly Half[] {
     watchZone(half);
   }
 
-  // §71/§72 picking. `@four/input` never reads geometry, so the layer that does
+  // §71/§72 picking. `@fourjs/input` never reads geometry, so the layer that does
   // states each candidate's **local** bounds; the ray is transformed into each
   // node's local space, so a tumbling crate is picked as a tumbling crate. The
   // list is built once because the set of pickable nodes never changes — the

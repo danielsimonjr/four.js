@@ -8,7 +8,7 @@
  * back exactly.
  */
 
-import { isFourError, type FourError } from "@four/core";
+import { isFourError, type FourError } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -549,7 +549,7 @@ describe("the §36 integrator kernel (R-31's GPU-simulation half)", () => {
       `fn ${COMPUTE_ENTRY_POINT}(`,
     );
     // v += g·dt lands in the velocity lanes before p += v·dt reads them —
-    // @four/particles' documented closed form, per lane.
+    // @fourjs/particles' documented closed form, per lane.
     expect(PARTICLE_INTEGRATOR_SHADER_SOURCE).toContain(
       "var vx = velocities[base] + ax * dt;",
     );

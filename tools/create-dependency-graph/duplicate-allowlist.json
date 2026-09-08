@@ -598,7 +598,7 @@
     {
       "names": ["PACKAGE_NAME"],
       "filesGlob": ["packages/**"],
-      "reason": "fourJS: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+      "reason": "fourJS: per-package identity constant — every @fourjs/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
     },
     {
       "names": [
@@ -613,7 +613,7 @@
     {
       "names": ["TRAIL_VERTEX_FLOATS"],
       "filesGlob": ["packages/particles/src/trail.ts", "packages/render/src/particles.ts"],
-      "reason": "fourJS: deliberate duck-typed cross-package contract for CPU particle trail ribbon vertices (position xyz + rgba), same matrix constraint as PARTICLE_INSTANCE_FLOATS — @four/particles builds the mesh and @four/render types the render-item stride without a forbidden particles↔render dependency edge; drift is caught by shared tests. 2026-09-06 trail tier gate wiring."
+      "reason": "fourJS: deliberate duck-typed cross-package contract for CPU particle trail ribbon vertices (position xyz + rgba), same matrix constraint as PARTICLE_INSTANCE_FLOATS — @fourjs/particles builds the mesh and @fourjs/render types the render-item stride without a forbidden particles↔render dependency edge; drift is caught by shared tests. 2026-09-06 trail tier gate wiring."
     },
     {
       "names": ["requireNonNegative"],

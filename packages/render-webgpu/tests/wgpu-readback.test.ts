@@ -11,8 +11,8 @@
  * is `tests/browser/webgpu/webgpu-effects.spec.ts`'s claim on a real adapter.
  */
 
-import { isFourError, type FourError } from "@four/core";
-import { RenderTarget } from "@four/render";
+import { isFourError, type FourError } from "@fourjs/core";
+import { RenderTarget } from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 import {

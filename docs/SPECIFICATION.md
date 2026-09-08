@@ -17,12 +17,12 @@
 | 1.0 | 2026-07-28 | Corrected rendering of the original PDF (ERRATA E-1/E-2/E-3 resolved, extraction artifacts repaired). |
 | 1.1 | 2026-07-28 | Technical revision applying [SPEC-REVIEW.md](SPEC-REVIEW.md) items R-1–R-35: contradictions resolved; component model, eventing, coordinate/math conventions, and the solver-adapter contract specified; scope of audio/networking settled; Appendices A (defaults) and B (glossary) added. New sections use letter suffixes (6a, 6b, 7a, 7b, 60a) so §1–120 numbering is unchanged. |
 | 1.2 | 2026-07-29 | §86 payload budget (minimal 2D application ≤ 150 kB gzip) confirmed by the owner; provisional marker removed. |
-| 1.3 | 2026-07-29 | Verification pass over the 1.1 material: world-matrix resolution per fixed step (§7); pause semantics (§10); replay records dropped time and step counts (§10, §34); §97 field of view in radians; §40 unit options restricted to display/authoring conversion; `ForceField.sample` gains `out` (§27); collider density authoritative over material density (§25); checksum order and "existing body" defined (§33); local-plane mapping in 2D worlds (§21); §39 sensor update moved before event dispatch; previous-pose capture defined (§37); marker behavior under replay/restore (§16); reduced motion in §14; cameras/viewports assigned to `@four/scene` (§98); §49–52 group renamed; §6 audio marked plugin-provided. |
+| 1.3 | 2026-07-29 | Verification pass over the 1.1 material: world-matrix resolution per fixed step (§7); pause semantics (§10); replay records dropped time and step counts (§10, §34); §97 field of view in radians; §40 unit options restricted to display/authoring conversion; `ForceField.sample` gains `out` (§27); collider density authoritative over material density (§25); checksum order and "existing body" defined (§33); local-plane mapping in 2D worlds (§21); §39 sensor update moved before event dispatch; previous-pose capture defined (§37); marker behavior under replay/restore (§16); reduced motion in §14; cameras/viewports assigned to `@fourjs/scene` (§98); §49–52 group renamed; §6 audio marked plugin-provided. |
 | 1.4 | 2026-07-29 | §98: the §45 Application composition root moved from `core` to the `four` umbrella package — `core` owning the application shell would invert the dependency direction (§45's Application owns scene, renderer, scheduler, input, assets, diagnostics, all of which sit above `core`). Found by the implementation-plan stress test. |
 | 1.5 | 2026-07-29 | Gap-closure pass: Part IX never scheduled the §120 MVP's interaction/content/tooling scope — added §106a (Phase 3a: input, picking, sprites, MVP-tier text) and §113a (Phase 11: assets, serialization, UI, benchmark harness, documentation). §56 gains an MVP text tier (full shaping staged behind a shaping-engine decision). §98 gains a publish-names note (`four` and `four-js` are occupied on npm; `fourjs`/`@fourjs` free as of 2026-07-29). |
-| 1.6 | 2026-07-29 | Publish names decided (owner): packages publish under the owner's personal npm scope — umbrella `@danielsimonjr/fourjs`, sub-packages `@danielsimonjr/fourjs-<name>`. No org claim or name dispute needed; §98 note updated. Workspace names remain `four`/`@four/*`. |
+| 1.6 | 2026-07-29 | Publish names decided (owner): packages publish under the owner's personal npm scope — umbrella `@danielsimonjr/fourjs`, sub-packages `@danielsimonjr/fourjs-<name>`. No org claim or name dispute needed; §98 note updated. Workspace names remain `four`/`@fourjs/*`. |
 | 1.7 | 2026-08-06 | Public-API reconciliation (gap analysis A-22/PH-18, owner decision — amend the specification rather than alias the shipped surface). New §97a "Namespace and Naming Conventions" records the per-package umbrella barrel (decision WP-0.7-fix1: collision avoidance plus §91 tree-shaking, so every `Four.X` of Parts VII and X reads `Four.<package>.X`), the shipped-name mapping (`Mesh`→`Renderable`; `*Geometry` classes→geometry factory functions; `*Collider` classes→one `Collider` component over a `CollisionShape` descriptor union; `Motion`→`MotionComponent`; `SceneMigrator.upgrade`→`migrateSceneDocument` + `SceneMigrationRegistry`; `scene.activeCamera`→§48 viewports on `app.views`; `physicsWeight`/`animationWeight` on the `RigidBody` component, not the node), the names with no shipped equivalent yet (a `Text` node, `AnimationController`, `Circle`, `StandardMaterial`, §8 space modes, `Node.animation`), and the deferred string-selection affordances (`renderer: "auto"`, `solver: "auto"`). §97 and §114–§117 and the inline snippets of §11, §15, §16, §18, §20, §111 are rewritten against the shipped API; where a feature is unshipped the example shows the available-today form and cites §97a. Frozen §1–120 numbering respected: the new section takes a letter suffix. |
-| 1.8 | 2026-08-08 | Consolidated staleness-and-conflict pass over the queued spec-revisit register (owner standing instruction; recommendations recorded with each item adopted and named as such). **Shipped since revision 1.7, so the specification's own "not implemented" wording was reversed:** §18 and §97a's `AnimationController` row (state machines ship; seven of §18's nine features, with `target` and typed predicate records as the two recorded spelling differences and blend trees / layered animation named as scheduled); §20's and §97a's `solver: "auto"` deferral and §97a's `renderer: "auto"` deferral (both resolve through explicit-registration registries — the whole "Deferred string selection" subsection is rewritten, retaining §45's `physics` option record as the one remaining instance and stating the `"sideEffects": false` reason registration can never be an import side effect); §97a's `StandardMaterial` row and §97's "a world is built and tracked, not an app option" comment. **Corrections of statements that were never implementable:** §54's `morphTargetWeights`, placed on a `@four/render` node that the frozen package dependency matrix forbids `@four/animation` from seeing, moves its storage to a §6a scene component with the declared field retained as an accessor (RFC 0003, register item 8's recommendation adopted — a spec statement that cannot be implemented under a frozen constraint is corrected in the spec); §17's *morph weight* and *skeletal joint* track types are identified as binding forms over existing value kinds, not new value kinds, so no duplicate discriminants get added by inference (RFC 0003 §2). **Additions:** §57's material family gains `LitMaterial` (present in the implementation since 2026-08-04, absent from the list) and a provisional-withdrawal note on `ShaderMaterial` recording RFC 0001's no-raw-source position and marking it *draft, owner decision pending*; §61 records `createTexture`/`createRenderTarget` as deferred by decision — descriptor-plus-backend-cache — rather than by omission. Frozen §1–120 numbering untouched: every change is in-place text in an existing section, and no new section was needed. |
+| 1.8 | 2026-08-08 | Consolidated staleness-and-conflict pass over the queued spec-revisit register (owner standing instruction; recommendations recorded with each item adopted and named as such). **Shipped since revision 1.7, so the specification's own "not implemented" wording was reversed:** §18 and §97a's `AnimationController` row (state machines ship; seven of §18's nine features, with `target` and typed predicate records as the two recorded spelling differences and blend trees / layered animation named as scheduled); §20's and §97a's `solver: "auto"` deferral and §97a's `renderer: "auto"` deferral (both resolve through explicit-registration registries — the whole "Deferred string selection" subsection is rewritten, retaining §45's `physics` option record as the one remaining instance and stating the `"sideEffects": false` reason registration can never be an import side effect); §97a's `StandardMaterial` row and §97's "a world is built and tracked, not an app option" comment. **Corrections of statements that were never implementable:** §54's `morphTargetWeights`, placed on a `@fourjs/render` node that the frozen package dependency matrix forbids `@fourjs/animation` from seeing, moves its storage to a §6a scene component with the declared field retained as an accessor (RFC 0003, register item 8's recommendation adopted — a spec statement that cannot be implemented under a frozen constraint is corrected in the spec); §17's *morph weight* and *skeletal joint* track types are identified as binding forms over existing value kinds, not new value kinds, so no duplicate discriminants get added by inference (RFC 0003 §2). **Additions:** §57's material family gains `LitMaterial` (present in the implementation since 2026-08-04, absent from the list) and a provisional-withdrawal note on `ShaderMaterial` recording RFC 0001's no-raw-source position and marking it *draft, owner decision pending*; §61 records `createTexture`/`createRenderTarget` as deferred by decision — descriptor-plus-backend-cache — rather than by omission. Frozen §1–120 numbering untouched: every change is in-place text in an existing section, and no new section was needed. |
 | 1.9 | 2026-08-28 | RFC 0002 (plugin system) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gap `A-3` implemented. **§45** gains `plugins?: readonly FourPlugin[]` and the paragraph stating that installation happens in `initialize` — open question 1's disposition (a), *amend §45*: the §40 precedent against inventing an option turned on `units` being absent from §45's own list, whereas §81 requires an install lifecycle and §45 owns the lifecycle, so §81 had nowhere else to live. **§81** gains the two fields its own closing sentence already required and its code block omitted (`dependencies`, `engineRange`), the statement that `PluginContext` is a set of capability tokens rather than a fixed interface (forced by §3.1: every registry §81 hands over sits downstream of `core`), the specified install order (topological over `dependencies`, ties broken by supply order — a §33 requirement, since a plugin may register a §39 system and equal-priority systems run in registration order), the revocability rule (a capability declares it; a plugin that acquired a non-revocable one cannot be uninstalled and the attempt is refused naming what pins it), and the §96 boundary (a plugin is a value; no URL, no module specifier, no name from a document; no sandbox is described or provided). §96's requirements list is unchanged — it states requirements, not status. Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
 | 1.10 | 2026-08-28 | RFC 0003 (skinning and skeletal animation) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gaps `PH-10` + `R-22` implemented. Revision 1.8 already carried the two corrections the RFC forced (§54's `morphTargetWeights` storage moved to a scene component; §17's *morph weight* and *skeletal joint* entries identified as binding forms); this revision records the remaining adopted dispositions and ends §54's silent staging. **§54** gains the shipped/staged split of its eleven rows, the layout commitments (four influences per vertex at fixed attribute locations 4 joints / 5 weights, `JOINTS_1`/`WEIGHTS_1` named as the extension point at the next two locations; joint index = position in `Skeleton.bones`, insertion order being the §33 ABI), the bone-axis disposition (the engine imposes **no** bone-axis convention on the data model — the inverse bind matrix absorbs the authoring tool's; **+Y as the bone's length axis is a helper convention only**), the joint-limit rule (a rig over the declared `maximumSkinningJoints` is refused at setup with `UNSUPPORTED_GPU_FEATURE`, §89 — never clamped, never a frame-time throw, §61), the §79 document form (a skeleton is written inline on its mesh as bone ids plus inverse bind matrices — intra-file references are by id), and the §33 boundary rule (**no engine API returns skinned vertex positions**: the palette is the last CPU value in the envelope; picking and culling therefore use bind-pose bounds, stated as known inaccuracies). **§62**'s capability list gains "maximum skinning joints"; the WebGL 2 tier reports a declared portability constant rather than a device query. Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
 | 1.11 | 2026-08-28 | RFC 0001 (shader and node-material system) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gap `R-14` implemented. **§57**: `ShaderMaterial`'s provisional withdrawal (revision 1.8) becomes **permanent** — the row is retained so the name stays reserved and cannot be implemented by inference, and a source-string material is never implemented (Q1's disposition: a raw GLSL/WGSL payload re-opens §96's "no arbitrary code execution from scene files" and makes §63's resource checks unable to see what a pass samples). **§60** gains the normative narrowing the owner-decision register's row 3 asked for: the backend-independent shader model is a **serializable graph of closed operators** — no user shader source at any tier — with the shipped/deferred split of §60's feature list recorded (the node graph, uniforms, textures and samplers, the four fixed vertex attributes, reflection metadata and GLSL ES 3.00 generation ship; WGSL generation follows the WebGPU backend; uniform blocks, reusable functions, conditional variants, storage buffers and source maps are deferred with RFC 0001 §6's recorded reasons; node materials are unlit at this tier, sequenced R-14 → R-17 → R-13), and §60's example is rewritten against the shipped authoring surface (`NodeMaterialBuilder`, §97a's namespace spelling) per revision 1.7's example-compilation discipline. Uniform ownership is per material (Q3); a displacing graph on a collider-carrying node raises no §85 warning (Q4 — a vertex displacement is not a transform, §42). Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
@@ -447,8 +447,8 @@ to physics solvers.
 Example:
 
 ```ts
-import { Vector3 } from "four/math";
-import { MotionComponent } from "four/motion";
+import { Vector3 } from "fourJS/math";
+import { MotionComponent } from "fourJS/motion";
 
 const motion = new MotionComponent({
     linearVelocity: new Vector3(2, 0, 0),
@@ -536,7 +536,7 @@ fourJS shall support:
 ### 15. Tween API
 
 ```ts
-import { animate } from "four/animation";
+import { animate } from "fourJS/animation";
 
 animate(node.position)
   .to({ x: 10, y: 5 }, 1.0)
@@ -566,7 +566,7 @@ Each family but `linear` names three `EasingName` values — `"<family>-in"`,
 ### 16. Timeline API
 
 ```ts
-import { Timeline, tween } from "four/animation";
+import { Timeline, tween } from "fourJS/animation";
 
 const timeline = new Timeline();
 timeline
@@ -675,7 +675,7 @@ than pending:
   compiles to these records; the records are the normative form.
 
 ```ts
-import { AnimationController, AnimationSystem } from "four/animation";
+import { AnimationController, AnimationSystem } from "fourJS/animation";
 
 const animation = new AnimationSystem();
 app.systems.register(animation);
@@ -745,9 +745,9 @@ The core framework may use adapter-backed solvers, but users should not need
 to write solver-specific application code for common tasks.
 
 ```ts
-import { Vector3 } from "four/math";
-import { PhysicsWorld } from "four/physics";
-import { Rapier3dAdapter } from "four/physics-rapier";
+import { Vector3 } from "fourJS/math";
+import { PhysicsWorld } from "fourJS/physics";
+import { Rapier3dAdapter } from "fourJS/physics-rapier";
 
 const world = new PhysicsWorld({
     dimension: "3d",
@@ -759,13 +759,13 @@ await world.initialize();
 
 The world takes either an **adapter instance**, as above, or the `solver` string
 form — `"auto"`, or one §102 solver by name — which resolves through
-`@four/physics`'s solver registry. Superseded wording: revision 1.7 said the
+`@fourjs/physics`'s solver registry. Superseded wording: revision 1.7 said the
 string form *"is deferred to the same registry work as `renderer: "auto"`
 (§97a)"*; that registry shipped, and both string forms now exist (§97a).
 
 ```ts
-import { PhysicsWorld } from "four/physics";
-import { registerRapierSolver } from "four/physics-rapier";
+import { PhysicsWorld } from "fourJS/physics";
+import { registerRapierSolver } from "fourJS/physics-rapier";
 
 registerRapierSolver();                       // explicit, never a side-effect import
 const world = new PhysicsWorld({ dimension: "3d", solver: "auto" });
@@ -1170,7 +1170,7 @@ Potential features:
 - shape matching.
 
 ```text
-@four/physics-soft
+@fourjs/physics-soft
 ```
 
 This should not block the core rigid-body MVP.
@@ -1678,7 +1678,7 @@ The tessellation subsystem shall support:
 - index-buffer reuse;
 - incremental rebuild of modified path segments;
 - optional compute-based tessellation in later releases.
-The tessellator shall be an isolated module of `@four/geometry` with a stable interface so implementations can be replaced without changing the scene API. (A dedicated package remains a possible future split; §98 stays authoritative for the package set.)
+The tessellator shall be an isolated module of `@fourjs/geometry` with a stable interface so implementations can be replaced without changing the scene API. (A dedicated package remains a possible future split; §98 stays authoritative for the package set.)
 
 **Geometry, Materials, and Shading (§53-§60a)**
 ### 53. Geometry Architecture
@@ -1741,7 +1741,7 @@ class Mesh extends Renderable {
 `morphTargetWeights` is **storage on a scene-side component**, reached through
 the declaration above rather than held by it. Superseded wording: this section
 previously placed the weights on `Mesh` as plain state. `Mesh` extends
-`Renderable` (§49), which lives in `@four/render` (§98), and the animation
+`Renderable` (§49), which lives in `@fourjs/render` (§98), and the animation
 package is not permitted to depend on a rendering backend — the layering rule
 this specification states in §3.2 and §61 and that the implementation plan's
 frozen package dependency matrix enforces edge by edge. So §14's required
@@ -2006,7 +2006,7 @@ Two notes on that model, both amendments rather than restatements (revision
   graph is one §63's validation can see inside — every texture a graph
   samples is enumerable from the graph, so a §70 graph effect keeps the
   render graph's feedback and ordering checks instead of switching them off.
-  The IR is `ShaderGraph` in `@four/materials` (JSON by construction); the
+  The IR is `ShaderGraph` in `@fourjs/materials` (JSON by construction); the
   authoring surface is the builder above; the operator set grows only by a
   versioned amendment, and a data-declared custom operator is RFC 0001's
   deferred alternative E. Backends compile lazily behind explicit
@@ -2289,7 +2289,7 @@ Events include pointer enter/leave, down/up/move, click, double-click, wheel,
 drag, pinch, rotate, keyboard, focus, and blur.
 Pointer capture must be supported across mixed 2D/3D objects.
 ### 73. Retained-Mode UI
-The optional @four/ui package shall provide:
+The optional @fourjs/ui package shall provide:
 - panel;
 - label;
 - button;
@@ -2925,27 +2925,27 @@ authority, world-space text, a UI panel, and a button that applies an impulse.
 The spellings are the shipped ones; §97a says what each replaced and why.
 
 ```ts
-import { Application } from "four/application";
-import { boxGeometry } from "four/geometry";
-import { LitMaterial, SpriteMaterial } from "four/materials";
-import { Vector3 } from "four/math";
-import { Collider, PhysicsSystem, PhysicsWorld, RigidBody } from "four/physics";
-import { Rapier3dAdapter } from "four/physics-rapier";
-import { Renderable, Sprite, type Texture } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
+import { Application } from "fourJS/application";
+import { boxGeometry } from "fourJS/geometry";
+import { LitMaterial, SpriteMaterial } from "fourJS/materials";
+import { Vector3 } from "fourJS/math";
+import { Collider, PhysicsSystem, PhysicsWorld, RigidBody } from "fourJS/physics";
+import { Rapier3dAdapter } from "fourJS/physics-rapier";
+import { Renderable, Sprite, type Texture } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
 import {
     DirectionalLight,
     Group,
     PerspectiveCamera,
     createFullscreenViewport
-} from "four/scene";
+} from "fourJS/scene";
 import {
     buildGlyphAtlas,
     layoutText,
     type GlyphAtlas,
     type TextQuad
-} from "four/text";
-import { Button, Label, Panel } from "four/ui";
+} from "fourJS/text";
+import { Button, Label, Panel } from "fourJS/ui";
 
 // --- application (§45): an instance here; `renderer: "auto"` also works (§97a) -
 const canvas = document.querySelector("canvas") as HTMLCanvasElement;
@@ -3051,7 +3051,7 @@ app.scene.add(panel);
 panel.layout();     // one explicit pass; layout is never implicit (§74)
 
 // Every widget surface above is drawn by an application-supplied `WidgetSkin`
-// (§73): `@four/ui` may not import a renderer, so it measures and states but
+// (§73): `@fourjs/ui` may not import a renderer, so it measures and states but
 // never draws. Assign `panel.skin` / `impulseButton.skin` to make it visible.
 
 // --- run (§10): the host drives the loop, the engine never calls rAF ---------
@@ -3077,11 +3077,11 @@ examples in this specification are spelled, and it records — rather than
 hides — the affordances that are deferred rather than renamed.
 
 **The umbrella barrel is per-package namespaces.** `import * as Four from
-"four"` yields one namespace per §98 package, plus the §45 composition root,
+"fourJS"` yields one namespace per §98 package, plus the §45 composition root,
 which is the only API the umbrella owns rather than re-exports:
 
 ```ts
-import * as Four from "four";
+import * as Four from "fourJS";
 
 const app = new Four.Application({ /* ... */ });        // owned by `four`
 const pid = new Four.motion.PIDController({ kp: 2 });   // re-exported namespace
@@ -3090,7 +3090,7 @@ const body = new Four.physics.RigidBody({ type: "dynamic" });
 
 So **every `Four.X` in this specification reads `Four.<package>.X`**, with
 `<package>` the §98 package name in camelCase — `physicsRapier` for
-`@four/physics-rapier`, `renderWebgl` for `@four/render-webgl`. Two reasons,
+`@fourjs/physics-rapier`, `renderWebgl` for `@fourjs/render-webgl`. Two reasons,
 both binding:
 
 - **Collision avoidance.** Independent packages legitimately export the same
@@ -3107,9 +3107,9 @@ Applications that want short names use the **subpath** form, which is what §97,
 Part X, and every worked example use, and which tree-shakes the same way:
 
 ```ts
-import { Application } from "four/application";
-import { Vector3 } from "four/math";
-import { PhysicsWorld, RigidBody } from "four/physics";
+import { Application } from "fourJS/application";
+import { Vector3 } from "fourJS/math";
+import { PhysicsWorld, RigidBody } from "fourJS/physics";
 ```
 
 **Shipped-name mapping.** Where this specification's prose names a symbol, the
@@ -3152,8 +3152,8 @@ candidate package, which every program would then carry (§86, §91).
 | Specified | Today | Note |
 |---|---|---|
 | `renderer: "auto" \| "webgpu" \| "webgl2" \| "canvas2d" \| "svg"` (§45, §62) | **shipped** — the string, or a `Renderer` instance, or `false` | Resolved through a renderer registry a backend package opts into by an explicit `register…` call. `"auto"` walks Appendix A's order (registration order is deliberately ignored, §33), skips the headless tier, and falls back with §62's diagnostics callback when a backend's `initialize` fails; a *named* backend fails fast per §62. Support probing never touches the caller's canvas — a probing `getContext` would fix the context attributes and silently disable `antialias`. |
-| `solver: "auto"` (§20, §37) | **shipped** — the string, one §102 solver by name, or an `adapter` instance | Resolved through `@four/physics`'s solver registry. `"auto"` walks registration order, since §37 fixes no preference between solvers; a solver named explicitly is handed back unfiltered so that `PhysicsWorld` reports a capability mismatch with its own precise message rather than silently selecting something else. |
-| `physics: { solver, dimension }` as an §45 option record (§45) | **deferred** — `physics` takes a `PhysicsWorld`, or a `({ poses }) => PhysicsWorld` factory | The one remaining instance of this deviation, and for the original reason: the composition root constructing a world from an option record would put `@four/physics` — and therefore a solver — in the module graph of every program that names `Application`, including one that only draws a user interface. The factory form exists because a world takes its §43 pose buffer at construction and the application's buffer does not exist until the application does. |
+| `solver: "auto"` (§20, §37) | **shipped** — the string, one §102 solver by name, or an `adapter` instance | Resolved through `@fourjs/physics`'s solver registry. `"auto"` walks registration order, since §37 fixes no preference between solvers; a solver named explicitly is handed back unfiltered so that `PhysicsWorld` reports a capability mismatch with its own precise message rather than silently selecting something else. |
+| `physics: { solver, dimension }` as an §45 option record (§45) | **deferred** — `physics` takes a `PhysicsWorld`, or a `({ poses }) => PhysicsWorld` factory | The one remaining instance of this deviation, and for the original reason: the composition root constructing a world from an option record would put `@fourjs/physics` — and therefore a solver — in the module graph of every program that names `Application`, including one that only draws a user interface. The factory form exists because a world takes its §43 pose buffer at construction and the application's buffer does not exist until the application does. |
 
 Registration is always an **explicit call, never an import side effect**: every
 package declares `"sideEffects": false` (§91), so a module whose only job was to
@@ -3224,18 +3224,18 @@ implementations of the §61 interface;
 - `four`: umbrella package hosting the §45 `Application` composition root and
 re-exporting the others through side-effect-free subpath exports (`four/scene`,
 `four/physics`, ...) so tree-shaking works for umbrella users (§91).
-Camera rigs and controls (§12, §44, §47) live in `@four/motion` as kinematic
-controllers, with input bindings supplied through `@four/input`.
+Camera rigs and controls (§12, §44, §47) live in `@fourjs/motion` as kinematic
+controllers, with input bindings supplied through `@fourjs/input`.
 Publish names (decided by the owner, 2026-07-29): packages publish under the owner's
 personal npm scope — the umbrella is `@danielsimonjr/fourjs`, and the other packages
 follow `@danielsimonjr/fourjs-<name>` (for example `@danielsimonjr/fourjs-core`,
 `@danielsimonjr/fourjs-physics-rapier`). The npm names `four` and `four-js` are
 occupied by unrelated packages and are not pursued. In-repo workspace names remain
-`four`/`@four/*` as specified here; the publish mapping is applied mechanically at
+`four`/`@fourjs/*` as specified here; the publish mapping is applied mechanically at
 release time (§94, release 0.1). Subpath exports on the umbrella
 (`@danielsimonjr/fourjs/scene`, ...) preserve the §91 tree-shaking requirement.
 ### 99. Motion Package
-@four/motion responsibilities:
+@fourjs/motion responsibilities:
 - clocks;
 - fixed-step scheduler;
 - motion components;
@@ -3248,7 +3248,7 @@ release time (§94, release 0.1). Subpath exports on the umbrella
 - interpolation;
 - transform authority.
 ### 100. Animation Package
-@four/animation responsibilities:
+@fourjs/animation responsibilities:
 - tweens;
 - easing;
 - timelines;
@@ -3260,7 +3260,7 @@ release time (§94, release 0.1). Subpath exports on the umbrella
 - inverse kinematics;
 - physics-animation blending.
 ### 101. Physics Package
-@four/physics responsibilities:
+@fourjs/physics responsibilities:
 - stable public API;
 - body and collider descriptors;
 - physics materials;
@@ -3271,14 +3271,14 @@ release time (§94, release 0.1). Subpath exports on the umbrella
 - event normalization;
 - solver adapters;
 - snapshots;
-- unit application in simulation (the unit system itself lives in `@four/core`,
+- unit application in simulation (the unit system itself lives in `@fourjs/core`,
 §40);
 - debug data.
 ### 102. Solver Packages
 
 ```text
-@four/physics-rapier
-@four/physics-box2d
+@fourjs/physics-rapier
+@fourjs/physics-box2d
 ```
 
 Each solver package implements the shared adapter interface and declares capability differences.
@@ -3458,7 +3458,7 @@ Engineering relevance
 A PID utility should support simulation and visualization of control systems:
 
 ```ts
-import { PIDController } from "four/motion";
+import { PIDController } from "fourJS/motion";
 
 const controller = new PIDController({
     kp: 2,
@@ -3524,13 +3524,13 @@ the names this specification's prose uses. Each continues from the one before �
 ### 114. Basic Animated Object
 
 ```ts
-import { animate } from "four/animation";
-import { Application } from "four/application";
-import { circleGeometry2D } from "four/geometry";
-import { UnlitMaterial } from "four/materials";
-import { Renderable } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
-import { OrthographicCamera, createFullscreenViewport } from "four/scene";
+import { animate } from "fourJS/animation";
+import { Application } from "fourJS/application";
+import { circleGeometry2D } from "fourJS/geometry";
+import { UnlitMaterial } from "fourJS/materials";
+import { Renderable } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
+import { OrthographicCamera, createFullscreenViewport } from "fourJS/scene";
 
 const camera = new OrthographicCamera({
     left: -4, right: 4, bottom: -3, top: 3, near: 0.1, far: 10
@@ -3566,11 +3566,11 @@ app.start();
 ### 115. Dynamic Physics Object
 
 ```ts
-import { LitMaterial } from "four/materials";
-import { Vector3 } from "four/math";
-import { Collider, RigidBody } from "four/physics";
-import { Renderable } from "four/render";
-import { boxGeometry } from "four/geometry";
+import { LitMaterial } from "fourJS/materials";
+import { Vector3 } from "fourJS/math";
+import { Collider, RigidBody } from "fourJS/physics";
+import { Renderable } from "fourJS/render";
+import { boxGeometry } from "fourJS/geometry";
 
 // No sphere primitive ships yet, so the drawn shape is a box and the collider
 // says what the solver sees (§97a). The two are authored separately on purpose:
@@ -3598,8 +3598,8 @@ world.addBody(ball);
 ### 116. Motorized Hinge
 
 ```ts
-import { HingeJoint } from "four/physics";
-import { Vector3 } from "four/math";
+import { HingeJoint } from "fourJS/physics";
+import { Vector3 } from "fourJS/math";
 
 const hinge = new HingeJoint({
     // The two §23 body components, not their nodes.
@@ -3626,9 +3626,9 @@ and axes are frozen.
 ### 117. Physics and Animation Blend
 
 ```ts
-import { AnimationMixer, AnimationSystem } from "four/animation";
-import { RigidBody, createPoseTargetCaptureSystem } from "four/physics";
-import { PoseTarget } from "four/scene";
+import { AnimationMixer, AnimationSystem } from "fourJS/animation";
+import { RigidBody, createPoseTargetCaptureSystem } from "fourJS/physics";
+import { PoseTarget } from "fourJS/scene";
 
 // §19's pipeline: animation writes a target pose, the solver writes a solved
 // pose, and the two are blended by weight. The capture system is REQUIRED —
@@ -3807,7 +3807,7 @@ blend previous and current simulation states for rendering (§10, §43).
 `same-platform`, `cross-platform` (§33).
 - **Sensor**: a collider that reports overlaps but exerts no forces (§24, §29).
 - **Solver adapter**: implementation of `PhysicsSolverAdapter` (§37) binding a
-concrete physics engine beneath the stable `@four/physics` API.
+concrete physics engine beneath the stable `@fourjs/physics` API.
 - **Logical pixel**: device-independent pixel unit used by screen space and UI
 layout, scaled to physical pixels by `resolution` (§47, §74).
 - **World / local-plane space**: the spaces in which physics normally operates (§8);

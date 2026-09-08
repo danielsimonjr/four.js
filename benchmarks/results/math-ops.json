@@ -9,7 +9,7 @@
   "operandVariants": 8,
   "baselineNote": "The `baseline (no op)` row does the operand indexing and the result read and no math at all. It is the floor: a row at the baseline is a deleted operation, not a fast one. Operands vary per iteration for the same reason — with fixed operands V8 hoisted the copy loop and reported 3.6 ns for a store that ran once.",
   "copyResetNote": "Rows with includesCopyReset=true time `out.copy(src).<op>(...)`; subtract the same type's copy row for the operation alone. §7b types mutate in place, so a repeated in-place op would otherwise measure a drifting receiver. Unprefixed rows take an explicit out parameter (or are pure queries); subtract the baseline row instead.",
-  "allocationNote": "allocationsPerBatch is @four/math's own constructionCount() (§83) across one extra batch run after the timed batches. Zero is the §7b requirement; any non-zero row is a hot-path defect, not a performance opinion.",
+  "allocationNote": "allocationsPerBatch is @fourjs/math's own constructionCount() (§83) across one extra batch run after the timed batches. Zero is the §7b requirement; any non-zero row is a hot-path defect, not a performance opinion.",
   "allocatingOperations": [],
   "baselineNanosecondsPerOperation": 1.51,
   "operations": [

@@ -9,8 +9,8 @@ import {
   buildPropagationPath,
   dispatchKeyEvent,
   dispatchPointerEvent,
-} from "@four/input";
-import { type Node } from "@four/scene";
+} from "@fourjs/input";
+import { type Node } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { CheckableWidget, Checkbox, Toggle } from "../src/checkable.js";

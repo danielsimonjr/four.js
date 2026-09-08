@@ -1,6 +1,6 @@
 /**
  * A-13 remainder — the §75 hidden DOM accessibility mirror is reachable from
- * the public `@four/ui` surface, not only from a deep `src/` import.
+ * the public `@fourjs/ui` surface, not only from a deep `src/` import.
  *
  * The document is a duck-typed fake: this suite runs in Node, the same way
  * the colocated unit tests do. A browser passes `window.document`.
@@ -14,7 +14,7 @@ import {
   installAccessibilityMirror,
   type DocumentLike,
   type ElementLike,
-} from "@four/ui";
+} from "@fourjs/ui";
 import { describe, expect, it } from "vitest";
 
 class FakeElement implements ElementLike {
@@ -103,7 +103,7 @@ class FakeDocument implements DocumentLike {
   }
 }
 
-describe("installAccessibilityMirror (public @four/ui surface)", () => {
+describe("installAccessibilityMirror (public @fourjs/ui surface)", () => {
   it("projects button label/role/disabled, slider values, and a disabled checkbox", () => {
     const document = new FakeDocument();
     const start = new Button({

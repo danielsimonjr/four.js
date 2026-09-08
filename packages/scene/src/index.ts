@@ -1,4 +1,4 @@
-export const PACKAGE_NAME = "@four/scene";
+export const PACKAGE_NAME = "@fourjs/scene";
 
 export type { AuthorityNode, TransformAuthority } from "./authority.js";
 export {

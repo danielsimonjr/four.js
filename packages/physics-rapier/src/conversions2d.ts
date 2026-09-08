@@ -2,7 +2,7 @@
  * The §21/P5-3 mapping between the engine's 3D-typed physics API and Rapier's
  * two-dimensional one.
  *
- * `@four/physics` is typed **once, in 3D** (`Vector3` positions, `Quaternion`
+ * `@fourjs/physics` is typed **once, in 3D** (`Vector3` positions, `Quaternion`
  * rotations) for both dimensions — §21 and plan P5-3. Rapier 2D speaks
  * `{ x, y }` and a scalar angle. Every crossing of that boundary happens in this
  * module, so the mapping can be read, tested, and reasoned about in one place
@@ -34,7 +34,7 @@
  * an angular velocity outside the Z axis are **rejected**, never projected:
  * §85 asks for invalid dimensions to be detected, and silently dropping the
  * out-of-plane part yields a body that is subtly somewhere else rather than
- * obviously wrong. The rejection is delegated to `@four/physics`'s own
+ * obviously wrong. The rejection is delegated to `@fourjs/physics`'s own
  * `resolveRotation` / `resolveAngularVelocity`, so this adapter cannot drift
  * from the engine's rule.
  *
@@ -56,26 +56,26 @@
  * `body.translation()` builds a fresh `{ x, y }` on every call — which is a
  * property of the 0.19.3 JavaScript binding this package cannot avoid; the
  * `out` parameters below at least stop that allocation from spreading into
- * `@four/math` types.
+ * `@fourjs/math` types.
  *
  * Every function here requires `initializeRapier2d()` to have resolved: the
  * shape constructors trap into wasm.
  */
 
-import { FourError } from "@four/core";
-import type { Quaternion, Vector3 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import type { Quaternion, Vector3 } from "@fourjs/math";
 import {
   ALL_COLLISION_GROUPS,
   resolveAngularVelocity,
   resolveRotation,
-} from "@four/physics";
+} from "@fourjs/physics";
 import type {
   AngularVelocityInput,
   BodyType,
   CollisionShape,
   RotationInput,
   Vector3Input,
-} from "@four/physics";
+} from "@fourjs/physics";
 
 import { RAPIER_2D } from "./init.js";
 import type { RapierColliderDesc, RapierShape, RapierVector } from "./init.js";
@@ -83,7 +83,7 @@ import type { RapierColliderDesc, RapierShape, RapierVector } from "./init.js";
 /**
  * §89 has no physics-input code and `PHYSICS_SOLVER_FAILED` means the solver
  * failed, which is a different event; bad input to this adapter is the same
- * general invalid-input code `@four/physics` uses for descriptors.
+ * general invalid-input code `@fourjs/physics` uses for descriptors.
  */
 const CONVERSION_ERROR_CODE = "INVALID_APPLICATION_STATE";
 
@@ -156,7 +156,7 @@ export function fromRapierVector2(value: RapierVector2, out: Vector3): Vector3 {
  *
  * A `number` passes through unchanged (it is already an angle about +Z); a
  * `Quaternion` must be a pure Z rotation and becomes `2 · atan2(z, w)`. The
- * plane check is `@four/physics`'s `resolveRotation`, so the adapter and the
+ * plane check is `@fourjs/physics`'s `resolveRotation`, so the adapter and the
  * engine reject exactly the same values.
  */
 export function toRapierAngle(
@@ -304,7 +304,7 @@ export function toRapierJointAxis2d(
  * Rapier's rule, from its own documentation: two filters `a` and `b` interact
  * when `((a >> 16) & b) !== 0 && ((b >> 16) & a) !== 0` — the high 16 bits are
  * the *membership* groups and the low 16 the *filter* mask. That is the same
- * mutual rule `passesQueryFilter` documents in `@four/physics`, so contact
+ * mutual rule `passesQueryFilter` documents in `@fourjs/physics`, so contact
  * filtering and query filtering agree by construction.
  *
  * Values above bit 15 cannot be represented and are **rejected**;
@@ -350,7 +350,7 @@ function packGroupHalf(field: string, value: number): number {
  * height as `halfHeight + radius` above the surface. No axis swap is needed.
  *
  * **Polygon.** `ConvexPolygon(vertices, skipConvexHullComputation)` is built
- * with the hull computation **on** (`false`). `@four/physics` already rejects a
+ * with the hull computation **on** (`false`). `@fourjs/physics` already rejects a
  * concave outline, so the hull is a no-op on valid input; leaving it on is what
  * makes either winding acceptable, which `PolygonShape` promises and Rapier's
  * `convexPolyline` (counter-clockwise only) does not.

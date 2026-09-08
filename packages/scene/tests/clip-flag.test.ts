@@ -3,8 +3,8 @@
  * a plain boolean field, defaulting off.
  *
  * Everything the flag *does* lives above this package — the render list emits
- * the mask and inherits the test (`@four/render`), the backend writes the
- * stencil (`@four/render-webgl`) — so this file pins only what `@four/scene`
+ * the mask and inherits the test (`@fourjs/render`), the backend writes the
+ * stencil (`@fourjs/render-webgl`) — so this file pins only what `@fourjs/scene`
  * promises: the field exists on every node, defaults `false`, and holds what
  * it is assigned. A plain field like `visible` and `layers`, for the recorded
  * reason: the render list reads it once per node per frame and there is no

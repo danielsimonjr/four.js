@@ -106,8 +106,8 @@
  * for a mouse that never pressed).
  */
 
-import { Vector3, type DepthRange } from "@four/math";
-import type { Camera, Node } from "@four/scene";
+import { Vector3, type DepthRange } from "@fourjs/math";
+import type { Camera, Node } from "@fourjs/scene";
 
 import { pick, type PickHit, type Pickable } from "./pick.js";
 import {
@@ -181,7 +181,7 @@ export type SurfacePointerListener = (event: SurfacePointerEvent) => void;
 
 /**
  * The drawing surface pointer events arrive on, described by what this module
- * actually touches — the same structural-seam policy `@four/render-webgl` uses
+ * actually touches — the same structural-seam policy `@fourjs/render-webgl` uses
  * for its canvas (`WebglCanvas`), and for the same reasons: an
  * `HTMLCanvasElement`, a wrapper around one, and a test double are all equally
  * acceptable, `instanceof HTMLCanvasElement` fails across realms, and this

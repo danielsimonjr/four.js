@@ -6,7 +6,7 @@ export default defineConfig({
   // `examples/flagship/one-scene-everything-moves` and every other example that
   // measures against §86's payload budget.
   //
-  // The reason is §84. `Application.stats` is gated on `@four/core`'s `DEV`:
+  // The reason is §84. `Application.stats` is gated on `@fourjs/core`'s `DEV`:
   // `this.stats = DEV && options.stats === true ? createFrameStats() : null`.
   // In a production build `app.stats` is `null` — by design, since §85 permits a
   // production build to drop expensive diagnostics — so a page whose subject is

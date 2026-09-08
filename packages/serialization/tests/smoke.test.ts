@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { PACKAGE_NAME } from "../src/index.js";
 
-describe("@four/serialization", () => {
+describe("@fourjs/serialization", () => {
   it("exposes its package name", () => {
-    expect(PACKAGE_NAME).toBe("@four/serialization");
+    expect(PACKAGE_NAME).toBe("@fourjs/serialization");
   });
 });

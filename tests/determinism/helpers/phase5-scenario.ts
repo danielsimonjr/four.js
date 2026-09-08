@@ -39,7 +39,7 @@
  * transform and velocities, quantized to 1e-6, in ascending body id. This file
  * does not re-hash body state; it takes that uint32 from each world after every
  * fixed step and combines the pair with the same D6 hasher
- * (`@four/diagnostics`'s `createChecksum`) that phase 1, 2 and 4 use, in the
+ * (`@fourjs/diagnostics`'s `createChecksum`) that phase 1, 2 and 4 use, in the
  * fixed order **2D then 3D**. So a per-step digest here is a hash of two
  * hashes, and the two raw sequences are published alongside it
  * ({@link Phase5ScenarioResult.checksums2d},
@@ -88,8 +88,8 @@
  * ## `four/application`, not `four` (as in WP-4.8)
  *
  * The subpath import keeps the claim "no renderer is loaded" a property of the
- * import graph: `four/application` reaches `@four/core`, `@four/motion`,
- * `@four/scene` and one `import type` from `@four/render`, and the root barrel's
+ * import graph: `four/application` reaches `@fourjs/core`, `@fourjs/motion`,
+ * `@fourjs/scene` and one `import type` from `@fourjs/render`, and the root barrel's
  * namespace re-export of every backend package is never pulled in.
  *
  * ## Determinism tier reached (§33)
@@ -104,8 +104,8 @@
  * requires evidence this suite does not gather.
  */
 
-import { createChecksum } from "@four/diagnostics";
-import { Vector2, Vector3 } from "@four/math";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Vector2, Vector3 } from "@fourjs/math";
 import {
   Collider,
   PhysicsSystem,
@@ -114,10 +114,10 @@ import {
   type CollisionShape,
   type PhysicsDimension,
   type PhysicsWorldAdapter,
-} from "@four/physics";
-import { Rapier2dAdapter, Rapier3dAdapter } from "@four/physics-rapier";
-import { Group, type Node } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/physics";
+import { Rapier2dAdapter, Rapier3dAdapter } from "@fourjs/physics-rapier";
+import { Group, type Node } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 export const FIXED_TIME_STEP = 1 / 60;
@@ -681,7 +681,7 @@ function sampleHalf(half: Half): HalfSample {
  * Every call in any process is independent: it builds its own `Application`,
  * its own two worlds on their own fresh Rapier adapters, and disposes all of
  * them before returning. Nothing is cached at module scope (the *wasm image*
- * is, inside `@four/physics-rapier`, which is a decoded module and not solver
+ * is, inside `@fourjs/physics-rapier`, which is a decoded module and not solver
  * state), so calling it twice in one process is a genuine second run rather
  * than a replay.
  *

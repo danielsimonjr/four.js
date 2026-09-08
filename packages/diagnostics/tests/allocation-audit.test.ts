@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resetDevWarnings } from "@four/core";
+import { resetDevWarnings } from "@fourjs/core";
 
 import {
   NO_FRAME_ALLOCATIONS,
@@ -31,7 +31,7 @@ describe("auditFrameAllocations", () => {
     const report = auditFrameAllocations(2, 5, { label: "simulate" });
     expect(report.excessive).toBe(true);
     expect(report.constructed).toBe(3);
-    expect(report.message).toContain("3 @four/math object(s)");
+    expect(report.message).toContain("3 @fourjs/math object(s)");
     expect(warn).toHaveBeenCalledTimes(1);
     auditFrameAllocations(0, 9, { label: "simulate" });
     expect(warn).toHaveBeenCalledTimes(1);

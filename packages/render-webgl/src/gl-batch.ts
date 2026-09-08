@@ -1,8 +1,8 @@
 /**
- * §65 batching for the WebGL 2 backend — the GPU half of `@four/render`'s
+ * §65 batching for the WebGL 2 backend — the GPU half of `@fourjs/render`'s
  * {@link RenderBatcher} (R-9, 2026-08-09).
  *
- * `@four/render`'s planner decides *which* consecutive draws merge and produces
+ * `@fourjs/render`'s planner decides *which* consecutive draws merge and produces
  * one interleaved vertex stream plus one index stream; this module owns the two
  * buffer objects and the vertex array those streams are uploaded into, and
  * issues the single `drawElements` that replaces them. Nothing here decides
@@ -31,7 +31,7 @@
  * module at runtime.** It holds an interface-typed field, imported
  * `import type`, and calls methods through it. An application that never calls
  * {@link createGlBatching} does not link this module, does not link
- * `@four/render`'s planner, and pays **zero bytes** — measured, both ways.
+ * `@fourjs/render`'s planner, and pays **zero bytes** — measured, both ways.
  *
  * The transparency §65 asks for is then true of everything *above* the switch:
  * no node, material, geometry, render item or scene knows whether batching is
@@ -83,13 +83,13 @@
  * them; {@link GlBatching.dispose} deletes them on a live context.
  */
 
-import { Matrix4 } from "@four/math";
+import { Matrix4 } from "@fourjs/math";
 import {
   RenderBatcher,
   type RenderBatch,
   type RenderBatchOptions,
   type RenderItem,
-} from "@four/render";
+} from "@fourjs/render";
 
 import {
   COLOR_ATTRIBUTE_LOCATION,
@@ -157,7 +157,7 @@ function layoutSlot(batch: RenderBatch): number {
 export interface RenderBatching {
   /**
    * Plans and assembles the batch starting at `items[from]`, or `null` when
-   * that item does not start one. See `@four/render`'s `RenderBatcher.next`:
+   * that item does not start one. See `@fourjs/render`'s `RenderBatcher.next`:
    * the returned record is pooled and valid until the next call.
    *
    * `layerMask` is **optional since R-8 (2026-08-09)**, and the renderer no

@@ -2,7 +2,7 @@
  * Typed event emitter (§6b).
  *
  * One event API serves nodes and the application. `EventEmitter` is the shared
- * implementation: `@four/scene`'s `Node` extends it (plan D1), and the
+ * implementation: `@fourjs/scene`'s `Node` extends it (plan D1), and the
  * application composition root re-emits `fixedUpdate` / `update` / `render`
  * through the same contract (§10).
  *

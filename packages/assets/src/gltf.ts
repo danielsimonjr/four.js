@@ -93,7 +93,7 @@
  *
  * ## Why this package cannot assemble a scene (§3.1)
  *
- * `@four/assets` depends on `core` alone (the frozen matrix), so a `Mesh`, a
+ * `@fourjs/assets` depends on `core` alone (the frozen matrix), so a `Mesh`, a
  * `Skeleton`, a `StandardMaterial`, and an `AnimationClip` are all names it
  * must not know. The parse tier therefore produces **plain validated data**
  * — typed arrays and records — and the umbrella package, which sees
@@ -109,7 +109,7 @@ import {
   parseUntrustedJson,
   type Disposable,
   type JsonValue,
-} from "@four/core";
+} from "@fourjs/core";
 
 import {
   DEFAULT_MAXIMUM_BYTES,
@@ -260,7 +260,7 @@ export interface GltfNodeRecord {
   /**
    * The node's column-major matrix, when the file used the matrix form —
    * mutually exclusive with authored TRS (refused otherwise). Decomposed at
-   * instantiation, where `@four/math` is visible.
+   * instantiation, where `@fourjs/math` is visible.
    */
   readonly matrix: Float32Array | null;
   /** Index into {@link GltfAsset.meshes}, or `null`. */

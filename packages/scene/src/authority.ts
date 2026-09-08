@@ -46,7 +46,7 @@
  * §42's model, the same writer.
  *
  * The message is unconditional `console.warn` — not `DEV` / `devWarnOnce`.
- * `@four/scene` is a §33 simulation package: `dev-build-mode.test.ts`
+ * `@fourjs/scene` is a §33 simulation package: `dev-build-mode.test.ts`
  * forbids any build-flag import here (the same reason a DEV-gated
  * `new Node()` warn was reverted). The WeakMap is the once-per-pair
  * suppress; production prints the first conflict and then stays quiet.
@@ -84,9 +84,9 @@ export interface AuthorityNode {
  * - `"blended"` — the §19 physics-animation pipeline is the single owner; blend
  *   weights vary *inside* that pipeline without changing ownership. Assignable
  *   since WP-7.3, which built that pipeline into `PhysicsWorld`
- *   (`@four/physics`, plan P7-4); between WP-2.3 and WP-7.3 assigning it threw
+ *   (`@fourjs/physics`, plan P7-4); between WP-2.3 and WP-7.3 assigning it threw
  *   `FourError("NOT_IMPLEMENTED")`, because no system could have driven such a
- *   node. A `"blended"` node needs two more things `@four/scene` cannot see: a
+ *   node. A `"blended"` node needs two more things `@fourjs/scene` cannot see: a
  *   `RigidBody` registered with a `PhysicsWorld`, and a `PoseTarget` for
  *   animation to write. The world raises the first step that finds the target
  *   missing; a node registered with no world at all is simply a node nothing

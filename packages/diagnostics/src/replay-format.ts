@@ -30,13 +30,13 @@
  * One of those deserves its honesty stated out loud (decision, WP-10.1):
  *
  * - **"Initial scene state" is the *solver's* state, not the scene graph's.**
- *   `@four/diagnostics` may depend on `core`, `math`, and `scene` only — it can
- *   never see `@four/physics` (same dispatch wave) — so the only initial state
+ *   `@fourjs/diagnostics` may depend on `core`, `math`, and `scene` only — it can
+ *   never see `@fourjs/physics` (same dispatch wave) — so the only initial state
  *   it can capture is whatever the target hands back from `createSnapshot()`.
  *   For a `PhysicsWorld` that is the full solver world. A caller that also needs
  *   the *authoring* scene serialized alongside puts it in `metadata` (or ships
- *   the `@four/serialization` document next to the recording); this format does
- *   not duplicate `@four/serialization`.
+ *   the `@fourjs/serialization` document next to the recording); this format does
+ *   not duplicate `@fourjs/serialization`.
  *
  * "Solver settings" used to be the second entry on that list, recorded here as
  * having *no dedicated field* (WP-10.1). {@link ReplayRecording.worldConfiguration}
@@ -65,7 +65,7 @@
  * ## Numbers
  *
  * All times are seconds (plan §1, §7a). `finalChecksum` is a uint32 — the §33
- * digest `@four/diagnostics`'s `hashFloats` and `PhysicsWorld.checksum()` both
+ * digest `@fourjs/diagnostics`'s `hashFloats` and `PhysicsWorld.checksum()` both
  * produce. Step indices are non-negative safe integers.
  */
 
@@ -75,13 +75,13 @@ import {
   parseUntrustedJson,
   type JsonValue,
   type UntrustedJsonLimits,
-} from "@four/core";
+} from "@fourjs/core";
 
 /**
- * Any value JSON can carry, losslessly — `@four/core`'s {@link JsonValue},
+ * Any value JSON can carry, losslessly — `@fourjs/core`'s {@link JsonValue},
  * re-exported so the replay format keeps naming its own payload type.
  *
- * This module's definition was the original; `@four/serialization` transcribed
+ * This module's definition was the original; `@fourjs/serialization` transcribed
  * it (no §3.1 edge runs between the two packages) and both carried dated
  * hoist-to-core notes until the 2026-08-04 hoist landed. Recorded input
  * payloads and metadata are typed with this rather than `unknown`: a replay
@@ -90,7 +90,7 @@ import {
  * recordable, and it is better to say so in the type than to discover it as a
  * silent `null` in a golden file.
  */
-export type { JsonValue } from "@four/core";
+export type { JsonValue } from "@fourjs/core";
 
 /**
  * The **highest** format version this build can write — an upper bound, not the
@@ -458,7 +458,7 @@ export function decodeBase64(text: string): ArrayBuffer {
 
 /**
  * Validates a value as JSON and returns a deep-frozen copy of it —
- * `@four/core`'s {@link cloneJsonValue}, re-exported.
+ * `@fourjs/core`'s {@link cloneJsonValue}, re-exported.
  *
  * Recorded payloads are copied rather than referenced because the caller
  * usually hands over the same mutable object every frame; a recording that kept
@@ -469,14 +469,14 @@ export function decodeBase64(text: string): ArrayBuffer {
  * cycle throws far from the call site that caused it. Each of those is a
  * {@link TypeError} here, at the `recordInput` that introduced it.
  *
- * The shared implementation carries `@four/serialization`'s `__proto__`
+ * The shared implementation carries `@fourjs/serialization`'s `__proto__`
  * strengthening (the 2026-08-04 hoist): a payload with a `__proto__` own key
  * is now refused with a `TypeError` instead of being silently mis-copied into
  * the fresh object's prototype — this module's original would have re-parented
  * the copy, contradicting its own "never carry a `__proto__` into the player"
  * contract at the payload level.
  */
-export { cloneJsonValue } from "@four/core";
+export { cloneJsonValue } from "@fourjs/core";
 
 // --- document validation ----------------------------------------------------
 
@@ -770,15 +770,15 @@ export function encodeReplayRecording(recording: ReplayRecording): string {
 }
 
 /**
- * Size and nesting bounds for an untrusted document — `@four/core`'s
+ * Size and nesting bounds for an untrusted document — `@fourjs/core`'s
  * {@link UntrustedJsonLimits}, re-exported so a caller of
  * {@link decodeReplayRecording} does not have to reach past this package for
  * the type of its own second argument.
  *
- * The same type bounds `@four/serialization`'s §79 scene documents; see
- * `@four/core`'s `untrusted.ts` for why one definition sits below both.
+ * The same type bounds `@fourjs/serialization`'s §79 scene documents; see
+ * `@fourjs/core`'s `untrusted.ts` for why one definition sits below both.
  */
-export type { UntrustedJsonLimits } from "@four/core";
+export type { UntrustedJsonLimits } from "@fourjs/core";
 
 /**
  * Parses and validates JSON text as a §34 replay document, treating the text as

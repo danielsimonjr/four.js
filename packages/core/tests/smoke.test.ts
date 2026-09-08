@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { PACKAGE_NAME } from "../src/index.js";
 
-describe("@four/core", () => {
+describe("@fourjs/core", () => {
   it("exposes its package name", () => {
-    expect(PACKAGE_NAME).toBe("@four/core");
+    expect(PACKAGE_NAME).toBe("@fourjs/core");
   });
 });

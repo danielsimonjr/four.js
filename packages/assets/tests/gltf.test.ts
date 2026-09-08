@@ -10,7 +10,7 @@
  * input bytes (§33).
  */
 
-import { isFourError, resetDevWarnings } from "@four/core";
+import { isFourError, resetDevWarnings } from "@fourjs/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

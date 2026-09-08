@@ -1,6 +1,6 @@
 /**
  * §44/§47's **trackball** rig (R-37, 2026-08-21) — the last of the seven camera
- * rigs that had a design reason to be somewhere other than `@four/motion`.
+ * rigs that had a design reason to be somewhere other than `@fourjs/motion`.
  *
  * ```ts
  * const trackball = new TrackballRig({ width: 960, height: 540, distance: 6 });
@@ -12,12 +12,12 @@
  * ## Why it lives here and not with the other rigs
  *
  * `camera-rigs.ts` staged it with a one-line reason: "defined in **screen
- * space**, and `@four/motion` may not import `render` or `input` (§3.1); it
+ * space**, and `@fourjs/motion` may not import `render` or `input` (§3.1); it
  * belongs with the §47 `ScreenCamera` packet." That is exactly right, and this
  * is that packet. A trackball is not parameterised by angles the way an orbit
  * rig is — its whole definition is *a mapping from two points on a viewport to
  * a rotation* — so the package that owns §48's `Viewport` and §47's
- * {@link ScreenCamera} is the one that can state it. `@four/scene` is also the
+ * {@link ScreenCamera} is the one that can state it. `@fourjs/scene` is also the
  * lowest package that can: it needs a rectangle and a quaternion, nothing else.
  *
  * ## It is a rig, not a component (decision, R-37)
@@ -31,7 +31,7 @@
  *   step re-writing a transform that had not changed. `OrbitRig` accumulates
  *   angles and *is* re-evaluated per step because its target may move; a
  *   trackball's pivot is a point the caller owns.
- * - **`ConstraintSystem` is in `@four/motion` and names its three component
+ * - **`ConstraintSystem` is in `@fourjs/motion` and names its three component
  *   classes literally.** A component here could not be driven by it without
  *   `motion` importing `scene`'s rig — which the staging note exists to
  *   prevent. Inventing a second constraint system to drive one rig would be
@@ -66,7 +66,7 @@
  * ## Parameter-driven, like every other rig (R-36)
  *
  * {@link TrackballRig.drag} takes four numbers in viewport pixels. There is no
- * `@four/input` import — `@four/scene` may not have one under the frozen §3.1
+ * `@fourjs/input` import — `@fourjs/scene` may not have one under the frozen §3.1
  * matrix — and, as R-36 recorded for the other rigs, that constraint is the
  * right design anyway: a rig whose only inputs are numbers is replayable (§34),
  * testable without a device, and leaves sensitivity, inversion and acceleration
@@ -89,7 +89,7 @@
  * per-instance.
  */
 
-import { Quaternion, Vector3 } from "@four/math";
+import { Quaternion, Vector3 } from "@fourjs/math";
 
 import { warnAuthorityConflict } from "./authority.js";
 import type { Node } from "./node.js";
@@ -147,7 +147,7 @@ function assertPositive(value: number, what: string): void {
 /**
  * Rotates `(0, 0, z)` by the unit quaternion `q`, into `out`.
  *
- * Written out here rather than added to `@four/math` as a general
+ * Written out here rather than added to `@fourjs/math` as a general
  * `Vector3.applyQuaternion`: that primitive is a math-package decision with its
  * own naming and `out` conventions (§7b), and this file needs exactly one
  * special case of it — the camera's own +Z offset. The identity used is
@@ -189,7 +189,7 @@ export class TrackballRig {
    * Parent space rather than world space, deliberately: a trackball camera is
    * authored as a top-level node or under a single rig parent, and writing the
    * local transform keeps this rig free of world-matrix inversion — the machinery
-   * `@four/motion`'s `placeAtWorldPosition` exists for, which a rig driven from a
+   * `@fourjs/motion`'s `placeAtWorldPosition` exists for, which a rig driven from a
    * pointer event does not need. A trackball under a moving parent orbits the
    * parent's frame, which is the useful reading of it.
    */

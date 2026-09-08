@@ -127,7 +127,7 @@ and of capabilities:
 | Fallback on init failure + diagnostics event                                                                                                                                             | `RendererRegistry` already implements it: `RendererFallbackReport { backend, reason: "unsupported" \| "initialization-failed", error }` via `onFallback`. | **Free**, and its upper rungs finally get exercised by a real second backend (this is `R-2`'s open half).                                                          |
 | Explicit `"webgpu"` fails fast with `RENDERER_INITIALIZATION_FAILED`                                                                                                                     | Registry throws for explicit selections.                                                                                                                  | **Free.**                                                                                                                                                          |
 | maximum texture dimensions                                                                                                                                                               | `RendererCapabilities.maxTextureSize` exists.                                                                                                             | **Free** (`device.limits.maxTextureDimension2D`).                                                                                                                  |
-| texture formats, multisampling, floating-point targets, timestamp queries, storage buffers, compute shaders, indirect draw, compressed textures, shader precision, max uniforms/bindings | **None of these exist on `RendererCapabilities`**, which today has exactly two members (`backend`, `maxTextureSize`).                                     | **Design work, shared-interface change.** See §3.3 — this is the single largest _interface_ consequence of R-1 and it lands in `@four/render`, not in the backend. |
+| texture formats, multisampling, floating-point targets, timestamp queries, storage buffers, compute shaders, indirect draw, compressed textures, shader precision, max uniforms/bindings | **None of these exist on `RendererCapabilities`**, which today has exactly two members (`backend`, `maxTextureSize`).                                     | **Design work, shared-interface change.** See §3.3 — this is the single largest _interface_ consequence of R-1 and it lands in `@fourjs/render`, not in the backend. |
 | "Applications may declare required and optional capabilities"                                                                                                                            | No `requiredCapabilities` / `optionalCapabilities` anywhere in `RendererOptions`.                                                                         | **Deferred by decision**, packet W-9. A declaration mechanism over a two-member capability record is theatre.                                                      |
 
 ### 3.2 What maps cleanly (backend-independent, no new design)
@@ -136,7 +136,7 @@ These are the parts a second backend gets for free, and the reason R-1 is L rath
 
 - **Per-view render lists.** `buildRenderList` / `buildViewRenderList` /
   `sortRenderListByDepth` / `viewLayerMask` / `groupRenderListByPipeline` live in
-  `@four/render` and name no GL symbol. A WebGPU backend consumes the identical
+  `@fourjs/render` and name no GL symbol. A WebGPU backend consumes the identical
   `RenderItem[]`.
 - **The batching planner.** `RenderBatcher` (`packages/render/src/batch.ts`, 700 lines) is a
   pure planner producing `RenderBatch` records; `gl-batch.ts`'s `GlBatching` is only the
@@ -147,7 +147,7 @@ These are the parts a second backend gets for free, and the reason R-1 is L rath
   collection; only the uniform _upload_ is per-backend, and WebGPU's is a uniform buffer
   rather than `uniform3fv` calls — strictly simpler.
 - **Particles.** `particleQuadGeometry`, `PARTICLE_INSTANCE_FLOATS` and the instance-buffer
-  layout constants are in `@four/render`; the CPU simulation is `@four/particles`.
+  layout constants are in `@fourjs/render`; the CPU simulation is `@fourjs/particles`.
 - **Render targets and textures as CPU descriptors.** §61's recorded design —
   _"both `Texture` and `RenderTarget` exist as CPU-side descriptors carrying an id and a
   version, with GPU residency held in a backend-owned cache keyed by that id"_ — is the
@@ -164,7 +164,7 @@ These are the parts a second backend gets for free, and the reason R-1 is L rath
 ### 3.3 What needs design (and where the design lands)
 
 1. **`RendererCapabilities` widening (§62's eleven fields).** This is an _interface_ change
-   in `@four/render`, affecting `NullRenderer`, `WebglRenderer`, every test double and any
+   in `@fourjs/render`, affecting `NullRenderer`, `WebglRenderer`, every test double and any
    third-party backend. It must be additive-with-defaults or it is a breaking change for
    implementors — the same hazard §61 already records about adding interface members.
    Recommended shape: a flat readonly record with conservative values that `NullRenderer`
@@ -186,7 +186,7 @@ These are the parts a second backend gets for free, and the reason R-1 is L rath
    implement graph features _inside_ the WebGPU backend. **Refuse that.** A graph feature
    that exists on one backend is a scene that renders differently per backend, which is the
    one thing §62's tiers exist to prevent. Transient-target pooling is filed as a
-   `@four/render` follow-up (`R-5`'s territory), not part of R-1.
+   `@fourjs/render` follow-up (`R-5`'s territory), not part of R-1.
 4. **Effects passes.** `renderEffect` is one full-screen triangle through one of three
    descriptors. On WebGPU this is a render pass with a `loadOp: "clear"`-free single draw —
    mechanically simpler than the GL version's state save/restore, because a WebGPU render
@@ -197,7 +197,7 @@ These are the parts a second backend gets for free, and the reason R-1 is L rath
    RFC 0005 §"asynchronous API" argues the public shape must be. **R-1 should ship
    `readPixels` on WebGPU** — it is ~40 lines against a probe-verified path, and it is the
    evidence RFC 0005's async-forever commitment is right rather than merely argued. It needs
-   `Rectangle2` in `@four/math` (RFC 0005's named prerequisite); if that has not landed,
+   `Rectangle2` in `@fourjs/math` (RFC 0005's named prerequisite); if that has not landed,
    ship the whole-target form and leave `region` unimplemented rather than inventing a type.
 6. **Stencil.** `RenderTargetOptions.stencil` is documented in terms of WebGL 2's packed
    `DEPTH24_STENCIL8` renderbuffer — _"the backend allocates the packed `DEPTH24_STENCIL8`
@@ -220,7 +220,7 @@ These are the parts a second backend gets for free, and the reason R-1 is L rath
 8. **Winding and clip space.** MEMORY records _"projection mirrors winding — free while the
    WebGL backend keeps `CULL_FACE` disabled"_. WebGPU's NDC depth range is **[0,1]**, not
    GL's [-1,1], and its framebuffer origin is top-left. Two consequences: the projection
-   matrices produced by `@four/math` are GL-convention and need a depth remap on WebGPU
+   matrices produced by `@fourjs/math` are GL-convention and need a depth remap on WebGPU
    (either a fixed pre-multiply in the backend or a per-pipeline `clip-space` flag), and any
    future `CULL_FACE` enablement must be decided for both backends at once. **The depth
    remap belongs in the backend**, applied once when writing the view uniform buffer — the
@@ -355,7 +355,7 @@ export function registerWebgpuRenderer(
 Non-negotiable properties, all inherited from the recorded decision _"explicit registration,
 never a side-effect import"_ (forced by `"sideEffects": false` on all 24 packages):
 
-- a **function call**, never `import "@four/render-webgpu/register"`;
+- a **function call**, never `import "@fourjs/render-webgpu/register"`;
 - `create()` constructs and does **not** initialize (the registry owns §62's fallback);
 - registering a `"webgpu"` backend twice in one registry throws
   `RENDERER_INITIALIZATION_FAILED`.
@@ -383,13 +383,13 @@ Three options; the packet must pick one and record why:
 
 ### 6.3 Size budgets — verified, with one live hazard
 
-`.size-limit.json` covers six _example bundles_; none imports `@four/render-webgpu`
+`.size-limit.json` covers six _example bundles_; none imports `@fourjs/render-webgpu`
 directly, and `pnpm run size` limits (34 kB for `first-3d-scene`, 31.5 kB for
 `particles-demo`, 39.5 kB for `ui-demo`) are the tight ones.
 
-**The hazard is real and must be a gate, not an assumption.** `packages/four/src/index.ts`
-carries `export * as renderWebgpu from "@four/render-webgpu";`, and four examples import
-from the umbrella `four` package (`import { Text } from "four"`). Today that costs nothing
+**The hazard is real and must be a gate, not an assumption.** `packages/fourJS/src/index.ts`
+carries `export * as renderWebgpu from "@fourjs/render-webgpu";`, and four examples import
+from the umbrella `four` package (`import { Text } from "fourJS"`). Today that costs nothing
 because the stub exports one string constant. A namespace re-export of a package containing
 a renderer class is precisely the shape MEMORY warns about (_"nothing reachable from a class
 method tree-shakes"_) — whether Rollup drops it depends on the namespace object being
@@ -407,7 +407,7 @@ measures nothing.
 
 ### 6.4 Packaging
 
-`@four/render-webgpu` is one of the five reserved stubs in the `A-25` packaging row (gap §5
+`@fourjs/render-webgpu` is one of the five reserved stubs in the `A-25` packaging row (gap §5
 question 10). **Implementation can proceed without that decision** — the row is about
 whether stubs are published to npm and how the umbrella's subpaths behave, not about whether
 code may be written. Landing a real renderer _improves_ that row's options (a package with
@@ -460,7 +460,7 @@ pnpm run size                                                # §6.3 tree-shakin
 pnpm graph:check                                             # no new §3.1 edge
 ```
 
-`@four/render-webgpu`'s deps are already `core, math, render` — the §3.1 row the WebGL
+`@fourjs/render-webgpu`'s deps are already `core, math, render` — the §3.1 row the WebGL
 backend has. **No packet below adds an edge.**
 
 ---
@@ -650,13 +650,13 @@ RFC 0001's GLSL emitter. **Effort: M + L.** Dispatch with the `R-14` wave, not t
 ```
 R1.1 ──▶ R1.2 ──▶ R1.3 ──▶ R1.4 ──▶ R1.5 ──▶ R1.6 ──▶ R1.7 ──▶ R1.8 ──▶ R1.9
  │                                                                        ▲
- └── capability widening (@four/render, touches NullRenderer + WebGL)      │
+ └── capability widening (@fourjs/render, touches NullRenderer + WebGL)      │
                                                         RFC 0001 (R-14) ──┘
 ```
 
 Strictly serial. Every packet shares `packages/render-webgpu/src/`, so §2's parallelism rule
 (disjoint `Files` sets) forbids concurrency; the only genuinely parallelisable work is
-R1.9's first half, which touches `@four/render` alone.
+R1.9's first half, which touches `@fourjs/render` alone.
 
 ---
 
@@ -666,12 +666,12 @@ R1.9's first half, which touches `@four/render` alone.
 | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Q1** | **Does landing R1.1 change `renderer: "auto"` for everyone?** `AUTO_RENDERER_ORDER` puts `"webgpu"` first, so the moment an application calls `registerWebgpuRenderer()` its rendering backend changes. And the umbrella `four` package may make that easy to do by accident. | A silent backend switch changes rasterisation, and therefore every application's output, on an upgrade. §62 mandates the _order_; it does not mandate _when a backend becomes registerable_. | **Ship behind an explicit opt-in for at least one release.** The registration call already is one — so the real content of the decision is: (i) do not add any convenience that registers all backends at once, and (ii) say in the changelog that calling `registerWebgpuRenderer()` moves you off WebGL 2. |
 | **Q2** | **Is the widened `RendererCapabilities` (§62's eleven fields) an acceptable interface change now**, given it touches `NullRenderer`, `WebglRenderer`, every test double and any third-party backend?                                                                          | It is the one shared-interface change R-1 forces, and doing it incrementally is worse than doing it once.                                                                                    | **Yes, once, in W-1**, additive with honest conservative answers from the existing implementors.                                                                                                                                                                                                             |
-| **Q3** | **Where does §82's `ComputePass` live** — `@four/render` (backend-independent descriptor, matching every other render type) or `@four/render-webgpu` (the only backend that can run it)?                                                                                      | It is a §3.1-adjacent placement call, and the spec's example writes `new Four.ComputePass({...})` — an umbrella-level name, which argues for `@four/render`.                                 | **`@four/render`**, as a descriptor with `Renderer.compute?()` as the optional-member-is-the-capability seam — the third instance of the pattern `statistics` and `renderEffect` already use.                                                                                                                |
+| **Q3** | **Where does §82's `ComputePass` live** — `@fourjs/render` (backend-independent descriptor, matching every other render type) or `@fourjs/render-webgpu` (the only backend that can run it)?                                                                                      | It is a §3.1-adjacent placement call, and the spec's example writes `new Four.ComputePass({...})` — an umbrella-level name, which argues for `@fourjs/render`.                                 | **`@fourjs/render`**, as a descriptor with `Renderer.compute?()` as the optional-member-is-the-capability seam — the third instance of the pattern `statistics` and `renderEffect` already use.                                                                                                                |
 | **Q4** | **Packaging (`A-25`, existing register row 10).** Does a `render-webgpu` with real content change the publish answer for the remaining four stubs?                                                                                                                            | Owner-gated by prior decision; unchanged by this plan.                                                                                                                                       | **No change requested.** Implementation proceeds; npm packaging stays where it is. Note only that the recommendation on row 10 ("publish the stubs") gets easier for this one package and no harder for the other four.                                                                                      |
 
 Secondary, packet-level, recorded so they are not re-litigated per packet: probe strategy
 (§6.2, recommend (a)); pipelines lazy not eager (§4.2, recommended as a rule); WGSL bind-group
-layouts declared as data (§7); depth remap in the backend, never in `@four/math` (§3.3.8).
+layouts declared as data (§7); depth remap in the backend, never in `@fourjs/math` (§3.3.8).
 
 ---
 

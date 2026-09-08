@@ -4,9 +4,9 @@
  * runs it had before the field existed.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { SpriteMaterial, UnlitMaterial } from "@four/materials";
-import { Scene, resolveWorldTransforms } from "@four/scene";
+import { planeGeometry } from "@fourjs/geometry";
+import { SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
+import { Scene, resolveWorldTransforms } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

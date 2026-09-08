@@ -33,5 +33,5 @@
   "hostCpuModel": "Intel(R) Xeon(R) Processor @ 2.80GHz",
   "hostCpuCount": 4,
   "hostTotalMemoryGb": 15.7,
-  "hostCaveat": "CI container, no GPU, shared host; run-to-run spread is large. CPU simulation only: no GL context, no upload, no draw. The rendering half of §112 is the single instanced draw call of @four/render-webgl, shown in examples/particles-demo."
+  "hostCaveat": "CI container, no GPU, shared host; run-to-run spread is large. CPU simulation only: no GL context, no upload, no draw. The rendering half of §112 is the single instanced draw call of @fourjs/render-webgl, shown in examples/particles-demo."
 }

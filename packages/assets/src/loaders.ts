@@ -20,7 +20,7 @@
  *
  * ## Why `createImageLoader` is a factory
  *
- * Image decoding is the one built-in that needs a platform API. `@four/assets`
+ * Image decoding is the one built-in that needs a platform API. `@fourjs/assets`
  * must build and unit-test under plain `lib.es2022` in Node, so this module
  * never names `createImageBitmap`, `Blob`, or `ImageBitmap`: it declares the
  * shapes it needs ({@link ImageDecodeLike}, {@link ImageBitmapLike}) and takes
@@ -46,7 +46,7 @@
  * have no engine behind them yet: the §77 texture tier (2D/cube/array textures,
  * mipmaps, wrap and filter modes, color-space metadata) does not exist, §55
  * materials beyond the unlit tier do not exist, and skins/morph targets have no
- * representation in `@four/geometry`. A loader that parsed a `.glb` container
+ * representation in `@fourjs/geometry`. A loader that parsed a `.glb` container
  * and returned buffers with nowhere to put them would be a stub wearing the
  * name of a feature — the plan's P11-2 wording ("dishonest to ship as a stub")
  * is the decision, and this note is the record of it. Until then a `.gltf`

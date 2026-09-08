@@ -11,7 +11,7 @@
  * instead would produce a number that is confidently wrong exactly when the
  * frame is interesting.
  *
- * So the counters live on the {@link @four/render!Renderer | Renderer}, as an
+ * So the counters live on the {@link @fourjs/render!Renderer | Renderer}, as an
  * **optional, opt-in** member:
  *
  * ```ts
@@ -24,7 +24,7 @@
  *
  * ## Three properties this shape is chosen for
  *
- * 1. **`@four/render` stays backend-free.** The record is a plain object of
+ * 1. **`@fourjs/render` stays backend-free.** The record is a plain object of
  *    three numbers; nothing here knows what a draw call is made of. The WebGL 2
  *    backend counts real `drawArrays`/`drawElements`/`drawArraysInstanced`
  *    calls, a future WebGPU backend counts its own, and a backend that counts
@@ -35,13 +35,13 @@
  *    per view, or per draw — the application owns one record for its lifetime —
  *    and **no GL call is added, removed, or reordered by switching it on**,
  *    which is what lets the pixel goldens and the recorded-GL-sequence tests
- *    keep passing byte for byte either way (`@four/render-webgl`'s tests assert
+ *    keep passing byte for byte either way (`@fourjs/render-webgl`'s tests assert
  *    exactly that).
  * 3. **Presence is the capability.** A backend that reports statistics declares
  *    the member; one that does not, does not, and
  *    {@link supportsRenderStatistics} tells them apart at runtime. An
  *    application then reports `NaN` — "not measured" — rather than `0`, which
- *    is the same stance {@link @four/render!RendererCapabilities |
+ *    is the same stance {@link @fourjs/render!RendererCapabilities |
  *    RendererCapabilities} takes on limits a backend has not queried.
  *
  * ## Accumulate, never clear
@@ -60,7 +60,7 @@
  * {@link resetRenderStatistics}.
  *
  * Mutable and written in place; a backend never allocates one. The three fields
- * are §84's, with §84's meanings — see {@link @four/diagnostics!FrameStats |
+ * are §84's, with §84's meanings — see {@link @fourjs/diagnostics!FrameStats |
  * FrameStats}, which is where they surface as `app.stats`.
  */
 export interface RenderStatistics {
@@ -102,7 +102,7 @@ export function resetRenderStatistics(statistics: RenderStatistics): void {
  * A renderer that reports §84 render counters — the structural capability.
  *
  * Written as its own interface rather than as a required member of
- * {@link @four/render!Renderer | Renderer} because adding a required member to
+ * {@link @fourjs/render!Renderer | Renderer} because adding a required member to
  * a published interface breaks every implementor, and because a backend with
  * nothing to count (a null renderer that draws nothing, an SVG backend whose
  * "draws" are DOM nodes) should be able to say so by omission.
@@ -125,7 +125,7 @@ export interface RenderStatisticsReporter {
  * can be assigned.
  *
  * A property test rather than an `instanceof`: backends are separate packages,
- * and `@four/render` must not name any of them (§61). The same duck-typed
+ * and `@fourjs/render` must not name any of them (§61). The same duck-typed
  * discipline `isDirectionalLightSource` and `isParticleDrawable` use.
  */
 export function supportsRenderStatistics<TRenderer extends object>(

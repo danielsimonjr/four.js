@@ -215,7 +215,7 @@ export class Quaternion {
    * outcome that neither invents nor destroys information.
    *
    * The math package validates nothing (see `Matrix4.setPerspective`), so this
-   * method reports nothing either. `Node.lookAt` in `@four/scene` is the policy
+   * method reports nothing either. `Node.lookAt` in `@fourjs/scene` is the policy
    * layer: it makes the same two tests on its own inputs and throws, so a scene
    * node never reaches the silent branch.
    */

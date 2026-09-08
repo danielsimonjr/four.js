@@ -5,8 +5,8 @@
  * This is pure arithmetic: no allocation of engine objects, no scene graph, no
  * renderer, no DOM, no measurement callback. Give it a string and it returns
  * where each glyph's rectangle goes and which part of the atlas it samples. A
- * caller turns those into geometry (`@four/geometry`), a sprite batch
- * (`@four/render`), or SVG rects — the layout never learns which.
+ * caller turns those into geometry (`@fourjs/geometry`), a sprite batch
+ * (`@fourjs/render`), or SVG rects — the layout never learns which.
  *
  * ## Coordinates (§7a)
  *
@@ -256,7 +256,7 @@ function requireFinite(name: string, value: number): number {
  * `+`, `−`, `×`, `÷` and `Math.max` — over doubles, with no `sqrt`, no
  * transcendental, no `Math.fround`, and no iteration over a hash order (the
  * atlas is consulted with `Map.get`, never walked). Two conforming engines
- * therefore produce bit-identical quads, which is the tier `@four/geometry`'s
+ * therefore produce bit-identical quads, which is the tier `@fourjs/geometry`'s
  * `triangulatePolygon` reached and `Path`'s arcs deliberately did not. An edit
  * that introduces a transcendental — a rotation, an italic shear, a
  * `Math.round` to whole texels — breaks this *stated tier*, not merely a number.

@@ -63,10 +63,10 @@ how the determinism suites and benchmarks drive it, and the easiest way to
 see the loop's anatomy. This runs under Node:
 
 ```ts
-import { Application } from "four/application";
-import { Vector3 } from "four/math";
-import { MotionComponent, MotionSystem } from "four/motion";
-import { Group } from "four/scene";
+import { Application } from "fourJS/application";
+import { Vector3 } from "fourJS/math";
+import { MotionComponent, MotionSystem } from "fourJS/motion";
+import { Group } from "fourJS/scene";
 
 const app = new Application({ fixedTimeStep: 1 / 60, maximumSubSteps: 5 });
 

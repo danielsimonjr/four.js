@@ -10,11 +10,11 @@
  *
  * ## Why the recorder records through an interface
  *
- * `@four/diagnostics` may depend on `core`, `math`, and `scene` only. It cannot
- * import `@four/physics` — the two packages are in the same dispatch wave — so
+ * `@fourjs/diagnostics` may depend on `core`, `math`, and `scene` only. It cannot
+ * import `@fourjs/physics` — the two packages are in the same dispatch wave — so
  * it cannot name `PhysicsWorld`, `PhysicsSnapshot`, or any solver type. What is
  * left is the **duck-typed contract** the codebase already uses for exactly this
- * situation (`@four/render`'s `ParticleDrawable`, plan §6h): this module
+ * situation (`@fourjs/render`'s `ParticleDrawable`, plan §6h): this module
  * *declares* the shape it needs as {@link ReplayTarget}, and `PhysicsWorld`
  * satisfies it structurally, without either side importing the other.
  *
@@ -59,7 +59,7 @@
  * may carry a date, but only one the *caller* supplied.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import {
   LATEST_REPLAY_FORMAT_VERSION,
@@ -76,7 +76,7 @@ import {
 /**
  * A solver snapshot plus §34's validity key.
  *
- * Structurally identical to `@four/physics`'s `PhysicsSnapshot`; see the module
+ * Structurally identical to `@fourjs/physics`'s `PhysicsSnapshot`; see the module
  * note on why it is re-declared instead of imported.
  */
 export interface ReplaySnapshot {
@@ -93,8 +93,8 @@ export interface ReplaySnapshot {
    *
    * `unknown`, deliberately: `PhysicsSnapshot` types this as
    * `PhysicsSnapshotConfiguration`, and naming that type would need an edge to
-   * `@four/physics` this package may not have. The recorder validates it as
-   * JSON and carries it ({@link @four/diagnostics!ReplayRecording.worldConfiguration});
+   * `@fourjs/physics` this package may not have. The recorder validates it as
+   * JSON and carries it ({@link @fourjs/diagnostics!ReplayRecording.worldConfiguration});
    * the player hands it back; only the solver reads a field of it.
    *
    * Optional because two legitimate producers cannot supply one: a target that

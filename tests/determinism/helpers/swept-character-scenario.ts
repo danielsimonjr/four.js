@@ -67,14 +67,14 @@
  * determinism is **not** claimed.
  */
 
-import { createChecksum } from "@four/diagnostics";
-import { Vector3 } from "@four/math";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Vector3 } from "@fourjs/math";
 import {
   PRIORITY_KINEMATICS,
   PRIORITY_PHYSICS_SOLVE,
   SystemRegistry,
   createTimeState,
-} from "@four/motion";
+} from "@fourjs/motion";
 import {
   Collider,
   PhysicsSystem,
@@ -82,9 +82,9 @@ import {
   RigidBody,
   SweptCharacterController,
   SweptCharacterSystem,
-} from "@four/physics";
-import { Rapier3dAdapter } from "@four/physics-rapier";
-import { Group } from "@four/scene";
+} from "@fourjs/physics";
+import { Rapier3dAdapter } from "@fourjs/physics-rapier";
+import { Group } from "@fourjs/scene";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 export const FIXED_TIME_STEP = 1 / 60;

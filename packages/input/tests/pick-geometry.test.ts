@@ -10,9 +10,9 @@
  * outside the shape.
  */
 
-import { isFourError } from "@four/core";
-import { Vector3 } from "@four/math";
-import { Group, OrthographicCamera, type HitTestMode } from "@four/scene";
+import { isFourError } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
+import { Group, OrthographicCamera, type HitTestMode } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

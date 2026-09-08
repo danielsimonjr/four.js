@@ -10,7 +10,7 @@
  * real adapter runs them, and they are the three this file makes:
  *
  * 1. **The hand-written WGSL compiles and draws.** The shader source under test
- *    is imported from `@four/render-webgpu` itself and handed to the page — not
+ *    is imported from `@fourjs/render-webgpu` itself and handed to the page — not
  *    retyped here — so a change to `wgpu-unlit.ts` that a fake device would
  *    happily record is caught by this gate.
  * 2. **The clip-depth remap is right.** A vertex stage that got
@@ -44,7 +44,7 @@
  * clear colour), never a pixel comparison against a committed image.
  */
 
-import { unlitShaderSource } from "@four/render-webgpu";
+import { unlitShaderSource } from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */

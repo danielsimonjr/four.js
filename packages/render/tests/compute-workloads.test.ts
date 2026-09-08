@@ -3,7 +3,7 @@
  * Token identity lives in `capabilities.test.ts`; this file pins the map.
  */
 
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import {

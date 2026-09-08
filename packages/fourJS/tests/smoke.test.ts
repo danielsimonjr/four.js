@@ -1,0 +1,53 @@
+import { describe, expect, it } from "vitest";
+
+import { PACKAGE_NAME as coreName } from "@fourjs/core";
+import { PACKAGE_NAME as mathName } from "@fourjs/math";
+import { PACKAGE_NAME as sceneName } from "@fourjs/scene";
+import { PACKAGE_NAME as geometryName } from "@fourjs/geometry";
+import { PACKAGE_NAME as materialsName } from "@fourjs/materials";
+import { PACKAGE_NAME as assetsName } from "@fourjs/assets";
+import { PACKAGE_NAME as motionName } from "@fourjs/motion";
+import { PACKAGE_NAME as inputName } from "@fourjs/input";
+import { PACKAGE_NAME as serializationName } from "@fourjs/serialization";
+import { PACKAGE_NAME as diagnosticsName } from "@fourjs/diagnostics";
+import { PACKAGE_NAME as particlesName } from "@fourjs/particles";
+import { PACKAGE_NAME as textName } from "@fourjs/text";
+import { PACKAGE_NAME as renderName } from "@fourjs/render";
+import { PACKAGE_NAME as animationName } from "@fourjs/animation";
+import { PACKAGE_NAME as physicsName } from "@fourjs/physics";
+import { PACKAGE_NAME as renderWebgpuName } from "@fourjs/render-webgpu";
+import { PACKAGE_NAME as renderWebglName } from "@fourjs/render-webgl";
+import { PACKAGE_NAME as renderCanvasName } from "@fourjs/render-canvas";
+import { PACKAGE_NAME as renderSvgName } from "@fourjs/render-svg";
+import { PACKAGE_NAME as uiName } from "@fourjs/ui";
+import { PACKAGE_NAME as physicsRapierName } from "@fourjs/physics-rapier";
+import { PACKAGE_NAME as physicsBox2dName } from "@fourjs/physics-box2d";
+import { PACKAGE_NAME as physicsSoftName } from "@fourjs/physics-soft";
+
+describe("four", () => {
+  it("resolves the package name of every workspace package", () => {
+    expect(coreName).toBe("@fourjs/core");
+    expect(mathName).toBe("@fourjs/math");
+    expect(sceneName).toBe("@fourjs/scene");
+    expect(geometryName).toBe("@fourjs/geometry");
+    expect(materialsName).toBe("@fourjs/materials");
+    expect(assetsName).toBe("@fourjs/assets");
+    expect(motionName).toBe("@fourjs/motion");
+    expect(inputName).toBe("@fourjs/input");
+    expect(serializationName).toBe("@fourjs/serialization");
+    expect(diagnosticsName).toBe("@fourjs/diagnostics");
+    expect(particlesName).toBe("@fourjs/particles");
+    expect(textName).toBe("@fourjs/text");
+    expect(renderName).toBe("@fourjs/render");
+    expect(animationName).toBe("@fourjs/animation");
+    expect(physicsName).toBe("@fourjs/physics");
+    expect(renderWebgpuName).toBe("@fourjs/render-webgpu");
+    expect(renderWebglName).toBe("@fourjs/render-webgl");
+    expect(renderCanvasName).toBe("@fourjs/render-canvas");
+    expect(renderSvgName).toBe("@fourjs/render-svg");
+    expect(uiName).toBe("@fourjs/ui");
+    expect(physicsRapierName).toBe("@fourjs/physics-rapier");
+    expect(physicsBox2dName).toBe("@fourjs/physics-box2d");
+    expect(physicsSoftName).toBe("@fourjs/physics-soft");
+  });
+});

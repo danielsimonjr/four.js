@@ -5,13 +5,13 @@
  * is derived by hand from the camera's projection.
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 import {
   Group,
   OrthographicCamera,
   PerspectiveCamera,
   type Node,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it, vi } from "vitest";
 
 import { DragManager } from "../src/drag.js";

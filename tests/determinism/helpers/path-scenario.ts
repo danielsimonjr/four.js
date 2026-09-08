@@ -58,9 +58,9 @@
  * are not.
  */
 
-import { SeededRandom } from "@four/core";
-import { createChecksum } from "@four/diagnostics";
-import { Path, type Point2D } from "@four/geometry";
+import { SeededRandom } from "@fourjs/core";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Path, type Point2D } from "@fourjs/geometry";
 
 /** Seed of the random half of each catalogue. Fixed forever; it is the input. */
 export const SEED = 0x51a7d24c;

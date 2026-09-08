@@ -3,7 +3,7 @@
   "benchmark": "physics-step",
   "specification": "§86 (active rigid bodies: 5 000 simple bodies baseline), §20–32, §37, §39, §92; plan §6j P11-4, WP-11.4",
   "recordedAt": "2026-08-08T14:48:18.704Z",
-  "solver": "rapier3d (@four/physics-rapier Rapier3dAdapter) through @four/physics",
+  "solver": "rapier3d (@fourjs/physics-rapier Rapier3dAdapter) through @fourjs/physics",
   "dimension": "3d",
   "fixedDeltaTimeSeconds": 0.016666667,
   "fixedStepBudgetMs": 16.6667,

@@ -7,9 +7,9 @@
  * `node.clip = true` masks the node's subtree to its own drawn shape, nested
  * clips intersect, and the whole arrangement is composed by the render list
  * into §57-shaped records the R-7 backend already knows how to apply. No unit
- * test inside one package can check that agreement — `@four/scene` owns the
- * flag, `@four/render` owns the allocator and the mask emission,
- * `@four/render-webgl` is where any of it becomes GL, and `four` owns §79 —
+ * test inside one package can check that agreement — `@fourjs/scene` owns the
+ * flag, `@fourjs/render` owns the allocator and the mask emission,
+ * `@fourjs/render-webgl` is where any of it becomes GL, and `four` owns §79 —
  * so this file drives the real renderer over the recording context.
  *
  * Five claims:
@@ -34,18 +34,18 @@
  * `tests/browser/clipping.spec.ts`.
  */
 
-import { resetDevWarnings } from "@four/core";
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
-import { MAX_CLIP_PLANES, Renderable } from "@four/render";
-import { GL, WebglRenderer, createGlBatching } from "@four/render-webgl";
+import { resetDevWarnings } from "@fourjs/core";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
+import { MAX_CLIP_PLANES, Renderable } from "@fourjs/render";
+import { GL, WebglRenderer, createGlBatching } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

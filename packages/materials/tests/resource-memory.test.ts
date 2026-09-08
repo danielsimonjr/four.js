@@ -13,7 +13,7 @@ import {
   resetDevWarnings,
   resetLeakRegistry,
   trackedDisposableId,
-} from "@four/core";
+} from "@fourjs/core";
 
 import { LitMaterial } from "../src/lit-material.js";
 import { NodeMaterial } from "../src/node-material.js";
@@ -23,7 +23,7 @@ import { StandardMaterial } from "../src/standard-material.js";
 import { UnlitMaterial } from "../src/unlit-material.js";
 import type { ShaderGraph } from "../src/shader-graph.js";
 
-/** Structural texture — `@four/materials` cannot import `@four/render`. */
+/** Structural texture — `@fourjs/materials` cannot import `@fourjs/render`. */
 function fakeTexture(): SpriteTexture {
   return {
     id: "texture-account-1",

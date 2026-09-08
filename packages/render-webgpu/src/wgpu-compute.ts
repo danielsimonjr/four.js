@@ -10,7 +10,7 @@
  * question Q3 — executed on 2026-08-29 as the promised **one re-export**:
  * {@link ComputePassDescriptor}, {@link ComputeBinding},
  * {@link ComputeBindingAccess} and {@link COMPUTE_ENTRY_POINT} now live in
- * `@four/render`'s `compute.ts` (with the structural `ComputeBuffer` handle
+ * `@fourjs/render`'s `compute.ts` (with the structural `ComputeBuffer` handle
  * and the optional `Renderer.compute?()` member), and this module re-exports
  * them — the capability-token identity precedent, so no call site moved.
  * What stays here is everything device-shaped: {@link WgpuComputeBuffer}
@@ -54,12 +54,12 @@
  * ## The §36 integrator (R-31's GPU-simulation half)
  *
  * {@link PARTICLE_INTEGRATOR_SHADER_SOURCE} is the emitter's semi-implicit
- * Euler step (`v += g·dt`, then `p += v·dt` — `@four/particles`' documented
+ * Euler step (`v += g·dt`, then `p += v·dt` — `@fourjs/particles`' documented
  * closed form) over flat `array<f32>` position/velocity lanes in the pool's
  * own x,y,z layout, under a constant gravity. It is the *integrator* the
  * WP-R1.8 packet scopes and nothing more: §27's force fields and §36's
  * `collisions: "depth-buffer"` are each their own follow-up packet, and
- * `@four/particles`' `simulation: "gpu"` option widens only in the change
+ * `@fourjs/particles`' `simulation: "gpu"` option widens only in the change
  * that wires this kernel to the emitter (the recorded WP-9.1 rule: an option
  * that silently does nothing is worse than one that does not exist yet).
  * The `count` lane travels as **f32** — the light block's precedent: the
@@ -67,14 +67,14 @@
  * 100 000-particle budget.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 import {
   COMPUTE_ENTRY_POINT,
   type ComputeBinding,
   type ComputeBindingAccess,
   type ComputeBuffer,
   type ComputePassDescriptor,
-} from "@four/render";
+} from "@fourjs/render";
 
 import {
   GPU_BUFFER_USAGE,
@@ -89,7 +89,7 @@ import {
 } from "./webgpu-device.js";
 
 // The Q3 promotion's re-export (module header): the descriptor vocabulary is
-// `@four/render`'s and these are the very tokens, so a pre-promotion import
+// `@fourjs/render`'s and these are the very tokens, so a pre-promotion import
 // from this package still names identical types.
 export { COMPUTE_ENTRY_POINT };
 export type { ComputeBinding, ComputeBindingAccess, ComputePassDescriptor };
@@ -119,7 +119,7 @@ export interface ComputeBufferOptions {
  * the §36 draw also binds as an instance stream — its header owns the
  * deviation.)
  *
- * The one implementor of `@four/render`'s structural {@link ComputeBuffer}
+ * The one implementor of `@fourjs/render`'s structural {@link ComputeBuffer}
  * (the Q3 promotion): the brand plus the §83 trio are the cross-seam face;
  * {@link WgpuComputeBuffer.buffer} stays this backend's own.
  */
@@ -389,7 +389,7 @@ export class WgpuComputeCache {
       const bare = (entry as Partial<ComputeBuffer>).isComputeBuffer === true;
       const buffer: unknown = bare ? entry : (entry as ComputeBinding).buffer;
       if (!(buffer instanceof WgpuComputeBuffer)) {
-        // The promoted handle type is structural (`@four/render`'s
+        // The promoted handle type is structural (`@fourjs/render`'s
         // `ComputeBuffer`), so a buffer minted by some other backend
         // type-checks; only this class carries a device allocation this
         // dispatch can bind. Loud, never a guess (§85).
@@ -626,7 +626,7 @@ export function particleIntegratorWorkgroups(
 
 /**
  * The §36 GPU particle integrator (R-31's simulation half) — semi-implicit
- * Euler under constant gravity, `@four/particles`' documented step order
+ * Euler under constant gravity, `@fourjs/particles`' documented step order
  * (`v += g·dt`, then `p += v·dt`) over the pool's flat x,y,z `Float32Array`
  * lanes.
  *

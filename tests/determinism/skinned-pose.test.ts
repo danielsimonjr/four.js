@@ -8,8 +8,8 @@
  * before vertex deformation leaves the §33 envelope for the GPU. This file
  * pins it in the gate's three forms:
  *
- * 1. **Headless.** The scenario imports `@four/animation`, `@four/scene`,
- *    `@four/math`, `@four/diagnostics` and `four/application` — no renderer
+ * 1. **Headless.** The scenario imports `@fourjs/animation`, `@fourjs/scene`,
+ *    `@fourjs/math`, `@fourjs/diagnostics` and `four/application` — no renderer
  *    package, no canvas, no DOM. That it *can* is itself part of the claim:
  *    the palette is engine state, skinned vertices are not.
  * 2. **Deterministic in-process.** Two runs in one process produce

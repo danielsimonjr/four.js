@@ -1,7 +1,7 @@
 /**
  * §77's mipmaps, min-filter split, and anisotropy across the packages that have
- * to agree about them (R-30b, 2026-08-21) — `@four/materials` declares the read
- * contract, `@four/render` owns the `Texture`, `@four/render-webgl` uploads it.
+ * to agree about them (R-30b, 2026-08-21) — `@fourjs/materials` declares the read
+ * contract, `@fourjs/render` owns the `Texture`, `@fourjs/render-webgl` uploads it.
  *
  * Three claims live only in the composition:
  *
@@ -20,16 +20,16 @@
  *    unrunnable would be worse than one that costs less on weaker hardware.
  */
 
-import { SpriteMaterial } from "@four/materials";
-import { Texture, type TextureSource } from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+import { SpriteMaterial } from "@fourjs/materials";
+import { Texture, type TextureSource } from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   type Viewport,
-} from "@four/scene";
-import { Sprite } from "@four/render";
+} from "@fourjs/scene";
+import { Sprite } from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 import {

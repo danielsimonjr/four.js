@@ -53,8 +53,8 @@
  * and `dt` are fixed, iteration is insertion order, and no wall clock is read.
  */
 
-import { createChecksum } from "@four/diagnostics";
-import { Vector3 } from "@four/math";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Vector3 } from "@fourjs/math";
 import {
   CharacterController,
   FirstPersonLook,
@@ -63,13 +63,13 @@ import {
   SeededRandom,
   SystemRegistry,
   createTimeState,
-} from "@four/motion";
+} from "@fourjs/motion";
 import {
   Group,
   PerspectiveCamera,
   Scene,
   resolveWorldTransform,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /** World +Y (§7a), the axis the scaled parent turns about. Allocated once. */
 const UP_AXIS = new Vector3(0, 1, 0);

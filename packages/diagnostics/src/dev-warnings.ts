@@ -2,7 +2,7 @@
  * §83's development warnings (A-5 remainder, 2026-09-06).
  */
 
-import { DEV, devWarnOnce } from "@four/core";
+import { DEV, devWarnOnce } from "@fourjs/core";
 
 export const DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD = 0;
 

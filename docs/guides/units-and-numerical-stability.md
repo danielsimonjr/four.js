@@ -19,14 +19,14 @@ behind the advice.
 - **Mass: kilograms**, derived from collider density (kg/m² in 2D, kg/m³ in
   3D) unless explicitly authored (§23).
 
-§40's `UnitSystem` record **shipped 2026-08-07** in `@four/core` (`UnitSystem`,
+§40's `UnitSystem` record **shipped 2026-08-07** in `@fourjs/core` (`UnitSystem`,
 `SI_UNITS`, `resolveUnitSystem`, the `{angle,time,length,mass}{To,From}Display`
 conversions, `unitSymbol`, and the `format*` helpers) — at exactly the tier §40
 specifies: **display and authoring-input conversion only**. Declaring a unit
 system changes nothing the engine computes; every signature stays radians,
 seconds, and world units, and the conversions are inexact in their last bits,
 so they must never run inside a simulation path (§33–§34 — an integration test
-fails if any package source outside `@four/core` imports the module). This
+fails if any package source outside `@fourjs/core` imports the module). This
 section said "no `UnitSystem` API has shipped … the conversion layer is yours"
 until 2026-08-07. Ad-hoc constants like the one below remain perfectly fine
 application-side style — the helpers are the engine-blessed spelling:
@@ -60,8 +60,8 @@ import {
   ParticleEmitter,
   dragField,
   uniformGravityField,
-} from "four/particles";
-import { Vector3 } from "four/math";
+} from "fourJS/particles";
+import { Vector3 } from "fourJS/math";
 
 const emitter = new ParticleEmitter({
   maxParticles: 2000,

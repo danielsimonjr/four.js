@@ -33,16 +33,16 @@
  * path (`PIXEL_PACK_BUFFER` + `fenceSync`), which only a browser can prove.
  */
 
-import { UnlitMaterial } from "@four/materials";
-import { Rectangle, type PickingService } from "@four/render";
-import { WebglRenderer, registerPickingPipeline } from "@four/render-webgl";
+import { UnlitMaterial } from "@fourjs/materials";
+import { Rectangle, type PickingService } from "@fourjs/render";
+import { WebglRenderer, registerPickingPipeline } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /** Canvas size the spec creates and this file reads back through picks. */
 const WIDTH = 320;

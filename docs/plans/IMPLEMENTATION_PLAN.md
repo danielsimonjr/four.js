@@ -43,7 +43,7 @@ packages.
    versions; never install or upgrade anything yourself.
 8. **Imports:** relative imports inside packages end in **`.js`** (NodeNext resolution),
    e.g. `import { Vector3 } from "./vector3.js"` — even though the source file is `.ts`.
-   Cross-package imports use the bare package name (`@four/math`), never relative paths.
+   Cross-package imports use the bare package name (`@fourjs/math`), never relative paths.
 9. **Dependency direction:** exactly the §3.1 matrix — never add or reverse an edge.
 10. **Frozen:** never edit `docs/SPECIFICATION.md`; never add packages (§98/E-3); § numbering
     1–120 is frozen.
@@ -136,7 +136,7 @@ Direct workspace dependencies only (transitives implied). Wave = parallel dispat
 | 6 | `four` | all 23 above |
 
 *Dated note (2026-08-01, orchestrator):* `physics-rapier` additionally declares
-`@four/core` + `@four/math` directly (WP-5.4-fix1) — the adapter imports both
+`@fourjs/core` + `@fourjs/math` directly (WP-5.4-fix1) — the adapter imports both
 (`FourError`, `Vector3`), and "transitives implied" should not hide a genuine direct
 import. No new edge: both were already transitively present via `physics`.
 
@@ -157,7 +157,7 @@ dependency build scripts by default — the root manifest allowlists `esbuild`
 (`"pnpm": { "onlyBuiltDependencies": ["esbuild"] }`).
 **Publish names (spec §98, rev 1.6 — decided):** umbrella `@danielsimonjr/fourjs`,
 sub-packages `@danielsimonjr/fourjs-<name>`, published from the owner's personal npm
-scope. Workspace names stay `four`/`@four/*`; the mechanical publish mapping is part of
+scope. Workspace names stay `four`/`@fourjs/*`; the mechanical publish mapping is part of
 the release-workflow packet at first publish (§94, 0.1).
 
 ### 3.3 `tsconfig.base.json` (WP-0.2 pastes exactly this)
@@ -184,11 +184,11 @@ the release-workflow packet at first publish (§94, 0.1).
 
 ### 3.4 Per-package template (WP-0.4 copies; only names/deps vary)
 
-`package.json` (name `@four/<P>`; the umbrella is plain `four`):
+`package.json` (name `@fourjs/<P>`; the umbrella is plain `four`):
 
 ```json
 {
-  "name": "@four/P",
+  "name": "@fourjs/P",
   "version": "0.0.0",
   "type": "module",
   "license": "MIT",
@@ -233,12 +233,12 @@ export per §3.1 package (`"./scene": { "types": "./dist/scene.d.ts", "import":
   `pivot` so `version` increments on method-based mutation (§7). Direct field writes
   (`v.x = 1`) are legal only if followed by `transform.markDirty()`.
 - **D4 Loop ownership:** the `Application` composition root lives in the **`four`** package
-  (§98 rev 1.4; §45). `@four/motion`'s scheduler is an event-free `step(elapsedSeconds)`
+  (§98 rev 1.4; §45). `@fourjs/motion`'s scheduler is an event-free `step(elapsedSeconds)`
   state machine; Application drives it (rAF or manual stepping for headless) and re-emits
   `fixedUpdate`/`update`/`render` (§6b/§10).
 - **D5 System ordering:** the §39 `SimulationSystem` priority registry is built in Phase 1
   (WP-1.11); every later feature **registers a system** — nothing ever edits the scheduler.
-- **D6 Checksum utility:** `@four/diagnostics` provides FNV-1a over quantized floats:
+- **D6 Checksum utility:** `@fourjs/diagnostics` provides FNV-1a over quantized floats:
   `q = Math.round(x * 1e6)` encoded as two uint32 words (high/low of the 53-bit integer),
   `-0` normalized to `+0`, `NaN` throws. Phase exits compare against **committed golden
   hashes**, and the second determinism run executes in a **fresh process**.
@@ -291,19 +291,19 @@ Files (per package P): `packages/P/package.json`, `packages/P/tsconfig.json`,
 `packages/P/tests/smoke.test.ts`. *(Files line corrected 2026-07-31: `tsconfig.build.json`
 was mandated by §3.4 but missing here; caught by the math-instance worker.)*
 Steps: instantiate §3.4 verbatim with P's name and §3.1 deps/references;
-`src/index.ts`: `export const PACKAGE_NAME = "@four/P";`; smoke test imports
+`src/index.ts`: `export const PACKAGE_NAME = "@fourjs/P";`; smoke test imports
 `../src/index.js` and asserts the name. Dispatch by §3.1 wave (waves 1→5); within a wave,
 parallel.
 Done (per package, after the wave's orchestrator install):
-`pnpm --filter @four/P run build && pnpm --filter @four/P run test` exits 0.
+`pnpm --filter @fourjs/P run build && pnpm --filter @fourjs/P run test` exits 0.
 
 **WP-0.5 [H] Umbrella package `four`** — Depends: all WP-0.4. Reads: §3.1, §3.4, §98.
-Files: `packages/four/{package.json,tsconfig.json,tsconfig.build.json,src/index.ts,src/<p>.ts ×23,tests/smoke.test.ts}`.
+Files: `packages/fourJS/{package.json,tsconfig.json,tsconfig.build.json,src/index.ts,src/<p>.ts ×23,tests/smoke.test.ts}`.
 *(Files line corrected 2026-07-31: `tsconfig.build.json` was missing, same omission as
 WP-0.4's; noted by the Phase-0 exit verifier. The landed package is complete.)*
 Steps: §3.4 template, name `four`, deps = all 23; one `src/<p>.ts` re-export module per
-package (`export * from "@four/scene";`) plus matching subpath exports (§3.4); root
-`src/index.ts` uses **namespace re-exports** (`export * as core from "@four/core";`,
+package (`export * from "@fourjs/scene";`) plus matching subpath exports (§3.4); root
+`src/index.ts` uses **namespace re-exports** (`export * as core from "@fourjs/core";`,
 dashes camelCased) — flat `export *` of all packages would collide on shared symbol names
 *(refined 2026-07-31 at dispatch)*; smoke test imports `PACKAGE_NAME` **from every one of
 the 23 packages** (the Phase-0 cross-package integration check).
@@ -345,7 +345,7 @@ Done: `pnpm run docs` exits 0 and `docs/api/index.html` exists. *(Revised 2026-0
 vacuous check; caught by the WP-0.10 worker. `run docs` also requires a prior build.)*
 
 **WP-0.11 [H] Root test-suite wiring** — Depends: WP-0.6.
-Files: `vitest.suites.config.ts`, `package.json` (devDeps add: every `@four/*` as
+Files: `vitest.suites.config.ts`, `package.json` (devDeps add: every `@fourjs/*` as
 `workspace:*` — orchestrator refreshes lockfile after).
 Steps: vitest config with `include: ["tests/**/*.test.ts"]`.
 Done: `pnpm test:suites` exits 0 (passWithNoTests).
@@ -396,7 +396,7 @@ Steps: mutable classes with plain `x/y/z/w` fields; methods
 (+`cross` on Vector3) per rule 2; each mutator calls the internal `changed` hook (D3);
 `alloc-counter.ts`: dev-mode module counter incremented in every constructor, exported for
 tests.
-Done: `pnpm --filter @four/math run build && pnpm --filter @four/math run test` green,
+Done: `pnpm --filter @fourjs/math run build && pnpm --filter @fourjs/math run test` green,
 including a test asserting **zero constructions** across 1000 chained ops on scratch
 objects (D6-style counter, not identity checks).
 
@@ -489,7 +489,7 @@ dispose removes.
 
 **WP-1.12 [S] Application composition root** — Depends: WP-1.9, WP-1.10, WP-1.11.
 Reads: §45, §6b, §10, D4 + WP-1.9/1.10/1.11 source.
-Files: `packages/four/src/application.ts`, `src/index.ts`, `tests/application.test.ts`.
+Files: `packages/fourJS/src/application.ts`, `src/index.ts`, `tests/application.test.ts`.
 Steps: minimal `Application` (§45 subset): owns a Scene, a Scheduler, the system registry;
 `initialize/start/stop/pause/resume/step/dispose`; emits `fixedUpdate`/`update`/`render`
 (§6b) from scheduler callbacks; manual `step(elapsed)` mode for headless (renderer arrives
@@ -507,7 +507,7 @@ Done: build+test green incl. committed known-answer vectors and −0/NaN cases.
 Files: `tests/determinism/phase1-headless-stepping.test.ts`,
 `tests/determinism/golden/phase1.json`.
 Steps: 100-node scene, transforms mutated from registered fixed-step systems, 1000 steps;
-hash all world matrices per step with `@four/diagnostics` (D6); run once in-process, once
+hash all world matrices per step with `@fourjs/diagnostics` (D6); run once in-process, once
 in a **fresh child process**; compare both against the committed golden hash. Fix nothing;
 defect list as `WP-1.<n>-fix<k>`.
 Done: `pnpm test:suites` green twice (warm/cold); golden file committed.
@@ -542,7 +542,7 @@ Reads: §42, §19, D1 + WP-1.8/2.2 source.
 Files: `packages/scene/src/authority.ts`, `packages/scene/src/index.ts`,
 `packages/motion/src/motion-component.ts` (enforcement), `tests/authority.test.ts`.
 Steps: `TransformAuthority` enum (§42 incl. `blended`) + `node.transformAuthority` field
-live in `@four/scene` (the §42 API is on Node); motion systems check ownership before
+live in `@fourjs/scene` (the §42 API is on Node); motion systems check ownership before
 writing and emit the §42 dev warning (once per node per offending system) on conflict.
 Done: build+test green: single-owner writes pass; conflicting writer warns and does not
 write; `blended` reserved (throws `NOT_IMPLEMENTED` until Phase 7 — note: this code is not
@@ -603,23 +603,23 @@ Exit: moving 2D and 3D primitives render smoothly despite fixed-step simulation.
 All surfaces spec-pinned (§47–48, §61–64, §49 subset, D8, rev-1.3 context-loss); no RFC
 triggered. MVP tier: unlit colored geometry, WebGL 2 only, `"negative-one-to-one"` depth.
 
-- **WP-3.1/3.2 [S] Cameras + Viewport** (`@four/scene`, batched: shared barrel) — §47
+- **WP-3.1/3.2 [S] Cameras + Viewport** (`@fourjs/scene`, batched: shared barrel) — §47
   `Camera` abstract Node subclass (near/far/projection/inverseProjection/view matrices;
   view = inverse world), `PerspectiveCamera` (fovY radians/aspect/near/far),
   `OrthographicCamera`; projections via Matrix4 D8 helpers with `depthRange` argument at
   update time; §48 `Viewport` (id, camera, rect, normalized?, clearColor) minimal. Tests vs
   math ground truth incl. view = world⁻¹ under hierarchy.
-- **WP-3.3 [S] Geometry/material/renderable lite** (batched across `@four/geometry`,
-  `@four/materials`, `@four/render`) — `BufferGeometry` (positions Float32Array, optional
+- **WP-3.3 [S] Geometry/material/renderable lite** (batched across `@fourjs/geometry`,
+  `@fourjs/materials`, `@fourjs/render`) — `BufferGeometry` (positions Float32Array, optional
   indices, bounds), `boxGeometry/planeGeometry/circleGeometry2D` builders;
   `UnlitMaterial` (RGBA color); `Renderable` Node subclass (§49 subset: geometry, material,
   renderLayer/renderOrder) + `buildRenderList(scene, camera)` (§64 subset → compact items)
   with an interpolation-aware variant composing PoseBuffer local render poses down the
   hierarchy (§43 application; documented O(n)).
-- **WP-3.4 [S] Renderer interface** (`@four/render`) — §61 interface verbatim + rev-1.3
+- **WP-3.4 [S] Renderer interface** (`@fourjs/render`) — §61 interface verbatim + rev-1.3
   context-loss contract (`contextlost`/`contextrestored` events, engine-resource
   re-creation policy), `RendererCapabilities` minimal, shared clear/viewport semantics.
-- **WP-3.5 [S] WebGL 2 backend** (`@four/render-webgl`) — implements §61 for unlit colored
+- **WP-3.5 [S] WebGL 2 backend** (`@fourjs/render-webgl`) — implements §61 for unlit colored
   geometry: context acquisition, one shader pair, VAO per geometry (cached, disposed),
   camera VP uniform, per-item model matrix, §48 viewport rects + clears, context-loss
   wiring to the §61 events, `"negative-one-to-one"` depth. Unit-testable parts split from
@@ -644,21 +644,21 @@ triggered. MVP tier: unlit colored geometry, WebGL 2 only, `"negative-one-to-one
 Exit: pointer events, picking, dragging, sprites, and text labels work in a mixed 2D/3D
 example — and the exit ships the demo-ready build (public deployment is an owner step).
 
-- **WP-3a.1 [S] Picking** (`@four/input`) — §71 bounds+analytic tier: camera ray from NDC
+- **WP-3a.1 [S] Picking** (`@fourjs/input`) — §71 bounds+analytic tier: camera ray from NDC
   (unproject via inverse projection + camera world), plane/circle analytic hits (2D),
   transformed-AABB hits from geometry bounds (3D), nearest-first ordering, `pick(scene,
   camera, ndcX, ndcY)` returning hits with node/distance/point.
-- **WP-3a.2 [S] Pointer input + propagation + dragging** (`@four/input`) — §72 subset:
+- **WP-3a.2 [S] Pointer input + propagation + dragging** (`@fourjs/input`) — §72 subset:
   structural DOM pointer source, normalized events (down/up/move/click/enter/leave) with
   NDC coords, capture→target→bubble through the scene graph (§6b input exception), pointer
   capture, drag manager (§120: down on node → move deltas in world → up releases) writing
   under `"manual"`-authority rules via a callback (no direct transform writes by input).
-- **WP-3a.3 [S] Textures + sprites** (`@four/render`, `@four/render-webgl`,
-  `@four/materials`) — minimal §55/§61 tier: `Texture` + `Renderer.createTexture`
+- **WP-3a.3 [S] Textures + sprites** (`@fourjs/render`, `@fourjs/render-webgl`,
+  `@fourjs/materials`) — minimal §55/§61 tier: `Texture` + `Renderer.createTexture`
   (structural ImageBitmap-like source), `SpriteMaterial` (texture + tint), `Sprite`
   renderable (anchor, world sizing), webgl textured-quad program + texture cache
   (loss-aware like the VAO cache).
-- **WP-3a.4 [S] Text MVP** (`@four/text`) — §56 MVP tier: runtime glyph atlas via an
+- **WP-3a.4 [S] Text MVP** (`@fourjs/text`) — §56 MVP tier: runtime glyph atlas via an
   injected structural rasterizer (canvas-like), Latin subset, `Text` producing textured
   quads through the sprite path; no shaping/bidi (staged per spec §56 note).
 - **WP-3a.5 [H] Example upgrade** — interactive: click recolors, drag moves, a live text
@@ -688,7 +688,7 @@ Phase-level pinned decisions (so no packet re-litigates them):
   trees (§18), IK, and spring *simulation* beyond the §15 spring easing are **not** Phase 4
   (§107 does not list them; they arrive with later phases). `AnimationClip.events` ships
   now, with §16 marker semantics.
-- **P4-4 Facade.** `@four/animation` owns `animate()`/`tween()`/`Timeline`/clip types; the
+- **P4-4 Facade.** `@fourjs/animation` owns `animate()`/`tween()`/`Timeline`/clip types; the
   `four` umbrella re-exports through its existing subpath pattern (`four/animation`).
   §15's `Four.animate(...)` reads as the umbrella namespace import.
 - **P4-5 Barrel discipline.** WP-4.1/WP-4.2 run in parallel and do **not** touch
@@ -702,30 +702,30 @@ Packets:
   per-package vitest coverage via a shared config (v8 provider, `src/**/*.ts` include,
   ≥95% thresholds on lines/statements/functions/branches) exposed as a root
   `coverage` task so the gate is tooling-enforced, not review-enforced.
-- **WP-4.1 [S] Easing library** (`@four/animation`) — §15's 12 families with in/out/in-out
+- **WP-4.1 [S] Easing library** (`@fourjs/animation`) — §15's 12 families with in/out/in-out
   variants; string registry ("cubic-out"-style keys, bare "linear"); pinned documented
   constants for back/elastic/spring parameters; pure `(t) => number` on [0,1] with exact
   0→0/1→1 endpoints; closed-form value tests.
-- **WP-4.2 [S] Bindings + value adapters** (`@four/animation`) — §16 typed property
+- **WP-4.2 [S] Bindings + value adapters** (`@fourjs/animation`) — §16 typed property
   references; string-path convenience resolved once at creation (FourError on bad paths);
   adapters: number, Vector2/3/4 (out-param lerp), Quaternion (shortest-arc slerp), RGBA
   4-tuple, boolean/discrete (step); zero per-frame allocation after setup.
-- **WP-4.3 [S] Tween core** (`@four/animation`) — §15 builder API
+- **WP-4.3 [S] Tween core** (`@fourjs/animation`) — §15 builder API
   (`animate(target).to(props, seconds).ease(name).play()` plus `from`/delay/repeat/yoyo/
   speed/pause/resume/seek/stop); value evaluation a pure function of local time;
   last-started-wins on a shared property with a dev warning (§16); transform targets
   require `"animation"` authority — refusal warns and skips the whole write (WP-2.3
   semantics). Assembles the package barrel (P4-5).
-- **WP-4.4 [S] Timeline** (`@four/animation`) — §16: `.at(time, tween | timeline |
+- **WP-4.4 [S] Timeline** (`@fourjs/animation`) — §16: `.at(time, tween | timeline |
   callback)`, nesting, labels, markers (fire exactly once per forward crossing; seek/scrub
   suppress by default with per-marker `replayOnSeek`), parallel tracks, sequencing, loop,
   reverse, scrub, playback speed, pause/resume; mid-timeline restore positions playback
   without re-firing crossed markers.
-- **WP-4.5 [S] Clips + tracks** (`@four/animation`) — §17: `AnimationClip { name, duration,
+- **WP-4.5 [S] Clips + tracks** (`@fourjs/animation`) — §17: `AnimationClip { name, duration,
   tracks, events }`; scalar/vector/quaternion/color/boolean/discrete/custom-property
   tracks (morph + skeletal staged per P4-3); interpolation step/linear/cubic/Hermite +
   slerp; binary-search keyframe sampling, pure in clip-local time (§9).
-- **WP-4.6 [S] Mixer + AnimationSystem** (`@four/animation`) — mixer resolves clip tracks
+- **WP-4.6 [S] Mixer + AnimationSystem** (`@fourjs/animation`) — mixer resolves clip tracks
   onto a target via WP-4.2 bindings; playback controls (play/pause/stop/speed/loop); clip
   event markers with §16 crossing semantics; `AnimationSystem` per P4-1 (fixed step,
   ordered before MotionSystem, `"animation"` authority, insertion-order updates,
@@ -783,7 +783,7 @@ Phase-level pinned decisions:
 
 Packets:
 
-- **WP-5.1 [S] Physics types + §37 contract** (`@four/physics`) — all §20–§34 public
+- **WP-5.1 [S] Physics types + §37 contract** (`@fourjs/physics`) — all §20–§34 public
   types: dimension/body-type/CCD/determinism/combine unions, `RigidBodyDescriptor`,
   `ColliderDescriptor` + the P5-6 shape unions, minimal `JointDescriptor` (P5-4),
   `PhysicsMaterial` (§25 combine rules + density-fallback doc), §29 event payload
@@ -791,7 +791,7 @@ Packets:
   `PhysicsSolverAdapter` (§37 verbatim shape), opaque handle types, §23/§85 validation
   helpers (positive dynamic mass, shape parameter checks). Types + validators only; no
   system. Starts the package barrel.
-- **WP-5.2 [S] RigidBody/Collider components + material** (`@four/physics`) — §6a
+- **WP-5.2 [S] RigidBody/Collider components + material** (`@fourjs/physics`) — §6a
   components: `RigidBody` (§23 fields incl. derived `inverseMass`, force/impulse
   command queue applied at the next fixed step, `wake()`/`sleep()`, §29 typed events on
   the component emitter), `Collider` (§24 fields, sensor flag, groups/mask),
@@ -799,15 +799,15 @@ Packets:
   derivation (§23) for the P5-6 shapes.
   *Dated note (2026-08-01, orchestrator):* mass-from-density derivation (§23) is
   **delegated to the solver** — Rapier derives mass from collider densities natively,
-  and duplicating a volume model in `@four/physics` risks disagreeing with it. The
+  and duplicating a volume model in `@fourjs/physics` risks disagreeing with it. The
   WP-5.2 worker correctly stopped rather than improvise; `inverseMass` reads `NaN`
   until the solver derives mass, and WP-5.3 refreshes the component's mass properties
   from the adapter after registration.
-- **WP-5.3 [S] PhysicsWorld + PhysicsSystem + fake-adapter seam** (`@four/physics`) —
+- **WP-5.3 [S] PhysicsWorld + PhysicsSystem + fake-adapter seam** (`@fourjs/physics`) —
   world lifecycle (component registration → adapter handles, monotonic body ids §33),
   P5-2 fixed-step pipeline, pose-store integration, `"physics"` authority writes, §30
   query surface with §21 2D semantics, §32 sleeping config, §33 checksum (FNV-1a via
-  @four/diagnostics, 1e-6, ascending body id), §34 snapshot passthrough with
+  @fourjs/diagnostics, 1e-6, ascending body id), §34 snapshot passthrough with
   adapter/version validity metadata; tests against a structural `FakeSolverAdapter`
   (scripted events + recorded calls — the fake-GL pattern).
   *Dated note (2026-08-01, orchestrator):* the §33 checksum could not "reuse WP-1.13"
@@ -815,14 +815,14 @@ Packets:
   edge. Resolution: FNV-1a is re-implemented privately in `world.ts`, pinned
   byte-for-byte against an independent reference implementation in its tests. Accepted
   duplication; preferable to widening the dependency matrix for one hash function.
-- **WP-5.4 [S] Rapier adapter, 2D** (`@four/physics-rapier`) — P5-1 deps (package.json
+- **WP-5.4 [S] Rapier adapter, 2D** (`@fourjs/physics-rapier`) — P5-1 deps (package.json
   edit; ORCHESTRATOR runs the install), shared init plumbing, 2D adapter: bodies,
   colliders (P5-6 tier), step, EventQueue → §37 `drainEvents`, queries, snapshot via
   Rapier serialization, honest `PhysicsCapabilities` (verify CCD-mode mapping against
   Rapier docs and report); unit tests against real wasm.
-- **WP-5.5 [S] Rapier adapter, 3D** (`@four/physics-rapier`) — same contract for
+- **WP-5.5 [S] Rapier adapter, 3D** (`@fourjs/physics-rapier`) — same contract for
   rapier3d; shared code factored with the 2D adapter where honest.
-- **WP-5.6 [S] Cross-integration** — `@four/physics` + Rapier end-to-end in both
+- **WP-5.6 [S] Cross-integration** — `@fourjs/physics` + Rapier end-to-end in both
   dimensions: gravity fall vs closed form (tolerance documented), restitution bounce,
   impulses, sensors (enter/exit), raycast/overlap, §29 event normalization, §33
   checksum repeatability in-process, §42 authority + pose interpolation seam.
@@ -854,7 +854,7 @@ Phase-level pinned decisions:
   loud validation errors:** `distance` (Rapier has no rigid distance joint — rope caps
   max distance only; emulating with a stiff spring would misrepresent §28) and `gear`
   (no Rapier support). `capabilities.jointTypes` lists exactly what each adapter ships.
-- **P6-2 Break thresholds** live at the `@four/physics` layer: the world monitors joint
+- **P6-2 Break thresholds** live at the `@fourjs/physics` layer: the world monitors joint
   reaction impulses each step and destroys joints exceeding `breakForce`/`breakTorque`,
   emitting a `jointbreak` event — IF the adapter can report reaction impulses (workers
   verify against 0.19.3; if unavailable, breakage is staged with a dated note, not
@@ -869,13 +869,13 @@ Phase-level pinned decisions:
 
 Packets:
 
-- **WP-6.1 [S] Joint API** (`@four/physics`) — full `JointDescriptor` discriminated
+- **WP-6.1 [S] Joint API** (`@fourjs/physics`) — full `JointDescriptor` discriminated
   unions for the P6-1 tier (+ staged types rejected in validation with P6-1 cited),
   §28 joint classes with limits/motor/spring params + break thresholds + collision
   enable/disable, world.addJoint/removeJoint plumbing to adapter handles, `jointbreak`
   event type, extended fake-adapter coverage.
 - **WP-6.2 [S] Rapier 2D joints** + **WP-6.3 [S] Rapier 3D joints**
-  (`@four/physics-rapier`, parallel after 6.1) — JointData mapping, motors
+  (`@fourjs/physics-rapier`, parallel after 6.1) — JointData mapping, motors
   (targetVelocity/maxTorque → Rapier motor model — verify configureMotor* APIs),
   limits, reaction-impulse reporting for P6-2 (verify; report honestly),
   capabilities.jointTypes updated, wasm-backed tests incl. pendulum period vs closed
@@ -904,7 +904,7 @@ documented continuity tolerance (no teleport step), plus the §19 pipeline order
 Phase-level pinned decisions:
 
 - **P7-1 Pose targets.** Animation drives *target poses*, not owned transforms, under
-  `"blended"`: a `PoseTarget` component lives in `@four/scene` (position/rotation/
+  `"blended"`: a `PoseTarget` component lives in `@fourjs/scene` (position/rotation/
   scale? — position+rotation MVP), bindable by tweens/mixers like any object. Neither
   `animation` nor `physics` may import the other (§3.1) — scene is the shared home.
 - **P7-2 Weights.** §19 sketch verbatim: `physicsWeight`/`animationWeight` on
@@ -914,18 +914,18 @@ Phase-level pinned decisions:
   `SolverBodyAccess` with `setBodyType(handle, type, wake)`; `world.setBodyControlMode`
   retypes IN PLACE (ids/checksum order preserved) with optional velocity inheritance
   from finite-differenced target-pose history (ragdoll activation).
-- **P7-4 Blend pipeline.** A `BlendSystem` in `@four/physics` at a priority after
+- **P7-4 Blend pipeline.** A `BlendSystem` in `@fourjs/physics` at a priority after
   PRIORITY_PHYSICS_SOLVE (§19 steps 1–5): before the solve it feeds targets to
   kinematic bodies (animation-weighted); after it, for `"blended"` nodes, writes the
   weighted combination of target and solver pose under the `"blended"` authority
   (unlocking WP-2.3's reserved value). Render interpolation stays downstream (§43).
-- **P7-5 Root motion MVP** (`@four/animation`): a mixer `rootMotion` option extracting
+- **P7-5 Root motion MVP** (`@fourjs/animation`): a mixer `rootMotion` option extracting
   per-step TRANSLATION deltas from a designated track onto a designated node;
   rotational root motion staged with a dated note. Seek does not accumulate (§16).
 
 Packets:
 
-- **WP-7.1 [S] PoseTarget + weights** — `@four/scene` PoseTarget component;
+- **WP-7.1 [S] PoseTarget + weights** — `@fourjs/scene` PoseTarget component;
   `physicsWeight`/`animationWeight` on RigidBody (validation, §19 sketch); tween/mixer
   binding proof.
 - **WP-7.2 [S] Retype + transitions** — SolverBodyAccess.setBodyType (verify Rapier
@@ -979,25 +979,25 @@ Phase-level pinned decisions:
   ship if it stays small — worker decides honestly; CCD/FABRIK staged), robotic
   joint commands (§119's domain — a thin command mapping over Phase 6 motors MAY
   ship as a utility if honest).
-- **P8-2 Home.** Everything lands in `@four/motion` (steering/PID/prediction are
+- **P8-2 Home.** Everything lands in `@fourjs/motion` (steering/PID/prediction are
   motion utilities over core+math+scene; no new deps). Steering integrates as
   forces/accelerations feeding MotionComponent or as target velocities — pinned:
   steering outputs an ACCELERATION (out-param), applied by the caller (composable
   with §38 integrators); a `SteeringAgent` convenience component MAY wrap it.
-- **P8-3 Determinism.** Wander uses the seeded RNG from @four/core (verify one
+- **P8-3 Determinism.** Wander uses the seeded RNG from @fourjs/core (verify one
   exists — else a small xorshift utility in motion with a documented seed contract);
   flocking neighbor iteration in insertion order.
 
 Packets:
 
-- **WP-8.1 [S] PID + spring-damper controllers** (`@four/motion`) — §111 sketch
+- **WP-8.1 [S] PID + spring-damper controllers** (`@fourjs/motion`) — §111 sketch
   verbatim + anti-windup/derivative-on-measurement (documented decisions), reset(),
   closed-form analytic tests (step response of a known plant vs discrete solution).
-- **WP-8.2 [S] Steering + flocking** (`@four/motion`) — P8-1 set, acceleration
+- **WP-8.2 [S] Steering + flocking** (`@fourjs/motion`) — P8-1 set, acceleration
   out-params, seeded wander, neighbor-query interface (brute-force MVP, spatial
   hash staged), analytic tests (arrive slows to zero at target; pursuit intercept
   on a closed form; flock cohesion bounded).
-- **WP-8.3 [S] Trajectory prediction + optional two-bone IK** (`@four/motion`) —
+- **WP-8.3 [S] Trajectory prediction + optional two-bone IK** (`@fourjs/motion`) —
   ballistic/lead closed forms; two-bone IK only if honest (else staged note).
 - **WP-8.4 [S] Integration + demo scenario** — root suite: PID drives a §111-style
   speed controller on a Phase 6 motorized hinge (closed-loop reaches setpoint;
@@ -1029,7 +1029,7 @@ Phase-level pinned decisions:
   §36's plane/ground collision only ("depth-buffer" and full solver coupling staged).
   Trails: MVP = position-history ribbon data (rendering via the sprite path; staged
   if dishonest — worker reports).
-- **P9-2 Home.** `@four/particles` (deps core/math/scene per §3.1). Force fields
+- **P9-2 Home.** `@fourjs/particles` (deps core/math/scene per §3.1). Force fields
   (§27's ForceField interface — sample(position, velocity, time, out)) ship in
   particles as the §27 built-in set MVP (uniform gravity, drag, wind, vortex, radial,
   turbulence via SeededRandom-driven curl noise — honest subset, report), reusable
@@ -1043,19 +1043,19 @@ Phase-level pinned decisions:
 
 Packets:
 
-- **WP-9.1 [S] Particle core** (`@four/particles`) — SoA pool, ParticleEmitter (§36
+- **WP-9.1 [S] Particle core** (`@fourjs/particles`) — SoA pool, ParticleEmitter (§36
   options subset: maxParticles, emission rate/burst, lifetime, velocity
   distributions (seeded), color/size over lifetime curves), CPU integrator step,
   plane collision, force-field application; zero-alloc; unit tests + closed forms.
-- **WP-9.2 [S] Force fields** (`@four/particles`) — §27 interface + built-in set
+- **WP-9.2 [S] Force fields** (`@fourjs/particles`) — §27 interface + built-in set
   (P9-2), volume inclusion/filtering MVP; tests.
-- **WP-9.3 [S] Particle rendering** (`@four/render` + `@four/render-webgl` +
-  `@four/particles`) — P9-3 batched path; fake-GL tests + structural render-item
+- **WP-9.3 [S] Particle rendering** (`@fourjs/render` + `@fourjs/render-webgl` +
+  `@fourjs/particles`) — P9-3 batched path; fake-GL tests + structural render-item
   tests.
   *Dated note (2026-08-02, orchestrator, P9-3 governance):* `ParticleRenderable`
   cannot subclass `Renderable` — the frozen §3.1 matrix gives `particles` only
   core/math/scene, and `particles`/`render` share a wave. The shipped seam is a
-  duck-typed structural contract (`ParticleDrawable` declared in `@four/render`,
+  duck-typed structural contract (`ParticleDrawable` declared in `@fourjs/render`,
   satisfied by `particles`' Node subclass; drift caught by tests, not the compiler —
   same shape as `SolverBodyAccess`). Accepted as a cross-package surface; the module
   header in `packages/render/src/particles.ts` carries the full rationale. Likewise
@@ -1087,7 +1087,7 @@ proveyors + a debug overlay MVP on the existing render path — full visual poli
 
 Pinned decisions:
 
-- **P10-1 Home.** Recording/replay in `@four/diagnostics` (deps core/math/scene —
+- **P10-1 Home.** Recording/replay in `@fourjs/diagnostics` (deps core/math/scene —
   NOTE: it cannot import physics/motion (same-wave); the recorder therefore records
   through INTERFACES the app supplies (a `ReplayTarget` contract: checksum(),
   createSnapshot(), restoreSnapshot(), applyInput(step, payload)) — PhysicsWorld
@@ -1110,7 +1110,7 @@ Pinned decisions:
   cheap — worker reports).
 
 Packets: **WP-10.1 [S]** Recorder + §34 format + ReplayTarget contract
-(@four/diagnostics; fake-target unit tests). **WP-10.2 [S]** ReplayPlayer +
+(@fourjs/diagnostics; fake-target unit tests). **WP-10.2 [S]** ReplayPlayer +
 inspection controls (+ integration with the real Application/scheduler).
 **WP-10.3 [S]** Debug-draw data providers + overlay MVP (render seam per P10-3).
 **WP-10.4 [S]** Integration + phase10 golden: record a Rapier scenario with scripted
@@ -1127,7 +1127,7 @@ deployment/owner step per the POSITIONING precedent).
 
 Pinned decisions:
 
-- **P11-1 Serialization MVP** (`@four/serialization`, deps core/math/scene): a JSON
+- **P11-1 Serialization MVP** (`@fourjs/serialization`, deps core/math/scene): a JSON
   scene format {formatVersion, nodes (tree: id/name/transform/authority), components
   by typeName with per-type serializers registered via a `ComponentSerializer`
   registry (the §6a typeName registry is the natural key)} + §80 migration hooks
@@ -1137,12 +1137,12 @@ Pinned decisions:
   the registry + scene/transform/PoseTarget serializers + ONE cross-package reference
   registration (RigidBody/Collider) done at the tests/app layer. Round-trip
   save→load→§33-checksum-relevant state equality is the gate.
-- **P11-2 Assets MVP** (`@four/assets`, deps core): AssetManager {load(url, loader),
+- **P11-2 Assets MVP** (`@fourjs/assets`, deps core): AssetManager {load(url, loader),
   cache, refcounts, dispose; structural fetch injection for testability}; loaders:
   JSON, text, binary (ArrayBuffer), image (structural ImageBitmap-like — browser
   gated). glTF (§76-78) is STAGED with a dated note (a real glTF pipeline needs the
   §55 texture tier + materials beyond unlit — dishonest to ship as a stub).
-- **P11-3 UI MVP** (`@four/ui`, deps core/math/scene/input/text): retained-mode
+- **P11-3 UI MVP** (`@fourjs/ui`, deps core/math/scene/input/text): retained-mode
   Panel/Label/Button over the existing sprite/text path with §72 pointer routing;
   accessibility MIRROR staged with a dated note (needs DOM integration policy).
   Enough §73-75 to prove the layer composes; completeness staged.
@@ -1172,7 +1172,7 @@ surfaces). Scope and anchors are fixed; exits are spec-quoted except where noted
 
 | Phase | Scope (spec) | Exit criterion | Notes / likely seams |
 |---|---|---|---|
-| 3 | Renderer interface, WebGL 2 backend, cameras, viewports (§61–62, §47–48, §106) | Moving 2D/3D primitives render smoothly despite fixed-step simulation | interface / context-loss (§61) / projections (D8) / render list / buffers / interpolation-aware draw; camera+viewport types live in `@four/scene` (§98 rev 1.3); **revisit the size gate** — real example replaces placeholder. **GPU in CI:** browser tests run Playwright against the pre-installed Chromium with SwiftShader (software GL) for WebGL 2; visual baselines are per-backend with perceptual tolerance (§92) |
+| 3 | Renderer interface, WebGL 2 backend, cameras, viewports (§61–62, §47–48, §106) | Moving 2D/3D primitives render smoothly despite fixed-step simulation | interface / context-loss (§61) / projections (D8) / render list / buffers / interpolation-aware draw; camera+viewport types live in `@fourjs/scene` (§98 rev 1.3); **revisit the size gate** — real example replaces placeholder. **GPU in CI:** browser tests run Playwright against the pre-installed Chromium with SwiftShader (software GL) for WebGL 2; visual baselines are per-backend with perceptual tolerance (§92) |
 | 3a | Input, picking, dragging, sprites, MVP-tier text (§106a; §71–72, §55, §56 MVP tier) | Pointer events, picking, dragging, sprites, and labels work in a mixed 2D/3D example | input routing / picking strategies / sprite batching / SDF Latin text; Playwright setup lands here; **exit ships a public demo** (demo-first, TODO 2026-07-29) |
 | 4 | Tween, easing, Timeline, clips/tracks, bindings (§15–17, §107) | Any numeric/vector/quaternion/color/transform property animatable | easing table / tween core / timeline+markers (§16 semantics incl. replay/restore) / tracks / binding resolution |
 | 5 | Physics API + Rapier adapter (§20–32, §37, §108) | Mixed 2D/3D demo: gravity, collisions, impulses, sensors via common API | descriptors / world API / §37 contract incl. `drainEvents` + capabilities / rapier2d+3d wasm (pins per MEMORY) / event normalization / sync into the WP-2.6 pose store; §33 checksum reuses WP-1.13 |

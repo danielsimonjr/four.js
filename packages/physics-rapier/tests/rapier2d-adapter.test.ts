@@ -3,7 +3,7 @@
  *
  * There is no fake solver in this file on purpose: the point of an adapter
  * packet is to prove the mapping onto a real engine, and a mock would only
- * re-assert this file's own assumptions. `@four/physics`'s structural
+ * re-assert this file's own assumptions. `@fourjs/physics`'s structural
  * `FakeSolverAdapter` (WP-5.3) is where the *contract* is exercised without a
  * solver.
  *
@@ -25,9 +25,9 @@
  * absolute drift accumulates over a few hundred substeps.
  */
 
-import { FourError } from "@four/core";
-import { Matrix3, Quaternion, Vector2, Vector3 } from "@four/math";
-import { ALL_COLLISION_GROUPS, PhysicsMaterial } from "@four/physics";
+import { FourError } from "@fourjs/core";
+import { Matrix3, Quaternion, Vector2, Vector3 } from "@fourjs/math";
+import { ALL_COLLISION_GROUPS, PhysicsMaterial } from "@fourjs/physics";
 import type {
   ColliderDescriptor,
   CollisionEvent,
@@ -37,7 +37,7 @@ import type {
   PhysicsWorldOptions,
   SleepEvent,
   TriggerEvent,
-} from "@four/physics";
+} from "@fourjs/physics";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -1485,8 +1485,8 @@ describe("shapes (plan P5-6 tier)", () => {
     adapter.createCollider({
       body,
       shape: { type: "circle", radius: 0.5 },
-      // `ColliderDescriptor.offset` is a `@four/scene` `Transform`, and this
-      // package may not depend on `@four/scene` (§37's layering). Only
+      // `ColliderDescriptor.offset` is a `@fourjs/scene` `Transform`, and this
+      // package may not depend on `@fourjs/scene` (§37's layering). Only
       // `position` and `rotation` are read — by the adapter and by
       // `validateColliderDescriptor` alike — so a structural stand-in is
       // enough to exercise the offset path from here.

@@ -39,23 +39,23 @@ Every symbol named here exists in the machine-verified export inventory
 ## Import spellings
 
 Three equivalent ways to reach every symbol. The examples and guides use the
-umbrella subpaths; library code inside the workspace uses the `@four/*`
+umbrella subpaths; library code inside the workspace uses the `@fourjs/*`
 package names directly.
 
 ```typescript
 // 1. Umbrella subpaths — the form every example and guide uses.
 //    Tree-shaken: importing "four/scene" pulls in no renderer, no physics.
-import { Application } from "four/application";
-import { Group, OrthographicCamera } from "four/scene";
-import { Vector3 } from "four/math";
+import { Application } from "fourJS/application";
+import { Group, OrthographicCamera } from "fourJS/scene";
+import { Vector3 } from "fourJS/math";
 
 // 2. The umbrella root — one namespace per package (§98).
 //    `Application` is the only symbol `four` owns rather than re-exports.
-import * as Four from "four";
+import * as Four from "fourJS";
 const pid = new Four.motion.PIDController({ kp: 8, ki: 2, kd: 0.4 });
 
 // 3. Workspace package names — what the umbrella re-exports.
-import { PhysicsWorld } from "@four/physics";
+import { PhysicsWorld } from "@fourjs/physics";
 ```
 
 `four/application` is the **headless composition subpath**: its emitted
@@ -66,7 +66,7 @@ author.
 
 **Publish naming (§98):** at first npm publish the umbrella becomes
 `@danielsimonjr/fourjs` and sub-packages `@danielsimonjr/fourjs-<name>`;
-workspace names stay `four` / `@four/*`. Subpath spellings are unchanged.
+workspace names stay `four` / `@fourjs/*`. Subpath spellings are unchanged.
 
 ---
 
@@ -164,7 +164,7 @@ import {
   Group,
   OrthographicCamera,
   createFullscreenViewport,
-} from "four/scene";
+} from "fourJS/scene";
 
 const camera = new OrthographicCamera({
   left: -4,
@@ -210,10 +210,10 @@ not node subclasses.
 | `collectSceneLights`                                                   | §68 light discovery: first `DirectionalLight` in DFS order + `Scene.ambientLight`.                                                   |
 
 ```typescript
-import { planeGeometry } from "four/geometry";
-import { LitMaterial, UnlitMaterial } from "four/materials";
-import { Renderable } from "four/render";
-import { DirectionalLight } from "four/scene";
+import { planeGeometry } from "fourJS/geometry";
+import { LitMaterial, UnlitMaterial } from "fourJS/materials";
+import { Renderable } from "fourJS/render";
+import { DirectionalLight } from "fourJS/scene";
 
 const slab = new Renderable(
   planeGeometry({ width: 2, height: 1 }),
@@ -261,8 +261,8 @@ import {
   AnimationTrack,
   animate,
   quaternionAdapter,
-} from "four/animation";
-import { Quaternion, Vector3 } from "four/math";
+} from "fourJS/animation";
+import { Quaternion, Vector3 } from "fourJS/math";
 
 const animationSystem = new AnimationSystem();
 app.systems.register(animationSystem);
@@ -327,10 +327,10 @@ keyframe (animation) or by force (physics).
 | `SpringDamper`                                                                                       | Exact zero-order-hold matrix-exponential step — unconditionally stable smoothing for setpoints and cameras.                                                       |
 | `solveTwoBoneIK` / `createTwoBoneIKSolution`                                                         | Analytic two-bone IK over positions.                                                                                                                              |
 | `predictBallistic` / `predictLinear` / `interceptPoint` / `interceptTime`                            | Ballistic and intercept prediction.                                                                                                                               |
-| `SeededRandom`                                                                                       | Deterministic xorshift128 RNG (§33) — canonical home is `@four/core`; re-exported here.                                                                           |
+| `SeededRandom`                                                                                       | Deterministic xorshift128 RNG (§33) — canonical home is `@fourjs/core`; re-exported here.                                                                           |
 
 ```typescript
-import { PIDController } from "four/motion";
+import { PIDController } from "fourJS/motion";
 
 // The §119 actuation cascade: PID output becomes a joint motor's
 // targetVelocity; maxTorque stays fixed as the effort bound.
@@ -402,9 +402,9 @@ class PhysicsWorld {
 | `PhysicsMaterial`               | §25 shared friction/restitution/density with combine modes.                                                                                                                                                                                                                                |
 
 ```typescript
-import { Collider, PhysicsWorld, RigidBody } from "four/physics";
-import { Rapier2dAdapter } from "four/physics-rapier";
-import { Group } from "four/scene";
+import { Collider, PhysicsWorld, RigidBody } from "fourJS/physics";
+import { Rapier2dAdapter } from "fourJS/physics-rapier";
+import { Group } from "fourJS/scene";
 
 const world = new PhysicsWorld({
   dimension: "2d",
@@ -471,8 +471,8 @@ import {
   dragField,
   uniformGravityField,
   vortexField,
-} from "four/particles";
-import { Vector3 } from "four/math";
+} from "fourJS/particles";
+import { Vector3 } from "fourJS/math";
 
 const fountain = new ParticleEmitter({
   maxParticles: 2600,
@@ -515,7 +515,7 @@ Recorded scale (a measurement, not a 60 fps claim — see
 | `dispatchPointerEvent` / `buildPropagationPath` | The §72 propagation machinery, public for custom sources.                                                                                                                                                                      |
 
 ```typescript
-import { DragManager, PointerInput, type Pickable } from "four/input";
+import { DragManager, PointerInput, type Pickable } from "fourJS/input";
 
 const pickables: readonly Pickable[] = [disc, cube].map((node) => {
   const bounds = node.geometry.computeBounds();
@@ -564,7 +564,7 @@ drags.makeDraggable(cube);
 
 **UI (§73–§75):** layout and state are engine-owned; **visuals are
 app-supplied** through the `WidgetSkin` seam (the dependency matrix keeps
-`@four/ui` renderer-free).
+`@fourjs/ui` renderer-free).
 
 | Symbol                                                                   | Contract                                                                                                                                                                                        |
 | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -592,7 +592,7 @@ import {
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
-} from "four/serialization";
+} from "fourJS/serialization";
 
 const registry = createDefaultComponentSerializers(); // PoseTarget built in
 registry.register(RigidBody, myRigidBodySerializer); // components YOUR app uses
@@ -609,7 +609,7 @@ the save loudly (`unknownComponents: "throw"`, the A-15 default since
 old tolerance, minus the silence). Versioned migrations (§80) run on load via
 `SceneMigrationRegistry` / `migrateSceneDocument`, with warnings surfaced.
 Reference `RigidBody`/`Collider` serializers live in
-`RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`, shipped from `@four/physics` since
+`RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`, shipped from `@fourjs/physics` since
 2026-08-06 (previously reference code in the test helpers). The §79/§34 boundary is
 measured: a contact-free save round-trips bit-identically; resuming
 mid-contact exactly requires pairing the document with a §34 snapshot.
@@ -647,7 +647,7 @@ import {
   ReplayPlayer,
   ReplayRecorder,
   encodeReplayRecording,
-} from "four/diagnostics";
+} from "fourJS/diagnostics";
 
 const recorder = new ReplayRecorder();
 recorder.begin(world, {
@@ -688,7 +688,7 @@ console.log(player.verifyChecksum()); // true ⇔ the run reproduced the recordi
 | `SeededRandom`                                         | xorshift128 + splitmix32 seeding (§33) — canonical home; re-exported by `four/motion` and `four/particles` with bit-identical streams. |
 | `JsonValue` / `cloneJsonValue`                         | Structured-clone-safe JSON with `__proto__` refusal (TypeError, not silent re-parenting).                                              |
 | `Vector2/3/4`, `Quaternion`, `Matrix3/4` (`four/math`) | Mutable types with `out`-parameter hot paths (§7b, D7: the loop allocates nothing per frame); shortest-arc `slerp`.                    |
-| `ColorRGBA`, `DepthRange`                              | Color tuple type (canonical home `@four/math`); depth-range parameterization for projections (D8).                                     |
+| `ColorRGBA`, `DepthRange`                              | Color tuple type (canonical home `@fourjs/math`); depth-range parameterization for projections (D8).                                     |
 
 ---
 
@@ -700,11 +700,11 @@ and nothing here should be documented as usable:
 
 | Package               | Reserved for                       |
 | --------------------- | ---------------------------------- |
-| `@four/render-webgpu` | §62 WebGPU backend tier            |
-| `@four/render-canvas` | §62 Canvas 2D backend tier         |
-| `@four/render-svg`    | §62 SVG backend tier               |
-| `@four/physics-box2d` | §102 second solver adapter (Box2D) |
-| `@four/physics-soft`  | Soft-body tier                     |
+| `@fourjs/render-webgpu` | §62 WebGPU backend tier            |
+| `@fourjs/render-canvas` | §62 Canvas 2D backend tier         |
+| `@fourjs/render-svg`    | §62 SVG backend tier               |
+| `@fourjs/physics-box2d` | §102 second solver adapter (Box2D) |
+| `@fourjs/physics-soft`  | Soft-body tier                     |
 
 `physics-matter` / `physics-cannon` do not exist and must not be added
 without a spec amendment (ERRATA E-3).

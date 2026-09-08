@@ -1,4 +1,4 @@
-# @four/input
+# @fourjs/input
 
 Input, pointer events, and picking. Part of [fourJS](../../README.md).
 
@@ -7,11 +7,11 @@ Implements §71 and the MVP subset of §72 in [`docs/SPECIFICATION.md`](../../do
 ## What's here
 
 - **Picking (§71)** — `pick` / `createPickRay` over the `Pickable` contract (ray vs. AABB and oriented-box tests, Y-up NDC), returning `PickHit` records.
-- **Propagation (§72, §6b)** — `SceneInputEvent` (target + `stopPropagation`), `buildPropagationPath`, and `dispatchThreePhase`: the DOM-mirroring capture → target → bubble walk every input event shares, with capture-phase listener keys under `CAPTURE_KEY_PREFIX`. Node event types are added to `@four/scene`'s `NodeEventMap` via declaration merging.
+- **Propagation (§72, §6b)** — `SceneInputEvent` (target + `stopPropagation`), `buildPropagationPath`, and `dispatchThreePhase`: the DOM-mirroring capture → target → bubble walk every input event shares, with capture-phase listener keys under `CAPTURE_KEY_PREFIX`. Node event types are added to `@fourjs/scene`'s `NodeEventMap` via declaration merging.
 - **Pointer events (§72 subset)** — `ScenePointerEvent` and `dispatchPointerEvent`, plus pointer capture. Every event carries `pointerType` (`PointerDeviceType`: `"mouse" | "pen" | "touch"`, absent when the source did not say or said something the union does not name), and the engine reads it for one rule: a mouse keeps its hover across its own release, where a finger or a stylus does not.
 - **Key events (§72)** — `SceneKeyEvent` (`key`, `code`, grouped `modifiers`, `repeat`, `preventDefault`) and `dispatchKeyEvent`, over the same three phases.
 - **`PointerInput`** — the DOM pointer source over a `PointerSurface`, with click-vs-drag disambiguation (`DEFAULT_CLICK_MOVE_THRESHOLD`).
-- **`KeyboardInput`** — the DOM key source over a `KeySurface` (`window`, `document`, or any duck-typed pair of listener methods), routing `keydown`/`keyup` to the node an injected `focusTarget()` resolver names. Focus itself belongs to `@four/ui` (§75); this package never imports it.
+- **`KeyboardInput`** — the DOM key source over a `KeySurface` (`window`, `document`, or any duck-typed pair of listener methods), routing `keydown`/`keyup` to the node an injected `focusTarget()` resolver names. Focus itself belongs to `@fourjs/ui` (§75); this package never imports it.
 - **`DragManager`** — world-delta drag handoff to application callbacks. This package never writes transforms; the application performs the §42 authority handover itself.
 
 ## Staged / not yet implemented
@@ -21,4 +21,4 @@ Implements §71 and the MVP subset of §72 in [`docs/SPECIFICATION.md`](../../do
 
 Unit tests are colocated in `tests/` per §92.
 
-Workspace name `@four/input`; publishes as `@danielsimonjr/fourjs-input`.
+Workspace name `@fourjs/input`; publishes as `@danielsimonjr/fourjs-input`.

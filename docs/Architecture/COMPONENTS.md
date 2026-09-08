@@ -24,7 +24,7 @@ Companion documents: [ARCHITECTURE.md](./ARCHITECTURE.md) (system design), [OVER
 
 ## Overview
 
-fourJS is a Bun workspace of 24 `@four/`-scoped packages (the umbrella is plain `four`), layered strictly by the §3.1 dependency matrix — never add or reverse an edge:
+fourJS is a Bun workspace of 24 `@fourjs/`-scoped packages (the umbrella is plain `four`), layered strictly by the §3.1 dependency matrix — never add or reverse an edge:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -50,7 +50,7 @@ fourJS is a Bun workspace of 24 `@four/`-scoped packages (the umbrella is plain 
 
 **Total** (from [`FILE_INVENTORY.md`](./FILE_INVENTORY.md), generated 2026-08-05): 335 tracked TypeScript files — 161 `src/`, 158 tests, plus tools/configs/examples. Zero orphans, zero runtime circular dependencies. Repo test counts as of the last recorded exit (`MEMORY.md`, 2026-08-04): 3,077 unit + 174 suite + 38 browser/visual tests; coverage ≥95% in every package; the §86 payload gate stands at 33.28 of 150 kB gzip.
 
-**Implementation status**: 20 of 24 packages are implemented. Four are **reserved stubs** whose barrels export only `PACKAGE_NAME` (each holds a truthful README and a single smoke test): `physics-box2d`, `physics-soft`, `render-canvas`, `render-svg`. `@four/render-webgpu` left that list 2026-08-21…29 (the R-1 plan). Each stub's entry below says what it is reserved for.
+**Implementation status**: 20 of 24 packages are implemented. Four are **reserved stubs** whose barrels export only `PACKAGE_NAME` (each holds a truthful README and a single smoke test): `physics-box2d`, `physics-soft`, `render-canvas`, `render-svg`. `@fourjs/render-webgpu` left that list 2026-08-21…29 (the R-1 plan). Each stub's entry below says what it is reserved for.
 
 Conventions in force everywhere (§7a/§7b): right-handed **Y-up world in both 2D and 3D** (2D gravity is negative Y), radians, **all times in seconds**, mutable math types with `out`-parameter hot paths, deterministic iteration (insertion order, never hash-map order), no wall clocks or unseeded RNG in engine code (§33).
 
@@ -58,7 +58,7 @@ Conventions in force everywhere (§7a/§7b): right-handed **Y-up world in both 2
 
 ## The §6a Component Model
 
-Behavior and state attach to nodes as **components**, keyed by class. The contract lives in `@four/core` (`component.ts`) and `Node` delegates to a private `ComponentRegistry`:
+Behavior and state attach to nodes as **components**, keyed by class. The contract lives in `@fourjs/core` (`component.ts`) and `Node` delegates to a private `ComponentRegistry`:
 
 ```typescript
 export interface ComponentHost {
@@ -86,7 +86,7 @@ Rules (§6a, plan D2):
 - Lifecycle is explicit: `onAttach` after registration, `onDetach` on removal or replacement; **detaching does not dispose**.
 - Components are keyed by `static readonly typeName`, which doubles as the §79 serialization type name.
 
-The components that ship today: `RigidBody` and `Collider` (`@four/physics`), `MotionComponent` (`@four/motion`), `PoseTarget` (`@four/scene`, the §19 blending target). Joints are deliberately **not** components — they register on the world (`world.addJoint`, plan P6-3). Usage:
+The components that ship today: `RigidBody` and `Collider` (`@fourjs/physics`), `MotionComponent` (`@fourjs/motion`), `PoseTarget` (`@fourjs/scene`, the §19 blending target). Joints are deliberately **not** components — they register on the world (`world.addJoint`, plan P6-3). Usage:
 
 ```typescript
 const ball = new Group();
@@ -104,19 +104,19 @@ Everything in the scene is a `Node` (single inheritance extending `EventEmitter<
 
 | Node type                                                      | Package           | Role                                                                                                             |
 | -------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `Node` / `Group` / `Scene`                                     | `@four/scene`     | Hierarchy base, plain container, root (§6, §46)                                                                  |
-| `Camera` (abstract), `OrthographicCamera`, `PerspectiveCamera` | `@four/scene`     | §47 cameras — a camera is a node (spec rev 1.3 placement)                                                        |
-| `DirectionalLight`                                             | `@four/scene`     | §68 MVP lighting — shines along its node's −Z world axis; scene-wide ambient is `Scene.ambientLight`, not a node |
-| `Renderable`                                                   | `@four/render`    | §49 geometry + material drawable                                                                                 |
-| `Sprite`                                                       | `@four/render`    | §55 textured quad (implements `Disposable`)                                                                      |
-| `ParticleRenderable`                                           | `@four/particles` | One node per particle system; satisfies `@four/render`'s duck-typed `ParticleDrawable` contract                  |
-| `UIWidget` (abstract), `Panel`, `Button`, `Label`              | `@four/ui`        | §73 widgets — scene nodes with a box model and interaction state; visuals are app-supplied (`WidgetSkin`)        |
+| `Node` / `Group` / `Scene`                                     | `@fourjs/scene`     | Hierarchy base, plain container, root (§6, §46)                                                                  |
+| `Camera` (abstract), `OrthographicCamera`, `PerspectiveCamera` | `@fourjs/scene`     | §47 cameras — a camera is a node (spec rev 1.3 placement)                                                        |
+| `DirectionalLight`                                             | `@fourjs/scene`     | §68 MVP lighting — shines along its node's −Z world axis; scene-wide ambient is `Scene.ambientLight`, not a node |
+| `Renderable`                                                   | `@fourjs/render`    | §49 geometry + material drawable                                                                                 |
+| `Sprite`                                                       | `@fourjs/render`    | §55 textured quad (implements `Disposable`)                                                                      |
+| `ParticleRenderable`                                           | `@fourjs/particles` | One node per particle system; satisfies `@fourjs/render`'s duck-typed `ParticleDrawable` contract                  |
+| `UIWidget` (abstract), `Panel`, `Button`, `Label`              | `@fourjs/ui`        | §73 widgets — scene nodes with a box model and interaction state; visuals are app-supplied (`WidgetSkin`)        |
 
 ---
 
 ## Foundation Layer
 
-### @four/core
+### @fourjs/core
 
 **Purpose**: Dependency-free foundation — §6a component model, §6b eventing, error model, disposal, and the shared utilities hoisted here by the 2026-08-04 zero-findings sweep.
 
@@ -132,7 +132,7 @@ Key exports (19 total):
 
 ---
 
-### @four/math
+### @fourjs/math
 
 **Purpose**: Math primitives per the §7b conventions — mutable types, `out?`-optional allocation policy (plan D7), radians, right-handed Y-up.
 
@@ -147,7 +147,7 @@ Key exports (12 total):
 
 ## Scene & Time Layer
 
-### @four/scene
+### @fourjs/scene
 
 **Purpose**: The shared scene graph all four pillars act on — nodes, transforms with dirty tracking, world-transform resolution, §42 transform authority, cameras, viewports, the §68 directional light, and the engine's single §43 previous/current pose store.
 
@@ -155,7 +155,7 @@ Key exports (12 total):
 
 Key exports (33 total):
 
-- **Hierarchy** — `Node`, `Group`, `Scene`, `NodeType`, `NodeEventMap` (an `interface` so other packages widen it by declaration merging — `@four/input` does), `NodeHierarchyEvent`. `Node.position/rotation/scale` alias getters return the live `Transform` members (§15/§97 idiom).
+- **Hierarchy** — `Node`, `Group`, `Scene`, `NodeType`, `NodeEventMap` (an `interface` so other packages widen it by declaration merging — `@fourjs/input` does), `NodeHierarchyEvent`. `Node.position/rotation/scale` alias getters return the live `Transform` members (§15/§97 idiom).
 - **Transforms** — `Transform` (dirty via math change-hooks + `markDirty`, plan D3), `resolveWorldTransform`, `resolveWorldTransforms`, `WorldTransformStats`. World matrices are version-cached: a frame that moved nothing recomputes nothing.
 - **Authority (§42)** — `TransformAuthority` (`"manual" | "animation" | "kinematic" | "physics" | "blended" | "constraint" | "network"`), `TRANSFORM_AUTHORITIES`, `DEFAULT_TRANSFORM_AUTHORITY`, `AuthorityNode`, `warnAuthorityConflict`: conflicts warn and refuse rather than silently overwrite.
 - **Cameras & viewports (§47–48)** — `Camera`, `OrthographicCamera`, `PerspectiveCamera`, `Viewport`, `createFullscreenViewport`.
@@ -166,7 +166,7 @@ Key exports (33 total):
 
 ## Motion & Animation Layer
 
-### @four/motion
+### @fourjs/motion
 
 **Purpose**: The time pillar — §9 `TimeState`, the §10 fixed-step scheduler, the §39 system registry and priority constants, `MotionComponent` + integrators, trajectories, and the §111 advanced-motion tier (PID, springs, steering, IK, prediction).
 
@@ -211,7 +211,7 @@ export interface SimulationSystem {
 
 ---
 
-### @four/animation
+### @fourjs/animation
 
 **Purpose**: The animation pillar — easing registry, property bindings, tweens, timelines, keyframe tracks/clips, and the clip mixer, all advanced on the fixed step by `AnimationSystem` (§39 step 3, priority 300 — deliberately before `MotionSystem` at 400 so the §19 pipeline order holds).
 
@@ -227,7 +227,7 @@ Key exports (selected from ~100):
 
 ## Physics Layer
 
-### @four/physics
+### @fourjs/physics
 
 **Purpose**: The stable, solver-independent physics API — the `PhysicsWorld` pipeline, `RigidBody`/`Collider` components, joints, §30 queries, §29 events, §33 checksums, §34 snapshots — phrased entirely over the §37 `PhysicsSolverAdapter` seam, never over a concrete solver.
 
@@ -260,7 +260,7 @@ export class PhysicsWorld {
 
 ---
 
-### @four/physics-rapier
+### @fourjs/physics-rapier
 
 **Purpose**: The first solver adapter (Phase 5, §108) — Rapier 2D and 3D via `@dimforge/rapier*-compat@0.19.3` WebAssembly, implementing `PhysicsSolverAdapter` plus the `SolverBodyAccess`/`SolverJointAccess` seams.
 
@@ -270,21 +270,21 @@ Key exports (selected from ~45): `Rapier2dAdapter`, `Rapier3dAdapter`, `RapierBo
 
 ---
 
-### @four/physics-box2d — reserved stub
+### @fourjs/physics-box2d — reserved stub
 
 **Purpose**: Reserved for the Box2D 2D solver adapter per §102. **Direct deps** (declared): `physics`. **Status**: **stub — barrel exports only `PACKAGE_NAME`**; one smoke test. Kept so the §98 monorepo tree and §102 solver list stay accurate (ERRATA E-3: no `physics-matter`/`physics-cannon` without a spec amendment). One recorded motivation: Box2D could honor §28's motor force cap as a real hard cap, which Rapier cannot.
 
 ---
 
-### @four/physics-soft — reserved stub
+### @fourjs/physics-soft — reserved stub
 
 **Purpose**: Reserved for §35 soft bodies and deformables (cloth, rope, pressure/volume models). **Not** a solver adapter. **Direct deps** (declared): `physics`. **Status**: **stub — barrel exports only `PACKAGE_NAME`**; no implementation phase has been scheduled for §35.
 
 ---
 
-### @four/particles
+### @fourjs/particles
 
-**Purpose**: Deterministic CPU particle simulation with force fields (§27, §36) — SoA `Float32Array` pools, seeded emission with a fixed RNG-draws-per-spawn contract, and a one-batched-render-item contract toward `@four/render`.
+**Purpose**: Deterministic CPU particle simulation with force fields (§27, §36) — SoA `Float32Array` pools, seeded emission with a fixed RNG-draws-per-spawn contract, and a one-batched-render-item contract toward `@fourjs/render`.
 
 **Spec**: §27, §36, §112 (100k target). **Direct deps**: `core`, `math`, `scene`. **Status**: implemented.
 
@@ -294,7 +294,7 @@ Key exports (selected from ~45): `ParticleSystem` (structurally satisfies motion
 
 ## Rendering Layer
 
-### @four/geometry
+### @fourjs/geometry
 
 **Purpose**: Vertex data — `BufferGeometry` (positions, optional index, optional per-face `normals` since the lighting packet; finite-validated) and the MVP primitive factories.
 
@@ -304,7 +304,7 @@ Key exports (12 total): `BufferGeometry`, `GeometryBounds`, `GeometryDrawMode`, 
 
 ---
 
-### @four/materials
+### @fourjs/materials
 
 **Purpose**: Surface appearance at the MVP tier — color-only materials carrying a `readonly kind` discriminant the render list picks pipelines from (no `instanceof` on the draw path).
 
@@ -314,7 +314,7 @@ Key exports (9 total): `UnlitMaterial` (`kind: "unlit"`), `LitMaterial` (`kind: 
 
 ---
 
-### @four/render
+### @fourjs/render
 
 **Purpose**: The backend-independent renderer half — the §61 `Renderer` interface, §64 render-list construction (flat, sorted, pooled compact items), sprites and textures, §68 light collection, and the §43 interpolated list builder. The logical scene never depends on a concrete backend.
 
@@ -326,11 +326,11 @@ Key exports (selected from ~40):
 - **Render list (§64/§66)** — `buildRenderList`, `buildInterpolatedRenderList` (§43 poses), `RenderItem` = `UnlitRenderItem | LitRenderItem | SpriteRenderItem | ParticleRenderItem` discriminated by `RenderItemKind`, sorted by render layer → explicit `renderOrder` → scene-graph order (deterministic, §33).
 - **Drawables** — `Renderable` (§49), `Sprite` + `Texture`/`TextureSource` (§55 — sprites map whole textures; §55 frame regions unimplemented, recorded advisory).
 - **Lights (§68)** — `collectSceneLights`, `SceneLights`, `DirectionalLightSource`, `AmbientLightSource`, `isDirectionalLightSource` (duck-typed brand check — deliberate, so render-webgl's doubles-only tests can fake lights). First light in scene-graph DFS order wins; light collection runs only for frames whose list contains a lit item; lights are not §43-interpolated (dated trade).
-- **Particle contract** — `ParticleDrawable`, `isParticleDrawable`, `particleQuadGeometry`, `PARTICLE_INSTANCE_FLOATS` and offsets: the duck-typed seam `@four/particles` satisfies (the matrix forbids the edge in either direction).
+- **Particle contract** — `ParticleDrawable`, `isParticleDrawable`, `particleQuadGeometry`, `PARTICLE_INSTANCE_FLOATS` and offsets: the duck-typed seam `@fourjs/particles` satisfies (the matrix forbids the edge in either direction).
 
 ---
 
-### @four/render-webgl
+### @fourjs/render-webgl
 
 **Purpose**: The WebGL 2 backend — the §120 MVP renderer. Four programs (`UnlitProgram`, `LitProgram`, `SpriteProgram`, `ParticleProgram`), VAO-cached geometry, texture cache, instanced particle batching (6 GL calls/frame at any count), all over a 34-method structural GL seam so units run against fake GL.
 
@@ -340,19 +340,19 @@ Key exports (selected from ~30): `WebglRenderer`, `WebglContext`/`WebglCanvas` (
 
 ---
 
-### @four/render-webgpu
+### @fourjs/render-webgpu
 
 **Purpose**: The WebGPU backend — §62 backend 1. `WebgpuRenderer` behind `registerWebgpuRenderer()`: unlit/sprite/lit/standard families, opt-in §65 batching, textures + samplers, §67 clips + §57 stencil parity, render targets / §70 effects / `readPixels`, the §69 directional shadow tier, §36 instanced particles, §82 compute, and §60 node materials + §70 graph effects behind `registerWebgpuNodeMaterialPipeline()`. Absent, not stubbed: RFC 0003's skinned pipelines and §71 picking. **Direct deps**: `core`, `math`, `scene`, `render`. **Status**: implemented (R-1, WP-R1.1–R1.9, 2026-08-21…29). This entry said "reserved stub" until 2026-08-30.
 
 ---
 
-### @four/render-canvas — reserved stub
+### @fourjs/render-canvas — reserved stub
 
 **Purpose**: Reserved for the Canvas 2D backend (2D scenes and fallback rendering) per §62. **Direct deps** (declared): `core`, `math`, `render`. **Status**: **stub — barrel exports only `PACKAGE_NAME`**.
 
 ---
 
-### @four/render-svg — reserved stub
+### @fourjs/render-svg — reserved stub
 
 **Purpose**: Reserved for the SVG backend (vector output) per §62. **Direct deps** (declared): `core`, `math`, `render`. **Status**: **stub — barrel exports only `PACKAGE_NAME`**.
 
@@ -389,17 +389,17 @@ export class Application extends EventEmitter<ApplicationEventMap> {
 
 ---
 
-### @four/input
+### @fourjs/input
 
 **Purpose**: §71 picking and the §72 pointer subset — platform events in, `ScenePointerEvent`s propagated capture → target → bubble out. Never writes a transform (§42: input reports, the application decides).
 
 **Spec**: §71, §72 (MVP subset — no wheel/gamepad/XR yet; keyboard landed 2026-08-07, `pointercancel` 2026-08-06). **Direct deps**: `core`, `math`, `scene`. **Status**: implemented.
 
-Key exports: `PointerInput` (NDC normalization with the +Y-up flip, picking, capture, click/enter/leave synthesis, `pointercancel` teardown), `KeyboardInput` (duck-typed `KeySurface`, injected `focusTarget(): Node | null` resolver — focus stays `@four/ui`'s; §3.1 unchanged), `SceneKeyEvent`/`dispatchKeyEvent` (with `preventDefault()` forwarded via `KeyDefaultSuppressor`), the shared three-phase machinery in `propagation.ts` (`SceneInputEvent`, `dispatchThreePhase`), `pick` + `createPickRay` + `Pickable`/`PickHit` (ray/AABB/oriented-box, nearest hit wins), `ScenePointerEvent`, `dispatchPointerEvent`, `buildPropagationPath`, `CAPTURE_KEY_PREFIX` (`"capture:"`-prefixed keys select the capture phase on the propagating types), `DragManager` (world-delta handoff to app callbacks), `PointerSurface`/`SurfacePointerEvent` (structural DOM seams). Widens scene's `NodeEventMap` by declaration merging — importing `@four/input` adds pointer and key events to every node.
+Key exports: `PointerInput` (NDC normalization with the +Y-up flip, picking, capture, click/enter/leave synthesis, `pointercancel` teardown), `KeyboardInput` (duck-typed `KeySurface`, injected `focusTarget(): Node | null` resolver — focus stays `@fourjs/ui`'s; §3.1 unchanged), `SceneKeyEvent`/`dispatchKeyEvent` (with `preventDefault()` forwarded via `KeyDefaultSuppressor`), the shared three-phase machinery in `propagation.ts` (`SceneInputEvent`, `dispatchThreePhase`), `pick` + `createPickRay` + `Pickable`/`PickHit` (ray/AABB/oriented-box, nearest hit wins), `ScenePointerEvent`, `dispatchPointerEvent`, `buildPropagationPath`, `CAPTURE_KEY_PREFIX` (`"capture:"`-prefixed keys select the capture phase on the propagating types), `DragManager` (world-delta handoff to app callbacks), `PointerSurface`/`SurfacePointerEvent` (structural DOM seams). Widens scene's `NodeEventMap` by declaration merging — importing `@fourjs/input` adds pointer and key events to every node.
 
 ---
 
-### @four/assets
+### @fourjs/assets
 
 **Purpose**: The MVP asset tier — an `AssetManager` with a coalescing, refcounted cache and pluggable typed loaders.
 
@@ -409,9 +409,9 @@ Key exports (13 total): `AssetManager`, `AssetLoader`, `textLoader`, `jsonLoader
 
 ---
 
-### @four/text
+### @fourjs/text
 
-**Purpose**: §56's MVP bitmap text tier — a built-in 6×12 font (95 glyphs), glyph atlases in exactly the shape `@four/render`'s `TextureSource` accepts, and layout. **Produces data, never nodes** (deps are `core`, `math`, `geometry` only).
+**Purpose**: §56's MVP bitmap text tier — a built-in 6×12 font (95 glyphs), glyph atlases in exactly the shape `@fourjs/render`'s `TextureSource` accepts, and layout. **Produces data, never nodes** (deps are `core`, `math`, `geometry` only).
 
 **Spec**: §56 MVP tier (full shaping staged behind a shaping-engine RFC). **Direct deps**: `core`, `math`, `geometry`. **Status**: implemented.
 
@@ -419,17 +419,17 @@ Key exports (17 total): `BitmapFont`, `createBitmapFont`, `BUILTIN_FONT`, `glyph
 
 ---
 
-### @four/ui
+### @fourjs/ui
 
 **Purpose**: Retained-mode UI at §113a's MVP tier — widgets are scene nodes with a box model, flex/stack/absolute layout, and §72-driven hover/press/focus state machines. **Widgets do not draw themselves**: the dependency matrix gives `ui` no `render`/`materials`/`geometry`, so visuals arrive through the app-supplied `WidgetSkin` seam.
 
 **Spec**: §73–75 MVP tier. **Direct deps**: `core`, `math`, `scene`, `input`, `text`. **Status**: implemented (keyboard traversal + activation landed 2026-08-07; a11y DOM mirror staged — `UI_STAGED`).
 
-Key exports (28 total): `UIWidget` (abstract `Node`), `Panel` + `PanelLayout` (`LayoutType` flex/stack/absolute, `LayoutDirection`, `LayoutAlign`, `LayoutJustify`, `Insets`/`applyInsets`), `Button`, `Label` (measures via `@four/text`), `WidgetSkin` (four optional hooks), `collectPickables` (§71 candidates), `focusedWidget`, `isUIWidget`, `UI_LAYOUT_AUTHORITY` (`"constraint"` — layout writes under §42 constraint authority; a widget under other authority has its position write refused with a warning), events `WidgetActivateEvent` (`uiactivate`), `WidgetStateChangeEvent`, `UIFocusEvent`, `WidgetAccessibility`. Layout is explicit: `root.layout()` runs one measure + one arrange pass.
+Key exports (28 total): `UIWidget` (abstract `Node`), `Panel` + `PanelLayout` (`LayoutType` flex/stack/absolute, `LayoutDirection`, `LayoutAlign`, `LayoutJustify`, `Insets`/`applyInsets`), `Button`, `Label` (measures via `@fourjs/text`), `WidgetSkin` (four optional hooks), `collectPickables` (§71 candidates), `focusedWidget`, `isUIWidget`, `UI_LAYOUT_AUTHORITY` (`"constraint"` — layout writes under §42 constraint authority; a widget under other authority has its position write refused with a warning), events `WidgetActivateEvent` (`uiactivate`), `WidgetStateChangeEvent`, `UIFocusEvent`, `WidgetAccessibility`. Layout is explicit: `root.layout()` runs one measure + one arrange pass.
 
 ---
 
-### @four/serialization
+### @fourjs/serialization
 
 **Purpose**: §79 scene documents — versioned, canonical, diff-friendly, byte-identical round trips — plus the §80 migration registry. Components cross the boundary through a serializer registry keyed by the component class's `typeName` (§6a's key is the §79 name).
 
@@ -439,7 +439,7 @@ Key exports (selected from ~35): `serializeScene`, `instantiateScene`, `instanti
 
 ---
 
-### @four/diagnostics
+### @fourjs/diagnostics
 
 **Purpose**: Determinism checksums, §34 record/replay, and debug-draw data. Depends only on `core`/`math`/`scene`, so it reaches physics through the duck-typed `ReplayTarget` contract that `PhysicsWorld` satisfies structurally.
 

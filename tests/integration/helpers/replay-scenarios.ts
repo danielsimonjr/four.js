@@ -3,7 +3,7 @@
  * 2D Rapier scenario with scripted inputs, plus **the `ReplayTarget` wrapper an
  * application is meant to copy**.
  *
- * `@four/diagnostics` records and replays through a duck-typed contract
+ * `@fourjs/diagnostics` records and replays through a duck-typed contract
  * ({@link ReplayTarget}: `checksum`, `createSnapshot`, `restoreSnapshot`, and an
  * optional `applyInput`) because it may depend on `core`, `math` and `scene`
  * only and therefore cannot name `PhysicsWorld` (plan P10-1, §6h). This file is
@@ -84,8 +84,8 @@ import {
   type ReplaySnapshot,
   type ReplayTarget,
   type SolverStatistics,
-} from "@four/diagnostics";
-import { Vector2, Vector3 } from "@four/math";
+} from "@fourjs/diagnostics";
+import { Vector2, Vector3 } from "@fourjs/math";
 import {
   Collider,
   PhysicsSystem,
@@ -95,17 +95,17 @@ import {
   type PhysicsSnapshot,
   type RigidBodyCollisionEvent,
   type WorldPhysicsEvent,
-} from "@four/physics";
-import { Rapier2dAdapter } from "@four/physics-rapier";
-import { Group, type Node } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/physics";
+import { Rapier2dAdapter } from "@fourjs/physics-rapier";
+import { Group, type Node } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 
 /**
  * The one narrowing the §34 snapshot round trip needs, and why it is a named
  * helper rather than an inline cast.
  *
  * `ReplaySnapshot.configuration` is `unknown` **by design**:
- * `@four/diagnostics` may not import `@four/physics`, so it cannot name
+ * `@fourjs/diagnostics` may not import `@fourjs/physics`, so it cannot name
  * `PhysicsSnapshotConfiguration` (`packages/diagnostics/src/recorder.ts`
  * says so at the field). `PhysicsSnapshot.configuration` *is* that type. The
  * two declarations are therefore assignable in the **produce** direction
@@ -187,7 +187,7 @@ export const BALL_FRICTION = 0.5;
  *
  * A `type` alias rather than an `interface` on purpose: TypeScript gives type
  * aliases an implicit index signature, so this is assignable to
- * `@four/diagnostics`'s `JsonValue` (an interface is not), which is what lets a
+ * `@fourjs/diagnostics`'s `JsonValue` (an interface is not), which is what lets a
  * scenario hand its own payload type straight to `ReplayRecorder.recordInput`.
  */
 export type ReplayInputPayload = {
@@ -779,8 +779,8 @@ export interface InspectedStep {
  *
  * The `WorldPhysicsEvent[]` handed to `collectContactPoints` is the one
  * cross-package check this suite can make about the two event declarations:
- * `@four/diagnostics` transcribes §29's `ContactPoint` as its own
- * `DebugContactPoint` because it may not import `@four/physics`, and nothing
+ * `@fourjs/diagnostics` transcribes §29's `ContactPoint` as its own
+ * `DebugContactPoint` because it may not import `@fourjs/physics`, and nothing
  * type-checks the transcription — except this call.
  */
 export function inspectStep(

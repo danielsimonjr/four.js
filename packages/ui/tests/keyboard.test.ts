@@ -1,6 +1,6 @@
 /**
  * §75's keyboard navigation (A-13): the Tab traversal order, the resolver that
- * feeds `@four/input`'s key source, and the focus walk itself.
+ * feeds `@fourjs/input`'s key source, and the focus walk itself.
  *
  * Key events are synthesized exactly as the pointer suites synthesize theirs —
  * a real {@link SceneKeyEvent} pushed through `dispatchKeyEvent` along a real
@@ -13,8 +13,8 @@ import {
   buildPropagationPath,
   dispatchKeyEvent,
   type KeyModifiers,
-} from "@four/input";
-import { Group, type Node } from "@four/scene";
+} from "@fourjs/input";
+import { Group, type Node } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { Button } from "../src/button.js";

@@ -7,8 +7,8 @@
  * underneath do not move. This file is the gate on that assumption, in the four
  * forms the phase suites established:
  *
- * 1. **Headless and dependency-free.** The scenario imports `@four/geometry`,
- *    `@four/core` and `@four/diagnostics` — no renderer, no application, no
+ * 1. **Headless and dependency-free.** The scenario imports `@fourjs/geometry`,
+ *    `@fourjs/core` and `@fourjs/diagnostics` — no renderer, no application, no
  *    canvas, no DOM. The tessellator is a pure function; there is no clock to
  *    inject and no state to reset.
  * 2. **Deterministic in-process.** Two independent runs produce identical
@@ -45,7 +45,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { triangulatePolygon, type Point2D } from "@four/geometry";
+import { triangulatePolygon, type Point2D } from "@fourjs/geometry";
 import { beforeAll, describe, expect, test } from "vitest";
 
 import {

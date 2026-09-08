@@ -6,7 +6,7 @@ import {
   resetDevWarnings,
   resetLeakRegistry,
   trackedDisposableId,
-} from "@four/core";
+} from "@fourjs/core";
 
 import { BufferGeometry } from "../src/buffer-geometry.js";
 import {

@@ -10,7 +10,7 @@
  * ## Which half of the row this is, and which half stays blocked
  *
  * §86 asks for 20 000 animated glyphs. Getting 20 000 glyphs onto a screen is
- * two costs, and only one of them is CPU work `@four/text` does:
+ * two costs, and only one of them is CPU work `@fourjs/text` does:
  *
  * 1. **Producing the quads** — `layoutText(string, atlas, options)` turning a
  *    string into one positioned, uv-mapped rectangle per drawn glyph. Pure
@@ -65,7 +65,7 @@
  * numeric fields, created and frozen in this file, touching no engine code at
  * all. It is labelled a control because that is what it is: a measurement of
  * the platform primitive, published so the per-glyph figure above it can be
- * read, and not a measurement of `@four/text`.
+ * read, and not a measurement of `@fourjs/text`.
  *
  * ## Determinism and wall clocks
  *
@@ -78,10 +78,10 @@
  * Recorded, never gated — see `benchmarks/README.md`.
  */
 
-import { UnlitMaterial } from "@four/materials";
-import { Texture } from "@four/render";
-import { buildGlyphAtlas, layoutText } from "@four/text";
-import { Text } from "four";
+import { UnlitMaterial } from "@fourjs/materials";
+import { Texture } from "@fourjs/render";
+import { buildGlyphAtlas, layoutText } from "@fourjs/text";
+import { Text } from "fourJS";
 
 import {
   MEASUREMENT_NOTE,

@@ -95,7 +95,7 @@
  * transform and velocities, quantized to 1e-6, in ascending body id. This file
  * does not re-hash body state; it takes that uint32 from each world after every
  * fixed step and combines the pair with the same D6 hasher
- * (`@four/diagnostics`'s `createChecksum`) that phases 1, 2, 4 and 5 use, in the
+ * (`@fourjs/diagnostics`'s `createChecksum`) that phases 1, 2, 4 and 5 use, in the
  * fixed order **2D then 3D**. The two raw sequences are published alongside it
  * ({@link Phase6ScenarioResult.checksums2d},
  * {@link Phase6ScenarioResult.checksums3d}) so a divergence can be localised to
@@ -148,8 +148,8 @@
  * requires evidence this suite does not gather.
  */
 
-import { createChecksum } from "@four/diagnostics";
-import { Vector2, Vector3 } from "@four/math";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Vector2, Vector3 } from "@fourjs/math";
 import {
   Collider,
   HingeJoint,
@@ -161,10 +161,10 @@ import {
   SphericalJoint,
   SpringJoint,
   type CollisionShape,
-} from "@four/physics";
-import { Rapier2dAdapter, Rapier3dAdapter } from "@four/physics-rapier";
-import { Group, type Node } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/physics";
+import { Rapier2dAdapter, Rapier3dAdapter } from "@fourjs/physics-rapier";
+import { Group, type Node } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 export const FIXED_TIME_STEP = 1 / 60;
@@ -1047,7 +1047,7 @@ function positionOf(part: Part): Triple {
  * Every call in any process is independent: it builds its own `Application`,
  * its own two worlds on their own fresh Rapier adapters, and disposes all of
  * them before returning. Nothing is cached at module scope (the *wasm image*
- * is, inside `@four/physics-rapier`, which is a decoded module and not solver
+ * is, inside `@fourjs/physics-rapier`, which is a decoded module and not solver
  * state), so calling it twice in one process is a genuine second run rather
  * than a replay.
  *

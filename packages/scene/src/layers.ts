@@ -76,13 +76,13 @@
  * {@link layerMaskNames}; a reader calls {@link resetLayers} and then
  * {@link defineLayer} once per saved name, in saved order, which reproduces the
  * document's assignment exactly. No extra API is needed for the round trip, and
- * none is invented here — `@four/serialization` owns the document shape (§79).
+ * none is invented here — `@fourjs/serialization` owns the document shape (§79).
  *
  * ## What this module deliberately does not do
  *
  * §46's list of what layers control is longer than what reads a mask today. The
  * shipped consumers are camera visibility and viewport selection (§47/§48, via
- * `@four/render`'s list builders and the backend's per-view filter). Physics
+ * `@fourjs/render`'s list builders and the backend's per-view filter). Physics
  * interaction groups (§25), post-processing inclusion (§70), and the §71 picking
  * filter are their own packets — each needs a mask *field* on a type this
  * package cannot see, and each is unblocked by this module rather than part of
@@ -102,7 +102,7 @@
  * safe.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 /**
  * A set of layers, as a bit per layer (§46, §47's `LayerMask`).
@@ -336,10 +336,10 @@ export function isLayerMask(value: number): boolean {
  * §85 lets production disable *expensive* validation "while preserving
  * essential safety checks", and this is three comparisons at an entry point,
  * not a scan: a build that skipped it would trade a named error for an empty
- * screen. And `@four/scene` is a simulation package under §33, which
+ * screen. And `@fourjs/scene` is a simulation package under §33, which
  * `tests/integration/dev-build-mode.test.ts` holds to a blunt rule — nothing
  * here may branch on the build mode at all, so that a replay cannot depend on
- * which build ran it (see `@four/core`'s `dev.ts` for the "unconditional throw
+ * which build ran it (see `@fourjs/core`'s `dev.ts` for the "unconditional throw
  * vs. `devAssert`" rule this follows).
  *
  * Call it **once per operation** — at the entry point that accepts an author's

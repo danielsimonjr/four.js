@@ -1,7 +1,7 @@
 /**
  * `WgpuParticleSimulation` — the device side of §36's `simulation: "gpu"`
  * (gap row R-31's residue, wired 2026-08-29): the implementor of
- * `@four/particles`' structural `ParticleGpuSimulation` contract, over
+ * `@fourjs/particles`' structural `ParticleGpuSimulation` contract, over
  * WP-R1.8's §82 compute tier.
  *
  * ## What lives here, and what does not
@@ -13,7 +13,7 @@
  * dispatch of the WP-R1.8 kernel), `writeSpawn` (CPU spawn state entering
  * residency), and `moveSlot` (the device mirror of the pool's swap-remove).
  * Everything §33-bearing — RNG, bursts, ageing, expiry, ramps — stays in
- * `@four/particles`; `types.ts` there owns the division-of-labour argument
+ * `@fourjs/particles`; `types.ts` there owns the division-of-labour argument
  * and the §33/§34 posture (display-tier motion; no golden checksums a GPU
  * pool; no snapshot surface).
  *
@@ -29,7 +29,7 @@
  * cannot express). The renderer finds this simulation at draw time by the
  * emitting node's id ({@link WgpuParticleSimulation.systemId}) — the same
  * key `WgpuParticleCache` already uses — so no render-item field and no
- * `@four/render` change was needed. Both buffers are wrapped as
+ * `@fourjs/render` change was needed. Both buffers are wrapped as
  * {@link WgpuComputeBuffer} so the §82 readback path (`readComputeBuffer`)
  * serves them verbatim — which is how the browser spec reads an integrated
  * step back exactly, and how a diagnostic can inspect a live system.
@@ -57,7 +57,7 @@
  * `computeShaders` capability is how an application asks first.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import {
   GPU_BUFFER_USAGE,
@@ -120,7 +120,7 @@ function unsupported(message: string): never {
  * destroyed device makes `destroy()` a defined no-op).
  */
 export class WgpuParticleSimulation {
-  /** `@four/particles`' structural brand — a literal `true`. */
+  /** `@fourjs/particles`' structural brand — a literal `true`. */
   readonly isParticleGpuSimulation = true;
 
   /** The emitting node's id this simulation is registered under. */

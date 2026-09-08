@@ -5,7 +5,7 @@ import {
   Vector4,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
+} from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -129,7 +129,7 @@ describe("vector adapters", () => {
     expect(a.equalsApprox(new Vector3(11, 2, -1))).toBe(true);
   });
 
-  it("extrapolates without clamping, like @four/math", () => {
+  it("extrapolates without clamping, like @fourjs/math", () => {
     const a = new Vector3(0, 0, 0);
     const b = new Vector3(1, 1, 1);
     const out = new Vector3();
@@ -380,7 +380,7 @@ describe("detectAdapter", () => {
 
 describe("allocation discipline (§7b)", () => {
   it("allocates no math objects in steady-state lerp/copy loops", () => {
-    // `constructionCount` counts @four/math constructions only, so this proves
+    // `constructionCount` counts @fourjs/math constructions only, so this proves
     // the vector/quaternion paths; the number, boolean, discrete and color
     // adapters are covered structurally (no `new`, no array literal outside
     // `clone`) and the color case is asserted below.

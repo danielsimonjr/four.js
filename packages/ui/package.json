@@ -1,5 +1,5 @@
 {
-  "name": "@four/ui",
+  "name": "@fourjs/ui",
   "version": "0.0.1",
   "type": "module",
   "license": "MIT",
@@ -13,10 +13,10 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@four/core": "workspace:*",
-    "@four/math": "workspace:*",
-    "@four/scene": "workspace:*",
-    "@four/input": "workspace:*",
-    "@four/text": "workspace:*"
+    "@fourjs/core": "workspace:*",
+    "@fourjs/math": "workspace:*",
+    "@fourjs/scene": "workspace:*",
+    "@fourjs/input": "workspace:*",
+    "@fourjs/text": "workspace:*"
   }
 }

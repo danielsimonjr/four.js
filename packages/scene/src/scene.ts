@@ -34,7 +34,7 @@
  * see the TODO below.
  */
 
-import type { Component, ComponentType } from "@four/core";
+import type { Component, ComponentType } from "@fourjs/core";
 
 import type { ColorRGB } from "./light.js";
 import { Node, type NodeType } from "./node.js";

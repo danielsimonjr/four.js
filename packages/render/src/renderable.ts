@@ -43,11 +43,11 @@
  * preference:
  *
  * - **`ParticleSystem`** (§36) is not in this package at all. It lives in
- *   `@four/particles`, which the matrix forbids from
- *   importing `@four/render`, so it is recognised by `buildRenderList` through
+ *   `@fourjs/particles`, which the matrix forbids from
+ *   importing `@fourjs/render`, so it is recognised by `buildRenderList` through
  *   a **structural contract** instead of by inheritance — see `particles.ts`.
  * - **`Text`** (§56) lives in the umbrella package `four` (R-28, 2026-08-13),
- *   because it needs `@four/text`'s layout and this package may not import it.
+ *   because it needs `@fourjs/text`'s layout and this package may not import it.
  *   It really does `extend Renderable`, though — `four` sits *above* this
  *   package rather than beside it — so it needs no structural contract and no
  *   special case anywhere: it is an unlit, textured drawable whose geometry is
@@ -78,9 +78,9 @@
  * whoever created the geometry or material disposes it.
  */
 
-import type { BufferGeometry } from "@four/geometry";
-import type { LitMaterial, Material, UnlitMaterial } from "@four/materials";
-import { Node } from "@four/scene";
+import type { BufferGeometry } from "@fourjs/geometry";
+import type { LitMaterial, Material, UnlitMaterial } from "@fourjs/materials";
+import { Node } from "@fourjs/scene";
 
 import type { ScissorRect } from "./scissor.js";
 
@@ -200,7 +200,7 @@ export class Renderable<M extends Material = SurfaceMaterial> extends Node {
    * standard). A §55 `Sprite` never casts whatever this says: a depth-only pass
    * writes geometry, not alpha, so a textured quad would cast its *rectangle* —
    * §69's transparent shadow masks are what fix that, and they are staged (see
-   * `@four/scene`'s `DirectionalLightShadow`).
+   * `@fourjs/scene`'s `DirectionalLightShadow`).
    */
   castShadow = true;
 

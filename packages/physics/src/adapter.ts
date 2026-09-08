@@ -4,7 +4,7 @@
  *
  * §20's promise is that "users should not need to write solver-specific
  * application code for common tasks". This interface is how that promise is
- * kept: `@four/physics` is the stable API, and a concrete engine — Rapier,
+ * kept: `@fourjs/physics` is the stable API, and a concrete engine — Rapier,
  * Box2D, or a bespoke engineering solver — reaches it only through
  * {@link PhysicsSolverAdapter}. Nothing above this line names a solver type,
  * which is what lets the solver be swapped, compared against another, or left
@@ -17,7 +17,7 @@
  * - **`readonly` capability fields.** §37 writes `jointTypes: string[]`;
  *   {@link PhysicsCapabilities} makes the arrays and fields `readonly`. An
  *   adapter publishes its capabilities once and callers only read them — the
- *   same treatment `RendererCapabilities` (§62) got in `@four/render`, and for
+ *   same treatment `RendererCapabilities` (§62) got in `@fourjs/render`, and for
  *   the same reason: a capability set that could be edited after negotiation
  *   would make the negotiation meaningless.
  * - **Handles are opaque.** §37's `PhysicsBodyHandle` and friends are named but
@@ -64,7 +64,7 @@
  * (WP-5.3), alongside the world that drives it.
  */
 
-import type { Disposable } from "@four/core";
+import type { Disposable } from "@fourjs/core";
 
 import type {
   ColliderDescriptor,

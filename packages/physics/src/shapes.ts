@@ -60,8 +60,8 @@
  * colliders.
  */
 
-import { FourError } from "@four/core";
-import type { Vector2, Vector3 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import type { Vector2, Vector3 } from "@fourjs/math";
 
 import type { PhysicsDimension } from "./types.js";
 

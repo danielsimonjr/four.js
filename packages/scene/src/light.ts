@@ -44,7 +44,7 @@
  *   staged with their owning designs.
  *
  * A light is a {@link Node} — the placement decision cameras made (§47,
- * spec rev 1.3 put cameras in `@four/scene`): it sits in the scene graph,
+ * spec rev 1.3 put cameras in `@fourjs/scene`): it sits in the scene graph,
  * is parented, animated, and driven like anything else, and a light on a
  * turntable is a light added under the turntable's node.
  *
@@ -74,12 +74,12 @@
  *
  * ## The renderer contract
  *
- * `@four/render` discovers lights **structurally** (its `lights.ts` declares
+ * `@fourjs/render` discovers lights **structurally** (its `lights.ts` declares
  * the `DirectionalLightSource` and `PunctualLightSource` shapes) — the same
  * duck-typed pattern as its `ParticleDrawable`, though for the opposite
  * reason: the dependency edge render → scene exists, but the *WebGL backend's*
  * unit tests build scenes from typed doubles and an `instanceof` check would
- * be unfakeable there. `@four/render`'s own tests pin these classes against
+ * be unfakeable there. `@fourjs/render`'s own tests pin these classes against
  * the contracts, so drift is caught at type level where the particle contract
  * can only catch it by test.
  */
@@ -90,21 +90,21 @@ import {
   srgbToLinearRGB,
   type ColorRGB,
   type Vector3,
-} from "@four/math";
+} from "@fourjs/math";
 
 import { Node } from "./node.js";
 import { resolveWorldTransform } from "./world-transforms.js";
 
 /**
- * Straight RGB, each component nominally in 0…1 — `@four/math`'s
+ * Straight RGB, each component nominally in 0…1 — `@fourjs/math`'s
  * {@link ColorRGB}, re-exported (hoisted 2026-08-08 by R-15's colour packet,
  * exactly as `ColorRGBA` was hoisted 2026-08-04).
  *
  * The declaration moved; the type did not. A light colour is a **linear-light**
- * value: §60a makes the GPU pipeline linear-light, and `@four/render` uploads
+ * value: §60a makes the GPU pipeline linear-light, and `@fourjs/render` uploads
  * these numbers to the shader as they stand. A constructor option may also be
  * a CSS string (§60a: strings denote *sRGB*); it is parsed and decoded with
- * `@four/math`'s `srgbToLinearRGB(parseColorRGB(css), out)` and stored as the
+ * `@fourjs/math`'s `srgbToLinearRGB(parseColorRGB(css), out)` and stored as the
  * same linear tuple, so existing uniform uploads do not change.
  */
 
@@ -113,7 +113,7 @@ import { resolveWorldTransform } from "./world-transforms.js";
  * or a CSS string that is decoded to linear-light on construction (§60a).
  */
 export type LightColorInput = ColorRGB | string;
-export type { ColorRGB } from "@four/math";
+export type { ColorRGB } from "@fourjs/math";
 
 /**
  * How a {@link DirectionalLight} casts (§69) — the shadow-map resolution, the
@@ -301,7 +301,7 @@ export class DirectionalLightShadow {
    *
    * A caster beyond `far`, or nearer than `near`, is simply not in the map;
    * a *receiver* outside the volume is fully lit rather than fully shadowed
-   * (see `@four/render-webgl`'s shadow chunk), which is the choice that makes
+   * (see `@fourjs/render-webgl`'s shadow chunk), which is the choice that makes
    * an under-sized volume read as "shadows stop here" rather than as "the
    * world went black".
    */
@@ -474,7 +474,7 @@ function requireFinite(name: string, value: number): number {
  * ```
  *
  * A frame shades with **at most one** directional light — the first one in
- * scene-graph order (see `@four/render`'s `collectSceneLights`); further
+ * scene-graph order (see `@fourjs/render`'s `collectSceneLights`); further
  * directional lights are still ignored, for the reason the module header
  * gives. {@link PointLight} and {@link SpotLight} are how a scene gets more
  * than one lamp (R-17, 2026-08-09). Visibility
@@ -489,7 +489,7 @@ function requireFinite(name: string, value: number): number {
  */
 export class DirectionalLight extends Node {
   /**
-   * The brand `@four/render`'s light collection recognises — a literal `true`,
+   * The brand `@fourjs/render`'s light collection recognises — a literal `true`,
    * one property load per node, exactly as `ParticleDrawable.isParticleDrawable`.
    */
   readonly isDirectionalLight = true as const;
@@ -529,7 +529,7 @@ export class DirectionalLight extends Node {
    * one packet on).
    *
    * At most **one** light casts in a frame, and it is the same one that lights
-   * it: `@four/render`'s `collectSceneLights` takes the first visible, enabled
+   * it: `@fourjs/render`'s `collectSceneLights` takes the first visible, enabled
    * directional light in scene-graph order (§33 — authored order decides, not
    * proximity or brightness) and reads this flag off *that* light. A second
    * directional light with `castShadow` set is ignored exactly as its
@@ -677,7 +677,7 @@ export interface PunctualLightOptions {
  */
 export abstract class PunctualLight extends Node {
   /**
-   * The brand `@four/render`'s light collection recognises — a literal `true`,
+   * The brand `@fourjs/render`'s light collection recognises — a literal `true`,
    * one property load per node, exactly as `DirectionalLight.isDirectionalLight`.
    */
   readonly isPunctualLight = true as const;
@@ -747,9 +747,9 @@ export abstract class PunctualLight extends Node {
  * There is no version counter, for the reason {@link DirectionalLight} records
  * — light uniforms are a handful of floats uploaded per frame.
  *
- * A frame draws at most {@link @four/render!MAX_PUNCTUAL_LIGHTS} point and
+ * A frame draws at most {@link @fourjs/render!MAX_PUNCTUAL_LIGHTS} point and
  * spot lights together; the rest are skipped, in a documented order, with one
- * warning. See `@four/render`'s `collectSceneLights`.
+ * warning. See `@fourjs/render`'s `collectSceneLights`.
  */
 export class PointLight extends PunctualLight {
   readonly lightType = "point" as const;
@@ -799,7 +799,7 @@ export interface SpotLightOptions extends PunctualLightOptions {
  *
  * Nothing here clamps or reorders the two angles (WP-3.3's no-silent-rewrites
  * rule). `inner ≥ outer` is therefore expressible and means a **hard-edged**
- * cone: `@four/render` divides by `max(cos inner − cos outer, 1e-6)`, which
+ * cone: `@fourjs/render` divides by `max(cos inner − cos outer, 1e-6)`, which
  * turns the ramp into a step rather than into a division by zero. An angle
  * past `π/2` is likewise expressible and lights a hemisphere or more — a
  * floodlight, not an error.

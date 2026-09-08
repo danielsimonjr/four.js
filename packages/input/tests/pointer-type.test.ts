@@ -8,8 +8,8 @@
  * expectation follows from the camera's projection.
  */
 
-import { Vector3 } from "@four/math";
-import { Group, OrthographicCamera, type Node } from "@four/scene";
+import { Vector3 } from "@fourjs/math";
+import { Group, OrthographicCamera, type Node } from "@fourjs/scene";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Pickable } from "../src/pick.js";

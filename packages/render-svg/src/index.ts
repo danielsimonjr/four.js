@@ -1,1 +1,1 @@
-export const PACKAGE_NAME = "@four/render-svg";
+export const PACKAGE_NAME = "@fourjs/render-svg";

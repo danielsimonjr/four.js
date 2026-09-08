@@ -1,6 +1,6 @@
-import { isFourError } from "@four/core";
-import { Vector2, Vector3 } from "@four/math";
-import { Group } from "@four/scene";
+import { isFourError } from "@fourjs/core";
+import { Vector2, Vector3 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import {
   PRIORITY_KINEMATICS,
   PRIORITY_PHYSICS_SOLVE,
@@ -8,7 +8,7 @@ import {
   createTimeState,
   type FixedUpdateContext,
   type SimulationSystem,
-} from "@four/motion";
+} from "@fourjs/motion";
 import { describe, expect, it } from "vitest";
 
 import type { CollisionEvent, PhysicsBodyHandle } from "../src/index.js";

@@ -6,7 +6,7 @@
  * `DEPTH24_STENCIL8`, R-18's samplable depth, and the staged float colour
  * formats §62 widens {@link RenderTargetFormat} toward.
  *
- * `@four/render-webgl`'s `gl-render-target.ts` is the reference for the depth
+ * `@fourjs/render-webgl`'s `gl-render-target.ts` is the reference for the depth
  * table: `DEPTH_COMPONENT16` (plain renderbuffer), `DEPTH_COMPONENT24`
  * (`depthTexture: true`), `DEPTH24_STENCIL8` (`stencil: true`). WebGPU's
  * `depth24plus` / `depth32float` / `depth24plus-stencil8` occupy the same

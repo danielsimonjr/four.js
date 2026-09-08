@@ -1,7 +1,7 @@
-export const PACKAGE_NAME = "@four/motion";
+export const PACKAGE_NAME = "@fourjs/motion";
 
 // §81's motion-side capability token (RFC 0002), declared by the package that
-// owns the §39 registry; `@four/four`'s `plugins.ts` re-exports the same
+// owns the §39 registry; `@fourjs/four`'s `plugins.ts` re-exports the same
 // object, so both import paths hand out one identity.
 export { SIMULATION_SYSTEMS } from "./capabilities.js";
 

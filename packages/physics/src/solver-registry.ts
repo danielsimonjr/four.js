@@ -1,6 +1,6 @@
 /**
  * The §37 solver registry — how `solver: "auto"` becomes an adapter without
- * `@four/physics`, or the `four` umbrella, ever importing a solver (PH-19).
+ * `@fourjs/physics`, or the `four` umbrella, ever importing a solver (PH-19).
  *
  * §37 says *"capability declarations drive `solver: "auto"` selection (§20)"*,
  * and §45's application options show the shape a user writes:
@@ -9,7 +9,7 @@
  * the `solver: "auto"` string form of §37's capability-driven selection is
  * deferred to the same registry work as `renderer: "auto"` (§97a)."*
  *
- * This is that work, and it is the exact mirror of `@four/render`'s
+ * This is that work, and it is the exact mirror of `@fourjs/render`'s
  * `renderer-registry.ts` — deliberately, because the two affordances were
  * filed as one design (gap analysis `A-8` / `R-2` / `PH-19`). Read that module
  * first: everything it says about why the dependency is inverted, why
@@ -19,7 +19,7 @@
  * depends on `physics`, and nothing here names a solver.
  *
  * ```ts
- * import { registerRapierSolver } from "@four/physics-rapier";
+ * import { registerRapierSolver } from "@fourjs/physics-rapier";
  *
  * registerRapierSolver();
  * const world = new PhysicsWorld({ dimension: "3d", solver: "auto" });
@@ -54,7 +54,7 @@
  * to solvers: naming a solver means it must work.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import type { PhysicsSolverAdapter } from "./adapter.js";
 import type { PhysicsWorldOptions } from "./descriptors.js";
@@ -135,8 +135,8 @@ export interface SolverResolveOptions extends PhysicsWorldOptions {
   /**
    * Called once per solver `"auto"` skips, in registration order — the
    * solver-side twin of §62's fallback diagnostics event, and a callback for
-   * the same reason: the frozen §3.1 matrix gives `@four/physics` no
-   * `@four/diagnostics` edge.
+   * the same reason: the frozen §3.1 matrix gives `@fourjs/physics` no
+   * `@fourjs/diagnostics` edge.
    *
    * Never called for an explicitly named solver, which is handed back
    * unfiltered so the world reports the mismatch itself.
@@ -330,7 +330,7 @@ export class SolverRegistry {
       SELECTION_ERROR_CODE,
       `solver: "auto" found no solver that can simulate a ${JSON.stringify(options.dimension)} world at determinism ${JSON.stringify(options.determinism ?? DEFAULT_DETERMINISM_LEVEL)} (§20, §37). Registered: ${describeSolvers(this.solvers)}.${
         reports.length === 0
-          ? " Call a solver's register function — for example `registerRapierSolver()` from @four/physics-rapier — before selecting by name."
+          ? " Call a solver's register function — for example `registerRapierSolver()` from @fourjs/physics-rapier — before selecting by name."
           : ` Rejected: ${reports
               .map(
                 (report) => `${JSON.stringify(report.name)} (${report.reason})`,
@@ -361,7 +361,7 @@ export class SolverRegistry {
     if (registration === undefined) {
       throw new FourError(
         SELECTION_ERROR_CODE,
-        `No ${JSON.stringify(name)} solver is registered (§37). Registered: ${describeSolvers(this.solvers)}. A solver opts in only when the application calls its register function — for example \`registerRapierSolver()\` from @four/physics-rapier.`,
+        `No ${JSON.stringify(name)} solver is registered (§37). Registered: ${describeSolvers(this.solvers)}. A solver opts in only when the application calls its register function — for example \`registerRapierSolver()\` from @fourjs/physics-rapier.`,
         { context: { selection: name, registered: this.solvers } },
       );
     }
@@ -392,7 +392,7 @@ export class SolverRegistry {
  *
  * A `let` rather than an eagerly constructed instance, so a program that never
  * selects a solver by name never references {@link SolverRegistry} and the
- * class leaves the bundle — see `@four/render`'s `renderer-registry.ts` for
+ * class leaves the bundle — see `@fourjs/render`'s `renderer-registry.ts` for
  * the full argument and the measurement.
  */
 let sharedRegistry: SolverRegistry | undefined;
@@ -450,7 +450,7 @@ export function resolveSolver(
   if (target === undefined) {
     throw new FourError(
       SELECTION_ERROR_CODE,
-      `Cannot resolve solver ${JSON.stringify(selection)}: no physics solver is registered (§37). A solver opts in only when the application calls its register function — for example \`registerRapierSolver()\` from @four/physics-rapier — because \`@four/physics\` never imports a solver itself (§20, §91). Passing a constructed adapter instead is always supported.`,
+      `Cannot resolve solver ${JSON.stringify(selection)}: no physics solver is registered (§37). A solver opts in only when the application calls its register function — for example \`registerRapierSolver()\` from @fourjs/physics-rapier — because \`@fourjs/physics\` never imports a solver itself (§20, §91). Passing a constructed adapter instead is always supported.`,
       { context: { selection, registered: [] } },
     );
   }

@@ -25,7 +25,7 @@
  * actually imported.
  *
  * ```ts
- * import { registerWebglRenderer } from "@four/render-webgl";
+ * import { registerWebglRenderer } from "@fourjs/render-webgl";
  *
  * registerWebglRenderer();                      // the app names its backends
  * const app = new Application({ renderer: "auto", canvas });
@@ -39,7 +39,7 @@
  * ## Explicit registration, never a side-effect import (decision, 2026-08-07)
  *
  * Registration is a **function the application calls**, not something an
- * `import "@four/render-webgl/register"` performs on evaluation. Every package
+ * `import "@fourjs/render-webgl/register"` performs on evaluation. Every package
  * in this workspace declares `"sideEffects": false`, which is precisely the
  * promise that importing a module and using nothing from it may be deleted —
  * a side-effect registration module would be *correctly* dropped by any
@@ -65,7 +65,7 @@
  * ## The diagnostics event of §62, and why it is a callback
  *
  * §62 asks for "a diagnostics event" when `"auto"` falls back. The frozen §3.1
- * matrix gives `@four/render` no `@four/diagnostics` edge — `render` is wave 3
+ * matrix gives `@fourjs/render` no `@fourjs/diagnostics` edge — `render` is wave 3
  * beside `diagnostics`, not above it — and this packet may not add one. The
  * report is therefore delivered through
  * {@link RendererResolveOptions.onFallback}, a callback the caller supplies;
@@ -75,7 +75,7 @@
  * carried in full by {@link RendererFallbackReport}.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import type {
   Renderer,
@@ -585,7 +585,7 @@ export class RendererRegistry {
       SELECTION_ERROR_CODE,
       `renderer: "auto" found no usable backend (§62). Registered: ${describeBackends(this.backends)}.${
         reports.length === 0
-          ? " Call a backend's register function — for example `registerWebglRenderer()` from @four/render-webgl — before selecting by name."
+          ? " Call a backend's register function — for example `registerWebglRenderer()` from @fourjs/render-webgl — before selecting by name."
           : ` Tried, in §62 order: ${reports
               .map(
                 (report) =>
@@ -616,7 +616,7 @@ export class RendererRegistry {
     if (registration === undefined) {
       throw new FourError(
         SELECTION_ERROR_CODE,
-        `No ${JSON.stringify(backend)} renderer is registered (§62). Registered: ${describeBackends(this.backends)}. A backend registers itself only when the application calls its register function — for example \`registerWebglRenderer()\` from @four/render-webgl.`,
+        `No ${JSON.stringify(backend)} renderer is registered (§62). Registered: ${describeBackends(this.backends)}. A backend registers itself only when the application calls its register function — for example \`registerWebglRenderer()\` from @fourjs/render-webgl.`,
         { context: { selection: backend, registered: this.backends } },
       );
     }
@@ -781,7 +781,7 @@ export async function resolveRenderer(
     // carries, so it says the one thing that is actionable and stops (§85).
     throw new FourError(
       SELECTION_ERROR_CODE,
-      `Cannot select renderer ${JSON.stringify(selection)}: no backend is registered (§62). Call e.g. registerWebglRenderer() from @four/render-webgl first, or pass a Renderer instance (§45).`,
+      `Cannot select renderer ${JSON.stringify(selection)}: no backend is registered (§62). Call e.g. registerWebglRenderer() from @fourjs/render-webgl first, or pass a Renderer instance (§45).`,
       { context: { selection, registered: [] } },
     );
   }

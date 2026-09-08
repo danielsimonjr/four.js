@@ -135,7 +135,7 @@ honest finding: this backlog is mostly deferred-by-decision packets, not stale b
   listed separately, not a second open claim.
 - **RFC 0005's `Rectangle2` prerequisite struck** from the R-1 follow-ups.
   `render/src/renderer.ts:464` states it directly: *"`readPixels` joined the interface when
-  `Rectangle2` landed in `@four/math` (2026-08-29; RFC 0005's recorded prerequisite, cleared)"*.
+  `Rectangle2` landed in `@fourjs/math` (2026-08-29; RFC 0005's recorded prerequisite, cleared)"*.
 
 **One verifier was overruled.** It reported `A-1 follow-ups` should stay open. The synthetic
 bundle test it relied on is not the same claim as the real example bundle, so I rebuilt
@@ -284,7 +284,7 @@ and nobody had said so.
 
 - **Step 2 (the §85 validation catalogue) is done**, verified rather than assumed:
   `diagnostics/src/validation.ts` is 278 lines / 18 exports, re-exported from the package
-  entry, covered by its own test, and consumed by `packages/four`. A catalogue nothing
+  entry, covered by its own test, and consumed by `packages/fourJS`. A catalogue nothing
   imported would not have counted.
 - **Step 3 (convert scene/physics checks to `devAssert`) is WON'T-DO.** `devAssert` opens
   `if (!DEV) return`, so converting those checks means the simulation packages import the
@@ -295,7 +295,7 @@ and nobody had said so.
 
 This is §33 working, not §33 in the way: a replay recorded in a development build must
 reproduce bit-exactly in a production one, so a simulation package has to behave identically
-in both. Checks that want `DEV` belong in `@four/diagnostics` — already gated, and already the
+in both. Checks that want `DEV` belong in `@fourjs/diagnostics` — already gated, and already the
 catalogue's home. Scene and physics keep unconditional `console.warn` with WeakMap
 suppression, which is what `warnAuthorityConflict` settled on when step 4 came out.
 
@@ -427,10 +427,10 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
 
 ### 2026-09-06 — A-4 FinalizationRegistry leak tracking
 
-- **Tracker in `@four/core`.** `trackDisposable` / `disposeTracked` /
+- **Tracker in `@fourjs/core`.** `trackDisposable` / `disposeTracked` /
   `auditFinalizedLeaks` / `trackedDisposableId` live next to `DEV` so
   geometry, render, and materials can register without importing
-  `@four/diagnostics`. Diagnostics re-exports the same functions.
+  `@fourjs/diagnostics`. Diagnostics re-exports the same functions.
 - **Constructors register.** `Texture`, `CanvasTexture`, `RenderTarget`,
   `BufferGeometry`, and `Material` call the tracker at construct and
   `dispose()`. Reading the getter is not required; `auditFinalizedLeaks`
@@ -504,10 +504,10 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
   upstream `@dimforge/rapier*` type aliases instead of the transcribed subset.
 - **`app.stats.contacts`.** Rapier adapters expose `countContacts()`; wired
   through `SolverStatistics` to `Application.stats`.
-- **A-4/A-5 partial.** `@four/diagnostics` §85 validation catalogue; extended
+- **A-4/A-5 partial.** `@fourjs/diagnostics` §85 validation catalogue; extended
   leak audit; materials and solver live-instance counts.
 - **CPU particle trails.** Optional `trail` on `ParticleEmitter`; ribbon mesh
-  in `@four/render` + WebGL trail pipeline; multi-stop lifetime ramps.
+  in `@fourjs/render` + WebGL trail pipeline; multi-stop lifetime ramps.
 - **CI.** Example typecheck fix (`#status` null guard); coverage tests for
   diagnostics validation, particle trails/ramps, live resource counts, and
   exported `ParticleTrailProgram` / `ParticleTrailBatchCache`; allowlist
@@ -524,7 +524,7 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
   `INVALID_APPLICATION_STATE` with a one-time stale-handle warning; Rapier 2D/3D
   adapters and the fake adapter use it.
 - **`allocation-audit.ts`.** `auditFrameAllocations` turns
-  `@four/math`'s `constructionCount` delta into a one-time per-frame allocation
+  `@fourjs/math`'s `constructionCount` delta into a one-time per-frame allocation
   warning; `Application.step` calls it when `stats` is enabled and `DEV` is true.
 
 ### 2026-09-06 — Auto-selection follow-ups (A-8/R-2 residue)
@@ -542,7 +542,7 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
 
 ### 2026-09-06 — SpatialHash (WP-8.2, #73)
 
-- **`@four/motion`.** Uniform-grid spatial index with explicit rebuild;
+- **`@fourjs/motion`.** Uniform-grid spatial index with explicit rebuild;
   query returns insertion order for §33 determinism.
 
 
@@ -568,7 +568,7 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
 ### 2026-09-06 — Camera rigs TODO residue (docs)
 
 - **`docs/guides/cameras-and-coordinate-conversion.md`.** Added §44 rig
-  coverage: `OrbitRig`/`FollowRig`, `TrackballRig` (`@four/scene`, R-37), and
+  coverage: `OrbitRig`/`FollowRig`, `TrackballRig` (`@fourjs/scene`, R-37), and
   the fly-camera application snippet. Updated the stale "no rig classes
   shipped" honest-state bullet.
 - **`TODO.md`.** Closed trackball and fly items in §44/§47 residue and staged
@@ -577,7 +577,7 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
 ### 2026-09-06 — §33 GATED list and §42 warn policy
 
 - **`asset-manager.ts`** is allowlisted for `devWarnOnce` (duplicate-load warn).
-- **`warnAuthorityConflict`** uses unconditional `console.warn` — `@four/scene`
+- **`warnAuthorityConflict`** uses unconditional `console.warn` — `@fourjs/scene`
   cannot gate on `DEV` per `dev-build-mode.test.ts` (simulation envelope).
 
 
@@ -656,7 +656,7 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
 
 ### 2026-09-06 — Open-TODO pass: Windows runner, Dependabot lockfile, A-26 renderer table
 
-- **Windows unit-test timeouts.** `packages/four/tests/barrels.test.ts` now
+- **Windows unit-test timeouts.** `packages/fourJS/tests/barrels.test.ts` now
   imports each barrel inside its test so the first `await` does not pay every
   dynamic import at once. `packages/core/tests/random.test.ts` and
   `packages/geometry/tests/svg-path.test.ts` take a 30 s timeout (Vitest 3.2
@@ -875,7 +875,7 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
   failed here with `ENOENT: open 'C:/Users/.../four.js/quad.bin'` — the relative buffer
   URI resolving against the process working directory instead of the asset's folder.
 
-  The loader is not at fault. `resolveUri` in `@four/assets` resolves a glTF's relative
+  The loader is not at fault. `resolveUri` in `@fourjs/assets` resolves a glTF's relative
   URIs against the asset's **URL**, lexically, splitting on `/`; its docblock says why
   (§33 — the package names no `URL` global, so resolution is identical everywhere). The
   tests handed it `fileURLToPath(...)`, a *native* path. On Windows the separator is `\`,
@@ -888,7 +888,7 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
 
   `bun run test:suites` is now 90/90 on Windows, where it had never completed.
 
-### 2026-09-06 — reverted the `new Node()` guard: §33 forbids the flag in `@four/scene`
+### 2026-09-06 — reverted the `new Node()` guard: §33 forbids the flag in `@fourjs/scene`
 
 - **The DEV-gated `new Node()` warning is withdrawn.** It put `if (DEV && …)` in
   `packages/scene/src/node.ts`, and `tests/integration/dev-build-mode.test.ts` refuses
@@ -898,7 +898,7 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
   Registering it in `GATED` was not an option either; that is the same test's other half.
 
   Nor could it simply drop the flag and run unconditionally: the message costs ~100 B
-  gzip in every bundle that carries `@four/scene`, and `examples/ui-demo` currently sits
+  gzip in every bundle that carries `@fourjs/scene`, and `examples/ui-demo` currently sits
   **at** its 45 kB §86 budget with no headroom.
 
   The underlying finding stands and is back open in `TODO.md`: `abstract` is erased at
@@ -907,7 +907,7 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
   inside `scene`, which makes it an owner decision rather than an oversight.
 
 - **`packages/input/src/keyboard-input.ts` is now registered in `GATED`** with its §33
-  argument. `@four/input` is not a simulation package, and the refusal is unreachable
+  argument. `@fourjs/input` is not a simulation package, and the refusal is unreachable
   from any well-formed call: the constructor requires `(surface, { focusTarget })` in
   both builds, and only the diagnostic prose moves with the flag.
 
@@ -967,9 +967,9 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
   dampingRatio}") — a message that makes the fix a one-step correction instead of a
   source-reading exercise.
 - **The message also says what the class is for**, because the name is what invites the
-  mistake. In a package called `@four/input`, `KeyboardInput` reads like "the way to read
+  mistake. In a package called `@fourjs/input`, `KeyboardInput` reads like "the way to read
   the keyboard", but it routes events to a *focused scene node* and pairs with
-  `@four/ui`'s `keyboardFocusTarget(root)`. Game code reading WASD wants neither, and
+  `@fourjs/ui`'s `keyboardFocusTarget(root)`. Game code reading WASD wants neither, and
   four offers no first-class alternative: its own `examples/character-controller` uses
   plain DOM listeners. The error now points there rather than leaving a game developer to
   discover it by reading the examples.
@@ -977,7 +977,7 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
   **The validation is `DEV`-gated**, and that was not the first attempt. Shipping the
   message unconditionally put `examples/ui-demo` **245 B over its 45 kB §86 budget** and
   turned CI red — roughly 400 characters of guidance were riding in every production
-  bundle that touches `@four/input`. Gating the whole check restores a byte-identical
+  bundle that touches `@fourjs/input`. Gating the whole check restores a byte-identical
   production build: under §85's build mode `DEV` is a literal `false` and the tree-shaker
   deletes branch and text alike (A-4). A consumer meets this error while developing,
   which is when the mistake is made — the same trade-off the library takes everywhere
@@ -1100,23 +1100,23 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
 
   ```
   rewriter   /(["'])@four\/([a-z0-9-]+)/     <- [a-z0-9-]+ cannot cross a "/"
-  validator  /(["'])@four\//                    <- flags any quote followed by @four/
+  validator  /(["'])@four\//                    <- flags any quote followed by @fourjs/
   ```
 
-  So `"@four/render-webgl"` was rewritten and `"@four/render-webgl/register"` was not, and the
+  So `"@fourjs/render-webgl"` was rewritten and `"@fourjs/render-webgl/register"` was not, and the
   validator then failed the run on the survivor. Every one of the 8 was that same subpath shape.
   Harmless today because all of them sit in JSDoc — but that is luck, not safety: a real
-  `import "@four/render-webgl/register"` would have staged unrewritten beside a manifest whose
+  `import "@fourjs/render-webgl/register"` would have staged unrewritten beside a manifest whose
   dependency had been renamed, resolved to nothing, and shipped broken on the first release, which
   is verbatim the failure this tool's header says it exists to prevent. The validator was right;
   the rewriter was one character short. `SCOPED_STRING` now matches subpath segments.
 - **Two renderer error messages named the workspace package to consumers who cannot have it.**
-  `"…Call registerSkinningPipeline() from " + "@four/render-webgl at application setup (RFC 0003)."`
+  `"…Call registerSkinningPipeline() from " + "@fourjs/render-webgl at application setup (RFC 0003)."`
   put the package name at the start of a prose string, where the rewriter deliberately does not
   reach — so a consumer of `@danielsimonjr/fourjs-render-webgl` would be told to import
-  `@four/render-webgl`, which does not exist on npm. Split so the name is its own quoted token,
+  `@fourjs/render-webgl`, which does not exist on npm. Split so the name is its own quoted token,
   which is exactly the shape the rewriter is built to rename. The workspace build still says
-  `@four/render-webgl`; the staged build now says `@danielsimonjr/fourjs-render-webgl`.
+  `@fourjs/render-webgl`; the staged build now says `@danielsimonjr/fourjs-render-webgl`.
 
 `apply-publish-names` now exits 0: 24 packages staged, 25 umbrella exports preserved, 724 code
 specifiers rewritten.
@@ -1161,7 +1161,7 @@ specifiers rewritten.
   the action's CLI-version check, and these renamed inputs; each was only visible once the one
   before it was fixed.
 
-After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rapier` is back to
+After the reverts: `docs`, `lint` and `build` all exit 0, and `@fourjs/physics-rapier` is back to
 341/341 passing (it was 337 passing / 4 failing on 0.20).
 
 ### 2026-09-05 — repository configuration repairs (Docs, Release, Dependabot)
@@ -1288,9 +1288,9 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 #### Docs
 
-- `@four/render-webgpu`'s README, `docs/Architecture/{OVERVIEW,ARCHITECTURE,COMPONENTS}.md`,
+- `@fourjs/render-webgpu`'s README, `docs/Architecture/{OVERVIEW,ARCHITECTURE,COMPONENTS}.md`,
   `AGENTS.md`, and `MEMORY.md` standing facts no longer call WebGPU a reserved
-  stub (R-1 closed 2026-08-29). `@four/scene` / `@four/motion` READMEs no
+  stub (R-1 closed 2026-08-29). `@fourjs/scene` / `@fourjs/motion` READMEs no
   longer claim camera rigs are unshipped.
 - `tools/check-docs.mjs` scans `docs/Architecture/` hand-written files and
   `packages/*/README.md`, and pins the retired `render-webgpu (stub)` wording.
@@ -1360,7 +1360,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 #### Added
 
-- **`Rectangle2` in `@four/math`** (RFC 0005's recorded prerequisite, cleared):
+- **`Rectangle2` in `@fourjs/math`** (RFC 0005's recorded prerequisite, cleared):
   a mutable `x/y/width/height` type in the §7b family spelling — plan-D3
   changed hook, `clone` the only allocating method, `equalsApprox` at the
   family tolerance, half-open `containsPoint`, `isEmpty`. Deliberately
@@ -1395,9 +1395,9 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 - **The six §81 capability tokens moved to their owning packages** (RFC 0002
   §2's spelling; the recorded reversible spelling-difference, reversed):
-  `SIMULATION_SYSTEMS` → `@four/motion`, `RENDERER_REGISTRY` + `RENDER_GRAPH`
-  → `@four/render`, `SOLVER_REGISTRY` → `@four/physics`,
-  `COMPONENT_SERIALIZERS` + `SCENE_MIGRATIONS` → `@four/serialization` — each
+  `SIMULATION_SYSTEMS` → `@fourjs/motion`, `RENDERER_REGISTRY` + `RENDER_GRAPH`
+  → `@fourjs/render`, `SOLVER_REGISTRY` → `@fourjs/physics`,
+  `COMPONENT_SERIALIZERS` + `SCENE_MIGRATIONS` → `@fourjs/serialization` — each
   a `capabilities.ts` declaring only `defineCapability` plus type-only
   registry imports, `@__PURE__`-annotated. `four/plugins.ts` re-exports the
   very objects, so every existing import keeps working; identity is pinned by
@@ -1423,7 +1423,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   what the candidate carries, which is byte-for-byte the pre-field behaviour.
   The mode gates the node, not the subtree (the `layers` scope, not the `clip`
   scope); `"custom"` is deliberately absent until a callback strategy exists.
-  `@four/input` gains `Pickable.triangles` (structural `positions`/`indices` —
+  `@fourjs/input` gains `Pickable.triangles` (structural `positions`/`indices` —
   `BufferGeometry`'s layout without the import; plan §3.1 intact) and `pick()`
   refines a box hit by exact Möller–Trumbore ray/triangle intersection:
   unnormalized-local-ray world distances, index-order iteration and
@@ -1463,7 +1463,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   deliberate omission of `maxUniformBufferBytes`/`maxBindings` (R-30b's
   lazy-query law) and `WebgpuRenderer`'s omission of `maximumSkinningJoints`,
   and the phantom `MAX_VERTEX_UNIFORM_VECTORS` byte-conversion aside is deleted
-  (no such code ever existed). Comment-only; `@four/render` tests green
+  (no such code ever existed). Comment-only; `@fourjs/render` tests green
   unchanged. `docs/guides/materials-and-render-graph.md` rewritten to the tip:
   §60 shipped (RFC 0001), §62's WebGPU backend shipped (R-1 complete), §65
   opt-in batching (R-9), §68–§70's punctual-light/shadow/post-processing tiers,
@@ -1482,11 +1482,11 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   state counts **four** reserved stubs — `render-webgpu` left the list with the
   R-1 plan (WP-R1.1–R1.9).
 
-### 2026-08-29 — §78 glTF 2.0 loader (A-19 closed: parse tier in `@four/assets`, assembly in `four`)
+### 2026-08-29 — §78 glTF 2.0 loader (A-19 closed: parse tier in `@fourjs/assets`, assembly in `four`)
 
 #### Added
 
-- **`createGltfLoader` / `GltfAsset`** (`@four/assets`): the §78 parse tier at
+- **`createGltfLoader` / `GltfAsset`** (`@fourjs/assets`): the §78 parse tier at
   the honest glTF 2.0-core slice — `.gltf` + separate `.bin` through the
   injected `FetchLike`, base64 `data:` URIs, and the GLB container; every
   geometry attribute the §53 layer has (positions/normals/uvs/colors/
@@ -1509,7 +1509,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   input bytes — file-array traversal, explicit little-endian `DataView` reads —
   pinned by digest in `tests/determinism/gltf-load.test.ts`.
 - **`instantiateGltf` / `GltfInstance`** (`four`): §78 assembly, in the
-  umbrella because `@four/assets`' frozen §3.1 row is `core` alone (the
+  umbrella because `@fourjs/assets`' frozen §3.1 row is `core` alone (the
   `scene-serializers.ts` argument). §78's sharing sentence applied literally:
   geometry, textures, and clips built once per asset and shared; nodes and
   (mutable) materials fresh per call. Joints become `Bone`s, skins become one
@@ -1522,7 +1522,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   (`metallicRoughnessTexture`, normal/occlusion/emissive) are validated,
   surfaced as `GltfMaterialRecord.ignoredTextures`, and warned at
   instantiation — never silently dropped; factors still apply.
-- **`createTextureDecoder`** (`@four/assets`): the fetch-free half of the
+- **`createTextureDecoder`** (`@fourjs/assets`): the fetch-free half of the
   landed texture decode path as a standalone export — `createTextureLoader`
   now wraps it, and the glTF loader reuses it whole for embedded and
   buffer-view images. No behaviour change.
@@ -1548,13 +1548,13 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 #### Added
 
 - **§36 `simulation: "gpu"` + the Q3 `ComputePass` promotion (R-31 residue
-  closed, 2026-08-29).** `@four/render` gains `compute.ts`
+  closed, 2026-08-29).** `@fourjs/render` gains `compute.ts`
   (`ComputePassDescriptor`, structural `ComputeBuffer`, `supportsCompute`) and
   optional `Renderer.compute?()` — the optional-member pattern's fourth
-  instance; `@four/render-webgpu` re-exports the promoted tokens (identity
+  instance; `@fourjs/render-webgpu` re-exports the promoted tokens (identity
   preserved, no call site moved) and refuses foreign buffer handles per binding;
   the umbrella ships §82's `Four.ComputePass` named-map sugar (record-key
-  insertion order = binding order). `@four/particles` widens
+  insertion order = binding order). `@fourjs/particles` widens
   `ParticleEmitterOptions.simulation` **in the same change** that wires
   `PARTICLE_INTEGRATOR_SHADER_SOURCE` to the emitter (the WP-9.1 rule): CPU
   spawn + GPU integrate through the structural `ParticleGpuSimulation`
@@ -1704,9 +1704,9 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   (presence is the capability; WebGL 2's absence stays structural) — plus the
   §36 GPU particle integrator kernel (semi-implicit Euler, the emitter's closed
   form, count as f32). The `ComputePass` descriptor lives in
-  `@four/render-webgpu` pending Q3's `@four/render` promotion (one re-export +
+  `@fourjs/render-webgpu` pending Q3's `@fourjs/render` promotion (one re-export +
   optional `Renderer.compute?()`; RFC 0004 held `packages/render` concurrently).
-  `simulation: "gpu"` in `@four/particles` is deliberately **not** widened (the
+  `simulation: "gpu"` in `@fourjs/particles` is deliberately **not** widened (the
   WP-9.1 rule: it widens in the change that wires the kernel to the emitter).
   R-31 closes on WebGPU only. Browser specs written (particle rasterisation; an
   exact integrator readback), pending the next `test:browser` run.
@@ -1716,7 +1716,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 #### Added
 
 - **§77a raster painting (RFC 0004, accepted 2026-08-21; tier (b) — the seam
-  tier).** `@four/render` gains `RasterSource` — a structural, DOM-free read seam
+  tier).** `@fourjs/render` gains `RasterSource` — a structural, DOM-free read seam
   in the `TextureSource`/`FetchLike` discipline: the application paints with
   whatever it likes (its `paint()` hook takes no parameter and the engine never
   learns what it closed over), `readPixels(out)` writes RGBA8 into an
@@ -1733,7 +1733,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   input** (§33): no §79 representation, no §34 replay content, enforced by
   `tests/integration/raster-display-only.test.ts` — §40's display-only scan with
   "inexact" replaced by "unreproducible".
-- **§73's canvas view ships** (`@four/ui` `CanvasViewWidget`, document type
+- **§73's canvas view ships** (`@fourjs/ui` `CanvasViewWidget`, document type
   `ui:canvas-view`): a skin-drawn control — box, supplied device-pixel
   `resolution` (`pixelWidth`/`pixelHeight`), and a monotonic `contentVersion`
   bumped by `invalidate()` through the existing `onContentChange` hook; no new
@@ -1779,20 +1779,20 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 #### Added
 
-- **§71 pixel/GPU-id picking (RFC 0005 — A-11's remaining half).** `@four/render`
+- **§71 pixel/GPU-id picking (RFC 0005 — A-11's remaining half).** `@fourjs/render`
   gains the backend-neutral seam (`PickingService`,
   `Renderer.createPickingService?()` — presence-is-the-capability; Canvas 2D/SVG
   declare the tier absent by omission per the adopted Q6), the §33 candidate-table
   rules (`collectPickCandidates`, traversal-ordered, rebuilt per pass) and the
   exact id codec (`encodePickId`/`decodePickId`, index+1 in RGBA8, 0 = nothing,
-  overflow refused per §85). `@four/render-webgl` executes it behind
+  overflow refused per §85). `@fourjs/render-webgl` executes it behind
   `registerPickingPipeline()` (fifth registration seam): a lazily compiled flat id
   program draws the frame's own view list — §66 order, frustum cull, material
   depth/colour state and §67 clip stencils included; skinned and particle items
   resolve through absence, stated — into a service-owned target, read back
   asynchronously on WebGL 2's fence path (`PIXEL_PACK_BUFFER` + `fenceSync`,
   stalling `readPixels` as the degradation) with `CONTEXT_LOST`-honest staleness
-  by cache-era identity. `@four/input` gains the render-free `PickProvider` seam
+  by cache-era identity. `@fourjs/input` gains the render-free `PickProvider` seam
   and RFC 0005's adopted Alternative D: `Pickable.alphaMask` confirms a bounds hit
   against CPU-resident texel alpha (§55 frames via `region`). `four` gains the
   promised adapter `createPickProvider(service, viewport)`. Scenes that never pick
@@ -1847,7 +1847,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 - **RFC 0001 — §60 shader and node-material system (gap R-14; §57, §58, §60, §63,
   §70, §96).** The unit of extension is a serializable graph, never a source
-  string. `@four/materials` gains the §60 IR — `ShaderGraph`, a closed-operator,
+  string. `@fourjs/materials` gains the §60 IR — `ShaderGraph`, a closed-operator,
   JSON-ready graph validated and reflected by `analyzeShaderGraph` (§85 caps on
   nodes and samplers) — the fluent `NodeMaterialBuilder`/`ShaderGraphBuilder`
   authoring surface (§60's own example compiles), and §57's `NodeMaterial` (frozen
@@ -1927,27 +1927,27 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 #### Added
 
 - **RFC 0003 implemented — §54 skinning and skeletal animation (gaps `PH-10` +
-  `R-22`; spec revision 1.10).** `@four/scene` gains `Bone` (an ordinary `Node` —
+  `R-22`; spec revision 1.10).** `@fourjs/scene` gains `Bone` (an ordinary `Node` —
   §42 authority, §19 blending, §79 and animation apply with no new mechanism),
   `Skeleton` (joint index = position in `bones`, insertion order the §33 ABI;
   `update` derives the palette `inverse(skinRootWorld)·boneWorld·inverseBind[i]`
   in a fixed association order), and the `MorphWeights` component (+ serializer,
   registered the same packet). `BufferGeometry` gains the §53 `joints`/`weights`
   attributes (4 influences/vertex, §85-validated; weight sums are the author's
-  contract), bound by the WebGL backend at fixed locations **4/5**. `@four/render`
+  contract), bound by the WebGL backend at fixed locations **4/5**. `@fourjs/render`
   gains §54's `Mesh` (skeleton refused over `MAX_SKINNING_JOINTS = 48` at setup
   with `UNSUPPORTED_GPU_FEATURE`; `morphTargetWeights` is an accessor over the
   component; §79 skeleton reference restored by id on first read via
   `restoreMeshSkeleton`), the `"skinned-unlit"`/`"skinned-lit"` render-item kinds
   with the palette refreshed in the same list build, and the optional
-  `RendererCapabilities.maximumSkinningJoints`. `@four/render-webgl` gains the
+  `RendererCapabilities.maximumSkinningJoints`. `@fourjs/render-webgl` gains the
   lazily-registered skinning pipeline (`registerSkinningPipeline()`; programs
   compile on a renderer's first skinned draw — skinless scenes transcribe
   byte-identically, transcript-asserted; unregistered/uncompilable/unskinnable
   draws are skipped with one warning, never shown in bind pose). §17 is **9 of 9**
   with zero new `ValueKind`s — the two "missing" track types are the indexed-array
   binding form (`bones.<i>.…`, `weights.<i>`), documented and tested in
-  `@four/animation` (+ `createArrayElementBinding`). New determinism golden
+  `@fourjs/animation` (+ `createArrayElementBinding`). New determinism golden
   `skinned-pose.json` (§33 `same-runtime`; the palette is the envelope's last CPU
   value — no engine API returns skinned vertex positions), new browser proof
   (two-bone column bends 90° on a real driver: arm region 0→480 px, top 560→0,
@@ -1961,7 +1961,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 #### Added
 
 - **WP-R1.3 — WebGPU sprites, text, §65 batching and §67 clip application.**
-  `@four/render-webgpu` gains the §55 sprite pipeline (`wgpu-sprite.ts`: quad-uniform
+  `@fourjs/render-webgpu` gains the §55 sprite pipeline (`wgpu-sprite.ts`: quad-uniform
   uv derivation, `texture × tint`, always-blend, R-29 frame reparametrization) over a
   second, lazily-created group-0 layout — the shared `DrawUniforms` layout does not
   move, so spriteless transcripts are byte-identical; §56 text needs nothing new
@@ -2008,7 +2008,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 #### Added
 
-- **WP-R1.2 — WebGPU texture and sampler caches (§77, §83).** `@four/render-webgpu`
+- **WP-R1.2 — WebGPU texture and sampler caches (§77, §83).** `@fourjs/render-webgpu`
   gains `WgpuTextureCache`: id/version-keyed `queue.writeTexture` uploads
   (`rgba8unorm`, `rgba8unorm-srgb` for §60a-tagged textures), a separate sampler
   cache deduplicating `GPUSampler`s on the canonical resolved key
@@ -2027,7 +2027,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 #### Added
 
-- **`@four/core` gains the §81 plugin host (RFC 0002, gap `A-3`).** `FourPlugin`,
+- **`@fourjs/core` gains the §81 plugin host (RFC 0002, gap `A-3`).** `FourPlugin`,
   `PluginContext`, `PluginHost`, `installPlugins`, `defineCapability`,
   `bindCapability`, `satisfiesPluginRange`, and `PLUGIN_API_VERSION`. A plugin
   declares `name`, `version`, optional `dependencies`, and an optional
@@ -2037,7 +2037,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   and equal-priority systems run in registration order, so an unspecified install
   order would be an unspecified fixed-step order.
 - **Six capability tokens, exported from `four`** (the umbrella is the one package
-  that sees all four registry owners at once, and `@four/core` may name none of
+  that sees all four registry owners at once, and `@fourjs/core` may name none of
   them under the frozen §3.1 matrix): `SIMULATION_SYSTEMS` (§39),
   `RENDERER_REGISTRY` (§62), `SOLVER_REGISTRY` (§37), `COMPONENT_SERIALIZERS` (§79),
   `SCENE_MIGRATIONS` (§80), `RENDER_GRAPH` (§63). §79's shipped promise —
@@ -2054,7 +2054,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   §45's `rendererRegistry` option supplied one; a plugin needing a solver registry,
   a serializer registry, or a render graph installs through a standalone
   `PluginHost`, because an `Application` holds none of those and naming them would
-  put `@four/physics` and `@four/serialization` in every bundle. `app.pluginContext`
+  put `@fourjs/physics` and `@fourjs/serialization` in every bundle. `app.pluginContext`
   publishes the sealed context.
 - **`PLUGIN_API_VERSION` starts at `0.1.0`** and is versioned independently of
   package semver (§90), like the §79 scene format. The range grammar is
@@ -2134,7 +2134,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 #### Added
 
-- **`@four/render-webgpu`: the WebGPU backend's foundation (R-1, WP-R1.1).** The
+- **`@fourjs/render-webgpu`: the WebGPU backend's foundation (R-1, WP-R1.1).** The
   reserved stub is now a real backend: `WebgpuRenderer` acquires an adapter, a device
   and the canvas's `"webgpu"` context (the first `initialize` for which the `Promise` is
   not a formality), clears per view, and draws unlit geometry through the same
@@ -2181,13 +2181,13 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 #### Added
 
-- **§12 solver-backed character controller (`PH-11b`).** `@four/physics` ships
+- **§12 solver-backed character controller (`PH-11b`).** `@fourjs/physics` ships
   `SweptCharacterController` — a capsule swept through `PhysicsWorld.shapeCast` (§30)
   with **slide along wall**, **step height** and a **slope limit** — and
   `SweptCharacterSystem`, which advances it at §39 step 4 (`PRIORITY_KINEMATICS`, 400)
   under §42's `"kinematic"` authority, before the solve at 600 so a character carrying a
   `"kinematic-position"` body feeds the solver this step's pose. It **holds** a
-  `@four/motion` `CharacterController` rather than extending one: the held instance is
+  `@fourjs/motion` `CharacterController` rather than extending one: the held instance is
   the heading/intent/parameter store (unit-disc clamp, unbounded yaw, every §85 refusal,
   executed once), while the swept class owns the vertical integrator and the collision
   resolution. Collide-and-slide is bounded by a stated `maxSlides` (default 4) and
@@ -2208,7 +2208,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 #### Added
 
 - **§77 mipmaps, the min-filter split, and anisotropy (R-30b).** `TextureSource.mipmaps`,
-  `.minFilter` and `.anisotropy` in `@four/render`, mirrored as optional `MaterialTexture`
+  `.minFilter` and `.anisotropy` in `@fourjs/render`, mirrored as optional `MaterialTexture`
   fields and applied by `TextureCache` at upload. R-30 recorded that the `minFilter` split
   would "land with mipmaps, beside this field", and it did: `filter` is unchanged and _is_
   the magnification filter, `minFilter` is the min-side override carrying GL's four
@@ -2273,7 +2273,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 #### Added
 
 - **§12 character controllers (`PH-11`'s residue) and §44's first-person camera
-  (`R-36`'s last substantive staged rig).** `@four/motion` ships `CharacterController` —
+  (`R-36`'s last substantive staged rig).** `@fourjs/motion` ships `CharacterController` —
   parameter-driven planar move intent clamped to the unit disc, the character's yaw as
   the single source of its heading, gravity/vertical velocity/terminal velocity/jumping
   against a ground plane — and `FirstPersonLook`, the pitch-only look channel. Both are
@@ -2292,7 +2292,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   three-form golden (`tests/determinism/golden/character-controller.json` — pinning both
   arms of `jump()`'s refusal, the pitch-pole guard being reached, and the
   terminal-velocity clamp biting). Slide, step height, slope limits and capsule sweeps
-  are **staged** as a `@four/physics`-tier packet over `PhysicsWorld.shapeCast` (§30),
+  are **staged** as a `@fourjs/physics`-tier packet over `PhysicsWorld.shapeCast` (§30),
   because §3.1 runs the dependency edge `physics → motion` and not the reverse. Bundle
   cost: **0 B** in every bundle that does not call `registerSceneNodeTypes()`,
   **+0.93 kB gzip** in `motor-digital-twin`.
@@ -2304,10 +2304,10 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 - **RFC 0005 — pixel and GPU-identifier picking (§71)** (`docs/rfcs/0005-pixel-picking.md`,
   draft, owner decision pending). Closes `A-11`'s outstanding half at the _design_ level:
   the analytic half fell with R-23/R-24's `toPath()`, but the pixel/GPU-id half needs a
-  render target that plan §3.1 forbids `@four/input` from importing. The RFC proposes a
-  `PickingService` in `@four/render` plus a structural `PickProvider` seam
+  render target that plan §3.1 forbids `@fourjs/input` from importing. The RFC proposes a
+  `PickingService` in `@fourjs/render` plus a structural `PickProvider` seam
   (`pick(ndcX, ndcY): Promise<string | undefined>`) that the application hands to input —
-  the FetchLike / SurfaceSizedCamera precedent, so `@four/input` gains no new dependency.
+  the FetchLike / SurfaceSizedCamera precedent, so `@fourjs/input` gains no new dependency.
   Records the design constraint an implementer would otherwise miss: `Node.id` is a
   _string_, so an id buffer must encode a traversal-ordered per-pass table index (a §33
   obligation), never the id itself. Six flagged owner questions (§5 register rows 18–20).
@@ -2363,7 +2363,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
     control-position publisher collapsed from twenty lines to two; `motor-digital-twin`
     keeps its instrument units under one scale on a screen-space root, which makes that
     move pixel-exact.
-  - **Doc fixes.** `@four/motion`'s rig table now points at `@four/scene`'s
+  - **Doc fixes.** `@fourjs/motion`'s rig table now points at `@fourjs/scene`'s
     `TrackballRig`; `docs/AUDIT-120.md`'s "ScreenCamera is absent" bullet and
     `packages/text/README.md`'s one-texture-per-glyph advisory are corrected, with a
     new `check-docs` retired-claim pin so neither can return undated.
@@ -2380,7 +2380,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 #### Added
 
-- **`@four/assets`: content hashing (§76) and verification (§79, §96).**
+- **`@fourjs/assets`: content hashing (§76) and verification (§79, §96).**
   `load(url, loader, { hashContent: true })` records a hash readable through
   `AssetManager.contentHash(url, loader)`; `{ expectedHash }` verifies the bytes and
   **refuses** a mismatch (`ASSET_LOAD_FAILED`, `context.reason === "hash-mismatch"`,
@@ -2395,16 +2395,16 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   `jsonLoader`; hashing wraps inside the §96 size bound, so an over-budget body is refused
   before any digest is taken. Verification is per caller, not per load: one waiter's wrong
   expectation does not disturb the others.
-- **`@four/assets`: the §79 manifest.** `manifestLoader` / `parseAssetManifest` (a
+- **`@fourjs/assets`: the §79 manifest.** `manifestLoader` / `parseAssetManifest` (a
   manifest is untrusted content too — shape-validated, with the offending key in
   `context`), `loadFromManifest(assets, manifest, key, loader)` resolving logical
   key → URL → verified bytes, `ManifestLoadOptions.requireHash` for the production
   posture, and `manifestUrl` for the matching `release`. This is the substrate `A-16`'s
   §79 manifest was blocked on.
-- **`@four/assets`: the texture loader tier (§77's assets half, A-19).**
+- **`@fourjs/assets`: the texture loader tier (§77's assets half, A-19).**
   `createTextureLoader({ decode })` — the decoder injected, as `createImageLoader`'s is,
   so the package still names no `Blob`, `ImageBitmap`, or canvas — producing a
-  `Disposable` `TextureAsset` shaped **structurally** as `@four/render`'s `TextureSource`
+  `Disposable` `TextureAsset` shaped **structurally** as `@fourjs/render`'s `TextureSource`
   (no dependency edge; the `PARTICLE_INSTANCE_FLOATS` precedent), carrying §60a/§77
   `colorSpace`/`filter`/`wrap` and flipping the codec's top-first rows so row 0 is
   `v = 0` (§7a).
@@ -2423,7 +2423,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 #### Added
 
-- **§47 `ScreenCamera` (`R-37`)** — the pixel-rectangle camera, in `@four/scene` beside the
+- **§47 `ScreenCamera` (`R-37`)** — the pixel-rectangle camera, in `@fourjs/scene` beside the
   others. All three origins §47 requires (`"top-left"`, `"bottom-left"`, `"centered"`) in
   either unit system (`"logical"`, `"physical"`), so UI content is authored in the units a
   designer hands over and does not move when the world camera does. It extends `Camera`
@@ -2453,10 +2453,10 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   virtual sphere (Shoemake's arcball with Bell's sheet, the two meeting tangentially at
   `d = 1/√2`), world-space composition so a second drag turns about screen axes, no pole and
   no up vector. Deliberately **not** a component: it is event-driven rather than per-step,
-  and `ConstraintSystem` lives in `@four/motion`, which may not import this package — so
+  and `ConstraintSystem` lives in `@fourjs/motion`, which may not import this package — so
   `applyTo(node)` is the application's write, under §42's `"manual"` authority, and a node
   owned by another authority is refused and warned about once. Parameter-driven like every
-  other rig: four numbers in viewport pixels, no `@four/input` edge. §33 tier
+  other rig: four numbers in viewport pixels, no `@fourjs/input` edge. §33 tier
   `same-runtime`.
 
 #### Proved
@@ -2473,7 +2473,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 #### Added
 
-- **§53 geometry model completed (`R-21`).** `@four/geometry` now exports the abstract
+- **§53 geometry model completed (`R-21`).** `@fourjs/geometry` now exports the abstract
   `Geometry` base §53 declares — `id`, `version`, `bounds`, `computeBounds()`, `clone()`,
   `dispose()` — with `BufferGeometry` re-parented onto it and the monotonic geometry-id
   counter hoisted into the base, so every §53 family member and every clone draws from one
@@ -2510,7 +2510,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 #### Added
 
 - **§67 stencil support (`R-7`)** — §57's seventh material member ships, with the buffer it
-  drives. `StencilState` (`@four/materials`) carries §67's eight comparisons, eight
+  drives. `StencilState` (`@fourjs/materials`) carries §67's eight comparisons, eight
   operations, reference and read/write masks, every value refused rather than clamped
   outside 0…255 (§85 — every stencil buffer WebGL 2 can allocate is 8 bits deep, and GL
   would mask a larger value down silently) and validated on assignment as well as at
@@ -2534,7 +2534,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
 
 #### Added
 
-- **§39 step 9 as a registered system (PH-21).** `PhysicsEventSystem` in `@four/physics`,
+- **§39 step 9 as a registered system (PH-21).** `PhysicsEventSystem` in `@fourjs/physics`,
   registered at `PRIORITY_EVENT_DISPATCH` (900), dispatches the queued physics events of a
   `PhysicsSystem`'s tracked worlds — the pass `PhysicsSystem` performed internally at step
   6's priority. Opt in with the new `PhysicsSystemOptions.dispatchEvents: false`; the
@@ -2548,7 +2548,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   draining an empty queue. `PhysicsWorld.step` and `PhysicsWorld.dispatchEvents` were not
   edited, so every §33 golden is unmoved by construction — PH-8's step-5 technique, reused
   for step 9.
-- **§33 rollback (PH-20).** `RollbackBuffer` in `@four/diagnostics`: a bounded, ordered ring
+- **§33 rollback (PH-20).** `RollbackBuffer` in `@fourjs/diagnostics`: a bounded, ordered ring
   of snapshots over the new `RollbackTarget` shape (`createSnapshot`/`restoreSnapshot`;
   `PhysicsWorld` satisfies it). `capture(step)` snapshots the end of a fixed step and evicts
   the oldest once full; `rollbackTo(step)` restores that exact step, forgets everything
@@ -2588,7 +2588,7 @@ After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rap
   (`"nearest" | "linear"`) and `TextureSource.wrap`
   (`"clamp-to-edge" | "repeat" | "mirrored-repeat"`), resolved on `Texture.filter` /
   `Texture.wrap`, mirrored as optional `MaterialTexture.filter` / `.wrap`, and applied by
-  `@four/render-webgl`'s `TextureCache` at upload time. Both default to the pair this tier
+  `@fourjs/render-webgl`'s `TextureCache` at upload time. Both default to the pair this tier
   hard-coded before 2026-08-13, so every already-authored texture issues the identical four
   `texParameteri` calls with the identical enums — byte-identity is structural, not
   numerical. One field rather than `minFilter`/`magFilter` because the other four GL filter
@@ -2626,8 +2626,8 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
   layout (~2.1 ms at 20 000 glyphs) and the `Text` geometry rebuild (~14 ms, ~700 ns/glyph,
   800 draw calls — 1 batched — against 20 000 before R-28). `benchmarks/README.md`'s
   `feature` block on the row's drawing half is amended in place.
-- Doc-truth: `@four/text`'s "a `Text` node … is not this package's to write" and
-  `@four/render`'s `Renderable` family note now name where `Text` landed and why the frozen
+- Doc-truth: `@fourjs/text`'s "a `Text` node … is not this package's to write" and
+  `@fourjs/render`'s `Renderable` family note now name where `Text` landed and why the frozen
   §3.1 matrix put it there.
 
 ### 2026-08-09 — R-36 rig half + PH-11 closed: §44/§47 camera rigs, §42's first constraint producer
@@ -2635,7 +2635,7 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
 #### Added
 
 - **§44/§47 camera rigs and §12 look-at constraints (`R-36` rig half + `PH-11`).**
-  `@four/motion` gains `OrbitRig` (§44 orbit control), `FollowRig` (§44 follow target
+  `@fourjs/motion` gains `OrbitRig` (§44 orbit control), `FollowRig` (§44 follow target
   and spring arm — one class, switched by `frame: "world" | "target"`, smoothed by an
   optional `SpringDamper`, with `resetSmoothing()` so a teleported target does not send
   the camera sailing), `LookAtConstraint` (§12) and `ConstraintSystem`, the first
@@ -2644,7 +2644,7 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
   system under one authority, because §42 allows a node exactly one owner. The aim is
   `Node.lookAt` on a clock, with an optional `maxAngularSpeed` slew limit in
   `MotionComponent`'s spelling (radians per second, absent means unlimited). Rigs never
-  read `@four/input` — the frozen §3.1 matrix has no `motion → input` edge, so
+  read `@fourjs/input` — the frozen §3.1 matrix has no `motion → input` edge, so
   `orbit(yawDelta, pitchDelta)` and `dolly(delta)` take deltas the application feeds,
   which is also what makes a rig replayable (§33/§34). §85 refusals on authored values
   (non-finite angles, non-positive distances, a zero or non-finite `up`, inconsistent
@@ -2674,13 +2674,13 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
 
 - **§64 per-view render lists and §87 frustum culling (gap `R-8`).** The frame builds
   **one** render list and each viewport now _derives_ its own from it:
-  `buildViewRenderList(source, view, out, { frustum })` in `@four/render` applies §46's
+  `buildViewRenderList(source, view, out, { frustum })` in `@fourjs/render` applies §46's
   layer mask (§48's `view.layerMask`-else-`camera.layers` fallback) and §87's frustum
   test, keeping the surviving items in order and sharing the frame list's pooled item
   objects, so a view costs one linear scan and no allocation. The substrate is
-  `@four/math`'s new **`Frustum`** — the six normalized clip planes of a view-projection
+  `@fourjs/math`'s new **`Frustum`** — the six normalized clip planes of a view-projection
   matrix, extracted for either `DepthRange` convention, with a conservative
-  `intersectsSphere` — and `@four/render`'s **`computeWorldBoundingSphere`**, which turns
+  `intersectsSphere` — and `@fourjs/render`'s **`computeWorldBoundingSphere`**, which turns
   §53's cached local box into a world-space sphere by the absolute-value transform (never
   too small, so a cull can never remove something visible). §49's **`frustumCulled`**
   lands on `Renderable`, defaults to `true`, and round-trips through §79. The WebGL 2
@@ -2701,7 +2701,7 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
 
 #### Changed
 
-- `@four/render-webgl`'s view loop no longer tests `item.layers` inline; it draws the list
+- `@fourjs/render-webgl`'s view loop no longer tests `item.layers` inline; it draws the list
   `buildViewRenderList` derived. Consequence, stated because it is observable: a batch run
   may now span an item the _frame_ list had between its members — a masked-out or culled
   draw no longer ends a run. This is strictly better batching and exactly as correct, since
@@ -2730,7 +2730,7 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
 
 #### Added
 
-- **§26/§27 force fields for rigid bodies (`PH-8`).** `@four/physics` gains `ForceField` — §27's
+- **§26/§27 force fields for rigid bodies (`PH-8`).** `@fourjs/physics` gains `ForceField` — §27's
   interface, transcribed — and `ForceFieldSystem`, the engine occupant of §39's step 5 ("force
   generation") at `PRIORITY_FORCES`. It samples every registered field at every dynamic, awake
   body once per fixed step and applies the sum through §26's `applyForce`. Units are declared per
@@ -2738,15 +2738,15 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
   (m/s², multiplied by the body's mass), because §27's own built-in list mixes the two.
   `PhysicsWorld.forEachActiveBody(visit)` is the §22/§32-filtered, registration-ordered (§33)
   iteration it walks, handing over each body's solver-read world-space centre of mass (§25).
-  `ParticleForceField` from `@four/particles` is structurally identical, so every built-in field
+  `ParticleForceField` from `@fourjs/particles` is structurally identical, so every built-in field
   there works here with no adapter, no cast and **no new §3.1 dependency edge**;
   `tests/integration/physics-force-fields.test.ts` is where the two declarations are type-checked
   against each other. `world.step` was not edited — fields reach the solver through the same §26
   command buffer user code uses — so every existing determinism golden is untouched by
   construction. New golden `tests/determinism/golden/force-fields.json` (same-runtime tier, real
   Rapier 2D, 300 steps, twelve bodies, four fields).
-- **§8 space modes (`PH-12`).** `@four/core` gains the §8 vocabulary — `SpaceMode`,
-  `SPACE_MODES`, `DEFAULT_SPACE_MODE`, `isSimulationSpaceMode` — and `@four/physics` gains
+- **§8 space modes (`PH-12`).** `@fourjs/core` gains the §8 vocabulary — `SpaceMode`,
+  `SPACE_MODES`, `DEFAULT_SPACE_MODE`, `isSimulationSpaceMode` — and `@fourjs/physics` gains
   `RigidBody.space` (also `RigidBodyDescriptor.space`), the frame a body is solved in.
   `PhysicsWorld.addBody` now enforces §8's sentence: the four presentation frames are refused
   because "screen-space UI should not automatically participate in physical simulation unless
@@ -2761,7 +2761,7 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
 
 #### Added
 
-- **`groupRenderListByPipeline(list)` (`@four/render`)** — §66's **sort key 3**, pipeline
+- **`groupRenderListByPipeline(list)` (`@fourjs/render`)** — §66's **sort key 3**, pipeline
   and material compatibility, as a **second verb** rather than a mode of `buildRenderList`.
   It re-sorts an already-built list with key 3 inserted between keys 2 and 5, stably, so a
   scene already grouped is unchanged and a scene of one pipeline and one material is left
@@ -2772,14 +2772,14 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
   wins, and all of this engine's 2D content sits at one depth. Grouping by material would
   therefore _repaint_ a 2D scene — it is what makes a §58 stroke cover its own fill (R-16)
   and a later sibling cover an earlier one.
-- **`RenderItem.materialId` (`@four/render`)** — the material half of key 3, snapshotted at
+- **`RenderItem.materialId` (`@fourjs/render`)** — the material half of key 3, snapshotted at
   generation time; `kind` was already the pipeline half. Two fields rather than one
   concatenated key, because `${kind}:${id}` would allocate a string per item per frame.
   `""` for a particle system, which has no material, and for a structural material double
   predating §57's `id` — `undefined < undefined` is false in both directions, which is not a
   total order.
-- **§65 batching (`RenderBatcher` in `@four/render`, `createGlBatching()` in
-  `@four/render-webgl`)** — **sprite batching and compatible shape batching**: consecutive
+- **§65 batching (`RenderBatcher` in `@fourjs/render`, `createGlBatching()` in
+  `@fourjs/render-webgl`)** — **sprite batching and compatible shape batching**: consecutive
   render items sharing a pipeline **and a material instance** merge into one `drawElements`.
   The planner concatenates a run into one interleaved vertex stream (position, then uv iff
   the material samples, then colour iff it declares `vertexColors`) plus one 32-bit index
@@ -2836,7 +2836,7 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
 
 #### Added
 
-- **`Node.lookAt(target, up?)` (`@four/scene`)** — the §44/§47 helper the tree had nowhere
+- **`Node.lookAt(target, up?)` (`@fourjs/scene`)** — the §44/§47 helper the tree had nowhere
   at all: aiming a camera or a light meant hand-composing quaternions, which the
   `first-3d-scene` packet recorded as the roughest edge of writing a 3D scene. It turns the
   node so its **−Z axis** points at a **world-space** `target`, with +Y as near `up` as the
@@ -2847,11 +2847,11 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
   uniformly scaled rig aims correctly; a non-uniformly scaled parent inherits
   `Matrix4.decompose`'s documented closest-rotation limitation, and a zero-scaled one
   decomposes to the identity so the aim lands in world terms.
-- **`Node.getWorldDirection(out)` (`@four/scene`)** — the inverse: the world-space unit
+- **`Node.getWorldDirection(out)` (`@fourjs/scene`)** — the inverse: the world-space unit
   vector a node faces. **Hoisted** from `DirectionalLight` and `SpotLight`, which carried two
   byte-identical copies; both are deleted and both classes inherit it unchanged, so the
-  `@four/render` structural light contract is untouched and the bundle is one copy lighter.
-- **`Quaternion.setFromLookDirection(direction, up)` (`@four/math`)** — the primitive under
+  `@fourjs/render` structural light contract is untouched and the bundle is one copy lighter.
+- **`Quaternion.setFromLookDirection(direction, up)` (`@fourjs/math`)** — the primitive under
   both. Neither argument need be unit and `up` need not be perpendicular; the basis is
   `z = normalize(−direction)`, `x = normalize(up × z)`, `y = z × x`, converted with
   Shepperd's method. Allocation-free (the basis lives in plain scalars) and the change hook
@@ -2859,7 +2859,7 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
 - **`packages/scene/tests/look-at.test.ts` (28 tests)** and
   **`tests/integration/look-at.test.ts` (8 tests)** — the integration suite pins the four
   claims no single package can: the aim survives the §7 → §47 chain (a lookAt'd camera
-  projects its target to the centre of clip space), `@four/render`'s `collectSceneLights`
+  projects its target to the centre of clip space), `@fourjs/render`'s `collectSceneLights`
   reads the same axis, the umbrella barrel exposes it, and it is a `"manual"` write a §42
   owner then drives without either side warning.
 
@@ -2906,7 +2906,7 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
   aims its camera and sun with `setFromAxisAngle`; replacing them derives the quaternion
   through `sqrt` where the current code uses `sin`/`cos`, which could move a pixel golden.
   Deferred to a packet that can run the browser gate.
-- **Bundle cost**: +0.50 kB gzip in every bundle that carries `@four/scene` (measured A/B:
+- **Bundle cost**: +0.50 kB gzip in every bundle that carries `@fourjs/scene` (measured A/B:
   first-3d 30.80 → 31.30 against a 31.5 kB budget; ui-demo 36.23 → 36.73 against 37;
   particles 28.20 → 28.70 against 29). All budgets pass; the headroom left is 0.20–0.30 kB
   and a bump is proposed in `TODO.md`.
@@ -2915,7 +2915,7 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
 
 #### Added
 
-- **§58's paint model at its solid tier (`@four/render`)** — `Paint`/`SolidPaint` (linear-light
+- **§58's paint model at its solid tier (`@fourjs/render`)** — `Paint`/`SolidPaint` (linear-light
   RGBA plus §50's separate `opacity`, which multiplies the alpha), `ShapeFill`
   (`"inherit"` | a paint | `"none"`, SVG's vocabulary because §50 asks for SVG compatibility),
   and `StrokeStyle`. `Paint` is a **closed one-member tagged union** so the six staged kinds are
@@ -2924,7 +2924,7 @@ align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that 
   **resolved** record (`ResolvedPaint`, `ResolvedShapeFill`, `ResolvedStrokeStyle`) — every
   optional filled in, validated and copied, so an in-place edit of the object you passed cannot
   desynchronise the geometry from the style that built it.
-- **§52 stroke expansion (`@four/geometry`, `tessellation.ts`)** — `expandStroke` widens
+- **§52 stroke expansion (`@fourjs/geometry`, `tessellation.ts`)** — `expandStroke` widens
   polylines into §58's band: `inside`/`center`/`outside` alignment, butt/round/square caps,
   miter/round/bevel joins with a miter limit that falls back to a bevel, and dashes with a phase
   offset walked by arc length. §52 puts stroke expansion in that module _by name_, beside the
@@ -3008,7 +3008,7 @@ AbortController()`, reported by `AssetManager.canAbortTransport`. **Presence is 
 #### Fixed
 
 - **A mouse no longer loses its hover when it clicks (A-9).** The A-9 teardown ended hover for
-  every device, so a `@four/ui` widget dropped its hover highlight the instant it was clicked
+  every device, so a `@fourjs/ui` widget dropped its hover highlight the instant it was clicked
   and regained it on the next move. A release now forgets the pointer _unless_ the device
   outlives its own gesture and has a hover worth keeping — in practice a mouse over a node.
   `pointercancel` still ends every pointer (the platform said it is gone; second-guessing that
@@ -3019,7 +3019,7 @@ AbortController()`, reported by `AssetManager.canAbortTransport`. **Presence is 
 
 - **The generic `FetchLike<TSignal>` seam works** — `typeof fetch` is assignable to
   `FetchLike<AbortSignal>`, so `{ fetch, abortController }` still needs no adapter and
-  `@four/assets` still names no DOM type. The 2026-08-07 finding it replaces (a _concrete_
+  `@fourjs/assets` still names no DOM type. The 2026-08-07 finding it replaces (a _concrete_
   `AbortSignalLike` parameter makes the platform `fetch` stop satisfying the seam) is kept in
   source.
 - **`TSignal` must not reach the instance type.** With `#fetch: FetchLike<TSignal>`,
@@ -3029,7 +3029,7 @@ AbortController()`, reported by `AssetManager.canAbortTransport`. **Presence is 
   assignable, asserted in `tests/integration/asset-abort.test.ts`.
 - **`SurfacePointerEvent.pointerType` is typed `string`, not the union.** `lib.dom` declares
   `PointerEvent.pointerType: string`, so narrowing the seam makes a real `PointerEvent` stop
-  satisfying it. The narrowing happens once inside `@four/input`, and a vendor value or `""`
+  satisfying it. The narrowing happens once inside `@fourjs/input`, and a vendor value or `""`
   becomes an **absent** `pointerType` rather than a refusal: §85's refuse-don't-clamp governs
   configuration the application got wrong, not hardware telemetry arriving mid-gesture, where
   a throw would break input on a device newer than the union.
@@ -3040,15 +3040,15 @@ AbortController()`, reported by `AssetManager.canAbortTransport`. **Presence is 
   mouse over nothing is forgotten like any other pointer, and a mouse's `pointerId` is stable —
   10 000 mouse clicks leave `trackedPointerCount` at 1, and A-9's original 10 000-gesture
   touch/cancel test is untouched at 0.
-- Coverage stays 100/100/100/100 on both `@four/assets` (77 tests) and `@four/input` (133).
-  Bundle: `@four/assets` is in no example bundle; `@four/input` +111 B gzip A/B-measured in
+- Coverage stays 100/100/100/100 on both `@fourjs/assets` (77 tests) and `@fourjs/input` (133).
+  Bundle: `@fourjs/assets` is in no example bundle; `@fourjs/input` +111 B gzip A/B-measured in
   isolation, `ui-demo` at 36.06/37 kB.
 
 ### 2026-08-09 — R-23 closed (solid-fill tier): §50 native 2D shape nodes
 
 #### Added
 
-- **§50's shape family (R-23)** — `Shape2D` plus nine concrete nodes in `@four/render`,
+- **§50's shape family (R-23)** — `Shape2D` plus nine concrete nodes in `@fourjs/render`,
   beside `Renderable` and `Sprite`: `Circle`, `Ellipse`, `Rectangle` (square-cornered or
   rounded — §50's own example passes `radius` to `Rectangle`, so §49's
   `RoundedRectangle` is that class), `RegularPolygon`, `Polygon`, `Star`, `Sector`,
@@ -3069,7 +3069,7 @@ AbortController()`, reported by `AssetManager.canAbortTransport`. **Presence is 
 #### Deliberately not shipped, with arguments in source
 
 - **No stroke, and therefore no `Line`, `Polyline`, or open `Arc` node.** §58's paint
-  model is `R-16`; §52 puts stroke expansion in `@four/geometry`'s tessellation module by
+  model is `R-16`; §52 puts stroke expansion in `@fourjs/geometry`'s tessellation module by
   name; and a stroke without a join rule is wrong at every corner, not merely plain. A
   node that draws nothing while claiming to draw something is worse than a missing one.
 - **No `ShapeMaterial`.** Without §58's paints it is `UnlitMaterial` renamed, and it costs
@@ -3100,8 +3100,8 @@ AbortController()`, reported by `AssetManager.canAbortTransport`. **Presence is 
 
 - **§50 SVG path data (R-26)** — `parseSvgPathData(d, options?)` reads an SVG `d`
   attribute into a §51 `Path`, `formatSvgPathData(path)` writes one back out, both in
-  `@four/geometry` (§98's placement: the `d` attribute is the serialized form of the
-  path model, so it lives beside the model — `render-svg` is a backend, `@four/assets`
+  `@fourjs/geometry` (§98's placement: the `d` attribute is the serialized form of the
+  path model, so it lives beside the model — `render-svg` is a backend, `@fourjs/assets`
   owns SVG as a file). **Grammar coverage is complete**: all ten commands in both cases,
   implicit argument-set repetition, the implicit lineto after a moveto, optional
   separators (`1-2` is two numbers), the greedy scan that reads `1.5.5` as two, and arc
@@ -3206,7 +3206,7 @@ AbortController()`, reported by `AssetManager.canAbortTransport`. **Presence is 
 
 #### Added
 
-- **§51 `Path` in `@four/geometry` (R-24)** — §98's own placement ("path model,
+- **§51 `Path` in `@fourjs/geometry` (R-24)** — §98's own placement ("path model,
   tessellation module"). Six segment kinds as a readable command list behind a fluent
   builder (spec's names — `cubicCurveTo`, not Canvas's; **no `fromCommands`**: the
   builder _is_ the well-formedness invariant, so every reader below can assume it).
@@ -3281,7 +3281,7 @@ holes?)` (ear clipping with bridged holes, O(n²), no dependencies, nothing vend
 
 #### Added
 
-- **`PointLight` and `SpotLight` (R-17, §68)** — two new `@four/scene` nodes over a
+- **`PointLight` and `SpotLight` (R-17, §68)** — two new `@fourjs/scene` nodes over a
   shared `PunctualLight` base, collected by the existing `collectSceneLights` walk into
   a bounded uniform-array light set (`MAX_PUNCTUAL_LIGHTS = 8` — a TS constant
   interpolated into the GLSL so the two cannot disagree; a runtime `maxLights` would
@@ -3326,7 +3326,7 @@ holes?)` (ear clipping with bridged holes, O(n²), no dependencies, nothing vend
   or a named DOM type, both refused) and a `CanvasTexture` satisfying the existing
   `MaterialTexture` contract — **no backend change, no new duck-typed contract, no
   closed union widened** (R-4's seam decision paying off a second time). A
-  `CanvasViewWidget` for §73 that needs no drawing API in `@four/ui` and no new skin
+  `CanvasViewWidget` for §73 that needs no drawing API in `@fourjs/ui` and no new skin
   hook — **the recorded §73 blocker is wrong, and the RFC corrects it**: `ImageWidget`
   already established the widget-owns-identity/skin-owns-texture split, and a repaint
   request is content with no layout transition, exactly what A-12's `onContentChange`
@@ -3394,7 +3394,7 @@ holes?)` (ear clipping with bridged holes, O(n²), no dependencies, nothing vend
   frameless sprites are byte-identical **by code path** (tenth recorded-sequence run;
   the R-13-era pinned transcript containing a sprite still asserts verbatim). A real
   uv stream remains §65 batching's answer, recorded there. Staged with dated notes:
-  the named-frame atlas object (a §77 metadata container for `@four/assets`) and
+  the named-frame atlas object (a §77 metadata container for `@fourjs/assets`) and
   sprite animation clips (§14/§17 step tracks — a private timeline inside `Sprite`
   would be a second animation system). §55 now 5 of 11.
 - **Diagnostics cost bytes, measured**: five per-component §85 messages were +330 B
@@ -3443,10 +3443,10 @@ holes?)` (ear clipping with bridged holes, O(n²), no dependencies, nothing vend
   `layersMatch`/`applyLayers`/`resetLayers`, with `Node.layers` (default the
   `"default"` layer), §47's `Camera.layers` (default `ALL_LAYERS` — discharging the
   `TODO(§46/§47)` `camera.ts` carried since WP-3.1), and §48's `Viewport.layerMask`.
-  `@four/render` filters during §64 stage-2 traversal (`buildRenderList(root, out,
+  `@fourjs/render` filters during §64 stage-2 traversal (`buildRenderList(root, out,
 layerMask?)` + the interpolated form), snapshots each node's mask onto
   `RenderItem.layers`, and resolves §48's fallback once in `viewLayerMask(view)`;
-  `@four/render-webgl` skips a filtered item per view before touching a GPU resource —
+  `@fourjs/render-webgl` skips a filtered item per view before touching a GPU resource —
   **one camera can feed two viewports with no overdraw** (proved: 7 drawables × 2
   disjoint views = 7 draws, not 14). Scene files carry **names, never bits** —
   round-trip is `layerNames()` out, `resetLayers()` + replay in saved order back.
@@ -3464,7 +3464,7 @@ layerMask?)` + the interpolated form), snapshots each node's mask onto
   all four pre-R-38 pinned transcripts, both goldens, and 58/58 browser unchanged —
   and the new tests are mutation-tested, not vacuous. Cost +120 B gzip on ui-demo: the
   render tier's §85 diagnostic is `DEV`-gated (~115 B, stripped in production; its
-  GATED-allowlist §33 argument recorded), while **`@four/scene`'s `assertLayerMask` is
+  GATED-allowlist §33 argument recorded), while **`@fourjs/scene`'s `assertLayerMask` is
   unconditional** — the dev-build suite holds simulation packages to the blunt rule
   that they may not branch on build mode at all. Unblocks R-8 (the mask parameter
   already tested), R-37 (`ScreenCamera`'s missing half), §71 picking filters
@@ -3482,7 +3482,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
   an `app.physics` that silently cannot interpolate §43), stepped at §39 step 6 and
   disposed only when the application built it (§83: ownership follows construction, in
   both directions — the renderer rule). §45's literal `PhysicsWorldOptions` form is
-  deferred for the recorded bundle reason (a static `@four/physics` import would put a
+  deferred for the recorded bundle reason (a static `@fourjs/physics` import would put a
   solver in every UI bundle — the third instance of the deferred-string-selection
   pattern; the import is type-only, zero runtime bytes). **`assets`** (§76's
   `app.assets`, instance form — the manager carries its own host seams).
@@ -3522,7 +3522,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 #### Added
 
 - **§60a colour management (R-15)** — v1's highest-leverage open render item.
-  `@four/math` gains the colour tier: `ColorRGB` (hoisted from `@four/scene`, exactly
+  `@fourjs/math` gains the colour tier: `ColorRGB` (hoisted from `@fourjs/scene`, exactly
   what R-13's emissive note asked for — the duplicate gate confirms 0), `ColorSpace`,
   the sRGB transfer functions (piecewise IEC 61966-2-1, component + RGB/RGBA
   out-param forms, **odd-extended below zero** so extended-range values round-trip
@@ -3664,11 +3664,11 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 
 #### Added
 
-- **§59 `StandardMaterial` — metallic-roughness PBR (R-13).** `@four/materials` gains
+- **§59 `StandardMaterial` — metallic-roughness PBR (R-13).** `@fourjs/materials` gains
   §57's sixth family member: `baseColor` (+ optional base-colour `map`), `metalness`
   (default 0), `roughness` (default 1), `emissive` (straight RGB; unclamped
   pass-through already gives HDR emissive, so no unnamed `emissiveIntensity` field).
-  `@four/render-webgl` gains a sixth pipeline (`StandardProgram`): Cook-Torrance GGX +
+  `@fourjs/render-webgl` gains a sixth pipeline (`StandardProgram`): Cook-Torrance GGX +
   height-correlated Smith + Schlick Fresnel against §68's one directional light and
   the scene ambient, with the **1/π folded out of both lobes** — the engine's
   radiometric convention is now written down (light colour × intensity is an
@@ -3688,7 +3688,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
   pipeline emits the transcript recorded at `e0ddd3b` call for call (pinned in
   `tests/integration/standard-material.test.ts`); browser 49/49, goldens
   byte-unchanged. The duplicate-symbol gate refused a second `ColorRGB` export —
-  the shared RGB alias belongs in `@four/math` with R-15's colour packet (inline
+  the shared RGB alias belongs in `@fourjs/math` with R-15's colour packet (inline
   tuple + dated note instead).
 
 #### Changed
@@ -3704,14 +3704,14 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 
 #### Added
 
-- **§85 development/production builds (A-4).** `@four/core` exports `DEV`, `devWarn`,
+- **§85 development/production builds (A-4).** `@fourjs/core` exports `DEV`, `devWarn`,
   `devWarnOnce`, `devAssert`, `resetDevWarnings`, resolved from an optional
   `__FOUR_DEV__` global (`typeof … ? … : true` — read only under `typeof`, so an
   unaware host cannot crash). **Dev is the default; you opt out**: bare consumption,
   Vitest, and the determinism suites are development builds automatically; a bundler
   `define: { __FOUR_DEV__: "false" }` folds the guarded paths away. `devAssert` skips
   its check entirely in production — and every `FourError` stays unconditional (§85's
-  "essential safety checks" asymmetry, deliberate). `@four/diagnostics` gains
+  "essential safety checks" asymmetry, deliberate). `@fourjs/diagnostics` gains
   `auditResourceLeaks` — §83's first development warning, an **audit you call, not a
   watcher that runs** (only the caller knows which span was supposed to balance;
   `FinalizationRegistry` rejected again for the A-5 reason).
@@ -3747,7 +3747,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
   `SpringJoint` pendulum (spring period 0.5 s inside a 2.9 s swing, so it bounces
   _and_ swings), a bouncing body whose §29 landings drive a particle burst and a
   re-launch impulse, a motorised `HingeJoint`, two world-space labels (one rides the
-  body), a `@four/ui` panel parented to the camera (screen-space until §46 layers land
+  body), a `@fourjs/ui` panel parented to the camera (screen-space until §46 layers land
   — a second viewport would draw the whole scene twice; documented), a §16 `Timeline`
   with a lap marker, and pause / slow-motion / single-step controls, keyboard-operable.
   **First example to use the §62/§37 registries** (`renderer: "auto"`,
@@ -3782,15 +3782,15 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 - **§83 resource accounting (gap A-5).** `BufferGeometry.byteLength`,
   `Texture.byteLength`, `RenderTarget.byteLength` (colour + the backend's real
   `DEPTH_COMPONENT16` when `depth`), and process-wide live totals:
-  `geometryMemoryBytes()`/`liveGeometryCount()` (`@four/geometry`),
+  `geometryMemoryBytes()`/`liveGeometryCount()` (`@fourjs/geometry`),
   `textureMemoryBytes()`/`liveTextureCount()`/`liveRenderTargetCount()`
-  (`@four/render`). **Leak-safe by holding numbers, not references** (a tracker
+  (`@fourjs/render`). **Leak-safe by holding numbers, not references** (a tracker
   retaining its resources would _be_ the leak; a `WeakRef` registry answers "was this
   collected?", not §83's "was this disposed?"). A resource dropped without `dispose()`
   stays billed — a counter that healed itself on GC would hide the only thing it
   exists to show. One rule ("a disposed resource holds nothing": `byteLength → 0`)
   makes double-dispose, resurrection-by-setter, and delta arithmetic fall out with no
-  call-site special cases. `recordResourceMemory` in `@four/diagnostics` is the §84
+  call-site special cases. `recordResourceMemory` in `@fourjs/diagnostics` is the §84
   bridge — deliberately two numbers, not a transcribed record (no producer-owned shape
   exists, so the seam is allocation-free by construction; the duck-typed-contract
   count stays at five).
@@ -3840,7 +3840,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 #### Added
 
 - **`docs/rfcs/0001-shader-and-node-material-system.md` (§60, gap R-14)** — a
-  serializable shader graph in `@four/materials` as the unit of extension; **no user
+  serializable shader graph in `@fourjs/materials` as the unit of extension; **no user
   GLSL/WGSL at any tier**. The argument is R-5/R-6's opacity principle, not only §96: a
   source string makes every user §70 pass unvalidatable exactly where feedback and
   ordering mistakes live, while a graph keeps `RenderGraph.validate()` able to
@@ -3864,7 +3864,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
   scene-graph nodes (§42 authority, §19 blending, and §79 serialization then need no
   new mechanism), skinned draws as a separate lazily-compiled pipeline (a vertex-stage
   branch would tax every unskinned draw). Two findings: §54's `morphTargetWeights` on
-  `Mesh` is **unanimatable under §3.1** and becomes a `@four/scene` component; §17's
+  `Mesh` is **unanimatable under §3.1** and becomes a `@fourjs/scene` component; §17's
   two "missing track types" are binding gaps, not `ValueKind` gaps. Status draft,
   owner decision pending — bone-axis convention is the named question.
 
@@ -3876,7 +3876,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
   Backends and solvers register themselves into a neutral host via an **explicit call**
   (`registerWebglRenderer()`, `registerRapierSolver()`) — never a side-effect import,
   which `"sideEffects": false` on all 24 packages makes _correctly deletable_ by any
-  bundler; `four` and `@four/physics` still import no backend and no solver. `"auto"`
+  bundler; `four` and `@fourjs/physics` still import no backend and no solver. `"auto"`
   walks §62's WebGPU → WebGL 2 → Canvas 2D → SVG order for renderers (registration
   order deliberately not consulted — §33; the headless tier is never auto-selected;
   fallback past a rejecting `initialize` disposes what it built and reports each skip
@@ -3910,7 +3910,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 
 #### Added
 
-- **`AnimationController` in `@four/animation` (PH-9, §18)** — declarative states over
+- **`AnimationController` in `@fourjs/animation` (PH-9, §18)** — declarative states over
   clips; transitions with **typed conditions** (`{parameter, is, value}` — all six
   numeric comparisons, Booleans, latched triggers; the string DSL `"speed > 0.1"` was
   deliberately not built: a parser is a second §33 surface, staged as optional sugar),
@@ -3940,14 +3940,14 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 
 #### Added
 
-- **§70 post-processing at the full-screen effect tier (R-6).** `@four/render` gains
+- **§70 post-processing at the full-screen effect tier (R-6).** `@fourjs/render` gains
   `EffectRenderPass` — a **third `RenderGraph` pass kind**, not an escape-hatch pass:
   a pass whose sampling is a _field_ (`source`) is validated exactly with no traversal,
   the inverse of the `CustomRenderPass` opacity problem — plus the **closed**
   `ScreenEffect` union (`"copy"`, `"grade"`: exposure → contrast → saturation),
   `COPY_EFFECT`, `COLOR_GRADE_DEFAULTS`, `validateEffectRenderPass`,
   `supportsScreenEffects`, and the optional `Renderer.renderEffect` (presence is the
-  capability, the A-1 stance). `@four/render-webgl` gains `EffectProgram` — a
+  capability, the A-1 stance). `@fourjs/render-webgl` gains `EffectProgram` — a
   full-screen-triangle pipeline compiled at initialization beside the other four (§61
   forbids compiling inside a frame) — and `WebglRenderer.renderEffect`, with all state
   borrowing inside the F13 envelope. Ping-pong chains between two `RenderTarget`s are
@@ -3970,7 +3970,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
   compiled-at-init pipeline costs 0.75 kB gzip per example bundle, and the conflict is
   structural, measured, not code golf: **even a stubbed `renderEffect` exceeds the old
   limit by 99 B** — "compile at init" (§61) and the 30 kB budget were provably
-  incompatible; ui-demo sat at 98.9% of budget before this packet. `@four/render`'s
+  incompatible; ui-demo sat at 98.9% of budget before this packet. `@fourjs/render`'s
   half tree-shakes completely (grep-verified: zero effect bytes in bundles); the GL
   half cannot (nothing reachable from a class method tree-shakes — second instance of
   A-1's cannot-tree-shake class; A-4's `__FOUR_DEV__`/opt-in seam is the recorded
@@ -3980,7 +3980,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 
 #### Added
 
-- **§40 `UnitSystem` in `@four/core`** — `UnitSystem`, `SI_UNITS`, `resolveUnitSystem`
+- **§40 `UnitSystem` in `@fourjs/core`** — `UnitSystem`, `SI_UNITS`, `resolveUnitSystem`
   (returns the shared frozen `SI_UNITS` with zero allocation when given nothing),
   `{angle,time,length,mass}{To,From}Display`, the SI accessors §101 will read
   (`worldLengthToMeters` …), `unitSymbol`, and `format{Length,Mass,Time,Angle}`.
@@ -3992,7 +3992,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
   (exact identity) and gets no symbol (§40 supplies no label field).
 - **The display-only rule is enforced mechanically**:
   `tests/integration/units-display.test.ts` fails if any package source outside
-  `@four/core` imports the module (visible `ALLOWED` allowlist), and proves authoring
+  `@fourjs/core` imports the module (visible `ALLOWED` allowlist), and proves authoring
   through the helpers is **bit-identical** to authoring in engine units on a real
   motion command — because the conversions are measurably inexact in their last bits
   (8.8% of degree round trips, 2.5% of millisecond ones), a solver calling them would
@@ -4006,7 +4006,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 
 #### Added
 
-- **`RenderGraph` in `@four/render` (R-5, §63)** — an ordered, named, individually
+- **`RenderGraph` in `@fourjs/render` (R-5, §63)** — an ordered, named, individually
   enableable list of render passes executed by one `execute(renderer, interpolation?)`
   call, each pass one `renderer.render(root, views, interpolation, target)` over R-4's
   seam — asserted **transcript-identical** to the hand-written calls it replaces, which
@@ -4064,7 +4064,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 
 #### Added
 
-- **`SolverBodyTuningAccess` (`@four/physics`)** — the §37 seam for post-registration
+- **`SolverBodyTuningAccess` (`@fourjs/physics`)** — the §37 seam for post-registration
   property changes: `setBodyMassProperties`, `setBodyDamping`, `setBodyGravityScale`,
   `setBodyCcdMode`, `setColliderMaterial`, `setColliderFilter`. Optional and
   **structurally detected** (`supportsSolverBodyTuning` / `missingSolverBodyTuning`),
@@ -4106,14 +4106,14 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 
 #### Added
 
-- **§84 runtime statistics (gap A-1).** `@four/diagnostics` gains `FrameStats` — §84's
+- **§84 runtime statistics (gap A-1).** `@fourjs/diagnostics` gains `FrameStats` — §84's
   **eleven** counters (the gap entry said twelve; the spec lists eleven, pinned by a
   test) — with `createFrameStats`/`resetFrameStats`/`copyFrameStats` (out-param),
   `recordRenderStatistics`, `recordSolverStatistics`, and `createMonotonicClock`.
-  `@four/render` gains `RenderStatistics` and an **optional `Renderer.statistics`
+  `@fourjs/render` gains `RenderStatistics` and an **optional `Renderer.statistics`
   capability — presence is the capability** (the `RendererCapabilities` stance applied
   to counters; a backend that cannot count omits the member instead of reporting
-  zeros); `@four/render-webgl` counts the draw calls, triangles, and instances it
+  zeros); `@fourjs/render-webgl` counts the draw calls, triangles, and instances it
   actually **submits** (a skipped geometry, disposed texture, zero-particle system, or
   lost-context frame counts nothing). `Application` gains `stats: FrameStats | null`,
   opt-in via `ApplicationOptions.stats` (default off) with an injectable `now` clock —
@@ -4139,13 +4139,13 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 
 - **Render targets (R-4, §61/§48/§63)** — `RenderTarget`, `RenderTargetOptions`,
   `RenderTargetFormat` (one-member `"rgba8"` union — unsupported formats are a compile
-  error), `RenderTargetTexture`, and `isRenderTargetTexture` in `@four/render`;
+  error), `RenderTargetTexture`, and `isRenderTargetTexture` in `@fourjs/render`;
   `Renderer.render` takes an optional fourth `target` argument; `RenderTargetCache`
   (FBO + RGBA8 colour texture + optional `DEPTH_COMPONENT16` renderbuffer,
-  completeness-checked, version-keyed, loss-aware) in `@four/render-webgl`.
+  completeness-checked, version-keyed, loss-aware) in `@fourjs/render-webgl`.
   **`RenderTarget.colorTexture` satisfies `MaterialTexture`**, so an off-screen pass is
   sampled by assigning it to any material's `map`/`texture` — no adapter, and
-  `@four/materials` was not touched at all. Target depth defaults **on** (a depth-less
+  `@fourjs/materials` was not touched at all. Target depth defaults **on** (a depth-less
   target would composite the same scene differently off-screen than on). Feedback loops
   are refused, not drawn (a material sampling the target being rendered into is skipped;
   ping-pong between two targets is the supported form). `bindFramebuffer` lives inside
@@ -4156,7 +4156,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
   pixel golden is unchanged; a permanent regression test pins the zero-framebuffer-call
   property. **R-5 (§63 render graph) and R-6 (§70 post-processing) are now unblocked.**
   Staged with dated notes: stencil (R-7), MRT, multisample, float formats, samplable
-  depth (§69), `readPixels` (needs `Rectangle2` in `@four/math`; §92 first consumer).
+  depth (§69), `readPixels` (needs `Rectangle2` in `@fourjs/math`; §92 first consumer).
   Deviations from the gap doc's sketch, documented in source: the target rides on
   `render` rather than `Viewport.renderTarget` (scene was outside the change's file
   set), and §61's `createRenderTarget` factory stays deferred **by decision** — a render
@@ -4167,7 +4167,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 
 #### Added
 
-- **Six §73 controls in `@four/ui` (gap A-12, the unblocked half)** — `Toggle`,
+- **Six §73 controls in `@fourjs/ui` (gap A-12, the unblocked half)** — `Toggle`,
   `Checkbox`, `RadioButton` (exclusive by **group name scoped to the tree**, the same
   scope `focusedWidget` uses; enforced on the transition to checked only, never at
   construction or attach, so a §79 document reloads exactly as saved), `Slider` (§72
@@ -4196,7 +4196,7 @@ PhysicsWorld({ …, poses })`; the factory form exists because a world built bef
 
 #### Added
 
-- **`@four/diagnostics`: `debugDrawStreams(buffer, out?)` + `applyDebugDrawStreams`
+- **`@fourjs/diagnostics`: `debugDrawStreams(buffer, out?)` + `applyDebugDrawStreams`
   (R-35)** — de-interleaves a `DebugDrawBuffer`'s 7-float layout into exactly-sized
   `positions`/`colors` `Float32Array`s whose field names spread straight into
   `BufferGeometryOptions` (`new BufferGeometry({ ...streams, mode: "lines" })` is the
@@ -4223,7 +4223,7 @@ against HEAD after R-19/R-20 moved the code around them.
 
 #### Fixed
 
-- **`@four/render-webgl`: a mid-frame exception no longer corrupts rendering permanently
+- **`@fourjs/render-webgl`: a mid-frame exception no longer corrupts rendering permanently
   (F13).** The §57 GL state mirror moved from module scope onto each `WebglRenderer`, and
   `render` wraps its draw work in `try`/`finally` so the state restore, texture unbind,
   and vertex-array unbind always run. Previously any throw from application code (a
@@ -4236,7 +4236,7 @@ against HEAD after R-19/R-20 moved the code around them.
   (verified against a baseline copy). The R-19 program-lifetime uniform mirrors were
   audited and deliberately left alone: they belong to the program object, as does the
   uniform they track, so they survive a throw correctly.
-- **`@four/materials`: `opacity` and `blendMode` validate on assignment, not only at
+- **`@fourjs/materials`: `opacity` and `blendMode` validate on assignment, not only at
   construction (F14).** `material.opacity = NaN` used to reach `uniform4fv`; `blendMode`
   was never validated at all. Both are now accessors applying the constructor's rules
   (§85 finite; §57's modes), rejecting before the first write. Out-of-range opacity still
@@ -4334,7 +4334,7 @@ citations to 40+.
 
 #### Security
 
-- **`@four/assets`**: `AssetManagerOptions.maximumBytes` (default 64 MiB) checked against
+- **`@fourjs/assets`**: `AssetManagerOptions.maximumBytes` (default 64 MiB) checked against
   `content-length` **before** the body is read _and_ against the body a loader actually
   reads (a lying header is caught by the second check — tested), and `timeoutSeconds`
   (default 30, injectable `TimerLike`; seconds per repo convention — milliseconds appear
@@ -4344,8 +4344,8 @@ citations to 40+.
   pin a refcount forever); caller-driven abort remains, with its compatible design
   (`FetchLike<TSignal>` + injected abort handle) recorded in `asset-manager.ts` — the
   naive `signal` widening is proven incompatible with `typeof fetch`.
-- **`@four/serialization` / `@four/diagnostics`**: new `decodeSceneDocument(text, limits?)`
-  (§79) and `decodeReplayRecording(text, limits?)` (§34) route through `@four/core`'s new
+- **`@fourjs/serialization` / `@fourjs/diagnostics`**: new `decodeSceneDocument(text, limits?)`
+  (§79) and `decodeReplayRecording(text, limits?)` (§34) route through `@fourjs/core`'s new
   `parseUntrustedJson` — `maximumTextLength` (32 Mi code units) and `maximumDepth` (1024
   levels, walked **iteratively**: a recursive checker would overflow on exactly the input
   it refuses; the vulnerability is proven by tests showing the unguarded validators
@@ -4376,7 +4376,7 @@ set stopped at box/plane.
   instance transform) stay deferred with the existing notes.
 - **`UnlitMaterial.map` / `.vertexColors`, `LitMaterial.map`** — the texture contract is
   the new `MaterialTexture` (`packages/materials/src/texture.ts`); `SpriteTexture` stays
-  exported as an alias, so `@four/render`'s `Texture` is untouched. The lit map multiplies
+  exported as an alias, so `@fourjs/render`'s `Texture` is untouched. The lit map multiplies
   the base colour **before** the lighting term.
 - **Nine 3D primitives (R-20, §53)** — `sphere`, `cylinder`, `cone`, `capsule`, `torus`,
   `lathe`, `extrude`, `tube`, `heightField`: Y-up, centred, CCW, analytic normals, uvs.
@@ -4415,10 +4415,10 @@ limits (ui-demo 28.1/30 kB — 1.9 kB headroom left).
   the discovered blocker that **the five reserved stubs cannot be `ignore`d** while the
   umbrella `four` depends on and re-exports them (Changesets validation refuses it,
   reproduced); they will publish unless the owner decides otherwise.
-- **`tools/apply-publish-names.mjs`** + `node --test` suite — applies the §98 `@four/*` →
+- **`tools/apply-publish-names.mjs`** + `node --test` suite — applies the §98 `@fourjs/*` →
   `@danielsimonjr/fourjs-*` mapping into a staging copy, never in place. It must (and
   does) rewrite **emitted code**, not just manifests: `dist/*.js`/`.d.ts` carry
-  `from "@four/core"` workspace specifiers (405 rewrite sites), and `workspace:*` ranges
+  `from "@fourjs/core"` workspace specifiers (405 rewrite sites), and `workspace:*` ranges
   are resolved the way pnpm would. A test asserts the umbrella's 25 subpath exports
   survive the rewrite (§91 tree-shaking).
 - **`.github/workflows/release.yml`** — reuses the whole of `ci.yml` via a new
@@ -4444,7 +4444,7 @@ limits (ui-demo 28.1/30 kB — 1.9 kB headroom left).
 - **`tools/generate-compatibility.mjs`** — emits the solver-adapter block of that document
   from the adapters' own §37 capability declarations, read off constructed instances of the
   built packages, with `SolverBodyAccess` / `SolverJointAccess` probed structurally against
-  `@four/physics`'s emitted declarations. `--check` fails when the committed document has
+  `@fourjs/physics`'s emitted declarations. `--check` fails when the committed document has
   drifted; adding a third adapter adds a column with no tool edit.
 
 #### Changed
@@ -4455,28 +4455,28 @@ limits (ui-demo 28.1/30 kB — 1.9 kB headroom left).
 
 ### 2026-08-07 — A-10 closed, A-13 keyboard half closed: `KeyboardInput` + UI traversal
 
-The gap analysis's A-10 ("`@four/input` has exactly one input source") and the keyboard half
+The gap analysis's A-10 ("`@fourjs/input` has exactly one input source") and the keyboard half
 of A-13 ("`WidgetAccessibility` is fully inert") close together, because they are one
-feature: keys enter through `@four/input` and land on the focused widget through `@four/ui`.
+feature: keys enter through `@fourjs/input` and land on the focused widget through `@fourjs/ui`.
 Focus crosses that boundary as an **injected resolver** (`focusTarget(): Node | null`),
 never an import — §3.1's one-way `ui → input` edge stays frozen.
 
 #### Added
 
-- **`KeyboardInput` in `@four/input` (A-10, §70, §72)** — the keyboard analogue of
+- **`KeyboardInput` in `@fourjs/input` (A-10, §70, §72)** — the keyboard analogue of
   `PointerInput`: a duck-typed `KeySurface` (satisfied by `window`, `document`, or a plain
   test object; no DOM lib type named anywhere), `SceneKeyEvent` (`keydown`/`keyup`, `key`,
   `code`, grouped `modifiers`, `repeat`, plus `preventDefault()` forwarded to the platform
   event via `KeyDefaultSuppressor` — Tab and Space mean something to the host), and
   `dispatchKeyEvent`. `NodeEventMap` gains `keydown`/`keyup` + `capture:` pairs by the same
   declaration merging the pointer events use. `keypress` is deliberately absent (documented).
-- **`propagation.ts` in `@four/input`** — the three-phase machinery generalized out of
+- **`propagation.ts` in `@fourjs/input`** — the three-phase machinery generalized out of
   `pointer-events.ts`: `SceneInputEvent` (abstract `target`/`stopPropagation` base),
   `buildPropagationPath`, `dispatchThreePhase(event, path, type, captureKey)`. Listener keys
   are parameters, not string concatenation, so `emit` stays fully checked with no cast.
   `dispatchPointerEvent` / `ScenePointerEvent` / `buildPropagationPath` keep their exact
   public surface — no import path changed.
-- **Keyboard traversal in `@four/ui` (A-13, §75)** — `collectFocusOrder` (prune rules of
+- **Keyboard traversal in `@fourjs/ui` (A-13, §75)** — `collectFocusOrder` (prune rules of
   `collectPickables`; ascending `accessibility.tabIndex`, scene order on ties; negative
   `tabIndex` opts out of traversal but stays programmatically focusable),
   `keyboardFocusTarget(root)` (the resolver for `KeyboardInput`; falls back to the root so
@@ -4546,19 +4546,19 @@ through a serializer copied out of a test helper.
 
 #### Added
 
-- **`RIGID_BODY_SERIALIZER` and `COLLIDER_SERIALIZER` from `@four/physics` (PH-17, §23–§25,
+- **`RIGID_BODY_SERIALIZER` and `COLLIDER_SERIALIZER` from `@fourjs/physics` (PH-17, §23–§25,
   §79)** — with `serializeCollisionShape` / `deserializeCollisionShape` and the
   `RigidBodyDocument` / `ColliderDocument` / `PhysicsMaterialDocument` shapes. Declared
-  against `ComponentSerializerShape`, the structural transcription `@four/motion` already
+  against `ComponentSerializerShape`, the structural transcription `@fourjs/motion` already
   exports, **imported over the existing `physics → motion` edge** — so registering them into
-  `@four/serialization`'s registry needs no cast and adds no §3.1 edge, and the repository
+  `@fourjs/serialization`'s registry needs no cast and adds no §3.1 edge, and the repository
   holds one transcription rather than two that can drift. The same honest cost applies:
   nothing type-checks it against `ComponentSerializer`, so a transcribed-mirror assignability
-  test asserts it, as `@four/motion`'s suite does.
+  test asserts it, as `@fourjs/motion`'s suite does.
 - **`registerPhysicsSerializers()` on the umbrella `four` package** — registers both on a
   caller's registry and returns it. `registerSceneNodeTypes()` calls it, so one call now
   covers the §73 widgets, `MotionComponent`, `RigidBody`, and `Collider`; it stays separate
-  so a headless simulation need not pull `@four/ui` and `@four/text` into its bundle (§91).
+  so a headless simulation need not pull `@fourjs/ui` and `@fourjs/text` into its bundle (§91).
 
 #### Changed
 
@@ -4606,7 +4606,7 @@ contradicted.
   the emission over the registry — so every byte-identical round-trip test still holds.
 - **A restored node id can no longer be re-issued to a node built after the load (A-17,
   §79).** `NodeOptions.id` restores an id at construction _and reserves it_ against
-  `@four/scene`'s monotonic counter; `restoreNodeId` moved into `@four/scene` (the module
+  `@fourjs/scene`'s monotonic counter; `restoreNodeId` moved into `@fourjs/scene` (the module
   that owns the field) for the `nodeFactory` path that cannot use the constructor, and
   `instantiateScene` refuses a document producing one id twice with `INVALID_SCENE_GRAPH`.
 - **§34 replay documents carry the world configuration they were captured under (PH-6).**
@@ -4630,14 +4630,14 @@ contradicted.
   disk keeps validating and re-encoding identically. A version-1 document carrying a
   configuration is refused rather than silently upgraded; deleting the field from a version-2
   document and re-validating yields a valid version 1.
-- **`MOTION_COMPONENT_SERIALIZER` from `@four/motion` (PH-17, §11, §79)** — declared against
+- **`MOTION_COMPONENT_SERIALIZER` from `@fourjs/motion` (PH-17, §11, §79)** — declared against
   a structural `ComponentSerializerShape` so no `motion → serialization` dependency edge is
   needed (the `ParticleDrawable` / `ReplayTarget` duck-typing pattern).
 - **`registerSceneNodeTypes()` / `registerUISerializers()` from the umbrella `four` package
   (A-14, §73, §79).** §73 promises UI objects "share … serialization"; a `Panel`/`Label`/
   `Button` tree previously round-tripped as bare `Node` state. It now round-trips completely
   — §74 box model and layout, interaction flags, §75 accessibility record — through the one
-  package allowed to see both `@four/ui` and `@four/serialization`.
+  package allowed to see both `@fourjs/ui` and `@fourjs/serialization`.
 - **`SceneNodeDocument.data` and `SerializeSceneOptions.nodeDataOf` (§79).** One opaque JSON
   value per node, written by the application and handed back verbatim to `nodeFactory` — the
   seam subclass state needed and the format did not have. Distinct from §6's `metadata`,
@@ -4673,7 +4673,7 @@ contradicted.
 #### Deliberately not done
 
 - `RigidBody` / `Collider` component serializers (the rest of PH-17). They belong in
-  `@four/physics`, which this change could not touch; they are tracked in `TODO.md`.
+  `@fourjs/physics`, which this change could not touch; they are tracked in `TODO.md`.
 
 ### 2026-08-05 — documentation-truth sweep
 
@@ -4740,20 +4740,20 @@ The minimal defensible tier: one directional light, Lambert diffuse plus a scene
 ambient term. No shadows, no point/spot lights, no PBR — each staged with a dated
 note where its design will land (§69, §59, §60a; see `docs/AUDIT-120.md` S-5).
 
-- `@four/scene`: `DirectionalLight` node (color + intensity, shines along its node's
+- `@fourjs/scene`: `DirectionalLight` node (color + intensity, shines along its node's
   −Z world axis — the camera look convention; `getWorldDirection(out)` resolves on
   demand) and `Scene.ambientLight`, §68's "ambient" as a scene-wide term.
-- `@four/materials`: `LitMaterial` mirroring `UnlitMaterial` (color-only, same §60a
+- `@fourjs/materials`: `LitMaterial` mirroring `UnlitMaterial` (color-only, same §60a
   no-color-space/no-clamp stance); both surface materials now carry a `kind`
   pipeline discriminant.
-- `@four/geometry`: optional `normals` vertex attribute on `BufferGeometry`
+- `@fourjs/geometry`: optional `normals` vertex attribute on `BufferGeometry`
   (index-aligned with positions, §85-validated); `boxGeometry` now emits 24
   vertices with per-face normals (same 12 triangles), `planeGeometry` +Z normals;
   2D shapes stay position-only and unlit.
-- `@four/render`: `"lit"` render-item kind chosen from `material.kind`;
+- `@fourjs/render`: `"lit"` render-item kind chosen from `material.kind`;
   backend-independent `collectSceneLights` with duck-typed light discovery
   (first light in scene-graph order; render-list-identical visibility pruning).
-- `@four/render-webgl`: fourth GL program (`LitProgram`; normal matrix derived
+- `@fourjs/render-webgl`: fourth GL program (`LitProgram`; normal matrix derived
   in-shader, no-light frames upload black and need no shader variant), normal
   stream at fixed attribute location 1, `uniform3fv` added to the GL seam.
 
@@ -4770,7 +4770,7 @@ Owner-directed: implement the recorded backlog, deferring nothing. One batch:
 
 #### Added
 
-- **UI browser proof** — `examples/ui-demo` (a `@four/ui` panel of buttons and
+- **UI browser proof** — `examples/ui-demo` (a `@fourjs/ui` panel of buttons and
   labels, app-supplied `WidgetSkin`s, real pointer + keyboard interaction,
   25 kB gzip) and `tests/browser/ui.spec.ts` (4 tests). Closes the plan's one
   recorded packet-intent shortfall (WP-11.5). `.size-limit.json` gains the
@@ -4848,25 +4848,25 @@ every issue in `docs/Architecture/` is now zero, and the gates hold it there.
 
 - **All 5 baselined TRUE_DUPLICATE names consolidated** —
   `duplicate-baseline.json` re-seeded to empty:
-  - `SeededRandom` → `@four/core` (`core/src/random.ts`, the WP-8.2 original
+  - `SeededRandom` → `@fourjs/core` (`core/src/random.ts`, the WP-8.2 original
     verbatim; both copies carried this exact hoist as their dated plan).
-    `@four/motion` and `@four/particles` re-export it; streams are unchanged
+    `@fourjs/motion` and `@fourjs/particles` re-export it; streams are unchanged
     for every seed. Motion's known-answer tests moved to `core/tests/`;
     particles' independent BigInt-oracle suite stays put and still pins
     stream identity.
-  - `JsonValue` + `cloneJsonValue` → `@four/core` (`core/src/json.ts`),
-    keeping `@four/serialization`'s `__proto__` refusal — the strengthening
-    both files' notes wanted shared. Behavior change in `@four/diagnostics`:
+  - `JsonValue` + `cloneJsonValue` → `@fourjs/core` (`core/src/json.ts`),
+    keeping `@fourjs/serialization`'s `__proto__` refusal — the strengthening
+    both files' notes wanted shared. Behavior change in `@fourjs/diagnostics`:
     a recorded payload with a `__proto__` own key is now refused with a
     `TypeError` instead of silently re-parenting the copy (the original
     contradicted its own "never carry a `__proto__` into the player"
     contract at the payload level). New `core/tests/json.test.ts` covers
     every branch; diagnostics/serialization re-export both names.
-  - `DEFAULT_GRAVITY_Y` → `@four/core` (`core/src/conventions.ts`, the
-    Appendix A normative default); `@four/physics` and `@four/particles`
+  - `DEFAULT_GRAVITY_Y` → `@fourjs/core` (`core/src/conventions.ts`, the
+    Appendix A normative default); `@fourjs/physics` and `@fourjs/particles`
     re-export.
-  - `ColorRGBA` → `@four/math` (`math/src/color.ts`, the value-type home
-    below both consumers); `@four/animation` and `@four/materials`
+  - `ColorRGBA` → `@fourjs/math` (`math/src/color.ts`, the value-type home
+    below both consumers); `@fourjs/animation` and `@fourjs/materials`
     re-export.
 - **Both type-only import cycles broken** (graph now reports 0 of any kind):
   - `scene/authority.ts ⇄ scene/node.ts`: `warnAuthorityConflict` now takes
@@ -4876,8 +4876,8 @@ every issue in `docs/Architecture/` is now zero, and the gates hold it there.
   - `physics/collider.ts ⇄ physics/rigid-body.ts`: `RigidBodyCollisionEvent`
     moved to `collider.ts`, and the three §29 collision keys of
     `RigidBodyEventMap` are merged in from there by declaration merging
-    (the `@four/input` → `NodeEventMap` pattern); `rigid-body.ts` keeps the
-    two §32 sleep keys and no longer imports `Collider`. The `@four/physics`
+    (the `@fourjs/input` → `NodeEventMap` pattern); `rigid-body.ts` keeps the
+    two §32 sleep keys and no longer imports `Collider`. The `@fourjs/physics`
     public surface is unchanged.
 - **All 21 "potentially unused exports" resolved**: the transcribed Rapier
   type subset in `physics-rapier/src/init.ts` had 21 interfaces exported but
@@ -4998,13 +4998,13 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 11 — Assets, Serialization, UI, Tooling, §113a; packets WP-11.1…WP-11.6 — THE FINAL PHASE)
 
-- `@four/serialization`: SceneDocument v1 with canonical validation, a
+- `@fourjs/serialization`: SceneDocument v1 with canonical validation, a
   component-class-keyed serializer registry, §80 migrations — byte-identical
   round trips; 84 tests, 100% coverage.
-- `@four/assets`: AssetManager (coalescing refcounted cache, disposal-aware image
+- `@fourjs/assets`: AssetManager (coalescing refcounted cache, disposal-aware image
   wrapper) + JSON/text/binary/image loaders; glTF staged with a dated note — 33
   tests, 100% coverage.
-- `@four/ui`: retained-mode Panel/Label/Button over a WidgetSkin visuals seam,
+- `@fourjs/ui`: retained-mode Panel/Label/Button over a WidgetSkin visuals seam,
   flex/stack/absolute layout, §72-driven state machines, focus management;
   accessibility mirror + keyboard staged — 90 tests, 100% coverage.
 - `benchmarks/`: a shared harness + five suites (math, scene, physics, animation,
@@ -5019,7 +5019,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 10 — Replay, Snapshots, Diagnostics, §33–34/§113; packets WP-10.1…WP-10.5)
 
-- `@four/diagnostics`: the §34 replay format (canonical serialization, strict base64,
+- `@fourjs/diagnostics`: the §34 replay format (canonical serialization, strict base64,
   adapter-validity refusal), `ReplayRecorder` + `ReplayPlayer` (host-supplied stepFn,
   periodic-snapshot seeking, slow motion, verify hooks), and `DebugDrawBuffer` with
   duck-typed providers (contacts/normals/impulses, velocities, origins, solver
@@ -5033,7 +5033,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 9 — Particles, §27/§36/§112; packets WP-9.1…WP-9.5)
 
-- `@four/particles`: SoA particle core (pool/emitter with seeded 4-draw spawn
+- `@fourjs/particles`: SoA particle core (pool/emitter with seeded 4-draw spawn
   contract, plane collision, over-lifetime ramps), the §27 force-field set
   (gravity/drag/wind/radial/vortex/bounded hash-noise turbulence/volumes), and a
   `ParticleSystem` at priority 500 — 174 tests, 100% coverage.
@@ -5050,7 +5050,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 8 — Advanced Motion, §111; packets WP-8.1…WP-8.5)
 
-- `@four/motion`: `PIDController` (§111 sketch verbatim, anti-windup, derivative on
+- `@fourjs/motion`: `PIDController` (§111 sketch verbatim, anti-windup, derivative on
   measurement), `SpringDamper` (exact matrix-exponential stepping), the Reynolds
   steering set + flocking with a seeded xorshift128 RNG (BigInt-oracle-pinned),
   ballistic/intercept trajectory prediction, and two-bone analytic IK — six new
@@ -5066,16 +5066,16 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 7 — Physics-Animation Blending, §19/§42/§110; packets WP-7.1…WP-7.8)
 
-- `@four/scene`: `PoseTarget` component (animation-drivable target poses with
+- `@fourjs/scene`: `PoseTarget` component (animation-drivable target poses with
   finite-difference history); the `"blended"` transform authority unlocked (§42's
   reserved value, guarded since Phase 2).
-- `@four/physics`: §19 blend weights on `RigidBody`; in-place body retype
+- `@fourjs/physics`: §19 blend weights on `RigidBody`; in-place body retype
   (`setBodyControlMode`) with velocity inheritance; the §19 pipeline inside
   `PhysicsWorld.step` (unweighted kinematic feed → solve → weighted lerp/slerp
   publish under `"blended"`, bit-identical at the weight extremes) plus
   `createPoseTargetCaptureSystem` at priority 299; `SolverBodyAccess.setBodyType`
   implemented on both Rapier adapters (verified in-place on live wasm).
-- `@four/animation`: root-motion MVP (loop-aware translation deltas from a designated
+- `@fourjs/animation`: root-motion MVP (loop-aware translation deltas from a designated
   clip track; rotational staged; seek never accumulates).
 - Integration: §19's four examples end-to-end on Rapier (17 tests) — the ragdoll
   cycle's kinematic→dynamic switch uses 6 ppm of its derived continuity bound.
@@ -5089,12 +5089,12 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 6 — Joints and Constraints, §28/§109; packets WP-6.1…WP-6.7)
 
-- `@four/physics`: §28 joint classes (Fixed/Hinge/Slider/Rope/Spring/Spherical +
+- `@fourjs/physics`: §28 joint classes (Fixed/Hinge/Slider/Rope/Spring/Spherical +
   Revolute/Prismatic/Ball aliases) over body-local descriptor unions; world-space
   anchors converted once at `world.addJoint`; live limits/motors via command queues;
   engine-level break monitoring with `jointbreak` events; `SolverJointAccess` seam;
   distance/gear staged with P6-1-citing errors — 109 new tests, still 100% coverage.
-- `@four/physics-rapier`: joint mapping in both dimensions (2D five types, 3D six)
+- `@fourjs/physics-rapier`: joint mapping in both dimensions (2D five types, 3D six)
   against measured 0.19.3 behavior — `reportsJointReactions: false` (no reaction API
   exists; breakable joints refused rather than faked), motor efforts as documented
   ForceBased gains, disabled motors as a measured-inert gain (bit-identical to
@@ -5117,7 +5117,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 5 — Physics API + Rapier Adapter, §108; packets WP-5.1…WP-5.9)
 
-- `@four/physics`: complete §20–§34 public API — types/shapes/descriptors/materials/
+- `@fourjs/physics`: complete §20–§34 public API — types/shapes/descriptors/materials/
   events/queries + the §37 `PhysicsSolverAdapter` contract with branded handles;
   `RigidBody` + `Collider` components (§26 command buffers, §29 typed events,
   density-derived mass per §23 restored by WP-5.2-fix1's authoredness rule);
@@ -5125,7 +5125,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   "physics" authority → dispatch-after-step; §30 queries with §21 2D naming; §33
   FNV-1a checksums; §34 snapshots with adapter validity metadata) and the
   `SolverBodyAccess` per-handle seam — 281 tests, 100% coverage.
-- `@four/physics-rapier`: Rapier 2D + 3D adapters on pinned
+- `@fourjs/physics-rapier`: Rapier 2D + 3D adapters on pinned
   `@dimforge/rapier{2d,3d}-compat@0.19.3` wasm — P5-6 shape tier, all four §22 body
   types, sensors, adapter-derived collisionstay, monotonic id registries, snapshot
   envelopes, honest capabilities (joints staged per P5-4) — 185 wasm-backed tests.
@@ -5142,7 +5142,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 4 — Animation Core, §107; packets WP-4.0…WP-4.9)
 
-- `@four/animation`: §15 easing (12 families × in/out/in-out, 34-key registry, pinned
+- `@fourjs/animation`: §15 easing (12 families × in/out/in-out, 34-key registry, pinned
   constants incl. a normalized damped-spring closed form); value adapters + property
   bindings (§16 resolved-once paths, in-place writes, zero-allocation hot paths);
   `Tween` builder (§15 API, last-started-wins conflict registry shared with the mixer,
@@ -5166,15 +5166,15 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 3a — Interaction, Sprites, Text MVP, §106a; packets WP-3a.1…WP-3a.7)
 
-- `@four/input`: §71 picking (ray from +Y-up NDC, AABB + oriented-box tests), §72-subset
+- `@fourjs/input`: §71 picking (ray from +Y-up NDC, AABB + oriented-box tests), §72-subset
   pointer routing with scene-graph propagation (`capture:`-prefixed capture-phase keys on
   the four propagating types), `NodeEventMap` augmentation, DragManager (near-plane
   unprojected world deltas handed to app callbacks; input never writes transforms) —
   80 tests, 100% coverage.
-- `@four/render`/`@four/materials`/`@four/render-webgl`: §55/§77 MVP textures + sprite
+- `@fourjs/render`/`@fourjs/materials`/`@fourjs/render-webgl`: §55/§77 MVP textures + sprite
   quads (`kind: "sprite"` render items, SpriteMaterial/SpriteTexture contract, GL texture
   uploads). §55 frame regions deferred (whole-texture mapping only; backlogged).
-- `@four/text`: §56 bitmap MVP tier — embedded 6×12 monospace font (95 printable ASCII,
+- `@fourjs/text`: §56 bitmap MVP tier — embedded 6×12 monospace font (95 printable ASCII,
   base-32 row encoding), glyph atlas, text layout (Y-up baselines); SDF staged — 48 tests,
   100% coverage.
 - Example upgrade: click-to-recolour palettes, pointer dragging with the §42
@@ -5187,10 +5187,10 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 3 — Renderer Foundation, §106; packets WP-3.1…WP-3.9)
 
-- `@four/scene`: §47 cameras (D8 depth ranges) + §48 viewport. `@four/geometry`/
-  `@four/materials`: BufferGeometry + primitives, UnlitMaterial. `@four/render`: §61
+- `@fourjs/scene`: §47 cameras (D8 depth ranges) + §48 viewport. `@fourjs/geometry`/
+  `@fourjs/materials`: BufferGeometry + primitives, UnlitMaterial. `@fourjs/render`: §61
   Renderer interface (context-loss contract) + NullRenderer, render lists incl. the §43
-  interpolated builder. `@four/render-webgl`: WebGL 2 backend over a structural GL seam
+  interpolated builder. `@fourjs/render-webgl`: WebGL 2 backend over a structural GL seam
   (fake-GL unit tests, 90 tests). `four`: renderer integration with RenderInterpolation.
 - Real moving example (14.88 kB gzip vs the 150 kB §86 gate) + Playwright browser gate
   (headless Chromium/SwiftShader; caught and fixed a real rAF-seed defect) + smoothness
@@ -5202,10 +5202,10 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 2 — Motion Foundation, §105; packets WP-2.1…WP-2.7)
 
-- `@four/motion`: five §38 integrators, MotionComponent + MotionSystem (pinned
+- `@fourjs/motion`: five §38 integrators, MotionComponent + MotionSystem (pinned
   semi-implicit update, §42 enforcement), eight §13 trajectories with pinned constructors,
   KinematicController (moveTo/rotateTo/followPath, channel state machines) — 200 tests.
-- `@four/scene`: TransformAuthority (§42, `blended` reserved via NOT_IMPLEMENTED),
+- `@fourjs/scene`: TransformAuthority (§42, `blended` reserved via NOT_IMPLEMENTED),
   PoseBuffer interpolation store (§43/§37 single owner, no write-back) — 114 tests.
 - Phase 2 exit: §105 demos vs independently derived closed forms (worst deviation
   3.1e-13), cross-process golden determinism; coverage ≥95% statements everywhere.
@@ -5213,17 +5213,17 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 #### Added (Phase 1 — Math, Scene, and Time, §104; packets WP-1.1…WP-1.14)
 
-- `@four/math`: mutable Vector2/3/4, Quaternion (shortest-arc slerp), column-major
+- `@fourjs/math`: mutable Vector2/3/4, Quaternion (shortest-arc slerp), column-major
   Matrix3/4 with §7 pivot compose, D8 projections, change-hooks, allocation counter —
   154 tests incl. zero-allocation proofs.
-- `@four/core`: typed EventEmitter (§6b), typeName-keyed component model (§6a),
+- `@fourjs/core`: typed EventEmitter (§6b), typeName-keyed component model (§6a),
   FourError (§89 + INVALID_APPLICATION_STATE) and Disposable — 57 tests.
-- `@four/scene`: Transform with the D3 dirty channel, Node/Group/Scene (D1 single
+- `@fourjs/scene`: Transform with the D3 dirty channel, Node/Group/Scene (D1 single
   inheritance, §46 lookups, cycle prevention), version-cached world-transform resolver —
   84 tests.
-- `@four/motion`: TimeState/Clock, the §10 fixed-step scheduler (clamp, droppedTime,
+- `@fourjs/motion`: TimeState/Clock, the §10 fixed-step scheduler (clamp, droppedTime,
   pause semantics), §39 SimulationSystem registry — 56 tests.
-- `@four/diagnostics`: D6 FNV-1a checksum with cross-checked immutable known-answer
+- `@fourjs/diagnostics`: D6 FNV-1a checksum with cross-checked immutable known-answer
   vectors — 28 tests. `four`: §45 Application composition root (headless) — 25 tests.
 - Phase 1 exit (`tests/determinism/`): 100-node/1000-frame golden-digest scenario, green
   in-process and in a fresh node process; coverage ≥95% statements in every package.
@@ -5234,7 +5234,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 #### Added (Phase 0 — Project Foundation, §103; plan packets WP-0.1…WP-0.15)
 
 - Working monorepo: root manifests with the pinned §3.2 toolchain, `tsconfig.base.json`,
-  Turborepo pipeline, all 24 `@four/*`/`four` packages scaffolded per the §3.4 template
+  Turborepo pipeline, all 24 `@fourjs/*`/`four` packages scaffolded per the §3.4 template
   (split dev/build tsconfigs, `tsc -b`, types-first exports; umbrella with per-package
   subpaths and a 23-package integration test), ESLint/Prettier config (type-checked,
   determinism bans per §33, named-exports rule), Vite example (`examples/first-2d-scene`),
@@ -5250,7 +5250,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 - npm publish names decided by the owner: umbrella `@danielsimonjr/fourjs`, sub-packages
   `@danielsimonjr/fourjs-<name>`, published from the personal scope (no org claim or
-  dispute). §98 note updated; workspace names remain `four`/`@four/*`; TODO owner item
+  dispute). §98 note updated; workspace names remain `four`/`@fourjs/*`; TODO owner item
   closed.
 
 #### Added (gap-closure pass)
@@ -5319,7 +5319,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   body-id order (§33); local-plane→XY mapping stated (§21); marker behavior under
   replay/snapshot-restore defined (§16); reduced motion added to §14; §40 unit options
   restricted to display/authoring conversion; `ForceField.sample` gains `out` (§27); §97
-  field of view converted to radians; cameras/viewports assigned to `@four/scene` (§98,
+  field of view converted to radians; cameras/viewports assigned to `@fourjs/scene` (§98,
   package README updated); Part VII group renamed "Renderables and 2D Vector Graphics";
   §6 audio marked plugin-provided.
 
@@ -5342,7 +5342,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   formally frozen at the pre-1.0 text), `website/README.md`, and the `core`/`motion`/
   `physics`/`geometry` package READMEs (transform authority incl. `blended`, seconds
   convention, Y-up in both dimensions, component model, revised adapter contract, camera
-  rigs in `@four/motion`, unit system in `@four/core`, tessellation as a geometry module).
+  rigs in `@fourjs/motion`, unit system in `@fourjs/core`, tessellation as a geometry module).
   Also fixed a pre-existing AGENTS.md error (phase order is Part IX, not VIII).
 - `docs/SPECIFICATION.md` bumped to **revision 1.2**: the §86 payload budget (minimal 2D
   application ≤ 150 kB gzip) was confirmed by the owner and its provisional marker removed;
@@ -5404,6 +5404,6 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 
 ### Earlier
 
-- Initial commit: directory scaffold (24 empty `@four/*` package directories, empty
+- Initial commit: directory scaffold (24 empty `@fourjs/*` package directories, empty
   `examples/`, `benchmarks/`, `tests/`, `tools/`, `website/`), specification PDF and
   extracted Markdown, `ERRATA.md`, `README.md`, MIT `LICENSE`.

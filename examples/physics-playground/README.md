@@ -2,7 +2,7 @@
 
 The §108 demonstration: **one** application, **one** canvas, **one** renderer, **one**
 `PhysicsSystem` — and **two** physics worlds, a `"2d"` one on the left and a `"3d"` one on
-the right, each driving its own Rapier solver through the same `@four/physics` API.
+the right, each driving its own Rapier solver through the same `@fourjs/physics` API.
 
 Both halves are built by the same function over the same helpers. Everything that differs
 between a plane simulation and a volume simulation is confined to two small records (a

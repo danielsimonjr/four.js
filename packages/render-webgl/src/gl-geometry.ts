@@ -62,8 +62,8 @@
  *   is already invalid and the context must not be touched (§61).
  */
 
-import type { RenderItem } from "@four/render";
-import { warnDisposedInUse } from "@four/render";
+import type { RenderItem } from "@fourjs/render";
+import { warnDisposedInUse } from "@fourjs/render";
 
 import {
   COLOR_ATTRIBUTE_LOCATION,
@@ -78,10 +78,10 @@ import {
 import type { GlBuffer, GlVertexArray } from "./gl-program.js";
 
 /**
- * The geometry type this cache stores, taken from `@four/render`'s render item
- * rather than imported from `@four/geometry`.
+ * The geometry type this cache stores, taken from `@fourjs/render`'s render item
+ * rather than imported from `@fourjs/geometry`.
  *
- * `@four/render-webgl`'s dependencies are `core`, `math`, and `render` (plan
+ * `@fourjs/render-webgl`'s dependencies are `core`, `math`, and `render` (plan
  * §3.1, frozen). Deriving the type from `RenderItem["geometry"]` gives the full
  * `BufferGeometry` surface — `id`, `version`, `positions`, `indices`, `mode`,
  * `drawCount` — with no new edge in the dependency matrix, and it stays correct

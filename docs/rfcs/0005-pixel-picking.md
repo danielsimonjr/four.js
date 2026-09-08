@@ -12,7 +12,7 @@ states the split this RFC exists to resolve:
 
 > the `R-23` half fell — every §50 shape answers `toPath()` with a §51 `Path`, so analytic
 > hit testing has its geometry. Still blocked on the pixel/GPU-id half: a render target
-> `@four/input` may not import. Wants an RFC, not a packet.
+> `@fourjs/input` may not import. Wants an RFC, not a packet.
 
 §71 asks for one unified picking API over seven strategies:
 
@@ -32,7 +32,7 @@ states the split this RFC exists to resolve:
   a normalized device coordinate and tests it against a per-candidate **local** AABB
   (the ray is transformed into local space, so the test is on the true oriented box).
 - The candidate list is passed in, not read off the scene, and the module says why:
-  `@four/input` depends on `core`, `math`, `scene` only (plan §3.1), so it cannot see
+  `@fourjs/input` depends on `core`, `math`, `scene` only (plan §3.1), so it cannot see
   `Renderable` or `BufferGeometry` and could not discover a node's bounds if it wanted to.
   The `Pickable` record — `{ node, boundsMin, boundsMax }` — is a **structural** candidate,
   which is why a UI rectangle (§73), a collider AABB (§21) and a hot zone with no drawn
@@ -42,13 +42,13 @@ states the split this RFC exists to resolve:
   list" is today's honest spelling of `hitTestMode = "none"`.
 - The analytic tier (`"geometry"` for §50 shapes) is **unblocked but unwritten**: `toPath()`
   landed with R-23/R-24, so the geometry an analytic test needs is reachable — by a layer
-  that may import `@four/geometry`, which `@four/input` still may not.
+  that may import `@fourjs/geometry`, which `@fourjs/input` still may not.
 - `readPixels` is **staged, not implemented, in both packages that would own it**. §61
   types it `readPixels?(target: RenderTarget, region?: Rectangle2): Promise<ArrayBuffer>`;
   `packages/render/src/renderer.ts` carries it as a typed TODO ("needs `Rectangle2`, which
-  `@four/math` does not define; §92's visual regression tier is its first consumer");
+  `@fourjs/math` does not define; §92's visual regression tier is its first consumer");
   `packages/render-webgl/src/gl-render-target.ts` says the same from the backend side
-  ("one entry point here, but `@four/math` has no `Rectangle2`").
+  ("one entry point here, but `@fourjs/math` has no `Rectangle2`").
 - Render targets themselves **do** exist (R-4, 2026-08-07): `RenderTarget` is a CPU-side
   descriptor with an id and a version, `colorTexture` satisfies `MaterialTexture`, depth
   _textures_ landed with R-18, stencil with R-7. Nothing about the target substrate blocks
@@ -58,7 +58,7 @@ states the split this RFC exists to resolve:
 
 Plan §3.1 is frozen and gives `input` exactly `core, math, scene`. A GPU-id or pixel-alpha
 pick needs, at minimum, a render target, a pass that draws into it, and a read-back — all
-three of which live in `@four/render` and a backend. So the strategy §71 names cannot be
+three of which live in `@fourjs/render` and a backend. So the strategy §71 names cannot be
 implemented in the package §98 charters as _"input sources and event propagation (§72),
 picking front end (§71)"_, and the fix is not an import: `input → render` would put input
 **below** the renderer in the layering, and `ui → input` would drag every UI application
@@ -67,7 +67,7 @@ into the renderer graph.
 This is the same shape as three settled precedents, which is why this RFC is short on
 invention:
 
-1. **`FetchLike`** — `@four/assets` names a _shape_ (`fetch`-compatible), the host supplies
+1. **`FetchLike`** — `@fourjs/assets` names a _shape_ (`fetch`-compatible), the host supplies
    a value, the browser adapter is five lines in the application.
 2. **`SurfaceSizedCamera`** — `Application.resize` feeds any camera with a `setSurfaceSize`
    method rather than testing `camera instanceof ScreenCamera`, so §47's custom projection
@@ -92,12 +92,12 @@ got wrong by an implementer who assumes the id is numeric.
 ## Proposed decision
 
 **Add a picking _service_ on the render side, and hand it to input as a structural
-provider. Do not give `@four/input` a render dependency, and do not give `@four/render` an
+provider. Do not give `@fourjs/input` a render dependency, and do not give `@fourjs/render` an
 input dependency.**
 
 Four parts.
 
-### 1. `@four/render` gains `PickingService` (§71's `"gpu"` and `"pixel"` tiers)
+### 1. `@fourjs/render` gains `PickingService` (§71's `"gpu"` and `"pixel"` tiers)
 
 A renderer-adjacent object that owns an offscreen `RenderTarget`, draws one id pass into it,
 and reads it back. It is constructed with a renderer, exactly like the render graph, and it
@@ -106,11 +106,11 @@ discipline applies verbatim: an application that never picks by pixel must carry
 this).
 
 ```ts
-// @four/render — sketch, not final signatures
+// @fourjs/render — sketch, not final signatures
 export interface PickRequest {
   /** The view the pick is against (§48); its camera supplies the projection. */
   readonly viewport: Viewport;
-  /** Normalized device coordinate, the same input `@four/input`'s ray pick takes. */
+  /** Normalized device coordinate, the same input `@fourjs/input`'s ray pick takes. */
   readonly ndcX: number;
   readonly ndcY: number;
 }
@@ -134,23 +134,23 @@ export interface PickingService extends Disposable {
 it wrote into the texel. Callers get the identity §6 defines; the encoding stays internal
 and can change (RGBA8 → R32UI on WebGPU) without a public break.
 
-### 2. The seam `@four/input` sees is structural and render-free
+### 2. The seam `@fourjs/input` sees is structural and render-free
 
 ```ts
-// @four/input — the whole of the new surface
+// @fourjs/input — the whole of the new surface
 export interface PickProvider {
   pick(ndcX: number, ndcY: number): Promise<string | undefined>;
 }
 ```
 
 That is the entire contract: two numbers in, a node id out, asynchronously. It names no
-render type, no target, no texture, no `Scene`, no `Viewport` — so `@four/input` gains **no
+render type, no target, no texture, no `Scene`, no `Viewport` — so `@fourjs/input` gains **no
 new dependency**, and the four-line adapter that closes over a `PickingService` and a
 `Viewport` lives in the application (or in `four`, which may import both). A test can
 satisfy `PickProvider` with a `Map` lookup and no GPU at all, exactly as `TextureSource`
 lets a test build a 2×2 checkerboard with no browser.
 
-`@four/input`'s existing synchronous `pick()` is **not changed and not deprecated**. The
+`@fourjs/input`'s existing synchronous `pick()` is **not changed and not deprecated**. The
 bounds tier stays the cheap default; the provider is what a pointer handler consults when
 the bounds tier is not precise enough.
 
@@ -196,11 +196,11 @@ adds two of its values.** Owner question 3 puts the alternative.
 
 ## Alternatives
 
-**A. Give `@four/input` a dependency on `@four/render`.** Loses on §3.1, which is frozen,
+**A. Give `@fourjs/input` a dependency on `@fourjs/render`.** Loses on §3.1, which is frozen,
 and on layering: `ui → input → render` puts the renderer under every UI application. It
 also breaks the property that makes pick.ts good — a `Pickable` need not be drawable.
 
-**B. Put picking entirely in `@four/four` (the umbrella).** Workable, and it is where the
+**B. Put picking entirely in `@fourjs/four` (the umbrella).** Workable, and it is where the
 _wiring_ goes. But the pass itself is a render pass — it needs the render list, the
 backend's program cache, and the target — and `four` may not reach into `render-webgl`'s
 internals any more than input may. The service belongs beside the graph that already owns
@@ -218,7 +218,7 @@ once `Rectangle2` exists. Deferred, with the reason recorded rather than assumed
 CPU question: sample the texture's alpha at the hit uv. This is much cheaper and needs
 **no renderer** — only a `TextureSource`'s `data`, which is already CPU-side. It is a real
 alternative for the sprite case and a non-answer for meshes and particles.
-**This RFC recommends doing D as well, in `@four/input`, as a `Pickable` extension** — it
+**This RFC recommends doing D as well, in `@fourjs/input`, as a `Pickable` extension** — it
 costs no new edge — and keeping the id buffer for the cases D cannot serve.
 
 **E. Do nothing; bounds plus analytic is enough for the MVP.** §120's MVP scope is
@@ -234,7 +234,7 @@ deferral with the seam already decided, which is still worth having.
 **Easier.** Meshes, particles, and shader-shaped content become pickable at all. Picking
 precision stops being a function of what geometry the input package can see. The
 `PickProvider` seam makes picking testable headlessly. §73's pixel-accurate UI hit testing
-gets an answer that does not require `@four/ui` to grow a renderer edge.
+gets an answer that does not require `@fourjs/ui` to grow a renderer edge.
 
 **Harder.** Picking acquires a frame of latency and a second render pass whose cost is
 proportional to the render list — meaning §86 gains a row and the pass must be opt-in per
@@ -250,8 +250,8 @@ obligation.
 
 ## Compatibility analysis
 
-- **Public API (§90 table 1):** additive. New exports in `@four/render`
-  (`PickingService`, `PickRequest`, `PickResult`) and one new interface in `@four/input`
+- **Public API (§90 table 1):** additive. New exports in `@fourjs/render`
+  (`PickingService`, `PickRequest`, `PickResult`) and one new interface in `@fourjs/input`
   (`PickProvider`). `pick()`'s existing signature is untouched.
 - **Scene format (§90 table 2):** unchanged, **unless** owner question 3 goes the other way
   and `node.hitTestMode` ships in this RFC — a new serialized `Node` field is a §79/§80
@@ -265,7 +265,7 @@ obligation.
   and must say so rather than silently degrading to bounds.
 - **`docs/COMPATIBILITY.md`:** the §71 row moves from "bounds only" to "bounds + gpu/pixel
   (WebGPU, WebGL 2)".
-- **Prerequisite:** `Rectangle2` in `@four/math`. §61's `readPixels(target, region?)`
+- **Prerequisite:** `Rectangle2` in `@fourjs/math`. §61's `readPixels(target, region?)`
   cannot be typed without it, and two packages already carry the staging note. This RFC
   does **not** claim that packet; it names it as a hard dependency.
 
@@ -312,15 +312,15 @@ exist yet. What the implementing packet must measure, in the shape §86 already 
 
 ## Open questions
 
-1. **Does `PickingService` live in `@four/render` or in a backend?** The pass needs the
+1. **Does `PickingService` live in `@fourjs/render` or in a backend?** The pass needs the
    backend's program cache and its framebuffer, which argues for `render-webgl`; the _type_
-   must be backend-neutral, which argues for `@four/render`. The render-graph precedent
+   must be backend-neutral, which argues for `@fourjs/render`. The render-graph precedent
    splits exactly this way (interface in `render`, execution in the backend) and this RFC
    assumes the split — but it means the service is an interface in one package and a class
    in another, and the owner may prefer one concrete home for the MVP's single backend.
 2. **Is `PickProvider` the right seam, or should input not know about picking-by-pixel at
    all?** The alternative is that the application consults the service directly in its
-   pointer handler and `@four/input` gains nothing. That is _less_ API and arguably more
+   pointer handler and `@fourjs/input` gains nothing. That is _less_ API and arguably more
    honest — but it means §72's propagation (capture → target → bubble) cannot dispatch on a
    pixel-picked target without the application re-implementing it. Recommendation: keep
    `PickProvider`, because event propagation is the thing input is for.
@@ -331,7 +331,7 @@ exist yet. What the implementing packet must measure, in the shape §86 already 
    a §79 serialized-field addition and a §90 scene-format row.
 4. **Alternative D (CPU pixel-alpha for sprites) — separate RFC, this packet, or never?**
    It needs no new edge and it answers §71's `"pixel"` for the most common 2D case at a
-   fraction of the cost. Recommendation: fold it into this RFC's scope as a `@four/input`
+   fraction of the cost. Recommendation: fold it into this RFC's scope as a `@fourjs/input`
    extension. It is only listed as a question because doing so makes one RFC cover two
    strategies with very different mechanics.
 5. **Does the `Rectangle2` prerequisite gate this, or does the service read back through a

@@ -43,15 +43,15 @@
  * and decorators are not.
  */
 
-import { SeededRandom } from "@four/core";
-import { createChecksum } from "@four/diagnostics";
+import { SeededRandom } from "@fourjs/core";
+import { createChecksum } from "@fourjs/diagnostics";
 import {
   Path,
   expandStroke,
   type Point2D,
   type Polyline2D,
   type StrokeGeometryOptions,
-} from "@four/geometry";
+} from "@fourjs/geometry";
 
 /** Seed of the random half of the catalogue. Fixed forever; it is the input. */
 export const SEED = 0x16b0a3d5;

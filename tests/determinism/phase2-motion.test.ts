@@ -20,11 +20,11 @@
  *    (the fresh-process test). Stated precisely, because the import graph does
  *    not say it on its own: `Application` is reachable only through `four`'s
  *    root barrel, which namespace-re-exports every workspace package including
- *    `@four/render-webgl`/`-webgpu`/`-canvas`/`-svg`. Those are still Phase 0
+ *    `@fourjs/render-webgl`/`-webgpu`/`-canvas`/`-svg`. Those are still Phase 0
  *    one-line stubs, so today nothing renderer-shaped even evaluates — but the
  *    guarantee this test can honestly make is behavioural, not structural, and
  *    it will need a `four/application` subpath (or a direct
- *    `@four/scene` + `@four/motion` composition) once Phase 3 puts real code
+ *    `@fourjs/scene` + `@fourjs/motion` composition) once Phase 3 puts real code
  *    behind those names. Filed by WP-2.7.
  * 3. **Deterministic in-process.** Two independent runs in one process produce
  *    byte-identical per-step digests, simulation and render poses alike.

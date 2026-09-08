@@ -17,8 +17,8 @@
  *
  * ## Why the candidates are passed in (`Pickable`), not read off the scene
  *
- * `@four/input` depends on `core`, `math`, and `scene` only (plan §3.1). It may
- * not import `@four/render` or `@four/geometry`, so it cannot see `Renderable`
+ * `@fourjs/input` depends on `core`, `math`, and `scene` only (plan §3.1). It may
+ * not import `@fourjs/render` or `@fourjs/geometry`, so it cannot see `Renderable`
  * or `BufferGeometry` and therefore cannot discover a node's bounds by itself —
  * and reversing that edge to let it try would put input below the renderer in
  * the layering, which the matrix forbids.
@@ -30,7 +30,7 @@
  * builds the list:
  *
  * ```ts
- * // in the application, which may import @four/geometry:
+ * // in the application, which may import @fourjs/geometry:
  * const bounds = renderable.geometry.computeBounds();
  * pickables.push({
  *   node: renderable,
@@ -77,7 +77,7 @@
  * §51's flattening tolerance included — through one exact code path instead
  * of a per-primitive zoo. **Ray/triangle intersection** is that tier's own
  * name. The **GPU identifier buffer** landed with RFC 0005 (2026-08-28) in
- * `@four/render` / `@four/render-webgl`, adapted by `four`'s
+ * `@fourjs/render` / `@fourjs/render-webgl`, adapted by `four`'s
  * `createPickProvider`; **pixel-alpha testing** for CPU-resident texels is
  * {@link Pickable.alphaMask} (alternative D). **Custom callbacks** are the
  * one §71 strategy still absent, and `HitTestMode` deliberately omits
@@ -110,14 +110,14 @@
  *
  * Both entry points are allocation-free in the steady state: module-level
  * scratch for the ray and the inverse matrix, and hit objects pooled per `out`
- * array exactly as `@four/render`'s render list pools its items. Nothing here
+ * array exactly as `@fourjs/render`'s render list pools its items. Nothing here
  * is re-entrant — single-threaded input handling never calls user code
  * mid-pick.
  */
 
-import { FourError } from "@four/core";
-import { Matrix4, Vector3, type DepthRange } from "@four/math";
-import { resolveWorldTransform, type Camera, type Node } from "@four/scene";
+import { FourError } from "@fourjs/core";
+import { Matrix4, Vector3, type DepthRange } from "@fourjs/math";
+import { resolveWorldTransform, type Camera, type Node } from "@fourjs/scene";
 
 /**
  * Clip-space depth convention assumed when a caller does not pass one: OpenGL's
@@ -333,14 +333,14 @@ export function createPickRay(
  * A picking result provider this package does not implement (§71's `"gpu"` /
  * `"pixel"` id-buffer tier; RFC 0005, 2026-08-28) — the structural seam that
  * lets §72's event propagation dispatch on a pixel-picked target without
- * `@four/input` gaining a render dependency.
+ * `@fourjs/input` gaining a render dependency.
  *
  * The whole contract: two normalized device coordinates in (the same
  * `[-1, 1]`, +Y-up pair {@link pick} takes), a `Node.id` out — or
  * `undefined` for "nothing there" — **asynchronously**, because every honest
  * GPU read-back is (RFC 0005 §4; a §9-tier explanation lives on
- * `@four/render`'s `PickingService`, which is one implementation of this
- * seam via `@four/four`'s `createPickProvider`). It names no render type, no
+ * `@fourjs/render`'s `PickingService`, which is one implementation of this
+ * seam via `@fourjs/four`'s `createPickProvider`). It names no render type, no
  * target, no texture, no scene — the fourth instance of the `FetchLike` /
  * `SurfaceSizedCamera` move — so a test satisfies it with a `Map` lookup and
  * no GPU at all:
@@ -414,13 +414,13 @@ export interface PickableAlphaMask {
  * what say a concave silhouette's notch, a circle's corner gap, or a mesh's
  * empty margin was *not* hit.
  *
- * The record is **structural** for the module header's reason: `@four/input`
- * may not import `@four/geometry` (plan §3.1), so the layout is
+ * The record is **structural** for the module header's reason: `@fourjs/input`
+ * may not import `@fourjs/geometry` (plan §3.1), so the layout is
  * `BufferGeometry`'s own (`positions`/`indices`) without naming it, and the
  * layer that sees geometry builds the record in one line:
  *
  * ```ts
- * // in the application, which may import @four/geometry:
+ * // in the application, which may import @fourjs/geometry:
  * pickable.triangles = { positions: geometry.positions, indices: geometry.indices };
  * ```
  *
@@ -519,7 +519,7 @@ interface HitPool {
 
 /**
  * Pools, keyed by the `out` array they serve — the same arrangement
- * `@four/render`'s render list uses, and for the same reason: two independent
+ * `@fourjs/render`'s render list uses, and for the same reason: two independent
  * live result lists (a hover query and a drag query) each keep their own hits,
  * and a discarded array takes its pool with it.
  */

@@ -1,17 +1,17 @@
 /**
  * JSON value typing and validation shared by every document format (§34, §79).
  *
- * Both persistence surfaces in the engine — `@four/diagnostics`' §34 replay
- * envelope and `@four/serialization`'s §79 scene document — are JSON on the
+ * Both persistence surfaces in the engine — `@fourjs/diagnostics`' §34 replay
+ * envelope and `@fourjs/serialization`'s §79 scene document — are JSON on the
  * wire, and both need the same two things: a type that says "representable
  * JSON, nothing else" ({@link JsonValue}) and a validating deep-copy that
  * enforces it ({@link cloneJsonValue}). Each package originally carried its own
  * copy because the §3.1 dependency matrix puts them side by side with no edge
  * between them; both copies carried a dated note naming the hoist into
- * `@four/core` as the fix. This module is that hoist (2026-08-04): one
+ * `@fourjs/core` as the fix. This module is that hoist (2026-08-04): one
  * definition, below every consumer, re-exported unchanged by both packages.
  *
- * The consolidated {@link cloneJsonValue} is `@four/serialization`'s variant —
+ * The consolidated {@link cloneJsonValue} is `@fourjs/serialization`'s variant —
  * the diagnostics original **plus** the `__proto__` refusal — because the
  * strengthening is correct everywhere: `JSON.parse` makes `__proto__` an
  * ordinary own property, and copying it with `copy[key] = …` would run the

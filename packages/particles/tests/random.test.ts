@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import { SeededRandom } from "../src/random.js";
 
 /**
- * `src/random.ts` is a deliberate copy of `@four/motion`'s `SeededRandom` (see
- * that file's provenance note: §3.1 gives `@four/particles` no motion
- * dependency, and `@four/core` has no RNG to hoist into yet). The copy is only
+ * `src/random.ts` is a deliberate copy of `@fourjs/motion`'s `SeededRandom` (see
+ * that file's provenance note: §3.1 gives `@fourjs/particles` no motion
+ * dependency, and `@fourjs/core` has no RNG to hoist into yet). The copy is only
  * worth anything if the two streams are **identical**, so this suite proves it
  * two ways:
  *
- * 1. **Stream identity** — three of `@four/motion`'s own known-answer vectors,
+ * 1. **Stream identity** — three of `@fourjs/motion`'s own known-answer vectors,
  *    transcribed verbatim from `packages/motion/tests/random.test.ts`
  *    (seeds `0`, `12345`, `0xffffffff`). If either copy's generator or seeding
  *    drifts, these fail here or there.
@@ -51,7 +51,7 @@ function referenceStream(seed: number): () => number {
 }
 
 /**
- * Three of `@four/motion`'s five pinned vectors, copied character for character
+ * Three of `@fourjs/motion`'s five pinned vectors, copied character for character
  * from `packages/motion/tests/random.test.ts`. **Do not regenerate these from
  * this package** — their whole purpose is to be the *other* copy's numbers.
  */
@@ -96,7 +96,7 @@ function draw(seed: number, count: number): number[] {
   return values;
 }
 
-describe("SeededRandom — stream identity with @four/motion (§33)", () => {
+describe("SeededRandom — stream identity with @fourjs/motion (§33)", () => {
   it("matches motion's pinned first eight outputs for three seeds", () => {
     for (const { seed, first8 } of MOTION_KNOWN_ANSWERS) {
       expect(draw(seed, 8), `seed ${seed}`).toEqual([...first8]);

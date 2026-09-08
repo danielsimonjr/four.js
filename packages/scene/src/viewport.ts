@@ -84,8 +84,8 @@ export interface Viewport {
    * rendered.
    *
    * §48 types this as `Color`, the engine-wide colour type that also accepts
-   * CSS-style strings. That type lands with `@four/materials` (§59, §60a), and
-   * `@four/scene` may not depend on `@four/materials` (plan §3.1 pins the
+   * CSS-style strings. That type lands with `@fourjs/materials` (§59, §60a), and
+   * `@fourjs/scene` may not depend on `@fourjs/materials` (plan §3.1 pins the
    * dependency matrix and forbids adding edges), so the field is a numeric RGBA
    * tuple here (decision, WP-3.2). Components are **linear-light**, matching the
    * §60a pipeline: a CSS string denotes sRGB and would need decoding, which is

@@ -2,7 +2,7 @@
  * §83's **leaked-resource** development warning via `FinalizationRegistry`
  * (A-5 / A-4 remainder, 2026-09-06).
  *
- * The counter audit in `@four/diagnostics` answers a *span* question: did
+ * The counter audit in `@fourjs/diagnostics` answers a *span* question: did
  * these live-instance counters climb between two readings? This module
  * answers a *lifetime* question: was a disposable constructed, dropped, and
  * then garbage-collected without `dispose()`?
@@ -11,9 +11,9 @@
  * site; a finalizer can, because {@link trackDisposable} captures the stack
  * (or an explicit `creationSite`) at construction.
  *
- * The implementation lives in `@four/core` so `@four/geometry`,
- * `@four/render`, and `@four/materials` can register at construction without
- * importing `@four/diagnostics` (dependency matrix). `@four/diagnostics`
+ * The implementation lives in `@fourjs/core` so `@fourjs/geometry`,
+ * `@fourjs/render`, and `@fourjs/materials` can register at construction without
+ * importing `@fourjs/diagnostics` (dependency matrix). `@fourjs/diagnostics`
  * re-exports the same functions as the public audit surface.
  *
  * ## Why a queue you drain, and not a warning from the finalizer
@@ -32,7 +32,7 @@
  * uses as its held-value callback.
  *
  * ```ts
- * import { trackDisposable, disposeTracked, auditFinalizedLeaks } from "@four/core";
+ * import { trackDisposable, disposeTracked, auditFinalizedLeaks } from "@fourjs/core";
  *
  * const texture = createTexture();
  * trackDisposable(texture, "level-atlas", "at loadLevel (demo.ts:40)");

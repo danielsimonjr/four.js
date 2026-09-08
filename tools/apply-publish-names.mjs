@@ -6,9 +6,9 @@
 //   exit 0 = clean, 1 = problems
 //
 // The owner decided on 2026-07-29 (spec §98, revision 1.6) that the workspace
-// keeps its short internal names — `four` and `@four/*` — and that the published
+// keeps its short internal names — `four` and `@fourjs/*` — and that the published
 // names live in the owner's personal npm scope: `four` → `@danielsimonjr/fourjs`
-// and `@four/<name>` → `@danielsimonjr/fourjs-<name>`. The spec says the mapping
+// and `@fourjs/<name>` → `@danielsimonjr/fourjs-<name>`. The spec says the mapping
 // "is applied mechanically at release time"; this is that mechanism.
 //
 // Two rules shape the whole script:
@@ -31,15 +31,15 @@
 //
 // The emitted code is renamed too, and it has to be: `tsc` writes the workspace
 // specifier straight through, so `packages/animation/dist/index.js` says
-// `from "@four/core"`. Publish that beside a manifest whose dependency is now
+// `from "@fourjs/core"`. Publish that beside a manifest whose dependency is now
 // `@danielsimonjr/fourjs-core` and every package resolves nothing — the rename
 // would ship broken on the first release and look fine in review. `rewriteCode`
 // therefore rewrites *quoted* workspace names in the staged `.js`/`.d.ts`: real
-// specifiers, the per-package `PACKAGE_NAME` constants, and the `from "four"`
+// specifiers, the per-package `PACKAGE_NAME` constants, and the `from "fourJS"`
 // lines inside JSDoc examples, all of which name the package rather than talk
-// about it. Unquoted prose (`` `@four/animation` — the public surface … ``) is
+// about it. Unquoted prose (`` `@fourjs/animation` — the public surface … ``) is
 // left alone, and so are READMEs, which already end with their own "Workspace
-// name `@four/x`; publishes as `…`" line. Rewriting prose mechanically is a
+// name `@fourjs/x`; publishes as `…`" line. Rewriting prose mechanically is a
 // different and much riskier job than rewriting a name, and it is not this
 // tool's.
 
@@ -59,9 +59,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = join(HERE, "..");
 
 /** Workspace name of the umbrella package (§98). */
-export const WORKSPACE_UMBRELLA = "four";
+export const WORKSPACE_UMBRELLA = "fourJS";
 /** Scope prefix every non-umbrella workspace package uses. */
-export const WORKSPACE_SCOPE = "@four/";
+export const WORKSPACE_SCOPE = "@fourjs/";
 /** Published name of the umbrella package (owner decision 2026-07-29). */
 export const PUBLISH_UMBRELLA = "@danielsimonjr/fourjs";
 /** Published-name prefix for every other package. */
@@ -144,7 +144,7 @@ export function checkRewrite(source, rewritten) {
   const expected = publishName(source.name);
   if (expected === null) {
     problems.push(
-      `"${source.name}" is not a workspace-owned name (expected "four" or "@four/*")`,
+      `"${source.name}" is not a workspace-owned name (expected "four" or "@fourjs/*")`,
     );
   } else if (rewritten.name !== expected) {
     problems.push(`name is "${rewritten.name}", expected "${expected}"`);
@@ -179,7 +179,7 @@ export function checkRewrite(source, rewritten) {
   const residue = JSON.stringify(rewritten).match(/@four\//g);
   if (residue) {
     problems.push(
-      `${residue.length} "@four/" string(s) survive in the rewritten manifest`,
+      `${residue.length} "@fourjs/" string(s) survive in the rewritten manifest`,
     );
   }
   if (!Array.isArray(rewritten.files) || rewritten.files.length === 0) {
@@ -196,8 +196,8 @@ const CODE_EXTENSIONS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"];
 // A quoted scoped workspace name is unmistakable, so it is rewritten wherever it
 // appears. The umbrella's bare `four` is an ordinary English word, so it is
 // rewritten only in the three positions where a string is a module specifier.
-// Subpaths included: `"@four/render-webgl/register"` is as real a specifier as
-// `"@four/render-webgl"`, and the validator below flags both. Matching only the bare
+// Subpaths included: `"@fourjs/render-webgl/register"` is as real a specifier as
+// `"@fourjs/render-webgl"`, and the validator below flags both. Matching only the bare
 // name left every subpath token behind and failed the run it was meant to protect.
 const SCOPED_STRING = /(["'])@four\/([a-z0-9-]+(?:\/[a-z0-9-]+)*)\1/g;
 const BARE_SPECIFIER =
@@ -333,7 +333,7 @@ function stagePackage(root, pkg, rewritten, outDir) {
     // one failure mode of this tool that a consumer discovers instead of CI.
     if (/(["'])@four\//.test(text)) {
       problems.push(
-        `${relative(outDir, file)}: a quoted "@four/" name survives in the staged file`,
+        `${relative(outDir, file)}: a quoted "@fourjs/" name survives in the staged file`,
       );
     }
   }

@@ -1,4 +1,4 @@
-# @four/animation
+# @fourjs/animation
 
 ## 0.0.1
 
@@ -6,5 +6,5 @@
 
 - Updated dependencies [13748d1]
 - Updated dependencies [13748d1]
-  - @four/scene@0.0.1
-  - @four/motion@0.1.0
+  - @fourjs/scene@0.0.1
+  - @fourjs/motion@0.1.0

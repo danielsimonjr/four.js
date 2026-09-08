@@ -23,7 +23,7 @@
  * invalidated per transform change. A sphere is rotation-invariant: its centre
  * is one point transform and its radius is a scalar that depends only on the
  * matrix's scale part, so the derivation is a fixed handful of arithmetic with
- * nothing to cache and nothing to invalidate. See `@four/math`'s `Frustum` for
+ * nothing to cache and nothing to invalidate. See `@fourjs/math`'s `Frustum` for
  * the same trade seen from the test's side.
  *
  * The radius is deliberately **the circumradius of the world-space AABB of the
@@ -41,8 +41,8 @@
  * a draw is submitted, and §33's tiers are defined over the simulation.
  */
 
-import type { BufferGeometry } from "@four/geometry";
-import type { Matrix4, Vector3 } from "@four/math";
+import type { BufferGeometry } from "@fourjs/geometry";
+import type { Matrix4, Vector3 } from "@fourjs/math";
 
 /**
  * A sphere in world space: everything a frustum test needs about an item.

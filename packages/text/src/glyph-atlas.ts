@@ -9,13 +9,13 @@
  *
  * ## Why the result is a plain object and not a `Texture` (decision, WP-3a.4)
  *
- * `@four/text` depends on `core`, `math`, and `geometry` — **not** on `render`,
- * `materials`, or `scene` (plan §3.1, frozen). `Texture` lives in `@four/render`
+ * `@fourjs/text` depends on `core`, `math`, and `geometry` — **not** on `render`,
+ * `materials`, or `scene` (plan §3.1, frozen). `Texture` lives in `@fourjs/render`
  * and cannot be imported here, and reversing that edge to get a convenience
  * constructor would put a text package underneath the renderer for the rest of
  * the project's life.
  *
- * So the atlas is **data**, and it is data in exactly the shape `@four/render`'s
+ * So the atlas is **data**, and it is data in exactly the shape `@fourjs/render`'s
  * `TextureSource` already accepts — `{ width, height, data }`, tightly packed
  * RGBA8, `width * height * 4` bytes, **row 0 is `v = 0`, the bottom row**. That
  * is a *structural* agreement, checked by neither compiler nor test in this
@@ -23,8 +23,8 @@
  *
  * ```ts
  * const atlas = buildGlyphAtlas();
- * const texture = new Texture(atlas);              // @four/render
- * const material = new SpriteMaterial({ texture }); // @four/materials
+ * const texture = new Texture(atlas);              // @fourjs/render
+ * const material = new SpriteMaterial({ texture }); // @fourjs/materials
  * ```
  *
  * and the extra fields the atlas carries beyond `TextureSource` (the glyph
@@ -36,8 +36,8 @@
  *
  * **It was written on 2026-08-13 (R-28), and it landed in the umbrella package
  * `four`** — the only one the frozen §3.1 matrix lets see both this package and
- * `@four/render`. It takes an atlas and a material and turns a string into one
- * geometry of glyph quads: `packages/four/src/text-node.ts`.
+ * `@fourjs/render`. It takes an atlas and a material and turns a string into one
+ * geometry of glyph quads: `packages/fourJS/src/text-node.ts`.
  *
  * ## Y-up, once (§7a)
  *
@@ -125,7 +125,7 @@ export interface GlyphAtlasEntry {
 /**
  * A packed font: RGBA8 texels, plus the table that says where each glyph is.
  *
- * The first three fields are deliberately `@four/render`'s `TextureSource` —
+ * The first three fields are deliberately `@fourjs/render`'s `TextureSource` —
  * see the module header.
  */
 export interface GlyphAtlas {
@@ -137,7 +137,7 @@ export interface GlyphAtlas {
 
   /**
    * Tightly packed RGBA8 texels, `width * height * 4` bytes, **row 0 first and
-   * row 0 is the bottom row** (`v = 0`) — the orientation `@four/render`'s
+   * row 0 is the bottom row** (`v = 0`) — the orientation `@fourjs/render`'s
    * `TextureSource` documents and GL's default unpack expects.
    */
   readonly data: Uint8Array;
@@ -208,7 +208,7 @@ function requirePadding(value: number): number {
  * const atlas = buildGlyphAtlas();                       // the built-in face
  * atlas.width;                                           // 128
  * atlas.glyphs.get("A");                                 // { u0, v0, u1, v1, … }
- * const texture = new Texture(atlas);                    // @four/render
+ * const texture = new Texture(atlas);                    // @fourjs/render
  * ```
  *
  * ## The packing

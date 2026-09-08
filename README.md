@@ -23,12 +23,12 @@ Until first publish, clone the repository and build the workspace
 `bunx vite examples/first-2d-scene`. The smallest program looks like this:
 
 ```ts
-import { Application } from "four/application";
-import { circleGeometry2D } from "four/geometry";
-import { UnlitMaterial } from "four/materials";
-import { OrthographicCamera, createFullscreenViewport } from "four/scene";
-import { Renderable } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
+import { Application } from "fourJS/application";
+import { circleGeometry2D } from "fourJS/geometry";
+import { UnlitMaterial } from "fourJS/materials";
+import { OrthographicCamera, createFullscreenViewport } from "fourJS/scene";
+import { Renderable } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
 
 const canvas = document.querySelector("canvas")!;
 const renderer = new WebglRenderer();
@@ -110,22 +110,22 @@ directly with `bunx vite examples/<name>`.
 | `mechanism`                           | §28 joints: a slider-crank driven by a motor, with live limits                                                                                                                                                  |
 | `blending`                            | §19 physics-animation blending: animated ↔ ragdoll ↔ recovering, in-place re-typing                                                                                                                             |
 | `particles-demo`                      | SoA particle core, §27 force fields, one-draw-call instanced rendering                                                                                                                                          |
-| `ui-demo`                             | @four/ui widgets (panel/buttons/labels), app-supplied skins, keyboard focus, §72 pointer events                                                                                                                 |
+| `ui-demo`                             | @fourjs/ui widgets (panel/buttons/labels), app-supplied skins, keyboard focus, §72 pointer events                                                                                                                 |
 | `gltf-model`                          | §78 glTF: `createGltfLoader` + `instantiateGltf`, and the `{ fetch }` an external `.bin` needs                                                                                                      |
 | `flagship/one-scene-everything-moves` | **§118's flagship**: 2D art, lit 3D meshes, bodies, joints, particles, world text and a screen-space UI panel in one scene; pause/slow-motion/step; §62/§37 `"auto"`                                            |
 | `flagship/motor-digital-twin`         | **§119's flagship**: a motorised, bearing-constrained rotor on a sprung mount; PID speed control, fault injection, §40 unit readouts, §84 statistics, waveform charts, §34 record/seek/replay and §79 save/load |
 
 ## The four pillars
 
-- **Scene** — one graph (`@four/scene`): nodes, typed events (§6b), components (§6a),
+- **Scene** — one graph (`@fourjs/scene`): nodes, typed events (§6b), components (§6a),
   transform authority (§42), cameras and viewports.
-- **Render** — a backend-independent interface (`@four/render`) with a WebGL 2 backend
-  (`@four/render-webgl`); WebGPU/Canvas/SVG tiers are reserved interfaces (§62).
+- **Render** — a backend-independent interface (`@fourjs/render`) with a WebGL 2 backend
+  (`@fourjs/render-webgl`); WebGPU/Canvas/SVG tiers are reserved interfaces (§62).
 - **Motion** — integrators, trajectories, kinematic control, steering, PID, springs,
-  seeded randomness (`@four/motion`), and authored animation (`@four/animation`).
-- **Physics** — a stable API (`@four/physics`) over pluggable solver adapters (§37);
-  `@four/physics-rapier` ships 2D and 3D Rapier solvers with determinism goldens,
-  snapshots, and bit-identical replay (§33–§34, `@four/diagnostics`).
+  seeded randomness (`@fourjs/motion`), and authored animation (`@fourjs/animation`).
+- **Physics** — a stable API (`@fourjs/physics`) over pluggable solver adapters (§37);
+  `@fourjs/physics-rapier` ships 2D and 3D Rapier solvers with determinism goldens,
+  snapshots, and bit-identical replay (§33–§34, `@fourjs/diagnostics`).
 
 Conventions everywhere: right-handed **Y-up world in both 2D and 3D**, radians, **all
 times in seconds**, fixed-step simulation with render interpolation (§10). See
@@ -156,7 +156,7 @@ preserved unchanged and **frozen at the pre-1.0 text**; [docs/ERRATA.md](docs/ER
 documents its known defects and the old-to-new numbering map.
 
 Publish naming (§98): the umbrella package publishes as `@danielsimonjr/fourjs`, the
-sub-packages as `@danielsimonjr/fourjs-<name>`; workspace names remain `four`/`@four/*`.
+sub-packages as `@danielsimonjr/fourjs-<name>`; workspace names remain `four`/`@fourjs/*`.
 
 ## Compatibility
 

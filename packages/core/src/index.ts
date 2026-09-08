@@ -1,4 +1,4 @@
-export const PACKAGE_NAME = "@four/core";
+export const PACKAGE_NAME = "@fourjs/core";
 
 export { DEFAULT_GRAVITY_Y } from "./conventions.js";
 export type { JsonValue } from "./json.js";
@@ -15,7 +15,7 @@ export type { Disposable } from "./disposable.js";
 export { disposeAll } from "./disposable.js";
 // §83 FinalizationRegistry leak bookkeeping (A-4 remainder, 2026-09-06).
 // Lives here so geometry / render / materials can register at construction
-// without importing `@four/diagnostics`. Production: every function is a no-op.
+// without importing `@fourjs/diagnostics`. Production: every function is a no-op.
 export {
   auditFinalizedLeaks,
   disposeTracked,

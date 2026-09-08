@@ -1,13 +1,13 @@
 /**
  * This backend's opt-in to §62's renderer registry (R-2, A-8).
  *
- * `@four/render` holds the registry and knows no backend; this module is the
+ * `@fourjs/render` holds the registry and knows no backend; this module is the
  * one place that names both, and it lives here — below the interface, above
  * nothing — because that is the only direction the frozen §3.1 matrix allows
  * (`render-webgl` already depends on `render`; no edge is added).
  *
  * ```ts
- * import { registerWebglRenderer } from "@four/render-webgl";
+ * import { registerWebglRenderer } from "@fourjs/render-webgl";
  *
  * registerWebglRenderer();
  * const app = new Application({ renderer: "auto", canvas });
@@ -15,9 +15,9 @@
  *
  * ## Why this is a function call and not an import side effect
  *
- * `@four/render-webgl` declares `"sideEffects": false`, so a bundler is
+ * `@fourjs/render-webgl` declares `"sideEffects": false`, so a bundler is
  * entitled to delete an import whose bindings are unused — which is exactly
- * what `import "@four/render-webgl/register"` would be. The registration would
+ * what `import "@fourjs/render-webgl/register"` would be. The registration would
  * vanish and `renderer: "auto"` would fail at runtime with "nothing is
  * registered", on the bundler's schedule rather than the author's. A call
  * expression is a use the bundler can see, so it survives precisely when it is
@@ -32,7 +32,7 @@ import {
   registerRenderer,
   type RendererOptions,
   type RendererRegistry,
-} from "@four/render";
+} from "@fourjs/render";
 
 import { WebglRenderer } from "./webgl-renderer.js";
 

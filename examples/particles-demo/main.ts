@@ -17,7 +17,7 @@
  *   restitution, so its particles bounce off a floor rather than falling out of
  *   the world.
  * - **Drawn batched.** Each `ParticleRenderable` becomes exactly **one**
- *   `RenderItem`, and `@four/render-webgl` turns that into exactly one
+ *   `RenderItem`, and `@fourjs/render-webgl` turns that into exactly one
  *   `drawArraysInstanced` — the property §112's 100 000-particle target rests
  *   on. This page is deliberately ~2 000 particles, not 100 000: the browser
  *   gate runs under SwiftShader (software GL) with no GPU, and plan §6h asks for
@@ -86,8 +86,8 @@
  * The README tabulates every landmark in both spaces.
  */
 
-import { Application } from "four/application";
-import { Vector3 } from "four/math";
+import { Application } from "fourJS/application";
+import { Vector3 } from "fourJS/math";
 import {
   ParticleEmitter,
   ParticleRenderable,
@@ -95,9 +95,9 @@ import {
   dragField,
   uniformGravityField,
   vortexField,
-} from "four/particles";
-import { WebglRenderer } from "four/render-webgl";
-import { OrthographicCamera, createFullscreenViewport } from "four/scene";
+} from "fourJS/particles";
+import { WebglRenderer } from "fourJS/render-webgl";
+import { OrthographicCamera, createFullscreenViewport } from "fourJS/scene";
 
 // --- surface ---------------------------------------------------------------
 

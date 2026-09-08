@@ -10,8 +10,8 @@
  * by name.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { SpriteMaterial, UnlitMaterial } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
 import { describe, expect, it } from "vitest";
 
 import { Rectangle, Renderable, Sprite, Texture } from "../src/index.js";

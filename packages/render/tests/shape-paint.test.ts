@@ -10,8 +10,8 @@
  * real-driver pixels are `tests/browser/shape-paint.spec.ts`'s.
  */
 
-import { NodeMaterial, UnlitMaterial } from "@four/materials";
-import type { MaterialTexture } from "@four/materials";
+import { NodeMaterial, UnlitMaterial } from "@fourjs/materials";
+import type { MaterialTexture } from "@fourjs/materials";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {

@@ -1,11 +1,11 @@
 /**
  * Shared rigs and measurement for the §111 advanced-motion integration suite
- * (WP-8.4): the six modules Phase 8 added to `@four/motion` — `PIDController`,
+ * (WP-8.4): the six modules Phase 8 added to `@fourjs/motion` — `PIDController`,
  * `SpringDamper`, the steering behaviours, `SeededRandom`, the trajectory
  * prediction closed forms, and the two-bone IK solver — composed with the
  * stacks Phases 5–7 already built, through the **public API** only
- * (`four/application`, `@four/motion`, `@four/physics`, `@four/physics-rapier`,
- * `@four/scene`).
+ * (`four/application`, `@fourjs/motion`, `@fourjs/physics`, `@fourjs/physics-rapier`,
+ * `@fourjs/scene`).
  *
  * This file is to Phase 8 what `joint-scenarios.ts` is to Phase 6 and
  * `blending-scenarios.ts` is to Phase 7, and like both of them it builds on
@@ -15,7 +15,7 @@
  *
  * ## What is only true of the composition
  *
- * Every module above has analytic unit tests inside `@four/motion`, and none of
+ * Every module above has analytic unit tests inside `@fourjs/motion`, and none of
  * them has ever met a solver, a scene node, or the §10 fixed step. What the
  * cases here add:
  *
@@ -45,7 +45,7 @@
  * random stream is a `SeededRandom` with a literal seed.
  */
 
-import { Quaternion, Vector3 } from "@four/math";
+import { Quaternion, Vector3 } from "@fourjs/math";
 import {
   PIDController,
   PRIORITY_ANIMATION_TARGETS,
@@ -65,10 +65,10 @@ import {
   type SpringDamperVector3Result,
   type SteeringNeighbor,
   type TwoBoneIKSolution,
-} from "@four/motion";
-import { Collider, HingeJoint, PhysicsWorld, RigidBody } from "@four/physics";
-import { Group, PoseTarget, type Node } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/motion";
+import { Collider, HingeJoint, PhysicsWorld, RigidBody } from "@fourjs/physics";
+import { Group, PoseTarget, type Node } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 
 import { createBlendRig, createBlendWorld } from "./blending-scenarios.js";
 import {
@@ -411,7 +411,7 @@ export interface FollowRun {
  * `SimulationSystem`, and a second node dragged after it by a
  * {@link SpringDamper} stepped with the same fixed delta.
  *
- * Both nodes are `@four/scene` nodes on the application's scene under §42
+ * Both nodes are `@fourjs/scene` nodes on the application's scene under §42
  * `"manual"` authority (the smoother is the author), and the spring's `out`
  * record **aliases the follower's own position vector**, which the module
  * documents as safe and which is how a real smoother keeps its state.

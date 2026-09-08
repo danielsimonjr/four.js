@@ -33,11 +33,11 @@ import {
   ReplayPlayer,
   ReplayRecorder,
   encodeReplayRecording,
-} from "four/diagnostics";
-import { PhysicsWorld, RigidBody, Collider } from "four/physics";
-import { Rapier2dAdapter } from "four/physics-rapier";
-import { Group } from "four/scene";
-import { Vector2 } from "four/math";
+} from "fourJS/diagnostics";
+import { PhysicsWorld, RigidBody, Collider } from "fourJS/physics";
+import { Rapier2dAdapter } from "fourJS/physics-rapier";
+import { Group } from "fourJS/scene";
+import { Vector2 } from "fourJS/math";
 
 const world = new PhysicsWorld({
   dimension: "2d",
@@ -109,7 +109,7 @@ import {
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
-} from "four/serialization";
+} from "fourJS/serialization";
 
 const registry = createDefaultComponentSerializers(); // PoseTarget built in
 // Register serializers for the component classes YOUR twin uses —

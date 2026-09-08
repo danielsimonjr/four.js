@@ -8,8 +8,8 @@
  * the implementation happened to produce.
  */
 
-import { BufferGeometry, boxGeometry, planeGeometry } from "@four/geometry";
-import { Matrix4, Quaternion, Vector3 } from "@four/math";
+import { BufferGeometry, boxGeometry, planeGeometry } from "@fourjs/geometry";
+import { Matrix4, Quaternion, Vector3 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

@@ -71,8 +71,8 @@
  *   reserves Enter for form submission, and there are no forms here.
  */
 
-import type { SceneKeyEvent } from "@four/input";
-import type { Node } from "@four/scene";
+import type { SceneKeyEvent } from "@fourjs/input";
+import type { Node } from "@fourjs/scene";
 
 import { CheckableWidget, type CheckableWidgetOptions } from "./checkable.js";
 

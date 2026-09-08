@@ -68,10 +68,10 @@
  *
  * `phase2-scenario.ts` imports `Application` from `four`'s root barrel and its
  * test file files the consequence as a follow-up: that barrel namespace-exports
- * every workspace package, including `@four/render-webgl`, which was a Phase 0
+ * every workspace package, including `@fourjs/render-webgl`, which was a Phase 0
  * stub then and is real code now. This scenario takes the subpath that note asks
- * for — `four/application` imports `@four/core`, `@four/motion`, `@four/scene`
- * and one `import type` from `@four/render`, so "no renderer is loaded" is a
+ * for — `four/application` imports `@fourjs/core`, `@fourjs/motion`, `@fourjs/scene`
+ * and one `import type` from `@fourjs/render`, so "no renderer is loaded" is a
  * fact about the import graph here and not only about behaviour. The two
  * existing scenarios are deliberately left alone: their goldens are immutable.
  *
@@ -100,12 +100,12 @@ import {
   tween,
   type AnimationEvent,
   type ColorRGBA,
-} from "@four/animation";
-import { createChecksum } from "@four/diagnostics";
-import { Quaternion, Vector3 } from "@four/math";
-import { MotionComponent, MotionSystem } from "@four/motion";
-import { Group, type Node } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/animation";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import { MotionComponent, MotionSystem } from "@fourjs/motion";
+import { Group, type Node } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 export const FIXED_TIME_STEP = 1 / 60;

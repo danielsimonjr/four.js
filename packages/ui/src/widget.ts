@@ -17,7 +17,7 @@
  * clipping, serialization, and diagnostics", and that is exactly what a widget
  * is here: a {@link Node}. What a widget is **not** is a thing that draws
  * itself, and that is not a stylistic choice — the frozen dependency matrix
- * (plan §3.1) gives `@four/ui` exactly `core`, `math`, `scene`, `input`, and
+ * (plan §3.1) gives `@fourjs/ui` exactly `core`, `math`, `scene`, `input`, and
  * `text`. `Renderable`, `Sprite`, `Texture`, every material, and every geometry
  * live in packages this one may not import, and the plan's ground rule 9 is
  * "never add or reverse an edge". A widget therefore **cannot** own a quad, a
@@ -31,20 +31,20 @@
  * | hierarchy, box model, layout (§74 subset)      | backgrounds, borders, glyph quads |
  * | hit areas (§71 candidates)                     | textures, materials, batching |
  * | hover / press / focus state machines (§72)     | what those states *look* like |
- * | text **measurement** (`@four/text`, a real dep) | text **rendering**            |
+ * | text **measurement** (`@fourjs/text`, a real dep) | text **rendering**            |
  *
  * The seam is {@link WidgetSkin}: an application-supplied object with five
  * optional hooks that the widget calls when something visible about it changed.
- * The app's skin holds the imports `@four/ui` may not have, reads
+ * The app's skin holds the imports `@fourjs/ui` may not have, reads
  * {@link UIWidget.measuredWidth}, {@link UIWidget.measuredHeight},
  * {@link UIWidget.hovered} and friends, and builds or updates its own nodes —
  * typically as children of the widget, so the whole thing still moves as one
  * subtree. Nothing in this package ever learns what a skin drew.
  *
  * This mirrors the precedents already in the tree rather than inventing a
- * mechanism: `@four/text` "produces data, never nodes" for the same matrix
- * reason, `@four/particles`' `ParticleRenderable` implements a structural
- * contract it cannot import, and `@four/input` describes its surface
+ * mechanism: `@fourjs/text` "produces data, never nodes" for the same matrix
+ * reason, `@fourjs/particles`' `ParticleRenderable` implements a structural
+ * contract it cannot import, and `@fourjs/input` describes its surface
  * (`PointerSurface`) by what it touches instead of naming a DOM type. The
  * difference here is the direction of the call — a skin is supplied *to* the
  * widget rather than implemented *by* it — because the visuals are the
@@ -114,14 +114,14 @@
  * {@link collectPickables} fills a caller-supplied array. Interaction is
  * different by nature — a state change allocates its event and its two snapshots
  * — and that is deliberate: pointer transitions happen at human rates, an event
- * outlives its dispatch whenever a listener stores one, and `@four/input` makes
+ * outlives its dispatch whenever a listener stores one, and `@fourjs/input` makes
  * the same trade for the same reason.
  */
 
-import type { Disposable, Unsubscribe } from "@four/core";
-import type { Pickable, ScenePointerEvent } from "@four/input";
-import { Vector2, Vector3 } from "@four/math";
-import { Node, warnAuthorityConflict, type NodeOptions } from "@four/scene";
+import type { Disposable, Unsubscribe } from "@fourjs/core";
+import type { Pickable, ScenePointerEvent } from "@fourjs/input";
+import { Vector2, Vector3 } from "@fourjs/math";
+import { Node, warnAuthorityConflict, type NodeOptions } from "@fourjs/scene";
 
 /**
  * The authority a layout pass writes a widget's position under (§42):
@@ -136,11 +136,11 @@ export const UI_LAYOUT_AUTHORITY = "constraint" as const;
  *
  * Exported as data rather than left in prose so the staging is greppable,
  * assertable in tests, and printable by a diagnostics overlay — the shape
- * `@four/diagnostics`' `DEBUG_DRAW_STAGED` established. Nothing reads it at
+ * `@fourjs/diagnostics`' `DEBUG_DRAW_STAGED` established. Nothing reads it at
  * runtime; it is documentation that cannot drift out of the build.
  *
  * **An entry leaves this array when the thing ships.** §75's keyboard
- * navigation and focus order left it on 2026-08-07 (A-13): `@four/input` gained
+ * navigation and focus order left it on 2026-08-07 (A-13): `@fourjs/input` gained
  * the key source that was its stated blocker (A-10), and `keyboard.ts` now
  * implements Tab/Shift-Tab traversal while `Button` implements Enter/Space
  * activation. The hidden DOM mirror, screen-reader updates, high-contrast
@@ -522,19 +522,19 @@ export interface UIWidgetOptions extends NodeOptions {
   role?: string;
 }
 
-declare module "@four/scene" {
+declare module "@fourjs/scene" {
   // UI events, merged into the one node event map (§6b) by declaration
-  // merging — the mechanism `@four/scene` documents on `NodeEventMap` and
-  // `@four/input` established for §72.
+  // merging — the mechanism `@fourjs/scene` documents on `NodeEventMap` and
+  // `@fourjs/input` established for §72.
   //
   // `focus` and `blur` take §72's own names, because §72 lists them among the
   // input events every node may receive and a later keyboard or DOM-mirror
   // focus source must be able to emit exactly these keys. The two events this
   // package *invents* — there is no §73–§75 name for either — are prefixed
-  // `ui`, so `@four/ui` squats no generic key it has no spec claim to.
+  // `ui`, so `@fourjs/ui` squats no generic key it has no spec claim to.
   //
   // Deliberately NOT a doc comment: TypeDoc warns when two declarations of one
-  // merged interface both carry one, and `@four/scene`'s declaration is the
+  // merged interface both carry one, and `@fourjs/scene`'s declaration is the
   // documented one.
   interface NodeEventMap {
     /** Hover, press, focus, or disabled state changed. Emitter only. */

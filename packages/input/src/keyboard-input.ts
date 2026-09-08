@@ -4,7 +4,7 @@
  *
  * ```ts
  * const keyboard = new KeyboardInput(window, {
- *   focusTarget: () => focusedWidget(scene) ?? uiRoot,   // @four/ui answers
+ *   focusTarget: () => focusedWidget(scene) ?? uiRoot,   // @fourjs/ui answers
  * });
  * button.on("keydown", (event) => { if (event.key === "Enter") activate(); });
  * // …
@@ -27,14 +27,14 @@
  *
  * ## Why focus is injected rather than owned (decision, A-10)
  *
- * §75's focus lives in `@four/ui`: one focused widget per scene root, with
+ * §75's focus lives in `@fourjs/ui`: one focused widget per scene root, with
  * focus/blur events and a disabled/enabled policy this package has no business
  * restating. And plan §3.1 is frozen in the direction that makes that work —
  * `ui` depends on `input`, never the reverse — so `KeyboardInput` **cannot**
  * import `focusedWidget`, and a package-private focus registry here would be a
  * second, competing answer to a question §75 already answers.
  *
- * A one-function seam resolves both problems: the application (or `@four/ui`'s
+ * A one-function seam resolves both problems: the application (or `@fourjs/ui`'s
  * `keyboardFocusTarget` helper) supplies `() => Node | null`, this class calls
  * it per event, and the resolver may return anything — the focused widget, a
  * fallback root so keystrokes still reach a UI tree with nothing focused yet, or
@@ -51,7 +51,7 @@
  * - It never writes a transform (§42), never touches the scene graph, and holds
  *   no reference to a scene — `PointerInput`'s whole discipline.
  * - It never decides what a key *means*. Tab is not traversal here, Enter is not
- *   activation here: those are §75 policy and live in `@four/ui`. This class
+ *   activation here: those are §75 policy and live in `@fourjs/ui`. This class
  *   normalizes and routes, which is why it needs no key table at all.
  * - It does not suppress platform defaults on its own. Whoever consumes a key
  *   calls {@link SceneKeyEvent.preventDefault}, which forwards to the platform
@@ -61,7 +61,7 @@
  *   `keypress` is not among them.
  */
 
-import type { Node } from "@four/scene";
+import type { Node } from "@fourjs/scene";
 
 import {
   SceneKeyEvent,
@@ -85,7 +85,7 @@ import { buildPropagationPath } from "./propagation.js";
  * side of the normalization: the whole point is that the DOM's own event
  * satisfies the interface without a wrapper.
  */
-import { DEV, FourError } from "@four/core";
+import { DEV, FourError } from "@fourjs/core";
 
 export interface SurfaceKeyEvent extends KeyDefaultSuppressor {
   /** The character or named key produced — `"a"`, `"Enter"`, `" "`. */
@@ -133,7 +133,7 @@ export interface KeyboardInputOptions {
    *
    * Returning `null` means "nothing is listening", and dispatches nothing. See
    * this module's header for why focus is resolved by an injected function
-   * rather than owned here; `@four/ui`'s `keyboardFocusTarget(root)` is the
+   * rather than owned here; `@fourjs/ui`'s `keyboardFocusTarget(root)` is the
    * ready-made resolver for a widget tree.
    */
   focusTarget: () => Node | null;
@@ -165,9 +165,9 @@ export class KeyboardInput {
      * accepted shapes, and that is what makes such a message a one-step correction.
      *
      * The message also says what this class is for, because the *name* is what invites
-     * the mistake: in a package called `@four/input`, `KeyboardInput` reads like "the
+     * the mistake: in a package called `@fourjs/input`, `KeyboardInput` reads like "the
      * way to read the keyboard", but it routes to a focused scene node and pairs with
-     * `@four/ui`'s `keyboardFocusTarget(root)`. Game code reading WASD wants neither;
+     * `@fourjs/ui`'s `keyboardFocusTarget(root)`. Game code reading WASD wants neither;
      * `examples/character-controller` uses plain DOM listeners for exactly that reason.
      */
     if (
@@ -190,7 +190,7 @@ export class KeyboardInput {
         "KeyboardInput takes two arguments: (surface, { focusTarget }). " +
           "`focusTarget` is required and must be a function returning the focused " +
           "Node or null — it is how key events are routed into the scene (§72). " +
-          "For a widget tree, pass `keyboardFocusTarget(root)` from `@four/ui`. " +
+          "For a widget tree, pass `keyboardFocusTarget(root)` from `@fourjs/ui`. " +
           "For raw game input (WASD and the like) this class is the wrong tool: " +
           "listen to the DOM directly, as `examples/character-controller` does.",
         { context: { received: typeof options } },

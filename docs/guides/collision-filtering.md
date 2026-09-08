@@ -31,10 +31,10 @@ complete, headless example — runnable under Node, since solvers need no
 renderer:
 
 ```ts
-import { Vector2, Vector3 } from "four/math";
-import { Collider, PhysicsWorld, RigidBody } from "four/physics";
-import { Rapier2dAdapter } from "four/physics-rapier";
-import { Group } from "four/scene";
+import { Vector2, Vector3 } from "fourJS/math";
+import { Collider, PhysicsWorld, RigidBody } from "fourJS/physics";
+import { Rapier2dAdapter } from "fourJS/physics-rapier";
+import { Group } from "fourJS/scene";
 
 const GROUP_TERRAIN = 0b001;
 const GROUP_DEBRIS = 0b010;

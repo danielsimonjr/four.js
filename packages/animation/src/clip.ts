@@ -40,7 +40,7 @@
  * a live one is not.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import type { AnimationTrackLike } from "./track.js";
 

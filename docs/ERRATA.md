@@ -75,11 +75,11 @@ The PDF's *Solver Packages* section (PDF §49, second range) named four solver a
 (`physics-rapier`, `physics-box2d`, `physics-matter`, `physics-cannon`), while the *Proposed
 Monorepo* tree (PDF §45, second range) listed only `physics-rapier`, `physics-box2d`, and
 `physics-soft` (a soft-body package, not a solver adapter). A full cross-check of every
-`@four/<pkg>` reference found no other mismatches.
+`@fourjs/<pkg>` reference found no other mismatches.
 
 **Resolution (owner decision, previously recorded here and now applied to the text):** the
 monorepo tree wins. §102 (Solver Packages) in `SPECIFICATION.md` now lists only
-`@four/physics-rapier` and `@four/physics-box2d`, with a note that Matter.js and Cannon-es
+`@fourjs/physics-rapier` and `@fourjs/physics-box2d`, with a note that Matter.js and Cannon-es
 (potential adapters per §37) may be added by future amendment. The scaffold contains
 `physics-rapier`, `physics-box2d`, and `physics-soft` only; `physics-matter` and
 `physics-cannon` must not be added without a further amendment.

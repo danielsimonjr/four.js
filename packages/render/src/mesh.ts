@@ -9,12 +9,12 @@
  *
  * - **`geometry`** is inherited: `Renderable` already owns the field, and a
  *   mesh's skin influences are the geometry's own `joints`/`weights`
- *   attributes (§53; `@four/geometry`).
+ *   attributes (§53; `@fourjs/geometry`).
  * - **`skeleton`** is this class's field, validated at assignment — see
  *   {@link Mesh.skeleton}.
  * - **`morphTargetWeights`** is an **accessor over the `MorphWeights`
- *   component** (`@four/scene`), not storage: §54's own placement was
- *   unimplementable under the frozen §3.1 matrix (`@four/animation` may never
+ *   component** (`@fourjs/scene`), not storage: §54's own placement was
+ *   unimplementable under the frozen §3.1 matrix (`@fourjs/animation` may never
  *   see this package), so the storage moved to a §6a component and the
  *   spelling here is kept as a getter — the amendment §54 records (spec
  *   revision 1.8; RFC 0003 §1c).
@@ -22,7 +22,7 @@
  * ## Which §54 rows this class carries, and which stay staged (RFC 0003 §7)
  *
  * **Ships:** the class itself; skeletal deformation (through the skinned
- * render-item kinds and `@four/render-webgl`'s registered skinning pipeline);
+ * render-item kinds and `@fourjs/render-webgl`'s registered skinning pipeline);
  * the morph-target *plumbing* (component, §17 binding form, weights on the
  * render item). **Staged, deliberately:** the GPU morph path (morph targets
  * are additional vertex streams — a four-target mesh triples the attribute
@@ -45,7 +45,7 @@
  *
  * - **§71 picking against a skinned mesh uses bind-pose bounds**, and is
  *   therefore wrong whenever the pose differs materially from bind
- *   (`@four/input`'s `pick.ts` already defers analytic picking; this is a
+ *   (`@fourjs/input`'s `pick.ts` already defers analytic picking; this is a
  *   second known inaccuracy of the same kind).
  * - **§87 frustum culling culls a skinned mesh by its bind-pose bounds**, so
  *   an animation that moves geometry outside them can pop; set
@@ -56,9 +56,9 @@
  *   rather than casting a bind-pose shadow.
  */
 
-import { FourError } from "@four/core";
-import type { Material } from "@four/materials";
-import { Bone, MorphWeights, Skeleton, type Node } from "@four/scene";
+import { FourError } from "@fourjs/core";
+import type { Material } from "@fourjs/materials";
+import { Bone, MorphWeights, Skeleton, type Node } from "@fourjs/scene";
 
 import {
   Renderable,
@@ -189,8 +189,8 @@ export class Mesh<M extends Material = SurfaceMaterial> extends Renderable<M> {
    * `undefined` when the node carries no component (RFC 0003 §1c).
    *
    * An accessor, not storage: the weights live in a §6a component on this
-   * node, which is what lets `@four/animation` bind a §17 morph-weight track
-   * to them (it can see `@four/scene`, never this package) and what makes them
+   * node, which is what lets `@fourjs/animation` bind a §17 morph-weight track
+   * to them (it can see `@fourjs/scene`, never this package) and what makes them
    * serializable through the existing §79 component registry. Attach the
    * component to give a mesh weights:
    *
@@ -267,7 +267,7 @@ export class Mesh<M extends Material = SurfaceMaterial> extends Renderable<M> {
  * not exist yet, and the earliest moment the mesh and its bones are guaranteed
  * to share a tree is the first read after instantiation — which is exactly
  * when the serializer's writer, the render list, or the application asks.
- * `packages/four/src/scene-serializers.ts` is the caller; an application's own
+ * `packages/fourJS/src/scene-serializers.ts` is the caller; an application's own
  * factory may call it for the same purpose. Any previously assigned or pending
  * skeleton is replaced.
  *

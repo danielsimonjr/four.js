@@ -1,20 +1,20 @@
 /**
  * `ReplayRecorder` (§33–34, plan P10-1) — capture.
  *
- * The target is a fake, on purpose: `@four/diagnostics` cannot import
- * `@four/physics` (same dispatch wave), and the point of {@link ReplayTarget}
+ * The target is a fake, on purpose: `@fourjs/diagnostics` cannot import
+ * `@fourjs/physics` (same dispatch wave), and the point of {@link ReplayTarget}
  * is that it does not need to. What *is* asserted against physics is the
  * **shape**: `MirroredPhysicsWorld` below is transcribed from
  * `packages/physics/src/world.ts` — `checksum(): number`,
  * `createSnapshot(): PhysicsSnapshot`, `restoreSnapshot(PhysicsSnapshot): void`,
  * with `PhysicsSnapshot` being `{ adapterName, adapterVersion, data }` — and the
  * assignability assertions in the first describe block fail to compile the day
- * the two drift apart. That is the same protection `@four/particles` and
- * `@four/render` give the `ParticleDrawable` contract, and the same honest
+ * the two drift apart. That is the same protection `@fourjs/particles` and
+ * `@fourjs/render` give the `ParticleDrawable` contract, and the same honest
  * limitation: it catches drift at *this* package's typecheck, not at physics'.
  */
 
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -29,7 +29,7 @@ import {
   encodeReplayRecording,
 } from "../src/replay-format.js";
 
-// --- the mirror of @four/physics -------------------------------------------
+// --- the mirror of @fourjs/physics -------------------------------------------
 
 /**
  * Transcribed from `PhysicsSnapshot` in `packages/physics/src/world.ts`,
@@ -174,7 +174,7 @@ describe("ReplayTarget — structural compatibility with PhysicsWorld", () => {
     // this package's mirror of it, `configuration` included (PH-6). The reverse
     // is deliberately not assignable — `ReplaySnapshot.configuration` is
     // `unknown` here, because naming the solver's type would need an edge to
-    // `@four/physics` this package may not have.
+    // `@fourjs/physics` this package may not have.
     const asReplaySnapshot: ReplaySnapshot = snapshot;
     target.restoreSnapshot(asReplaySnapshot);
 

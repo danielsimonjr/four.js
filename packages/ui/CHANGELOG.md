@@ -1,9 +1,9 @@
-# @four/ui
+# @fourjs/ui
 
 ## 0.0.1
 
 ### Patch Changes
 
 - Updated dependencies [13748d1]
-  - @four/scene@0.0.1
-  - @four/input@0.0.1
+  - @fourjs/scene@0.0.1
+  - @fourjs/input@0.0.1

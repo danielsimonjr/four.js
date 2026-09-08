@@ -1,9 +1,9 @@
 /**
  * §60 node materials across the packages that have to agree about them, on
  * the WebGPU backend (RFC 0001; WP-R1.9 — the twin of
- * `node-materials.test.ts`): `@four/materials` carries the IR and the
- * material, `@four/render` the `"node"` item kind and the §70 graph effect,
- * `@four/render-webgpu` the lazily registered WGSL emitter and pipeline
+ * `node-materials.test.ts`): `@fourjs/materials` carries the IR and the
+ * material, `@fourjs/render` the `"node"` item kind and the §70 graph effect,
+ * `@fourjs/render-webgpu` the lazily registered WGSL emitter and pipeline
  * store.
  *
  * The same three composition claims, restated for this backend:
@@ -20,26 +20,26 @@
  *    the pass's uniforms packed into its block and its source sampled.
  */
 
-import { planeGeometry } from "@four/geometry";
+import { planeGeometry } from "@fourjs/geometry";
 import {
   NodeMaterial,
   NodeMaterialBuilder,
   ShaderGraphBuilder,
   UnlitMaterial,
-} from "@four/materials";
-import { RenderTarget, Renderable } from "@four/render";
+} from "@fourjs/materials";
+import { RenderTarget, Renderable } from "@fourjs/render";
 import {
   WebgpuRenderer,
   clearRegisteredWebgpuNodeMaterialPipeline,
   registerWebgpuNodeMaterialPipeline,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

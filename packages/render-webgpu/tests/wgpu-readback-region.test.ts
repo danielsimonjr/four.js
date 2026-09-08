@@ -9,8 +9,8 @@
  * keeps the landed transcripts byte-identical).
  */
 
-import { Rectangle2 } from "@four/math";
-import { RenderTarget } from "@four/render";
+import { Rectangle2 } from "@fourjs/math";
+import { RenderTarget } from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 import {

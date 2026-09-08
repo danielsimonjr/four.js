@@ -102,13 +102,13 @@
  *
  * What is **staged, with its seam named**: capsule sweeps, slide-along-wall,
  * step height, slope limits and moving platforms. Every one of them needs a
- * shape cast against the collision world. `@four/physics` already has one —
+ * shape cast against the collision world. `@fourjs/physics` already has one —
  * `PhysicsWorld.shapeCast` (§30) — but §3.1's frozen dependency matrix gives
- * `@four/motion` only `core`, `math` and `scene`, and the edge runs the other
+ * `@fourjs/motion` only `core`, `math` and `scene`, and the edge runs the other
  * way: **`physics` depends on `motion`.** So a solver-backed character
- * controller is a `@four/physics`-tier packet (a `SweptCharacterController`
+ * controller is a `@fourjs/physics`-tier packet (a `SweptCharacterController`
  * over `world.shapeCast`, reusing this class's intent/heading/gravity state),
- * not a `@four/motion` one, and it is filed there rather than smuggled in
+ * not a `@fourjs/motion` one, and it is filed there rather than smuggled in
  * behind an injected query interface nobody implements. This module ships the
  * half that owes nothing to a solver, and says which half that is.
  *
@@ -123,12 +123,12 @@
  * exactly rounded.
  */
 
-import type { Component, ComponentHost } from "@four/core";
-import type { Transform } from "@four/scene";
+import type { Component, ComponentHost } from "@fourjs/core";
+import type { Transform } from "@fourjs/scene";
 
 /**
  * Default {@link CharacterController.gravity}, in m/s²: `−9.81`, Appendix A's
- * world gravity and `@four/physics`'s own default, so a kinematic character and
+ * world gravity and `@fourjs/physics`'s own default, so a kinematic character and
  * a dynamic body fall at the same rate in the same scene (§7a: `+Y` is up in
  * both 2D and 3D, so the sign is negative).
  */
@@ -221,7 +221,7 @@ export interface CharacterControllerOptions {
  * — so walking diagonally is not `√2` times faster than walking forwards, the
  * oldest bug in the genre. The mapping from a device to those two numbers is
  * application policy: like every rig in this package the controller reads no
- * `@four/input` (§3.1 gives `@four/motion` `core`, `math` and `scene` only),
+ * `@fourjs/input` (§3.1 gives `@fourjs/motion` `core`, `math` and `scene` only),
  * which is also what makes it replayable from a seeded stream (§33/§34).
  *
  * ## Frames

@@ -69,9 +69,9 @@ import {
   AnimationTrack,
   quaternionAdapter,
   vector3Adapter,
-} from "@four/animation";
-import { Quaternion, Vector3 } from "@four/math";
-import { Group } from "@four/scene";
+} from "@fourjs/animation";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 
 import {
   MEASUREMENT_NOTE,

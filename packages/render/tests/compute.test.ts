@@ -2,7 +2,7 @@
  * §82's promoted compute vocabulary (the Q3 promotion, 2026-08-29): the
  * descriptor and handle types, the entry-point constant, and the
  * `supportsCompute` guard — the optional-member pattern's fourth instance.
- * The one implementor of `Renderer.compute?()` lives in `@four/render-webgpu`,
+ * The one implementor of `Renderer.compute?()` lives in `@fourjs/render-webgpu`,
  * whose suite pins the dispatch; here the claims are the seam's own.
  */
 

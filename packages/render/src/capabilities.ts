@@ -4,7 +4,7 @@
  *
  * RFC 0002 §2 spells it this way: *each token is exported from the package
  * that owns its registry*. The tokens first shipped together in
- * `@four/four`'s `plugins.ts` — a recorded, reversible spelling difference —
+ * `@fourjs/four`'s `plugins.ts` — a recorded, reversible spelling difference —
  * and moved home once the owning packages were free; the umbrella still
  * re-exports the very same objects, so every existing import keeps working
  * and a token's identity (its `name` string) never changed.
@@ -18,7 +18,7 @@
  * a token nothing references leaves the bundle entirely.
  */
 
-import { defineCapability } from "@four/core";
+import { defineCapability } from "@fourjs/core";
 
 import type { ComputeWorkloadRegistry } from "./compute-workloads.js";
 import type { RenderGraph } from "./render-graph.js";
@@ -38,7 +38,7 @@ import type { RendererRegistry } from "./renderer-registry.js";
  * for the process-wide one would make `four` name the class in every bundle,
  * which is precisely the cost `resolveRenderer` exists to avoid. Applications
  * whose plugins register backends pass their own registry, or install through
- * a standalone `@four/core` plugin host (its name is left unwritten here —
+ * a standalone `@fourjs/core` plugin host (its name is left unwritten here —
  * the §96 boundary test's textual ban is blunt on purpose).
  */
 export const RENDERER_REGISTRY =
@@ -62,7 +62,7 @@ export const RENDERER_REGISTRY =
  * removed one's output, so removal is conditional on the state of a graph the
  * host does not control — which is not a promise a lifecycle can keep.
  *
- * Provided only by a standalone `@four/core` plugin host: §45 has no
+ * Provided only by a standalone `@fourjs/core` plugin host: §45 has no
  * render-graph option, and inventing one would be the API invention RFC 0002
  * Q1 was careful to avoid.
  */

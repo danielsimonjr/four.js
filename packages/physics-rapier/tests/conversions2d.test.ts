@@ -5,10 +5,10 @@
  * `initializeRapier2d()` — there is no mock Rapier anywhere in this package.
  */
 
-import { FourError } from "@four/core";
-import { Quaternion, Vector2, Vector3 } from "@four/math";
-import { ALL_COLLISION_GROUPS } from "@four/physics";
-import type { CollisionShape } from "@four/physics";
+import { FourError } from "@fourjs/core";
+import { Quaternion, Vector2, Vector3 } from "@fourjs/math";
+import { ALL_COLLISION_GROUPS } from "@fourjs/physics";
+import type { CollisionShape } from "@fourjs/physics";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {

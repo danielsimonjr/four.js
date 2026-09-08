@@ -26,7 +26,7 @@
  * `createTexture(source: TextureSource)` and §77 lists "canvas and image-bitmap
  * sources". {@link TextureSource} here is **structural and DOM-free**: a width,
  * a height, and optional tightly packed RGBA8 bytes. That is deliberate —
- * `@four/render` compiles with no `lib.dom` (see `renderer.ts` on
+ * `@fourjs/render` compiles with no `lib.dom` (see `renderer.ts` on
  * `RendererOptions.canvas`), a glyph atlas rasterized into a byte array is
  * exactly what §56's MVP text tier produces, and a test can build a 2×2
  * checkerboard with no browser at all. `ImageBitmap`/`HTMLImageElement`/video
@@ -46,7 +46,7 @@
  *   after a §61 context loss. None of that is true of geometries or materials
  *   today, and none of it should be true of textures either.
  * - The backend already solves the same problem for geometry, with a cache keyed
- *   on `id` and validated by `version` (`@four/render-webgl`'s `GeometryCache`).
+ *   on `id` and validated by `version` (`@fourjs/render-webgl`'s `GeometryCache`).
  *   A texture carries the same two fields for the same reason, so the WebGL
  *   backend discovers textures from the materials in the render list and uploads
  *   them on first use — and a context loss is handled by dropping the cache, not
@@ -73,14 +73,14 @@
  * to anything and never runs on a draw path.
  */
 
-import { FourError, type Disposable } from "@four/core";
+import { FourError, type Disposable } from "@fourjs/core";
 import type {
   MaterialTextureFilter,
   MaterialTextureMinFilter,
   MaterialTextureWrap,
   SpriteTexture,
-} from "@four/materials";
-import type { ColorSpace } from "@four/math";
+} from "@fourjs/materials";
+import type { ColorSpace } from "@fourjs/math";
 
 import { validateColorSpace } from "./render-target.js";
 import {
@@ -349,7 +349,7 @@ export interface TextureSource {
    *
    * A backend whose context cannot generate mipmaps at all uploads the texture
    * with one level and an in-level min filter — degrading rather than leaving
-   * a texture GL would treat as incomplete (see `@four/render-webgl`).
+   * a texture GL would treat as incomplete (see `@fourjs/render-webgl`).
    */
   readonly mipmaps?: boolean;
 

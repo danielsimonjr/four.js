@@ -22,14 +22,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 import {
   CharacterController,
   PRIORITY_KINEMATICS,
   createTimeState,
   type FixedUpdateContext,
-} from "@four/motion";
-import { Group } from "@four/scene";
+} from "@fourjs/motion";
+import { Group } from "@fourjs/scene";
 
 import { Collider } from "../src/collider.js";
 import { RigidBody } from "../src/rigid-body.js";

@@ -29,9 +29,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, test } from "vitest";
 
-import { emitShaderGraphGlsl } from "@four/render-webgl";
-import type { ShaderGraph } from "@four/render";
-import { NodeMaterialBuilder, ShaderGraphBuilder } from "@four/materials";
+import { emitShaderGraphGlsl } from "@fourjs/render-webgl";
+import type { ShaderGraph } from "@fourjs/render";
+import { NodeMaterialBuilder, ShaderGraphBuilder } from "@fourjs/materials";
 
 interface GoldenFile {
   _warning: string;

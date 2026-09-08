@@ -11,7 +11,7 @@ criterion into the parts that can each be shown honestly, and this page is the v
 | half of §112                                          | where it is shown                                                       |
 | ----------------------------------------------------- | ----------------------------------------------------------------------- |
 | 100 000 particles simulated on the CPU                | `benchmarks/particles-100k.mjs` — recorded ms/step, never CI-gated      |
-| rendered as one batched draw per system               | `@four/render`'s `particles.ts` + `@four/render-webgl`'s instanced path |
+| rendered as one batched draw per system               | `@fourjs/render`'s `particles.ts` + `@fourjs/render-webgl`'s instanced path |
 | at interactive rates, on screen, responding to a user | **this page**, at ~1 800 particles — the size SwiftShader can sustain   |
 | deterministically (plan P9-4)                         | `tests/determinism/phase9-particles.test.ts`                            |
 

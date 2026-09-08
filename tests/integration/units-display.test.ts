@@ -5,13 +5,13 @@
  * §40 was narrowed by spec revision 1.3 to exactly one claim: *"The `angle` and
  * `time` selections govern display and authoring-input conversion only: the
  * engine's internal representation and every API signature remain radians and
- * seconds (§7a)."* A unit test inside `@four/core` can check that the
+ * seconds (§7a)."* A unit test inside `@fourjs/core` can check that the
  * conversion arithmetic is right; it cannot check that claim, because the claim
  * is about **every other package**. That is what this file is for, and it makes
  * the check in two directions:
  *
- * 1. **Authoring composes.** A real `@four/motion` kinematic command, issued on
- *    a real `@four/scene` node, authored as *"90 degrees over 500 milliseconds,
+ * 1. **Authoring composes.** A real `@fourjs/motion` kinematic command, issued on
+ *    a real `@fourjs/scene` node, authored as *"90 degrees over 500 milliseconds,
  *    1 500 millimetres along X"* through the §40 helpers, produces a
  *    **bit-identical** simulation to the same command authored directly as
  *    `Math.PI / 2`, `0.5`, and `1.5`. The helpers are a boundary, not a mode.
@@ -37,16 +37,16 @@ import {
   lengthFromDisplay,
   resolveUnitSystem,
   timeFromDisplay,
-} from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
+} from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
 import {
   DEFAULT_FIXED_DELTA_TIME,
   KinematicController,
   KinematicSystem,
   createTimeState,
   type ReadonlyTimeState,
-} from "@four/motion";
-import { Group } from "@four/scene";
+} from "@fourjs/motion";
+import { Group } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 const repositoryRoot = join(import.meta.dirname, "..", "..");
@@ -147,7 +147,7 @@ describe("§40 authoring in display units drives an identical simulation", () =>
 /**
  * The only files permitted to name the §40 conversion module.
  *
- * `units.ts` is the module; `index.ts` is `@four/core`'s public re-export.
+ * `units.ts` is the module; `index.ts` is `@fourjs/core`'s public re-export.
  * Everything else is a simulation-adjacent package until someone argues
  * otherwise in writing.
  */
@@ -190,7 +190,7 @@ function walk(directory: string, out: string[]): void {
 
 /**
  * Names that only appear in a file that has reached for the §40 tier. The
- * module path catches a relative import inside `@four/core`; the identifiers
+ * module path catches a relative import inside `@fourjs/core`; the identifiers
  * catch a cross-package one, whatever spelling the import takes.
  */
 const FORBIDDEN = [
@@ -208,7 +208,7 @@ const FORBIDDEN = [
 ];
 
 describe("§40 conversion helpers stay out of the engine (§33–§34 determinism)", () => {
-  it("is imported by no package source outside @four/core's own surface", () => {
+  it("is imported by no package source outside @fourjs/core's own surface", () => {
     const offenders: string[] = [];
     for (const file of packageSources()) {
       if (ALLOWED.has(file.split("/").join(sep))) {

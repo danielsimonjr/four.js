@@ -1,1 +1,1 @@
-export const PACKAGE_NAME = "@four/render-canvas";
+export const PACKAGE_NAME = "@fourjs/render-canvas";

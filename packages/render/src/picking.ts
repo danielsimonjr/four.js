@@ -2,12 +2,12 @@
  * Pixel/GPU-id picking — the backend-neutral half (§71; RFC 0005, accepted
  * 2026-08-21).
  *
- * §71 lists seven picking strategies. The bounds tier lives in `@four/input`
+ * §71 lists seven picking strategies. The bounds tier lives in `@fourjs/input`
  * (`pick.ts` there says why the candidates are structural), and this module is
  * the seam for the two strategies that cannot live there because they need a
  * renderer: `"pixel"` and `"gpu"`. The design is RFC 0005's, split exactly as
  * the render graph is — the **interface** here, backend-neutral, and the
- * **execution** in a backend (`@four/render-webgl`'s `gl-picking.ts`, behind
+ * **execution** in a backend (`@fourjs/render-webgl`'s `gl-picking.ts`, behind
  * its `registerPickingPipeline()` seam).
  *
  * ## How the id pass works
@@ -45,23 +45,23 @@
  * (behind its registration seam), the future WebGPU backend will, and Canvas
  * 2D / SVG declare the tier **absent** by omission rather than emulating it
  * (owner decision on RFC 0005 Q6 — emulation would make §71's result quality
- * vary by backend). {@link supportsPicking} is the runtime test. `@four/four`'s
+ * vary by backend). {@link supportsPicking} is the runtime test. `@fourjs/four`'s
  * `Application` never references any of this statically: an application that
  * never picks by pixel carries 0 B of it (the A-8 discipline).
  *
- * ## What `@four/input` sees
+ * ## What `@fourjs/input` sees
  *
  * Nothing from this module. Its whole seam is `PickProvider` — two numbers in,
  * a node id out, asynchronously — and the adapter that closes over a
- * {@link PickingService} and a `Viewport` is `@four/four`'s
+ * {@link PickingService} and a `Viewport` is `@fourjs/four`'s
  * `createPickProvider` (four lines; RFC 0005 §2). That is what keeps the
  * frozen `input → core, math, scene` row true while §72's event propagation
  * can still dispatch on a pixel-picked target.
  */
 
-import { FourError } from "@four/core";
-import type { Matrix4 } from "@four/math";
-import type { Node, Viewport } from "@four/scene";
+import { FourError } from "@fourjs/core";
+import type { Matrix4 } from "@fourjs/math";
+import type { Node, Viewport } from "@fourjs/scene";
 
 import { Renderable } from "./renderable.js";
 import type { Renderer } from "./renderer.js";
@@ -69,7 +69,7 @@ import type { Renderer } from "./renderer.js";
 /**
  * One pick query against a {@link PickingService} (§71; RFC 0005).
  *
- * `ndcX`/`ndcY` are the same normalized device coordinate `@four/input`'s ray
+ * `ndcX`/`ndcY` are the same normalized device coordinate `@fourjs/input`'s ray
  * pick takes: `[-1, 1]` on both axes, **+Y up** (§7a), so `(-1, -1)` is the
  * bottom-left of the viewport. Converting a pointer position in CSS pixels
  * into NDC is the pointer source's job (§72), not this API's.
@@ -117,7 +117,7 @@ export interface PickResult {
  * single-texel read-back (RFC 0005).
  *
  * ```ts
- * import { registerPickingPipeline } from "@four/render-webgl";
+ * import { registerPickingPipeline } from "@fourjs/render-webgl";
  *
  * registerPickingPipeline();                       // once, at setup
  * const picking = renderer.createPickingService!();
@@ -274,7 +274,7 @@ export function assertEncodableCandidateCount(count: number): void {
  *
  * Particle systems are **not** collected: §36's batched item has no
  * per-particle node and its id draw is the staged half of RFC 0005's tier
- * (see `@four/render-webgl`'s `gl-picking.ts`); a table entry nothing can
+ * (see `@fourjs/render-webgl`'s `gl-picking.ts`); a table entry nothing can
  * draw would only suggest otherwise.
  *
  * Both containers are cleared first, so a caller can reuse them per pass —

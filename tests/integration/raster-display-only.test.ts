@@ -20,7 +20,7 @@
  *
  * **This is a reachability rule, not a readability rule.** The scan below
  * fails any package source outside {@link ALLOWED} that names the raster
- * module — most simulation packages cannot see `@four/render` at all under
+ * module — most simulation packages cannot see `@fourjs/render` at all under
  * the frozen §3.1 matrix, and the scan states the rule for the ones that
  * could and for every package added later. What it cannot enforce:
  * `MaterialTexture.data` is public (the upload path reads it), so an
@@ -36,7 +36,7 @@
  * module specifier — RFC 0002's plugin rule in a second place, asserted here
  * the same two ways: `@ts-expect-error` that the constructor admits no string
  * (`pnpm typecheck:tests` runs it), and the scan's guarantee that neither
- * `@four/serialization` nor `@four/assets` — the two packages that touch
+ * `@fourjs/serialization` nor `@fourjs/assets` — the two packages that touch
  * §96's untrusted content — can reach the raster module at all. §77a's "no
  * §79 representation" is what makes the second half true by construction: a
  * painted surface has no key, so no document can name one.
@@ -45,14 +45,14 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-import { CanvasTexture } from "@four/render";
+import { CanvasTexture } from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 const repositoryRoot = join(import.meta.dirname, "..", "..");
 
 /**
  * The only files permitted to name the §77a raster module (RFC 0004 §3):
- * `@four/render` owns it, `@four/render-webgl` uploads it (through the
+ * `@fourjs/render` owns it, `@fourjs/render-webgl` uploads it (through the
  * `MaterialTexture` path it already has — listed so a future explicit read is
  * a decision here, not an accident there), and the `four` umbrella re-exports
  * it. Everything else is a simulation-adjacent package until someone argues
@@ -99,7 +99,7 @@ function walk(directory: string, out: string[]): void {
 
 /**
  * Names that only appear in a file that has reached for the §77a raster tier.
- * The module path catches a relative import inside `@four/render`; the
+ * The module path catches a relative import inside `@fourjs/render`; the
  * identifiers catch a cross-package one, whatever spelling the import takes.
  */
 const FORBIDDEN = [
@@ -131,7 +131,7 @@ describe("§77a painted pixels stay out of the simulation (§33–§34)", () => 
       offenders,
       "§77a's painted pixels are unreproducible by construction; a simulation " +
         "path that reads them breaks replay determinism (§33–§34), and " +
-        "@four/serialization / @four/assets reaching them would open §96's " +
+        "@fourjs/serialization / @fourjs/assets reaching them would open §96's " +
         "boundary. If a package legitimately displays painted content, add it " +
         "to ALLOWED_PACKAGES with a dated note, after confirming nothing on a " +
         "fixed-step path touches the import.",

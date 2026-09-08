@@ -8,7 +8,7 @@
  * `webgpu-renderer.test.ts`.
  */
 
-import { createSceneLights } from "@four/render";
+import { createSceneLights } from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 import { createRecordingGpu } from "../../../tests/integration/helpers/recording-gpu.js";

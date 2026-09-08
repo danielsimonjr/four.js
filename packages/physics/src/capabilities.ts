@@ -4,7 +4,7 @@
  *
  * RFC 0002 §2 spells it this way: *each token is exported from the package
  * that owns its registry*. The tokens first shipped together in
- * `@four/four`'s `plugins.ts` — a recorded, reversible spelling difference —
+ * `@fourjs/four`'s `plugins.ts` — a recorded, reversible spelling difference —
  * and moved home once the owning packages were free; the umbrella still
  * re-exports the very same object, so every existing import keeps working and
  * the token's identity (its `name` string) never changed.
@@ -15,7 +15,7 @@
  * nothing references leaves the bundle entirely.
  */
 
-import { defineCapability } from "@four/core";
+import { defineCapability } from "@fourjs/core";
 
 import type { SolverRegistry } from "./solver-registry.js";
 
@@ -26,11 +26,11 @@ import type { SolverRegistry } from "./solver-registry.js";
  * revocation is granted only where a plugin's `uninstall` can provably put
  * the registry back exactly as it found it, and `SIMULATION_SYSTEMS`'
  * idempotent-unregister contract is the one registry that qualifies.
- * Provided only by a standalone `@four/core` plugin host (its name is left
+ * Provided only by a standalone `@fourjs/core` plugin host (its name is left
  * unwritten here — the §96 boundary test's textual ban is blunt on purpose)
  * — `Application` never constructs or holds a `SolverRegistry` (§45 takes a
  * constructed `PhysicsWorld`, and naming the registry would put
- * `@four/physics` in every bundle).
+ * `@fourjs/physics` in every bundle).
  */
 export const SOLVER_REGISTRY = /* @__PURE__ */ defineCapability<SolverRegistry>(
   "four:solver-registry",

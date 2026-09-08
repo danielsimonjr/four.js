@@ -1,6 +1,6 @@
 /**
  * The node-material pipeline (§60, §62; RFC 0001 — gap R-14): a GLSL ES 3.00
- * emitter over `@four/materials`' shader-graph IR, a program class, and the
+ * emitter over `@fourjs/materials`' shader-graph IR, a program class, and the
  * per-context structural program cache — reached only through
  * {@link registerNodeMaterialPipeline}.
  *
@@ -8,7 +8,7 @@
  *
  * Nothing here accepts GLSL text from outside this repository. The emitter's
  * input is the closed-operator graph (`ShaderGraph`, read through the types
- * `@four/render` re-exposes — the frozen §3.1 row is untouched), and its
+ * `@fourjs/render` re-exposes — the frozen §3.1 row is untouched), and its
  * output is a pure, deterministic function of that graph: nodes are visited
  * in **array order** (§33 — the rule is written for simulation, and applying
  * it here is what makes the emitted source, and therefore the program-cache
@@ -53,8 +53,8 @@
  * invisible to authors.
  */
 
-import { DEV, devWarnOnce, type Disposable } from "@four/core";
-import type { Matrix4 } from "@four/math";
+import { DEV, devWarnOnce, type Disposable } from "@fourjs/core";
+import type { Matrix4 } from "@fourjs/math";
 import {
   analyzeShaderGraph,
   type ShaderAttributeName,
@@ -64,7 +64,7 @@ import {
   type ShaderNode,
   type ShaderUniformReflection,
   type ShaderValueType,
-} from "@four/render";
+} from "@fourjs/render";
 
 import {
   createLinkedProgram,
@@ -744,7 +744,7 @@ export class GlNodeProgramCache implements NodeMaterialPrograms {
  * effects (RFC 0001).
  *
  * ```ts
- * import { registerNodeMaterialPipeline } from "@four/render-webgl";
+ * import { registerNodeMaterialPipeline } from "@fourjs/render-webgl";
  * registerNodeMaterialPipeline();      // once, at application setup
  * ```
  *

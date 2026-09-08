@@ -101,9 +101,9 @@
  * the next build into the same array.
  */
 
-import { DEV, devWarnOnce } from "@four/core";
-import type { BufferGeometry } from "@four/geometry";
-import { Matrix4, Quaternion, Vector3 } from "@four/math";
+import { DEV, devWarnOnce } from "@fourjs/core";
+import type { BufferGeometry } from "@fourjs/geometry";
+import { Matrix4, Quaternion, Vector3 } from "@fourjs/math";
 import type {
   LitMaterial,
   Material,
@@ -111,7 +111,7 @@ import type {
   SpriteMaterial,
   StandardMaterial,
   UnlitMaterial,
-} from "@four/materials";
+} from "@fourjs/materials";
 import {
   ALL_LAYERS,
   DEFAULT_LAYER_MASK,
@@ -123,7 +123,7 @@ import {
   type PoseBuffer,
   type Skeleton,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 import {
   computeWorldBoundingSphereFromBox,
@@ -889,7 +889,7 @@ export function isSkinnedLitItem(
  *
  * The trailing `?? ALL_LAYERS` is not dead: `Camera.layers` is non-optional in
  * the type system, but a **structurally typed camera** predating the field
- * (`@four/render-webgl`'s test double, a host's own minimal camera object)
+ * (`@fourjs/render-webgl`'s test double, a host's own minimal camera object)
  * reports `undefined`, and that must resolve to "draws everything" rather than
  * to a mask of zero that silently empties the view. Same defence, same reason,
  * as `material.transparent === true` in `collect`.
@@ -898,7 +898,7 @@ export function viewLayerMask(view: Viewport): LayerMask {
   const mask = view.layerMask ?? view.camera.layers ?? ALL_LAYERS;
   // §85, and only in a development build: this runs once per view per frame, so
   // the cheap predicate gates the message — a template literal built here would
-  // allocate a string every frame, which is precisely what `@four/core`'s
+  // allocate a string every frame, which is precisely what `@fourjs/core`'s
   // `dev.ts` tells callers not to do. `assertLayerMask` re-tests and throws.
   if (DEV && !isLayerMask(mask)) {
     assertLayerMask(mask, `viewport "${view.id}" layer mask`);
@@ -1164,7 +1164,7 @@ function writeWorldMatrix(
  * Copies a particle system's live AABB onto the item as a world sphere so
  * §87 can cull it (R-8 follow-up b).
  *
- * `@four/particles`' `ParticleRenderable.computeBounds` writes a **local**
+ * `@fourjs/particles`' `ParticleRenderable.computeBounds` writes a **local**
  * box; this package cannot import that class, so the method is probed
  * structurally. No method, a `false` return (empty / GPU-simulated), or a
  * non-finite box leaves `frustumCulled = false` — the pre-follow-up
@@ -1283,7 +1283,7 @@ function collectSpriteItem(
  * **Per-node skipping**, for §46's layer mask (R-38, 2026-08-08): a node whose
  * `layers` shares no bit with `mask` generates no item, and **its children are
  * still visited**. That asymmetry is deliberate and is §46's model — a layer is
- * membership, not state, so it does not inherit (see `@four/scene`'s
+ * membership, not state, so it does not inherit (see `@fourjs/scene`'s
  * `layers.ts` for the recorded decision). The consequence here is that layer
  * filtering costs one `&` per node and never changes the traversal, which is
  * what keeps a masked list a permutation-free subsequence of the unmasked one
@@ -1310,7 +1310,7 @@ function collect(
   //
   // `?? DEFAULT_LAYER_MASK` for the same reason `material.transparent === true`
   // is written that way below: a **structurally typed** drawable predating the
-  // field — a `ParticleDrawable` implemented outside `@four/scene`, a host's own
+  // field — a `ParticleDrawable` implemented outside `@fourjs/scene`, a host's own
   // minimal node — reports `undefined`, and that must read as "on the default
   // layer", which is where every real node starts. Reading it as a bare
   // `undefined` would make `undefined & mask` zero and drop the node from every
@@ -1367,7 +1367,7 @@ function collect(
         // issued in bind pose: a character standing in T-pose is a different
         // picture, and the recorded rule is that a value must not become one
         // — the same direction the unregistered-pipeline case fails in
-        // (`@four/render-webgl`).
+        // (`@fourjs/render-webgl`).
         skinSkipped = true;
         if (DEV) {
           devWarnOnce(
@@ -1736,7 +1736,7 @@ export function compareRenderItems(a: RenderItem, b: RenderItem): number {
  *
  * The point of key 3 is that a batcher can only merge draws that are already
  * **adjacent**: grouping is what turns an interleaved scene into runs
- * `@four/render-webgl`'s batcher can collapse (§65, R-9). A scene authored in
+ * `@fourjs/render-webgl`'s batcher can collapse (§65, R-9). A scene authored in
  * groups already — a thousand sprites parented to one node, sharing one atlas —
  * needs none of this, which is why the builders do not do it.
  *
@@ -1839,7 +1839,7 @@ export function groupRenderListByPipeline(list: RenderItem[]): RenderItem[] {
  * bundle for a mistake that is an authoring error by construction, so it is
  * gated: measured at ~115 B gzip on `ui-demo`, deleted entirely by
  * `__FOUR_DEV__: false` (R-38, 2026-08-08). The check itself,
- * `@four/scene`'s `assertLayerMask`, is unconditional there — `@four/scene` is a
+ * `@fourjs/scene`'s `assertLayerMask`, is unconditional there — `@fourjs/scene` is a
  * §33 simulation package and may not branch on the build mode at all.
  */
 export function buildRenderList(

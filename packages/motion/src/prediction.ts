@@ -58,7 +58,7 @@
  * natural driver for shipping one.
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 
 /** `out`, or a fresh vector when the caller did not supply one (plan D7). */
 function resultVector(out: Vector3 | undefined): Vector3 {

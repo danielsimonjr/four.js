@@ -64,7 +64,7 @@
  * number of steps than it accounted for would drift with no error anywhere.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import type { ReplaySnapshot } from "./recorder.js";
 
@@ -74,7 +74,7 @@ const ROLLBACK_ERROR_CODE = "INVALID_APPLICATION_STATE";
 /**
  * What {@link RollbackBuffer} needs from a simulation.
  *
- * A strict subset of {@link @four/diagnostics!ReplayTarget} — `PhysicsWorld`
+ * A strict subset of {@link @fourjs/diagnostics!ReplayTarget} — `PhysicsWorld`
  * satisfies it, and so
  * does any application object that can capture and restore itself. `checksum`
  * is deliberately *not* required: a rollback does not verify, it rewinds, and

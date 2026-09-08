@@ -1,5 +1,5 @@
-import { isFourError } from "@four/core";
-import { Vector3, constructionCount, resetConstructionCount } from "@four/math";
+import { isFourError } from "@fourjs/core";
+import { Vector3, constructionCount, resetConstructionCount } from "@fourjs/math";
 import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 import { Timeline, type TimelineChild } from "../src/timeline.js";

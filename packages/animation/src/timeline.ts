@@ -68,7 +68,7 @@
  * `seek` calls that are themselves allocation-free.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import { requireNonNegativeSeconds } from "./tween.js";
 

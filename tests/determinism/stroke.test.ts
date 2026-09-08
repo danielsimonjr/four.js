@@ -38,7 +38,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { expandStroke } from "@four/geometry";
+import { expandStroke } from "@fourjs/geometry";
 import { beforeAll, describe, expect, test } from "vitest";
 
 import {

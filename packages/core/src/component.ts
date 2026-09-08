@@ -2,9 +2,9 @@
  * Component model (§6a, plan D2).
  *
  * Components attach typed behavior and state to a host — in practice a
- * `@four/scene` `Node`, which owns a {@link ComponentRegistry} and delegates
+ * `@fourjs/scene` `Node`, which owns a {@link ComponentRegistry} and delegates
  * `addComponent` / `getComponent` / `removeComponent` to it (plan D1).
- * `@four/core` must not depend on `@four/scene`, so the host is expressed here
+ * `@fourjs/core` must not depend on `@fourjs/scene`, so the host is expressed here
  * as the structural {@link ComponentHost} interface rather than as `Node`.
  *
  * Rules implemented (§6a):
@@ -22,7 +22,7 @@ import { DEV, devWarn } from "./dev.js";
 import { FourError } from "./errors.js";
 
 /**
- * What a component sees of its host. `@four/scene`'s `Node` satisfies this
+ * What a component sees of its host. `@fourjs/scene`'s `Node` satisfies this
  * structurally; so does {@link ComponentRegistry} itself.
  */
 export interface ComponentHost {

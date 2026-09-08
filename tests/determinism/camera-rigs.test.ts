@@ -7,8 +7,8 @@
  * obligation, in the three forms WP-1.14 established and every later phase
  * reused:
  *
- * 1. **Headless.** The scenario imports `@four/motion`, `@four/math`,
- *    `@four/scene` and `@four/diagnostics` — no renderer package, no canvas, no
+ * 1. **Headless.** The scenario imports `@fourjs/motion`, `@fourjs/math`,
+ *    `@fourjs/scene` and `@fourjs/diagnostics` — no renderer package, no canvas, no
  *    DOM, and no solver.
  * 2. **Deterministic in-process.** Two independent runs, each on a freshly
  *    built scene and a freshly seeded input stream, produce byte-identical

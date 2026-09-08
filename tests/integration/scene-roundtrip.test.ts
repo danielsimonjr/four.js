@@ -4,12 +4,12 @@
  *
  * Three things compose here that nothing else in the repository composes:
  *
- * 1. **`@four/serialization` × `@four/physics` × `@four/physics-rapier`.** The
+ * 1. **`@fourjs/serialization` × `@fourjs/physics` × `@fourjs/physics-rapier`.** The
  *    P11-1 gate is "round-trip save → load → §33-checksum-relevant state
- *    equality", and it cannot be met inside `@four/serialization`, which may not
+ *    equality", and it cannot be met inside `@fourjs/serialization`, which may not
  *    name `RigidBody` (plan §3.1). Since 2026-08-06 (`PH-17`) the serializers
  *    are **shipped** — `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER` from
- *    `@four/physics`, registered by the umbrella's
+ *    `@fourjs/physics`, registered by the umbrella's
  *    `registerPhysicsSerializers()` — and `helpers/roundtrip-scenarios.ts`
  *    holds only the scenario. This file is what proves the shipped pair works.
  * 2. **The §79 / §34 line.** Saving a *scene* is not snapshotting a
@@ -17,7 +17,7 @@
  *    bit-identically when the solver holds no contacts, and parts from the run
  *    it was saved from within two steps when it does. Both halves are asserted
  *    below, because the pair is the finding — either one alone is an anecdote.
- * 3. **`@four/ui` composition (§72–§75).** A `Panel`/`Label`/`Button` tree lays
+ * 3. **`@fourjs/ui` composition (§72–§75).** A `Panel`/`Label`/`Button` tree lays
  *    itself out and activates from a synthetic §72 click, and round-trips
  *    through §79 — completely, including its §74 box model and §75
  *    accessibility record, through the umbrella package's
@@ -36,14 +36,14 @@
  * a constant, injected delta, so every number below is reproducible.
  */
 
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import {
   ScenePointerEvent,
   buildPropagationPath,
   dispatchPointerEvent,
-} from "@four/input";
-import { Collider, RIGID_BODY_SERIALIZER, RigidBody } from "@four/physics";
-import { Group, Node, Scene } from "@four/scene";
+} from "@fourjs/input";
+import { Collider, RIGID_BODY_SERIALIZER, RigidBody } from "@fourjs/physics";
+import { Group, Node, Scene } from "@fourjs/scene";
 import {
   ComponentSerializerRegistry,
   SCENE_FORMAT_VERSION,
@@ -57,10 +57,10 @@ import {
   type JsonObject,
   type SceneDocument,
   type SceneMigrationWarning,
-} from "@four/serialization";
-import { buildGlyphAtlas } from "@four/text";
-import { Button, Label, Panel, UI_LAYOUT_AUTHORITY } from "@four/ui";
-import { registerSceneNodeTypes } from "four";
+} from "@fourjs/serialization";
+import { buildGlyphAtlas } from "@fourjs/text";
+import { Button, Label, Panel, UI_LAYOUT_AUTHORITY } from "@fourjs/ui";
+import { registerSceneNodeTypes } from "fourJS";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -354,7 +354,7 @@ describe("scene round trip (§79, §113a)", () => {
     // The closing half of PH-17, and the one path an application actually
     // takes: no hand-written registry, no `{ unknownComponents: "skip" }`, no
     // serializer copied out of a test helper — one umbrella call that knows
-    // `RigidBody` and `Collider` because `@four/physics` ships their
+    // `RigidBody` and `Collider` because `@fourjs/physics` ships their
     // serializers and this package registers them.
     //
     // Saved contact-free (see the §79/§34 boundary above), so the claim is the
@@ -587,7 +587,7 @@ describe("UI composition (§72–§75)", () => {
     root.layout();
 
     // §74: the panel's explicit width wins, the label measures its own text
-    // through `@four/text`, and the flex column stacks them with the gap.
+    // through `@fourjs/text`, and the flex column stacks them with the gap.
     expect(root.measuredWidth).toBe(200);
     expect(caption.measuredWidth).toBeGreaterThan(0);
     expect(button.measuredHeight).toBe(30);
@@ -637,7 +637,7 @@ describe("UI composition (§72–§75)", () => {
   it("round-trips a widget tree's Node state through a bare nodeTypeOf pair", () => {
     // The minimum an application can supply: a `nodeTypeOf` / `nodeFactory`
     // pair that names the classes and nothing more. The tree round-trips — as
-    // `Node`s. What survives is exactly what `@four/scene`'s own serializer
+    // `Node`s. What survives is exactly what `@fourjs/scene`'s own serializer
     // carries: hierarchy, names, transforms (including the positions the layout
     // pass wrote), authority, flags, tags.
     //
@@ -696,8 +696,8 @@ describe("UI composition (§72–§75)", () => {
     // §73: "UI objects are scene nodes and therefore share animation, input,
     // clipping, serialization, and diagnostics." Of those five, serialization
     // did not hold until 2026-08-06 — and this is the cross-package proof that
-    // it now does, because only the umbrella package may see `@four/ui` and
-    // `@four/serialization` at once.
+    // it now does, because only the umbrella package may see `@fourjs/ui` and
+    // `@fourjs/serialization` at once.
     const { root, button, buttonLabel } = buildUITree();
     root.layout();
     const io = registerSceneNodeTypes({ atlas: buildGlyphAtlas() });

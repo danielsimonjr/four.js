@@ -9,7 +9,7 @@ live in one scene graph with one clock, one transform-authority model, one
 event system, and one set of conventions. Deterministic fixed-step simulation
 with snapshots and replay is a first-class requirement, not an afterthought.
 
-Workspace packages are `@four/*`-scoped (umbrella: `four`); the decided publish
+Workspace packages are `@fourjs/*`-scoped (umbrella: `four`); the decided publish
 names are **`@danielsimonjr/fourjs`** (umbrella) and
 `@danielsimonjr/fourjs-<name>` (sub-packages). Nothing is published yet — the
 mechanical rename happens in the release workflow at first publish (§94, 0.1).
@@ -107,7 +107,7 @@ frozen dependency matrix behind it are explained in
 
 ## Package map (24 packages)
 
-All workspace packages are `@four/`-scoped; the scaffold matches the §98
+All workspace packages are `@fourjs/`-scoped; the scaffold matches the §98
 monorepo tree exactly. "Wave" is the build/dispatch layer from the frozen
 dependency matrix (implementation plan §3.1).
 
@@ -141,7 +141,7 @@ dependency matrix (implementation plan §3.1).
 The four reserved stubs (`physics-box2d`, `physics-soft`, `render-canvas`,
 `render-svg`) each contain a single placeholder file exporting
 `PACKAGE_NAME`, and their READMEs say so honestly ("interface reserved; not
-yet implemented"). `@four/render-webgpu` left that list 2026-08-21…29 (the
+yet implemented"). `@fourjs/render-webgpu` left that list 2026-08-21…29 (the
 R-1 plan). Per ERRATA E-3, `physics-matter` and `physics-cannon`
 directories must **not** be added without a spec amendment.
 
@@ -162,9 +162,9 @@ directories must **not** be added without a spec amendment.
 - Imports use the umbrella package's subpaths, exactly as the examples do:
 
   ```ts
-  import { Application } from "four/application";
-  import { Group, OrthographicCamera } from "four/scene";
-  import { Vector3 } from "four/math";
+  import { Application } from "fourJS/application";
+  import { Group, OrthographicCamera } from "fourJS/scene";
+  import { Vector3 } from "fourJS/math";
   ```
 
 ## Current implementation status

@@ -19,10 +19,10 @@
  *    between a textured quad and the flat-colour pipeline.
  */
 
-import { isFourError } from "@four/core";
-import { planeGeometry } from "@four/geometry";
-import { SpriteMaterial, UnlitMaterial } from "@four/materials";
-import { PoseBuffer, Scene } from "@four/scene";
+import { isFourError } from "@fourjs/core";
+import { planeGeometry } from "@fourjs/geometry";
+import { SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
+import { PoseBuffer, Scene } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

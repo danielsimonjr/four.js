@@ -5,10 +5,10 @@
  * The six methods only close PH-1 if Rapier really applies them to a body that
  * already exists, so this file measures the consequences against
  * `@dimforge/rapier2d-compat` and `@dimforge/rapier3d-compat` 0.19.3 rather
- * than asserting that a setter was called. What `@four/physics` builds on top —
+ * than asserting that a setter was called. What `@fourjs/physics` builds on top —
  * the dirty set, the drain order, the warnings — is proved over the structural
- * double in `@four/physics`'s `world-properties.test.ts`; a `PhysicsWorld`
- * cannot be built here, because it needs `@four/scene` and this package does
+ * double in `@fourjs/physics`'s `world-properties.test.ts`; a `PhysicsWorld`
+ * cannot be built here, because it needs `@fourjs/scene` and this package does
  * not depend on it.
  *
  * ## What was verified about Rapier itself (2026-08-07, 0.19.3, both builds)
@@ -29,13 +29,13 @@
  * tolerances below.
  */
 
-import { Matrix3, Vector2, Vector3 } from "@four/math";
+import { Matrix3, Vector2, Vector3 } from "@fourjs/math";
 import type {
   CCDMode,
   PhysicsBodyHandle,
   PhysicsColliderHandle,
-} from "@four/physics";
-import { supportsSolverBodyTuning } from "@four/physics";
+} from "@fourjs/physics";
+import { supportsSolverBodyTuning } from "@fourjs/physics";
 import { describe, expect, it } from "vitest";
 
 import { Rapier2dAdapter } from "../src/rapier2d-adapter.js";

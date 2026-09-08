@@ -1,7 +1,7 @@
 /**
  * §83 resource accounting for materials — how many are live (A-5 follow-up).
  *
- * The twin of `@four/geometry`'s and `@four/render`'s `resource-memory.ts`,
+ * The twin of `@fourjs/geometry`'s and `@fourjs/render`'s `resource-memory.ts`,
  * which document the design in full: **numbers, not references**, so the
  * tracker cannot itself become the leak it reports; process-wide rather than
  * per-application, because a material belongs to whoever created it (§83);
@@ -14,11 +14,11 @@
  * A material is CPU-side state (colour arrays, sampler pointers, a stencil
  * record). The GPU objects a backend builds from it — pipelines, uniform
  * buffers — are the backend's, and the textures a material samples are
- * already billed by `@four/render`. There is no honest byte length here that
+ * already billed by `@fourjs/render`. There is no honest byte length here that
  * is not already counted elsewhere, so this module holds **one number**.
  *
  * {@link liveMaterialCount} is what a caller passes to
- * `@four/diagnostics`' `auditResourceLeaks` as `LiveResourceCounts.materials`.
+ * `@fourjs/diagnostics`' `auditResourceLeaks` as `LiveResourceCounts.materials`.
  * There is no §84 `app.stats` slot for materials; the audit is the surface.
  *
  * ## Always on (the count)
@@ -29,7 +29,7 @@
  * helpers below, not on the count.
  */
 
-import { DEV, disposeTracked, trackDisposable } from "@four/core";
+import { DEV, disposeTracked, trackDisposable } from "@fourjs/core";
 
 /** Live (constructed, undisposed) {@link Material} instances. */
 let liveMaterials = 0;
@@ -38,8 +38,8 @@ let liveMaterials = 0;
  * Records a change to the live material accounting: `instances` is `+1` at
  * construction and `-1` at disposal.
  *
- * Internal to `@four/materials` — exported so `material.ts` can reach it,
- * deliberately absent from the package index, exactly as `@four/math`'s
+ * Internal to `@fourjs/materials` — exported so `material.ts` can reach it,
+ * deliberately absent from the package index, exactly as `@fourjs/math`'s
  * `noteConstruction` is.
  */
 export function noteMaterial(instances: number): void {

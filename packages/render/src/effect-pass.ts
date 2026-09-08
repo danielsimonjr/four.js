@@ -95,7 +95,7 @@ import {
   SHADER_VALUE_COMPONENTS,
   analyzeShaderGraph,
   type ShaderGraph,
-} from "@four/materials";
+} from "@fourjs/materials";
 
 import type { RenderTarget, RenderTargetTexture } from "./render-target.js";
 import { isRenderTargetTexture } from "./render-target.js";
@@ -227,7 +227,7 @@ export interface ColorGradeEffect {
  *
  * ## The arithmetic, exactly
  *
- * Per colour channel, `@four/math`'s `linearToSrgb`: the IEC 61966-2-1
+ * Per colour channel, `@fourjs/math`'s `linearToSrgb`: the IEC 61966-2-1
  * piecewise curve, odd-extended below zero. **Alpha is not encoded** — it is a
  * coverage fraction, not a light quantity — which is the same rule
  * `srgbToLinearRGBA` follows on the way in. Nothing is clamped by the effect;
@@ -452,7 +452,7 @@ export interface ScreenEffectRenderer {
  * {@link ScreenEffectRenderer.renderEffect} can be called.
  *
  * A property test rather than an `instanceof`: backends are separate packages
- * and `@four/render` must not name any of them (§61) — the same duck-typed
+ * and `@fourjs/render` must not name any of them (§61) — the same duck-typed
  * discipline as {@link supportsRenderStatistics}, `isParticleDrawable`, and
  * `isRenderTargetTexture`. {@link RenderGraph.execute} uses it to fail loudly
  * on the first frame instead of drawing nothing forever.

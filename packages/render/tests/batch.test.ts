@@ -1,6 +1,6 @@
-import { BufferGeometry, planeGeometry } from "@four/geometry";
-import { Vector3 } from "@four/math";
-import { LitMaterial, SpriteMaterial, UnlitMaterial } from "@four/materials";
+import { BufferGeometry, planeGeometry } from "@fourjs/geometry";
+import { Vector3 } from "@fourjs/math";
+import { LitMaterial, SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
 import {
   DEFAULT_LAYER_MASK,
   NO_LAYERS,
@@ -8,7 +8,7 @@ import {
   Scene,
   layerMask,
   resolveWorldTransforms,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -45,7 +45,7 @@ class ParticleSystemDouble extends Node implements ParticleDrawable {
 }
 
 /**
- * §65 batching — `@four/render`'s backend-independent planner (R-9,
+ * §65 batching — `@fourjs/render`'s backend-independent planner (R-9,
  * 2026-08-09).
  *
  * The claims under test are the ones the module's header makes: a run is

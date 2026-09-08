@@ -8,7 +8,7 @@
  * type needs no adapter; here the point is every branch of the policy.
  */
 
-import { FourError, isFourError, type Disposable } from "@four/core";
+import { FourError, isFourError, type Disposable } from "@fourjs/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

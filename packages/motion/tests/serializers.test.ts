@@ -5,15 +5,15 @@
  *
  * Two things are under test: the payloads round-trip every field the components
  * declare, and the structural declaration still matches
- * `@four/serialization`'s `ComponentSerializer`. The second is what the module
+ * `@fourjs/serialization`'s `ComponentSerializer`. The second is what the module
  * header calls the honest cost of duck typing — no compiler checks the two
  * declarations against each other, so a transcribed mirror is asserted here
  * instead.
  */
 
-import type { JsonValue } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
-import { Group, type Node } from "@four/scene";
+import type { JsonValue } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import { Group, type Node } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -34,7 +34,7 @@ import {
 } from "../src/index.js";
 
 /**
- * `@four/serialization`'s `ComponentSerializer<T>`, transcribed member for
+ * `@fourjs/serialization`'s `ComponentSerializer<T>`, transcribed member for
  * member (there is no §3.1 edge from `motion` to `serialization`).
  */
 interface ComponentSerializerMirror<T> {

@@ -44,8 +44,8 @@
  * two priorities — so the tier is entirely the solver's.
  */
 
-import { createChecksum } from "@four/diagnostics";
-import { Vector2 } from "@four/math";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Vector2 } from "@fourjs/math";
 import {
   PRIORITY_CONSTRAINTS,
   PRIORITY_EVENT_DISPATCH,
@@ -53,16 +53,16 @@ import {
   SystemRegistry,
   createTimeState,
   type SimulationSystem,
-} from "@four/motion";
+} from "@fourjs/motion";
 import {
   Collider,
   PhysicsEventSystem,
   PhysicsSystem,
   PhysicsWorld,
   RigidBody,
-} from "@four/physics";
-import { Rapier2dAdapter } from "@four/physics-rapier";
-import { Group } from "@four/scene";
+} from "@fourjs/physics";
+import { Rapier2dAdapter } from "@fourjs/physics-rapier";
+import { Group } from "@fourjs/scene";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 export const FIXED_TIME_STEP = 1 / 60;

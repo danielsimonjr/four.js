@@ -1,6 +1,6 @@
 /**
  * §36 particles on the WebGPU backend (WP-R1.8, 2026-08-29) — the real
- * `@four/particles` path, end to end: a seeded `ParticleEmitter` under a
+ * `@fourjs/particles` path, end to end: a seeded `ParticleEmitter` under a
  * `ParticleRenderable` node, repacked by `buildRenderList` and drawn by
  * `WebgpuRenderer` as **one instanced draw** over the shared unit quad.
  *
@@ -19,23 +19,23 @@
  * transcript identity (§33's per-backend rule).
  */
 
-import { Vector3 } from "@four/math";
-import { ParticleEmitter, ParticleRenderable } from "@four/particles";
-import { PARTICLE_INSTANCE_FLOATS } from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+import { Vector3 } from "@fourjs/math";
+import { ParticleEmitter, ParticleRenderable } from "@fourjs/particles";
+import { PARTICLE_INSTANCE_FLOATS } from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   PARTICLE_MODEL_OFFSET,
   PARTICLE_UNIFORM_BYTES,
   UNIFORM_STRIDE_BYTES,
   WebgpuRenderer,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { RecordingCanvas, createRecordingGl } from "./helpers/recording-gl.js";
@@ -125,7 +125,7 @@ function instanceUploads(gpu: RecordingGpu, floats: number): number[][] {
     .map((call) => call.args[2] as number[]);
 }
 
-describe("WebGPU particles — the real @four/particles node (§36, WP-R1.8)", () => {
+describe("WebGPU particles — the real @fourjs/particles node (§36, WP-R1.8)", () => {
   it("draws the system as one instanced draw of the repacked pool", async () => {
     const { renderable, scene, views } = fountain();
     const { gpu, renderer } = await webgpuRig();

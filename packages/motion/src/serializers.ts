@@ -4,7 +4,7 @@
  * constraint added 2026-08-13).
  *
  * §6a says components "serialize under registered type names (§79)", and §79's
- * registry is `@four/serialization`'s — which may depend on `core`, `math`, and
+ * registry is `@fourjs/serialization`'s — which may depend on `core`, `math`, and
  * `scene` only (plan §3.1) and so can never name `MotionComponent`. The
  * registry is therefore empty of everything except the components `scene` owns,
  * and every scene carrying a `MotionComponent` used to round-trip through §79
@@ -13,14 +13,14 @@
  *
  * ## Why the type is declared here rather than imported
  *
- * Nothing below imports `@four/serialization`. The §3.1 matrix has no
+ * Nothing below imports `@fourjs/serialization`. The §3.1 matrix has no
  * motion → serialization edge, adding one would invert the layering (an
  * application-tier format depended on by a foundation-tier package), and it is
  * not needed: {@link ComponentSerializerShape} is the same **structural**
  * contract `ComponentSerializer` declares, so
  * `registry.register(MotionComponent, MOTION_COMPONENT_SERIALIZER)` type-checks
- * with no cast and no edge — the duck-typing pattern `@four/render`'s
- * `ParticleDrawable` and `@four/diagnostics`'s `ReplayTarget` already use, and
+ * with no cast and no edge — the duck-typing pattern `@fourjs/render`'s
+ * `ParticleDrawable` and `@fourjs/diagnostics`'s `ReplayTarget` already use, and
  * with the same honest cost: **nothing type-checks the two declarations against
  * each other.** A change to `ComponentSerializer` will not fail this package's
  * build; it will fail `tests/serializers.test.ts`, which asserts assignability
@@ -71,8 +71,8 @@
  * say nothing about it.
  */
 
-import type { JsonValue } from "@four/core";
-import { Vector3 } from "@four/math";
+import type { JsonValue } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
 
 import {
   DEFAULT_ORBIT_MIN_DISTANCE,
@@ -94,7 +94,7 @@ import type { RigTarget } from "./rig-target.js";
 import { SpringDamper } from "./spring-damper.js";
 
 /**
- * The structural shape of `@four/serialization`'s `ComponentSerializer<T>`.
+ * The structural shape of `@fourjs/serialization`'s `ComponentSerializer<T>`.
  *
  * Declared with **method syntax**, exactly as the original is, because
  * TypeScript's methods are bivariant in their parameters — which is what lets a
@@ -137,7 +137,7 @@ function readNumber(value: JsonValue | undefined, fallback: number): number {
  * The §79 serializer for {@link MotionComponent} (§11, PH-17).
  *
  * ```ts
- * import { MotionComponent, MOTION_COMPONENT_SERIALIZER } from "@four/motion";
+ * import { MotionComponent, MOTION_COMPONENT_SERIALIZER } from "@fourjs/motion";
  *
  * registry.register(MotionComponent, MOTION_COMPONENT_SERIALIZER);
  * ```
@@ -202,7 +202,7 @@ export const MOTION_COMPONENT_SERIALIZER: ComponentSerializerShape<MotionCompone
  * The §79 serializer for {@link KinematicController} (§12, 2026-08-07).
  *
  * ```ts
- * import { KinematicController, KINEMATIC_CONTROLLER_SERIALIZER } from "@four/motion";
+ * import { KinematicController, KINEMATIC_CONTROLLER_SERIALIZER } from "@fourjs/motion";
  *
  * registry.register(KinematicController, KINEMATIC_CONTROLLER_SERIALIZER);
  * ```
@@ -216,7 +216,7 @@ export const MOTION_COMPONENT_SERIALIZER: ComponentSerializerShape<MotionCompone
  * serializer (A-15, 2026-08-06), which turned "this scene contains a
  * `KinematicController`" into a `serializeScene` that could not save the scene
  * at all. Four of the five shipped components had a serializer; this is the
- * fifth. `packages/four/tests/scene-serializers.test.ts` now enumerates every
+ * fifth. `packages/fourJS/tests/scene-serializers.test.ts` now enumerates every
  * exported class carrying a `static typeName` and asserts each one is
  * registered, so the sixth component cannot be forgotten the same way.
  *
@@ -233,7 +233,7 @@ export const MOTION_COMPONENT_SERIALIZER: ComponentSerializerShape<MotionCompone
  *
  * - §79 keeps simulation state out of a scene document ("physics state,
  *   animation state, and replay data must be separate optional sections"), and
- *   a half-finished move is exactly that: `@four/physics`'s serializers draw
+ *   a half-finished move is exactly that: `@fourjs/physics`'s serializers draw
  *   the same line with the same words ("a document is a scene, not a
  *   simulation"). The node's transform *is* saved, so a scene saved mid-move
  *   reloads with the node where the move had got to, standing still.
@@ -298,7 +298,7 @@ function targetJson(target: RigTarget | null): JsonValue | undefined {
  * The §79 serializer for {@link OrbitRig} (§44, 2026-08-13).
  *
  * ```ts
- * import { OrbitRig, ORBIT_RIG_SERIALIZER } from "@four/motion";
+ * import { OrbitRig, ORBIT_RIG_SERIALIZER } from "@fourjs/motion";
  *
  * registry.register(OrbitRig, ORBIT_RIG_SERIALIZER);
  * ```
@@ -354,7 +354,7 @@ export const ORBIT_RIG_SERIALIZER: ComponentSerializerShape<OrbitRig> = {
  * The §79 serializer for {@link FollowRig} (§44, 2026-08-13).
  *
  * ```ts
- * import { FollowRig, FOLLOW_RIG_SERIALIZER } from "@four/motion";
+ * import { FollowRig, FOLLOW_RIG_SERIALIZER } from "@fourjs/motion";
  *
  * registry.register(FollowRig, FOLLOW_RIG_SERIALIZER);
  * ```
@@ -406,7 +406,7 @@ export const FOLLOW_RIG_SERIALIZER: ComponentSerializerShape<FollowRig> = {
  * The §79 serializer for {@link LookAtConstraint} (§12, 2026-08-13).
  *
  * ```ts
- * import { LookAtConstraint, LOOK_AT_CONSTRAINT_SERIALIZER } from "@four/motion";
+ * import { LookAtConstraint, LOOK_AT_CONSTRAINT_SERIALIZER } from "@fourjs/motion";
  *
  * registry.register(LookAtConstraint, LOOK_AT_CONSTRAINT_SERIALIZER);
  * ```
@@ -452,7 +452,7 @@ export const LOOK_AT_CONSTRAINT_SERIALIZER: ComponentSerializerShape<LookAtConst
  * 2026-08-21).
  *
  * ```ts
- * import { CharacterController, CHARACTER_CONTROLLER_SERIALIZER } from "@four/motion";
+ * import { CharacterController, CHARACTER_CONTROLLER_SERIALIZER } from "@fourjs/motion";
  *
  * registry.register(CharacterController, CHARACTER_CONTROLLER_SERIALIZER);
  * ```
@@ -513,7 +513,7 @@ export const CHARACTER_CONTROLLER_SERIALIZER: ComponentSerializerShape<Character
  * 2026-08-21).
  *
  * ```ts
- * import { FirstPersonLook, FIRST_PERSON_LOOK_SERIALIZER } from "@four/motion";
+ * import { FirstPersonLook, FIRST_PERSON_LOOK_SERIALIZER } from "@fourjs/motion";
  *
  * registry.register(FirstPersonLook, FIRST_PERSON_LOOK_SERIALIZER);
  * ```
@@ -551,7 +551,7 @@ export const FIRST_PERSON_LOOK_SERIALIZER: ComponentSerializerShape<FirstPersonL
  * The §79 serializer for {@link CameraShake} (§44, R-36/R-37 residue).
  *
  * ```ts
- * import { CameraShake, CAMERA_SHAKE_SERIALIZER } from "@four/motion";
+ * import { CameraShake, CAMERA_SHAKE_SERIALIZER } from "@fourjs/motion";
  *
  * registry.register(CameraShake, CAMERA_SHAKE_SERIALIZER);
  * ```

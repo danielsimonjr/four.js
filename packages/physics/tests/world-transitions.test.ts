@@ -3,7 +3,7 @@
  * structural double (§22, §23, §33, §42, §110; plan P7-3, WP-7.2).
  *
  * The solver-side proof that a body really can be re-typed in place lives in
- * `@four/physics-rapier`'s `rapier-retype.test.ts`, against the real wasm. What
+ * `@fourjs/physics-rapier`'s `rapier-retype.test.ts`, against the real wasm. What
  * is proved *here* is everything the engine owns and a solver cannot answer for:
  * which call the world makes and in which order, that the fixed-step pipeline
  * follows the **new** type from the next step, §23's mass rule for the switch,
@@ -12,9 +12,9 @@
  * stream — are untouched.
  */
 
-import { isFourError } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
-import { Group, PoseBuffer, PoseTarget } from "@four/scene";
+import { isFourError } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import { Group, PoseBuffer, PoseTarget } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import type { PhysicsWorldInit } from "../src/index.js";

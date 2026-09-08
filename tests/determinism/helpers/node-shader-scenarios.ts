@@ -14,8 +14,8 @@
  * it).
  */
 
-import { NodeMaterialBuilder, ShaderGraphBuilder } from "@four/materials";
-import type { ShaderGraph } from "@four/render";
+import { NodeMaterialBuilder, ShaderGraphBuilder } from "@fourjs/materials";
+import type { ShaderGraph } from "@fourjs/render";
 
 /**
  * The canonical surface graph: every transportable uniform type, a sampled

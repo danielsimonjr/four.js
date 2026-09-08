@@ -6,7 +6,7 @@
  * optional-shortfall diagnostics — all over scripted backend doubles.
  */
 
-import { EventEmitter, isFourError } from "@four/core";
+import { EventEmitter, isFourError } from "@fourjs/core";
 import { describe, expect, it, vi } from "vitest";
 
 import {

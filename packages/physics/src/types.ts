@@ -2,7 +2,7 @@
  * The physics vocabulary (§21, §22, §25, §31, §32, §33) and the opaque solver
  * handles of §37.
  *
- * This module is the leaf of `@four/physics`: it imports nothing from the rest
+ * This module is the leaf of `@fourjs/physics`: it imports nothing from the rest
  * of the package, so every other module can name these types without creating a
  * cycle. It holds the closed unions the specification spells out, the small
  * amount of configuration data that goes with them, and the three handle types
@@ -31,7 +31,7 @@
  * package is in seconds.
  */
 
-import type { Quaternion, Vector2, Vector3 } from "@four/math";
+import type { Quaternion, Vector2, Vector3 } from "@fourjs/math";
 
 /**
  * Which dimensional model a world simulates (§21).
@@ -261,7 +261,7 @@ declare const physicsHandleBrand: unique symbol;
  * `PhysicsSolverAdapter.createBody` (§37).
  *
  * Handles carry no readable data on purpose. The engine-assigned monotonic body
- * id that §33's checksum orders by is owned by `@four/physics` (WP-5.3), not by
+ * id that §33's checksum orders by is owned by `@fourjs/physics` (WP-5.3), not by
  * the adapter, so it lives beside the handle rather than inside it.
  *
  * A handle is valid until it is passed to `destroyBody`; using one afterwards

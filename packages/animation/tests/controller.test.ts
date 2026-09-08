@@ -1,6 +1,6 @@
-import { isFourError } from "@four/core";
-import { Vector3 } from "@four/math";
-import { Group, Node } from "@four/scene";
+import { isFourError } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
+import { Group, Node } from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 import { AnimationSystem } from "../src/animation-system.js";

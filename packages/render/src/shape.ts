@@ -43,7 +43,7 @@
  *   them the family covers **all fourteen** of §50's rows.
  *
  * The stroke's geometry is not here. §52 puts stroke expansion in
- * `@four/geometry`'s tessellation module by name, beside the fill
+ * `@fourjs/geometry`'s tessellation module by name, beside the fill
  * tessellator, and that is where it went (`expandStroke`); this module
  * decides what a stroke *is* and lets §52 decide where its triangles are.
  *
@@ -198,7 +198,7 @@
  * §51 path, so an exporter never learns what kind of shape it is holding.
  */
 
-import type { Disposable } from "@four/core";
+import type { Disposable } from "@fourjs/core";
 import {
   BufferGeometry,
   DEFAULT_FLATTEN_TOLERANCE,
@@ -212,9 +212,9 @@ import {
   type StrokeLineCap,
   type StrokeLineJoin,
   type StrokeMesh,
-} from "@four/geometry";
-import type { Material, MaterialTexture } from "@four/materials";
-import type { ColorRGBA } from "@four/math";
+} from "@fourjs/geometry";
+import type { Material, MaterialTexture } from "@fourjs/materials";
+import type { ColorRGBA } from "@fourjs/math";
 
 import {
   Renderable,
@@ -278,7 +278,7 @@ function requireCount(name: string, value: number, minimum: number): number {
  * ```
  *
  * The colour is linear-light straight RGBA, §60a's working space and the same
- * tuple every material carries; `@four/math`'s `srgbToLinearRGBA(parseColor(…))`
+ * tuple every material carries; `@fourjs/math`'s `srgbToLinearRGBA(parseColor(…))`
  * is the one-line path from §50's `"#4466ff"` (§101 pins tuples as the shipped
  * spelling — see `R-15`).
  */
@@ -650,7 +650,7 @@ export type ResolvedShapeFill = ResolvedPaint | "inherit" | "none";
  * Canvas and §58's own ordering already agree on. The defaults are named on
  * each field and restated in Appendix A terms by `expandStroke`.
  *
- * The geometric half is `@four/geometry`'s `StrokeGeometryOptions`, which this
+ * The geometric half is `@fourjs/geometry`'s `StrokeGeometryOptions`, which this
  * interface re-declares minus its `tolerance` — a shape has its own
  * {@link Shape2D.tolerance} and stroking at a different one than the
  * flattening would put facets on a curve that has none — and plus §58's
@@ -2411,7 +2411,7 @@ export interface PathShapeOptions<
  *
  * ## The name
  *
- * §49 spells this node `Path`. `@four/geometry` already publishes a `Path` —
+ * §49 spells this node `Path`. `@fourjs/geometry` already publishes a `Path` —
  * §51's model, which is exactly the **data** this node draws — and the two
  * would collide in the umbrella's barrels precisely where an author needs both
  * in one expression. The suffix follows `ImageWidget`, which carries one for

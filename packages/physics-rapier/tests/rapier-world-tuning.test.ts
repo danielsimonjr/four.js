@@ -19,8 +19,8 @@
  * these are exact assertions, not tolerances hiding flake.
  */
 
-import { Quaternion, Vector2, Vector3 } from "@four/math";
-import type { PhysicsBodyHandle, PhysicsWorldOptions } from "@four/physics";
+import { Quaternion, Vector2, Vector3 } from "@fourjs/math";
+import type { PhysicsBodyHandle, PhysicsWorldOptions } from "@fourjs/physics";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { initializeRapier2d } from "../src/init.js";

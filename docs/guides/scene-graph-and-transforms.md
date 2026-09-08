@@ -13,18 +13,18 @@ box are siblings in the same right-handed, Y-up world (§6, §7a).
 is a node with a geometry and a material.
 
 ```ts
-import { Application } from "four/application";
-import { boxGeometry, circleGeometry2D } from "four/geometry";
-import { UnlitMaterial } from "four/materials";
-import { Vector3 } from "four/math";
-import { MotionComponent, MotionSystem } from "four/motion";
-import { Renderable } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
+import { Application } from "fourJS/application";
+import { boxGeometry, circleGeometry2D } from "fourJS/geometry";
+import { UnlitMaterial } from "fourJS/materials";
+import { Vector3 } from "fourJS/math";
+import { MotionComponent, MotionSystem } from "fourJS/motion";
+import { Renderable } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
 import {
   Group,
   OrthographicCamera,
   createFullscreenViewport,
-} from "four/scene";
+} from "fourJS/scene";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#scene");
 if (canvas === null) throw new Error("no canvas");

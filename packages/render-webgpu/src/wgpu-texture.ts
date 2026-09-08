@@ -1,9 +1,9 @@
 /**
  * GPU-side textures and samplers for the WebGPU backend: one `GPUTexture` per
- * `@four/render` `Texture`, cached and invalidated by version, plus a
+ * `@fourjs/render` `Texture`, cached and invalidated by version, plus a
  * **separate, deduplicated sampler cache** (§77, §83, §61).
  *
- * The port of `@four/render-webgl`'s `gl-texture.ts`, and deliberately so —
+ * The port of `@fourjs/render-webgl`'s `gl-texture.ts`, and deliberately so —
  * same key (`id`), same validator (`version`), same lazy eviction, same
  * loss-aware {@link WgpuTextureCache.forget}, same refusal to throw inside
  * `render`. Reading one module tells you how the other behaves. Everything
@@ -82,7 +82,7 @@
  * `Texture.byteLength` uses, so a cache holding one texture reports exactly
  * that texture's `byteLength` — 256 × 256 RGBA8 is 262 144 bytes, and 4 × 4
  * mipmapped is 84, on both backends. It is backend-side diagnostics, and it is
- * deliberately *not* wired into `@four/render`'s process-wide totals: those are
+ * deliberately *not* wired into `@fourjs/render`'s process-wide totals: those are
  * fed by `Texture` itself at construction and disposal (`resource-memory.ts`),
  * which is what keeps them true for a texture no renderer has met yet.
  *
@@ -96,8 +96,8 @@
  * allocations that belong to a device that is gone (§61).
  */
 
-import type { RenderItem } from "@four/render";
-import { warnDisposedInUse } from "@four/render";
+import type { RenderItem } from "@fourjs/render";
+import { warnDisposedInUse } from "@fourjs/render";
 
 import {
   GPU_TEXTURE_USAGE,
@@ -124,7 +124,7 @@ import { FRAGMENT_ENTRY_POINT, VERTEX_ENTRY_POINT } from "./wgpu-unlit.js";
  *
  * The choice `CacheableGeometry` and `gl-texture.ts`'s `CacheableTexture` both
  * make: it types the cache against **what the render list actually hands it** —
- * `@four/materials`' `MaterialTexture` read contract — so the module keeps
+ * `@fourjs/materials`' `MaterialTexture` read contract — so the module keeps
  * working unchanged if a second texture implementation ever satisfies that
  * contract, and it cannot reach for state a render item does not carry.
  *

@@ -92,7 +92,7 @@
  * pinned set is the one implemented above (2026-08-02).
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 
 import { interceptTime as predictedInterceptTime } from "./prediction.js";
 import type { SeededRandom } from "./random.js";

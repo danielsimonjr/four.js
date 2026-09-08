@@ -18,7 +18,7 @@
  * | a spring-connected pendulum| {@link PENDULUM_ANCHOR}: a §28 `SpringJoint` from a static anchor to a dynamic bob, swinging *and* bouncing on its spring |
  * | a bouncing rigid body      | {@link BALL_START}: a restitution-0.92 sphere the solver drops onto the slab, re-launched by an impulse on each landing |
  * | a world-space label        | two: the scene title above the horizon, and a live `bounces: N` readout that **rides the bouncing body**              |
- * | a screen-space control panel| a `@four/ui` panel parented to the **camera**, so it is fixed in the viewport: three `Button`s and a `Slider`         |
+ * | a screen-space control panel| a `@fourjs/ui` panel parented to the **camera**, so it is fixed in the viewport: three `Button`s and a `Slider`         |
  * | a timeline                 | a §16 `Timeline` sequencing two tweens on different nodes plus a lap marker, looping forever                          |
  * | a motorized hinge          | {@link ROTOR_POSITION}: a `HingeJoint` with an enabled §28 motor turning a rotor bar against gravity                  |
  * | collision events           | the ball's `collisionstart` (§29) drives the bounce counter, the label, a particle burst, and the impulse that keeps it alive |
@@ -149,8 +149,8 @@
  * state.
  */
 
-import { AnimationSystem, Timeline, animate } from "four/animation";
-import { Application } from "four/application";
+import { AnimationSystem, Timeline, animate } from "fourJS/animation";
+import { Application } from "fourJS/application";
 import {
   DebugDrawBuffer,
   applyDebugDrawStreams,
@@ -160,25 +160,25 @@ import {
   debugDrawStreams,
   type DebugDrawStreams,
   type DebugPhysicsEventLike,
-} from "four/diagnostics";
+} from "fourJS/diagnostics";
 import {
   BufferGeometry,
   boxGeometry,
   circleGeometry2D,
   planeGeometry,
   sphereGeometry,
-} from "four/geometry";
-import { KeyboardInput, PointerInput, type Pickable } from "four/input";
-import { LitMaterial, UnlitMaterial } from "four/materials";
-import { Quaternion, Vector3 } from "four/math";
-import { MotionComponent, MotionSystem } from "four/motion";
+} from "fourJS/geometry";
+import { KeyboardInput, PointerInput, type Pickable } from "fourJS/input";
+import { LitMaterial, UnlitMaterial } from "fourJS/materials";
+import { Quaternion, Vector3 } from "fourJS/math";
+import { MotionComponent, MotionSystem } from "fourJS/motion";
 import {
   ParticleEmitter,
   ParticleRenderable,
   ParticleSystem,
   dragField,
   uniformGravityField,
-} from "four/particles";
+} from "fourJS/particles";
 import {
   Collider,
   HingeJoint,
@@ -186,10 +186,10 @@ import {
   PhysicsWorld,
   RigidBody,
   SpringJoint,
-} from "four/physics";
-import { registerRapierSolver } from "four/physics-rapier";
-import { Renderable, Texture } from "four/render";
-import { registerWebglRenderer } from "four/render-webgl";
+} from "fourJS/physics";
+import { registerRapierSolver } from "fourJS/physics-rapier";
+import { Renderable, Texture } from "fourJS/render";
+import { registerWebglRenderer } from "fourJS/render-webgl";
 import {
   DEFAULT_LAYER_MASK,
   DirectionalLight,
@@ -201,8 +201,8 @@ import {
   defineLayer,
   layerMask,
   resolveWorldTransform,
-} from "four/scene";
-import { buildGlyphAtlas } from "four/text";
+} from "fourJS/scene";
+import { buildGlyphAtlas } from "fourJS/text";
 import {
   Button,
   Label,
@@ -215,8 +215,8 @@ import {
   type UIWidget,
   type WidgetActivationSource,
   type WidgetSkin,
-} from "four/ui";
-import { Text } from "four";
+} from "fourJS/ui";
+import { Text } from "fourJS";
 
 // --- surface -----------------------------------------------------------------
 
@@ -300,7 +300,7 @@ view.layerMask = DEFAULT_LAYER_MASK;
  * is laid out in pixels.
  *
  * `origin: "bottom-left"` rather than §7a's default `"top-left"`, and the reason
- * is §74: a `@four/ui` layout writes its children at `(left, −top)` — a Y-**up**
+ * is §74: a `@fourjs/ui` layout writes its children at `(left, −top)` — a Y-**up**
  * frame with downward offsets expressed as negative numbers. Under a top-left
  * origin the projection flips Y, and every one of those offsets would climb the
  * screen instead of descending it. `"bottom-left"` is the origin a widget tree
@@ -451,7 +451,7 @@ const world = physics.track(
  * A `width × height` RGBA8 checkerboard, as a renderer `Texture` (§77).
  *
  * Procedural rather than loaded: an example that fetched a PNG would be
- * demonstrating `@four/assets`, and this one is demonstrating that a
+ * demonstrating `@fourjs/assets`, and this one is demonstrating that a
  * `LitMaterial` samples a map with the geometry's uvs (§53, R-19) — the
  * cheapest way to make a rotating cube's rotation legible, since a flat-shaded
  * cube face and its neighbour differ only by their Lambert term.
@@ -932,7 +932,7 @@ app.scene.add(ballLabel);
 /**
  * The overlay's line buffer, and the two `Float32Array`s it publishes.
  *
- * `@four/diagnostics` has no `geometry` edge in the frozen §3.1 matrix, so it
+ * `@fourjs/diagnostics` has no `geometry` edge in the frozen §3.1 matrix, so it
  * emits streams whose field names spread straight into `BufferGeometryOptions`
  * and the assembly happens here — the one place that may see both packages
  * (R-35, 2026-08-07). This page is the first *example* to do it.

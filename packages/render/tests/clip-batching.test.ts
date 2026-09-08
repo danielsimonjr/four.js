@@ -9,9 +9,9 @@
  * record.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
-import { Scene, resolveWorldTransforms } from "@four/scene";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
+import { Scene, resolveWorldTransforms } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { RenderBatcher, Renderable, buildRenderList } from "../src/index.js";

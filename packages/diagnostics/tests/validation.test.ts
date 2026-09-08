@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FourError, resetDevWarnings } from "@four/core";
-import { Group } from "@four/scene";
+import { FourError, resetDevWarnings } from "@fourjs/core";
+import { Group } from "@fourjs/scene";
 
 import {
   COORDINATE_ENVELOPE,

@@ -27,25 +27,25 @@
  * while the graph's fragment stage computes the inner colour there.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { NodeMaterialBuilder, ShaderGraphBuilder } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { NodeMaterialBuilder, ShaderGraphBuilder } from "@fourjs/materials";
 import {
   RenderTarget,
   Renderable,
   createRenderStatistics,
   resetRenderStatistics,
-} from "@four/render";
+} from "@fourjs/render";
 import {
   WebgpuRenderer,
   registerWebgpuNodeMaterialPipeline,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /** Target size the spec reads back. */
 const WIDTH = 320;

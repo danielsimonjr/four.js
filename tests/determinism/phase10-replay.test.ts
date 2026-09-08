@@ -9,8 +9,8 @@
  * It follows the form WP-1.14, WP-2.7, WP-4.8, WP-5.8, WP-6.6, WP-7.7 and
  * WP-9.4 established:
  *
- * 1. **Headless.** The scenario imports `@four/diagnostics`, `@four/physics`,
- *    `@four/physics-rapier`, `@four/math`, `@four/scene` and
+ * 1. **Headless.** The scenario imports `@fourjs/diagnostics`, `@fourjs/physics`,
+ *    `@fourjs/physics-rapier`, `@fourjs/math`, `@fourjs/scene` and
  *    `four/application` — no renderer package, no canvas, no DOM. The
  *    `four/application` subpath keeps "nothing renderer-shaped is loaded" a
  *    property of the import graph and not only of behaviour.

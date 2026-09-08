@@ -150,9 +150,9 @@
  * - **Unbounded live-interrupt chains.** A second interrupt still freezes.
  */
 
-import { FourError } from "@four/core";
-import { Node, warnAuthorityConflict } from "@four/scene";
-import type { TransformAuthority } from "@four/scene";
+import { FourError } from "@fourjs/core";
+import { Node, warnAuthorityConflict } from "@fourjs/scene";
+import type { TransformAuthority } from "@fourjs/scene";
 
 import type { Advanceable } from "./animation-system.js";
 import {

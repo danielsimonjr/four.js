@@ -23,7 +23,7 @@
  * | this widget owns | the skin owns |
  * | --- | --- |
  * | the box (§74), and the intrinsic size that comes from the source's natural size | the texture, the material, the quad |
- * | the **logical key** of the image (§79 references resources by key, never inline) | resolving that key through `@four/assets` |
+ * | the **logical key** of the image (§79 references resources by key, never inline) | resolving that key through `@fourjs/assets` |
  * | telling the skin when either changed | what "fit", "cover", and tinting mean |
  *
  * That is the same split `Label` already ships under: a label measures text it
@@ -36,7 +36,7 @@
  *
  * {@link ImageWidget.naturalWidth} and {@link ImageWidget.naturalHeight} are
  * supplied, not discovered: discovering them means loading the image, which is
- * `@four/assets`' job and this package's forbidden import. An application that
+ * `@fourjs/assets`' job and this package's forbidden import. An application that
  * has loaded the texture writes both, the layout picks them up as §74's
  * "intrinsic text/image size", and until then the widget measures `0 × 0` —
  * the same honest answer a `Label` with no atlas gives. Give the widget an
@@ -45,14 +45,14 @@
  * ## The name
  *
  * `ImageWidget`, not `Image`, because `Image` is a global constructor in every
- * browser and `import { Image } from "@four/ui"` would shadow it in the very
+ * browser and `import { Image } from "@fourjs/ui"` would shadow it in the very
  * files most likely to want both — the ones that load a picture and put it in a
  * UI. §73's name survives in the §79 document type (`ui:image`) and in the
  * documentation; the class carries the suffix so nothing has to be renamed at
  * the call site to keep the platform's `Image` reachable.
  */
 
-import type { Vector2 } from "@four/math";
+import type { Vector2 } from "@fourjs/math";
 
 import { requireNonNegative } from "./numbers.js";
 import { UIWidget, type UIWidgetOptions } from "./widget.js";
@@ -99,7 +99,7 @@ export class ImageWidget extends UIWidget {
    * The logical key of the image to draw, or `null` for none (§79).
    *
    * A string, deliberately: it is what a §79 document can carry and what
-   * `@four/assets` resolves. Assigning notifies the skin — the widget's box did
+   * `@fourjs/assets` resolves. Assigning notifies the skin — the widget's box did
    * not move, so this is not a layout — and nothing else; swapping the picture
    * for one of a different size means writing the natural size too.
    */

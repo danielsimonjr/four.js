@@ -8,9 +8,9 @@
  * solver's determinism tier. This file is that obligation, in the three forms
  * WP-1.14 established and every later phase reused:
  *
- * 1. **Headless.** The scenario imports `@four/physics`,
- *    `@four/physics-rapier`, `@four/motion`, `@four/math`, `@four/scene` and
- *    `@four/diagnostics` — no renderer package, no canvas, no DOM.
+ * 1. **Headless.** The scenario imports `@fourjs/physics`,
+ *    `@fourjs/physics-rapier`, `@fourjs/motion`, `@fourjs/math`, `@fourjs/scene` and
+ *    `@fourjs/diagnostics` — no renderer package, no canvas, no DOM.
  * 2. **Deterministic in-process.** Two independent runs, each on a freshly
  *    built world, produce byte-identical per-step checksums and probe samples.
  * 3. **Deterministic across processes, against a committed golden.** A fresh

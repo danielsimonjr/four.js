@@ -1,8 +1,8 @@
 /**
- * `@four/ui` — retained-mode UI at §113a's MVP tier (§73–§75).
+ * `@fourjs/ui` — retained-mode UI at §113a's MVP tier (§73–§75).
  *
  * Ten controls over one base class: {@link Panel} (container + §74 layout),
- * {@link Label} (text measured with `@four/text`), {@link Button} (§72 click →
+ * {@link Label} (text measured with `@fourjs/text`), {@link Button} (§72 click →
  * activation), the three checkables — {@link Toggle}, {@link Checkbox}, and
  * {@link RadioButton} (exclusive by group name) — {@link Slider} (pointer drag
  * + §75 arrow keys), {@link ProgressIndicator}, {@link ImageWidget}, and
@@ -38,9 +38,9 @@
  * `widget.ts`'s header is the full argument.
  */
 
-export const PACKAGE_NAME = "@four/ui";
+export const PACKAGE_NAME = "@fourjs/ui";
 
-// §81's UI-control token (RFC 0002): declared here; `@four/four`'s
+// §81's UI-control token (RFC 0002): declared here; `@fourjs/four`'s
 // `plugins.ts` re-exports the same object.
 export { UI_CONTROLS } from "./capabilities.js";
 export type { UIControlConstructor } from "./control-registry.js";

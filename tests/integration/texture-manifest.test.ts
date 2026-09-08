@@ -2,17 +2,17 @@
  * The two cross-package contracts this wave's assets packet rests on (A-18,
  * A-19; 2026-08-21).
  *
- * 1. **`TextureAsset` is a `TextureSource`.** `@four/assets` sits below the
+ * 1. **`TextureAsset` is a `TextureSource`.** `@fourjs/assets` sits below the
  *    renderer in §3.1's matrix and must not import it, so `packages/assets/
  *    src/texture.ts` states the §61/§77 source contract structurally. That is
  *    only safe if the two spellings agree — so this suite hands a loaded
- *    {@link TextureAsset} to `@four/render`'s real `Texture`, which is the
+ *    {@link TextureAsset} to `@fourjs/render`'s real `Texture`, which is the
  *    compile-time and run-time proof. (The `PARTICLE_INSTANCE_FLOATS`
  *    precedent: a duplicated contract with a test on each side, not a
  *    dependency edge in the wrong direction.)
  * 2. **A §79 manifest reaches a `SceneResourceCatalog`.** §79 resolves assets
  *    by logical key through a manifest of URL + content hash, while
- *    `@four/four`'s deserializer resolves keys *synchronously* from a catalog.
+ *    `@fourjs/four`'s deserializer resolves keys *synchronously* from a catalog.
  *    The wiring is therefore preload-then-catalog, and `preloadManifestIntoCatalog`
  *    is the walk — this suite uses that helper so the seam A-16 finishes
  *    against is the shipped API, not a hand-rolled proof of the same steps.
@@ -26,9 +26,9 @@ import {
   type AssetManifest,
   type FetchResponse,
   type TextureAsset,
-} from "@four/assets";
-import { preloadManifestIntoCatalog, resourceCatalog } from "four";
-import { Texture } from "@four/render";
+} from "@fourjs/assets";
+import { preloadManifestIntoCatalog, resourceCatalog } from "fourJS";
+import { Texture } from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 /** A 2 × 2 image, top row first: red row over blue row. */
@@ -72,7 +72,7 @@ const fakeCodec = createTextureLoader({
   },
 });
 
-describe("TextureAsset satisfies @four/render's TextureSource", () => {
+describe("TextureAsset satisfies @fourjs/render's TextureSource", () => {
   it("constructs a Texture with no adapter, bottom row first (§7a, §77)", async () => {
     const assets = new AssetManager({
       fetch: () => Promise.resolve(response(ENCODED)),

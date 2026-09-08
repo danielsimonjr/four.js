@@ -4,7 +4,7 @@
  *
  * No fake solver here, for the reason `rapier3d-adapter.test.ts` gives: the
  * point of an adapter packet is to prove the mapping onto a real engine, and
- * the closed forms below are the only referee worth having. `@four/physics`'s
+ * the closed forms below are the only referee worth having. `@fourjs/physics`'s
  * `FakeSolverAdapter` is where the `SolverJointAccess` *contract* is exercised
  * without a solver.
  *
@@ -31,15 +31,15 @@
  * a period over 50 seconds must not race it.
  */
 
-import { FourError } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
-import { supportsSolverJointAccess } from "@four/physics";
+import { FourError } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import { supportsSolverJointAccess } from "@fourjs/physics";
 import type {
   JointDescriptor,
   PhysicsBodyHandle,
   PhysicsJointHandle,
   PhysicsWorldOptions,
-} from "@four/physics";
+} from "@fourjs/physics";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { initializeRapier3d } from "../src/init.js";

@@ -9,9 +9,9 @@
 
 `PH-10` and `R-22` are two halves of one problem, and the gap analysis says so explicitly in its closing note: _"§54 skinning (`R-22`) and skeletal animation (`PH-10`) are two halves of one RFC."_ This is that RFC.
 
-`PH-10` (**major / L**): _"Repo-wide grep for `Skeleton|skinning|skinIndex|morphTarget` finds only those two doc comments plus an unrelated `ui/widget.ts` hit. There is no bone/joint model in `@four/scene`, no skin attribute in `@four/geometry`, no skinning path in `@four/render-webgl`, and `ValueKind` has no `morphWeight`/`skeletalJoint` member. §17's track-type list is therefore 7 of 9."_ Its provenance is a deferral to a phase that was never written: `packages/animation/src/track.ts:40-45` says the missing track types _"arrive with the phase that introduces skinning"_ — and, in the gap doc's words, **"no such phase exists in Part IX."**
+`PH-10` (**major / L**): _"Repo-wide grep for `Skeleton|skinning|skinIndex|morphTarget` finds only those two doc comments plus an unrelated `ui/widget.ts` hit. There is no bone/joint model in `@fourjs/scene`, no skin attribute in `@fourjs/geometry`, no skinning path in `@fourjs/render-webgl`, and `ValueKind` has no `morphWeight`/`skeletalJoint` member. §17's track-type list is therefore 7 of 9."_ Its provenance is a deferral to a phase that was never written: `packages/animation/src/track.ts:40-45` says the missing track types _"arrive with the phase that introduces skinning"_ — and, in the gap doc's words, **"no such phase exists in Part IX."**
 
-`R-22` (**major / L**, and flagged ⚠️ **silent — §54 has no staging note anywhere in the repository**): all eleven §54 rows verified absent, with `AUDIT-120.md` folding the section into _"basic 3D meshes: shipped, §53–54"_. The gap doc calls it _"the highest-value silent gap in the domain after R-6"_, precisely because `@four/animation` ships a mixer with no skinning target and `@four/assets` stages glTF partly on it.
+`R-22` (**major / L**, and flagged ⚠️ **silent — §54 has no staging note anywhere in the repository**): all eleven §54 rows verified absent, with `AUDIT-120.md` folding the section into _"basic 3D meshes: shipped, §53–54"_. The gap doc calls it _"the highest-value silent gap in the domain after R-6"_, precisely because `@fourjs/animation` ships a mixer with no skinning target and `@fourjs/assets` stages glTF partly on it.
 
 `PH-10`'s closure plan names the decision that needs an owner: _"Needs an RFC (`docs/rfcs/`) for the bone-axis convention — note `packages/motion/src/ik.ts` already ships two-bone IK **in positions, not angles**, precisely because no bone-axis convention is pinned (MEMORY 2026-08-02)."_
 
@@ -38,7 +38,7 @@ Three consequences follow mechanically:
 **(a) Skin influences are plain numeric attributes on `BufferGeometry`.** `geometry` cannot name a `Bone`, so joints are _indices_, and what they index is somebody else's problem. This follows the `normals`/`uvs`/`colors` precedent exactly — optional, index-aligned, §85-validated on assignment, dropped by `dispose()`, `markDirty()`-announced.
 
 ```ts
-// @four/geometry — BufferGeometry gains two optional attributes (§53)
+// @fourjs/geometry — BufferGeometry gains two optional attributes (§53)
 /** 4 joint indices per vertex; `joints[4 * i]` is vertex i's first influence. */
 joints?: Uint16Array;
 /** 4 weights per vertex, index-parallel with `joints`; should sum to 1. */
@@ -52,7 +52,7 @@ Four influences per vertex, matching glTF's `JOINTS_0`/`WEIGHTS_0` — see Open 
 **(b) The skeleton is scene-graph nodes.**
 
 ```ts
-// @four/scene
+// @fourjs/scene
 export class Bone extends Node {
   static readonly typeName = "bone";
 }
@@ -69,14 +69,14 @@ export class Skeleton {
 }
 ```
 
-A bone is a `Node`, not a parallel hierarchy, and this is the decision with the largest downstream payoff: it means bones already have `Transform`, already resolve through `resolveWorldTransform`, already carry `transformAuthority` (§42), already participate in §19's `"blended"` pipeline, already work with `@four/motion`'s two-bone IK, already serialize as node types (§79), and are already animatable by everything `@four/animation` ships. **No new mechanism is required for any of it.** The cost is real and stated under Consequences.
+A bone is a `Node`, not a parallel hierarchy, and this is the decision with the largest downstream payoff: it means bones already have `Transform`, already resolve through `resolveWorldTransform`, already carry `transformAuthority` (§42), already participate in §19's `"blended"` pipeline, already work with `@fourjs/motion`'s two-bone IK, already serialize as node types (§79), and are already animatable by everything `@fourjs/animation` ships. **No new mechanism is required for any of it.** The cost is real and stated under Consequences.
 
-**(c) Morph-target weights cannot live where §54 puts them.** §54 declares `morphTargetWeights?: Float32Array` on `Mesh`, and `Mesh extends Renderable` (§49) — which lives in `@four/render`. `animation`'s §3.1 row is `core, math, scene, motion`: **it cannot see `@four/render`**, so it cannot bind a track to `Mesh.morphTargetWeights`. §14 requires morph-target animation, so the spec's own placement makes its own requirement unimplementable under the frozen matrix.
+**(c) Morph-target weights cannot live where §54 puts them.** §54 declares `morphTargetWeights?: Float32Array` on `Mesh`, and `Mesh extends Renderable` (§49) — which lives in `@fourjs/render`. `animation`'s §3.1 row is `core, math, scene, motion`: **it cannot see `@fourjs/render`**, so it cannot bind a track to `Mesh.morphTargetWeights`. §14 requires morph-target animation, so the spec's own placement makes its own requirement unimplementable under the frozen matrix.
 
-Resolution: morph weights are a **§6a component in `@four/scene`**.
+Resolution: morph weights are a **§6a component in `@fourjs/scene`**.
 
 ```ts
-// @four/scene
+// @fourjs/scene
 export class MorphWeights implements Component {
   static readonly typeName = "morph-weights";
   readonly weights: Float32Array;
@@ -85,7 +85,7 @@ export class MorphWeights implements Component {
 
 `animation` reaches it through `node.getComponent(MorphWeights)` — an edge that already exists. `render` reads the same component when building the render item. `Mesh.morphTargetWeights` remains available as a **getter that reads the component**, so §54's spelling still works and the storage sits where §3.1 permits. As a bonus it becomes serializable through the existing §79 component registry with no new machinery.
 
-Note for the packet: `packages/four/tests/scene-serializers.test.ts` _"enumerates every umbrella barrel class carrying `static typeName` … and requires each registered; a sixth component fails the suite until registered."_ `MorphWeights` is that sixth component, and `Bone` needs a node-type registration. Both are gates, not follow-ups.
+Note for the packet: `packages/fourJS/tests/scene-serializers.test.ts` _"enumerates every umbrella barrel class carrying `static typeName` … and requires each registered; a sixth component fails the suite until registered."_ `MorphWeights` is that sixth component, and `Bone` needs a node-type registration. Both are gates, not follow-ups.
 
 ### 2. §17's two "missing track types" are binding gaps, not value-kind gaps
 
@@ -139,7 +139,7 @@ The trade is real and resolves cleanly once the boundary is drawn in the right p
 
 **Skeletal animation is deterministic; vertex skinning is not required to be.**
 
-- Bone transforms are produced on the CPU by `@four/animation`, whose determinism is already established (PH-9 shipped a 600-step golden, transcendental-free). Bones are nodes, so their transforms flow through the same `resolveWorldTransform` every other node uses. Nothing changes about the §33 envelope.
+- Bone transforms are produced on the CPU by `@fourjs/animation`, whose determinism is already established (PH-9 shipped a 600-step golden, transcendental-free). Bones are nodes, so their transforms flow through the same `resolveWorldTransform` every other node uses. Nothing changes about the §33 envelope.
 - `Skeleton.update` is CPU arithmetic and must obey §33's iteration rule: bones visited in `bones` array order (insertion order — the joint index _is_ the order), matrix products in a fixed association order, never `Map`/`Set` enumeration.
 - The **vertex deformation** happens in the GPU vertex stage, where float behaviour varies across drivers. That is outside the envelope for the same reason shading is: §42/§43 make rendering a consumer of simulation state and never a producer. The palette goes to the GPU; nothing comes back.
 - §33's checksum is _"FNV-1a over each existing body's transform and velocities"_ — bodies, not vertices. Skinned vertices are not in it, and should not be.
@@ -172,17 +172,17 @@ CPU skinning is **deferred, not rejected**: it is the only path for the Canvas 2
 
 ### 8. What the MVP packet ships
 
-`Bone` + `Skeleton` + `MorphWeights` in `@four/scene`; `joints`/`weights` on `BufferGeometry` at locations 4 and 5, with §85 validation; `Mesh` in `@four/render` with `skeleton`, the skinned render-item kinds, and the palette on the render item; the two skinned programs in `render-webgl` behind `registerSkinningPipeline()`; `maximumSkinningJoints` on `RendererCapabilities`; the indexed-array binding in `@four/animation`; `Bone` and `MorphWeights` serializer/node-type registrations; the byte-identical-sequence gate; one pixel golden of a two-bone skinned quad in a known pose.
+`Bone` + `Skeleton` + `MorphWeights` in `@fourjs/scene`; `joints`/`weights` on `BufferGeometry` at locations 4 and 5, with §85 validation; `Mesh` in `@fourjs/render` with `skeleton`, the skinned render-item kinds, and the palette on the render item; the two skinned programs in `render-webgl` behind `registerSkinningPipeline()`; `maximumSkinningJoints` on `RendererCapabilities`; the indexed-array binding in `@fourjs/animation`; `Bone` and `MorphWeights` serializer/node-type registrations; the byte-identical-sequence gate; one pixel golden of a two-bone skinned quad in a known pose.
 
 **Defers:** GPU morph targets, bone textures, CPU skinning, skinned bounds and picking, dual-quaternion skinning, IK in angles, blend-tree/layer integration (PH-9's half), and the glTF loader — which this unblocks (`MEMORY` records glTF staged pending textures + non-unlit materials; R-19 closed the first, `R-12`/`R-13` the second, and skinning is the third).
 
 ## Alternatives
 
-**A. A skeleton with its own transform hierarchy, outside the scene graph.** Cheaper per frame: a 60-bone rig becomes one array walk instead of 60 node resolves, with better locality. It loses on everything else: §42 authority stops applying to bones, so §19's `"blended"` ragdoll needs a parallel conflict mechanism; `@four/motion`'s IK cannot target bones; bones cannot be parented to or from ordinary nodes (a sword in a hand, a camera on a head — both are node parenting today); §79 needs a bespoke serializer instead of the node-type path. The performance argument is real and unmeasured, so the packet must measure it (see Prototype); if 60-node resolution proves to cost more than the whole skinning path, this alternative comes back with evidence rather than by preference.
+**A. A skeleton with its own transform hierarchy, outside the scene graph.** Cheaper per frame: a 60-bone rig becomes one array walk instead of 60 node resolves, with better locality. It loses on everything else: §42 authority stops applying to bones, so §19's `"blended"` ragdoll needs a parallel conflict mechanism; `@fourjs/motion`'s IK cannot target bones; bones cannot be parented to or from ordinary nodes (a sword in a hand, a camera on a head — both are node parenting today); §79 needs a bespoke serializer instead of the node-type path. The performance argument is real and unmeasured, so the packet must measure it (see Prototype); if 60-node resolution proves to cost more than the whole skinning path, this alternative comes back with evidence rather than by preference.
 
 **B. Skinning as a uniform switch on the existing unlit/lit programs.** Preserves the one-program-per-family shape and needs no new pipeline. Rejected in §5 above: it moves cost into the vertex stage of every unskinned draw, which is the opposite of the trade `useMap` makes, and it adds uniform traffic to the sequence R-19's byte-identity property depends on.
 
-**C. `morphTargetWeights` on `Mesh`, as §54 writes it.** The spec's own placement. Impossible under §3.1: `animation` cannot see `@four/render`, and §14 requires morph-target animation. Adding an `animation → render` edge is forbidden (the matrix is frozen and the edge inverts the layering — the logical scene must never depend on a renderer). The component form keeps §54's spelling working through a getter, which is the smallest possible deviation.
+**C. `morphTargetWeights` on `Mesh`, as §54 writes it.** The spec's own placement. Impossible under §3.1: `animation` cannot see `@fourjs/render`, and §14 requires morph-target animation. Adding an `animation → render` edge is forbidden (the matrix is frozen and the edge inverts the layering — the logical scene must never depend on a renderer). The component form keeps §54's spelling working through a getter, which is the smallest possible deviation.
 
 **D. New `ValueKind` members for `morphWeight` and `skeletalJoint`, per §17 and per `track.ts`'s staged note.** What the repository said it would do. It loses to a plain reading of what those tracks contain: a joint track holds vectors and quaternions, a morph track holds numbers, and the only thing missing is a binding that addresses an array element. Adding enum members that duplicate existing adapters would create two ways to express one thing and a synchronisation obligation between them — the exact argument `track.ts` already makes for taking the adapter directly rather than a second discriminant.
 
@@ -221,7 +221,7 @@ None run. What the packet must measure, in priority order:
 
 1. **Bone-axis convention** — the question `PH-10` says this RFC exists to answer. **Recommendation: the engine imposes none.** A bone is a `Node` with an arbitrary local frame; the inverse bind matrix absorbs whatever convention the authoring tool used, so the _data model_ needs no axis. A convention is needed only by **helpers** that reason about a bone's length direction (procedural rigs, look-at-down-a-bone, IK expressed in angles). For those, pin **+Y as the bone's length axis**, matching §7a's Y-up world, and document it as a helper convention rather than a format requirement. This keeps `motion/src/ik.ts`'s position-based two-bone solver correct as written, and gives an angle-based successor something to be correct against. Owner confirmation wanted, because reversing it later invalidates authored rigs.
 2. **Four influences per vertex, or eight?** Four matches glTF's first joint set and fits the attribute budget. Eight doubles two attributes for a quality difference most content never shows. Recommendation: four, with the second set (`JOINTS_1`/`WEIGHTS_1`, locations 6/7) named as the extension point so the layout is not re-litigated.
-3. **`morphTargetWeights` placement is a spec deviation.** §54 puts it on `Mesh`; §3.1 makes that unanimatable. The proposal (a `@four/scene` component with a `Mesh` getter) needs either an amendments-table row against §54 or a dated note. Owner call on which.
+3. **`morphTargetWeights` placement is a spec deviation.** §54 puts it on `Mesh`; §3.1 makes that unanimatable. The proposal (a `@fourjs/scene` component with a `Mesh` getter) needs either an amendments-table row against §54 or a dated note. Owner call on which.
 4. **§17's track-type list should be re-read.** If §2 above is accepted, §17's _"morph weight"_ and _"skeletal joint"_ entries are satisfied by binding forms rather than by track types, and the staged note in `track.ts:40-45` is wrong about what it promised. Worth a spec-revisit item so a future reader does not add the enum members anyway.
 5. **What happens when a skeleton exceeds `maximumSkinningJoints`?** This RFC proposes refusing at setup with `UNSUPPORTED_GPU_FEATURE`. The alternatives are splitting the mesh into per-palette submeshes (real work, and it changes draw counts) or falling back to CPU skinning (which does not exist yet). Confirm the refusal.
 6. **Is `Bone` worth being a subclass at all**, rather than an ordinary `Node` referenced by a `Skeleton`? A subclass gives a `typeName` for §79 and a place to hang a debug-draw hook; a plain `Node` avoids a class whose only content is its name. Minor, but it is a public type either way.

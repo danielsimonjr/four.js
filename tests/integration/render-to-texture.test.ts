@@ -4,12 +4,12 @@
  * Render-to-texture is a claim about three packages agreeing, and no unit test
  * inside any one of them can check it:
  *
- * 1. `@four/render` produces a `RenderTarget` whose `colorTexture` satisfies
- *    `@four/materials`' `MaterialTexture`;
- * 2. `@four/materials`' `UnlitMaterial.map` accepts it — **at compile time**,
+ * 1. `@fourjs/render` produces a `RenderTarget` whose `colorTexture` satisfies
+ *    `@fourjs/materials`' `MaterialTexture`;
+ * 2. `@fourjs/materials`' `UnlitMaterial.map` accepts it — **at compile time**,
  *    with no cast and no adapter, which is the line in this file that would
  *    stop building if the seam ever broke;
- * 3. `@four/render-webgl` binds the *framebuffer's* colour attachment for that
+ * 3. `@fourjs/render-webgl` binds the *framebuffer's* colour attachment for that
  *    material rather than trying to upload texels that do not exist.
  *
  * That chain is what R-5 (§63's render graph) and R-6 (§70's post-processing)
@@ -23,17 +23,17 @@
  * browser. What a real driver adds is checked by the Playwright gate.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { SpriteMaterial, UnlitMaterial } from "@four/materials";
-import { RenderTarget, Renderable, Sprite, Texture } from "@four/render";
-import { GL, WebglRenderer } from "@four/render-webgl";
+import { planeGeometry } from "@fourjs/geometry";
+import { SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
+import { RenderTarget, Renderable, Sprite, Texture } from "@fourjs/render";
+import { GL, WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

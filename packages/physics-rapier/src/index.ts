@@ -1,10 +1,10 @@
 /**
- * `@four/physics-rapier` — the Rapier solver adapters (§37, §102, §108).
+ * `@fourjs/physics-rapier` — the Rapier solver adapters (§37, §102, §108).
  *
- * This package sits *below* `@four/physics`: it implements
+ * This package sits *below* `@fourjs/physics`: it implements
  * `PhysicsSolverAdapter` and depends on nothing else in the engine, which is
  * what makes the solver swappable (§20, §37). Application code should target
- * `@four/physics` and hand it an adapter instance (plan P5-5) rather than
+ * `@fourjs/physics` and hand it an adapter instance (plan P5-5) rather than
  * importing Rapier types from here.
  *
  * Two adapters share the barrel — {@link Rapier2dAdapter} (WP-5.4) and
@@ -20,7 +20,7 @@
  * Named exports only, alphabetical within each module group.
  */
 
-export const PACKAGE_NAME = "@four/physics-rapier";
+export const PACKAGE_NAME = "@fourjs/physics-rapier";
 
 export {
   createRapierColliderDesc,

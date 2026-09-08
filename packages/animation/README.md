@@ -1,4 +1,4 @@
-# @four/animation
+# @fourjs/animation
 
 Animation system — the animation pillar (Part III). Part of [fourJS](../../README.md).
 
@@ -18,8 +18,8 @@ Implements §14–§18 (§100, Part III) of [`docs/SPECIFICATION.md`](../../docs
 
 - State machines, blend trees, skeletal and morph-target animation (staged per plan P4-3).
 - Rotational root motion (translation-only ships; staged 2026-08-02).
-- Physics-animation blending itself lives in `@four/physics` (§19), driven by `@four/scene`'s `PoseTarget`.
+- Physics-animation blending itself lives in `@fourjs/physics` (§19), driven by `@fourjs/scene`'s `PoseTarget`.
 
 Unit tests are colocated in `tests/` per §92.
 
-Workspace name `@four/animation`; publishes as `@danielsimonjr/fourjs-animation`.
+Workspace name `@fourjs/animation`; publishes as `@danielsimonjr/fourjs-animation`.

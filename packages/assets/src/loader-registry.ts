@@ -19,7 +19,7 @@
  * No `unregister`. The capability token is therefore not revocable.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import type { AssetLoader } from "./asset-manager.js";
 

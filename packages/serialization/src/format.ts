@@ -19,7 +19,7 @@
  * everything `Node` itself owns.
  *
  * It does not *interpret* subclass state — a camera's field of view, a mesh's
- * geometry reference, a widget's box model. `@four/serialization` may depend on
+ * geometry reference, a widget's box model. `@fourjs/serialization` may depend on
  * `core`, `math`, and `scene` only (plan §3.1), so it cannot even name those
  * types, and inventing a schema for them here would pin an API this packet may
  * not open. It does **carry** it, opaquely: {@link SceneNodeDocument.data} is
@@ -37,7 +37,7 @@
  *
  * Physics state, animation state, and replay data are likewise absent — §79
  * requires exactly that ("separate optional sections so static scene definitions
- * remain clean"); the §34 replay document in `@four/diagnostics` is the sibling
+ * remain clean"); the §34 replay document in `@fourjs/diagnostics` is the sibling
  * format that carries simulation state.
  *
  * ## Canonical form
@@ -69,20 +69,20 @@ import {
   parseUntrustedJson,
   type JsonValue,
   type UntrustedJsonLimits,
-} from "@four/core";
+} from "@fourjs/core";
 import {
   DEFAULT_TRANSFORM_AUTHORITY,
   TRANSFORM_AUTHORITIES,
   type TransformAuthority,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /**
- * Any value JSON can carry, losslessly — `@four/core`'s {@link JsonValue},
+ * Any value JSON can carry, losslessly — `@fourjs/core`'s {@link JsonValue},
  * re-exported so this format keeps naming its own payload type.
  *
  * This module originally *transcribed* the type (and `cloneJsonValue`) from
- * `@four/diagnostics` — the §3.1 matrix has no serialization → diagnostics
- * edge — with a dated note naming the hoist into `@four/core` as the fix.
+ * `@fourjs/diagnostics` — the §3.1 matrix has no serialization → diagnostics
+ * edge — with a dated note naming the hoist into `@fourjs/core` as the fix.
  * That hoist landed 2026-08-04, taking this module's `__proto__`
  * strengthening with it, so the shared definition below both packages is
  * exactly what this file shipped.
@@ -93,7 +93,7 @@ import {
  * is not serializable, and it is better to say so in the type than to discover
  * it as a silent `null` after a reload.
  */
-export type { JsonValue } from "@four/core";
+export type { JsonValue } from "@fourjs/core";
 
 /** A JSON object — the shape of component payloads and node metadata. */
 export type JsonObject = { readonly [key: string]: JsonValue };
@@ -246,7 +246,7 @@ export interface SceneDocument {
 
 /**
  * Validates a value as JSON and returns a deep-frozen copy of it —
- * `@four/core`'s {@link cloneJsonValue}, re-exported.
+ * `@fourjs/core`'s {@link cloneJsonValue}, re-exported.
  *
  * The `__proto__` refusal this module added over the diagnostics original
  * (`JSON.parse` makes `__proto__` an ordinary own property, and copying it
@@ -255,7 +255,7 @@ export interface SceneDocument {
  * every consumer downstream (`instantiateScene`'s metadata copy in
  * particular) can still assign keys without a guard.
  */
-export { cloneJsonValue } from "@four/core";
+export { cloneJsonValue } from "@fourjs/core";
 
 // --- primitive validators ---------------------------------------------------
 
@@ -680,15 +680,15 @@ export function encodeSceneDocument(document: SceneDocument): string {
 }
 
 /**
- * Size and nesting bounds for an untrusted document — `@four/core`'s
+ * Size and nesting bounds for an untrusted document — `@fourjs/core`'s
  * {@link UntrustedJsonLimits}, re-exported so a caller of
  * {@link decodeSceneDocument} does not have to reach past this package for the
  * type of its own second argument.
  *
- * The same type bounds `@four/diagnostics`' §34 recordings; see `@four/core`'s
+ * The same type bounds `@fourjs/diagnostics`' §34 recordings; see `@fourjs/core`'s
  * `untrusted.ts` for why one definition sits below both.
  */
-export type { UntrustedJsonLimits } from "@four/core";
+export type { UntrustedJsonLimits } from "@fourjs/core";
 
 /**
  * Parses and validates JSON text as a §79 scene document, treating the text as

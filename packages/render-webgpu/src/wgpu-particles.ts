@@ -3,7 +3,7 @@
  * WP-R1.8) — the port of `gl-particles.ts`'s instanced billboard draw.
  *
  * One particle system is **one draw call**: `draw(6, count)` over the six
- * vertices of `@four/render`'s shared unit quad, with `count` instances fed
+ * vertices of `@fourjs/render`'s shared unit quad, with `count` instances fed
  * from a per-system vertex buffer re-uploaded once per frame. The §112 scaling
  * argument is `gl-particles.ts`'s, unchanged: the CPU cost of drawing a system
  * is one `queue.writeBuffer` of `count × 32` bytes plus a handful of pass
@@ -11,7 +11,7 @@
  *
  * ## What ports straight across, and what evaporates
  *
- * The *contract* is `@four/render`'s `particles.ts`, byte for byte: the same
+ * The *contract* is `@fourjs/render`'s `particles.ts`, byte for byte: the same
  * interleaved 8-float instance stream, the same view-space billboard (offset
  * between `view` and `projection`), the same flat opaque-edged quad, the same
  * straight-alpha `"normal"` blend a material-less item cannot override, the
@@ -69,7 +69,7 @@ import {
   PARTICLE_SOFTNESS_OFFSET,
   PARTICLE_WIDE_INSTANCE_FLOATS,
   type ParticleRenderItem,
-} from "@four/render";
+} from "@fourjs/render";
 
 import {
   GPU_BUFFER_USAGE,
@@ -104,7 +104,7 @@ export const PARTICLE_MODEL_OFFSET = 128;
  */
 export const PARTICLE_UNIFORM_BYTES = 192;
 
-/** Bytes per instance — `@four/render`'s interleaved 8-float stride. */
+/** Bytes per instance — `@fourjs/render`'s interleaved 8-float stride. */
 export const PARTICLE_INSTANCE_STRIDE_BYTES =
   PARTICLE_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 
@@ -152,7 +152,7 @@ export const PARTICLE_UNIFORM_WGSL = `struct ParticleUniforms {
 @group(0) @binding(0) var<uniform> draw : ParticleUniforms;`;
 
 /**
- * Vertex layout of the interleaved instance stream: `@four/render`'s 32-byte
+ * Vertex layout of the interleaved instance stream: `@fourjs/render`'s 32-byte
  * stride, advancing **once per instance**, carrying the particle's centre
  * (`vec3`, location 1), current world-unit size (`f32`, location 2) and
  * current straight-alpha RGBA (`vec4`, location 3) — GL's
@@ -219,7 +219,7 @@ export const PARTICLE_GPU_POSITION_BUFFER_LAYOUT: GpuVertexBufferLayout =
  * interleaved 32-byte instance stream, minus the position attribute — size
  * and colour are ramp values, functions of CPU-side age, and keep riding the
  * per-frame repack; the stale position lanes in that stream stride past
- * unread (`@four/particles`' `updateParticleInstances` documents the lanes).
+ * unread (`@fourjs/particles`' `updateParticleInstances` documents the lanes).
  */
 export const PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT: GpuVertexBufferLayout =
   Object.freeze({

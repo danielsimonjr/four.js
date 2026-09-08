@@ -3,13 +3,13 @@
  * parsing — §60a's colour management at the value-type layer (R-15,
  * 2026-08-08).
  *
- * `@four/materials` authors colours, `@four/animation` tweens them, `@four/scene`
- * gives them to lights and `@four/render` uploads them, but the §3.1 dependency
- * matrix has no edge between most of those pairs. `@four/math` is the value-type
+ * `@fourjs/materials` authors colours, `@fourjs/animation` tweens them, `@fourjs/scene`
+ * gives them to lights and `@fourjs/render` uploads them, but the §3.1 dependency
+ * matrix has no edge between most of those pairs. `@fourjs/math` is the value-type
  * home below all of them: the tuples live here and each package re-exports them
  * unchanged, so values keep passing between packages without conversion.
  * {@link ColorRGBA} was hoisted here 2026-08-04; {@link ColorRGB} joined it
- * 2026-08-08, exactly as `@four/materials`'
+ * 2026-08-08, exactly as `@fourjs/materials`'
  * `StandardMaterial.emissive` said it should.
  *
  * ## The working-space policy §60a defines, stated once
@@ -40,7 +40,7 @@
  *    forbids for the MVP tier, so it is recorded as an owner question rather than
  *    taken here (R-15, 2026-08-08).
  * 3. **The output transform — tone mapping then sRGB encoding — is the final
- *    render-graph pass.** That half lives in `@four/render`'s `effect-pass.ts`
+ *    render-graph pass.** That half lives in `@fourjs/render`'s `effect-pass.ts`
  *    (`OutputTransformEffect`) and the backends, not here; what lives here is
  *    {@link linearToSrgb}, the encode it performs, so a CPU-side read-back, a
  *    test, and the GPU can be checked against one definition.
@@ -52,7 +52,7 @@
  * whole real line by **odd extension** — `f(-x) = -f(x)`, the scRGB convention —
  * rather than by clamping to 0…1 first. Clamping would silently rewrite authored
  * data, which is the rule `UnlitMaterial` has recorded since WP-3.3 and the one
- * `@four/animation` keeps mid-tween.
+ * `@fourjs/animation` keeps mid-tween.
  *
  * ## Allocation
  *

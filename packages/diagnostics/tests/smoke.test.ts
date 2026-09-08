@@ -10,9 +10,9 @@ import {
   warnVersionMismatch,
 } from "../src/index.js";
 
-describe("@four/diagnostics", () => {
+describe("@fourjs/diagnostics", () => {
   it("exposes its package name", () => {
-    expect(PACKAGE_NAME).toBe("@four/diagnostics");
+    expect(PACKAGE_NAME).toBe("@fourjs/diagnostics");
   });
 
   it("re-exports the A-4/A-5 leak and validation helpers", () => {

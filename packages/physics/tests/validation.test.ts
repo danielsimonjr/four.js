@@ -1,6 +1,6 @@
-import { isFourError } from "@four/core";
-import { Matrix3, Quaternion, Vector2, Vector3 } from "@four/math";
-import { Transform } from "@four/scene";
+import { isFourError } from "@fourjs/core";
+import { Matrix3, Quaternion, Vector2, Vector3 } from "@fourjs/math";
+import { Transform } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import type {

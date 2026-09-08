@@ -255,5 +255,5 @@ Not covered by the §86 payload budget: the Rapier wasm image is embedded as bas
 anyway, WP-7.6: **1,833,243 B raw / 674,667 B gzip** for the one JS chunk, plus 1,971 B
 (977 B gzip) of HTML — `gzip -9`, the measurement `examples/mechanism` records. That is 1.2%
 raw and 1.0% gzip above the mechanism's: the same single wasm image and the same renderer,
-plus `@four/animation`, which the mechanism does not pull in. (Vite's own build log reports
+plus `@fourjs/animation`, which the mechanism does not pull in. (Vite's own build log reports
 681.24 kB for the same chunk; it gzips at a lower level.)

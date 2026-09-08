@@ -11,7 +11,7 @@
  * and §58 stroke draws through (`tests/integration/webgpu-shapes.test.ts`).
  *
  * Everything else follows the sibling spec's recorded decisions verbatim: the
- * shader is **imported** from `@four/render-webgpu`, never retyped; the page
+ * shader is **imported** from `@fourjs/render-webgpu`, never retyped; the page
  * program is a string because this repository pins no WebGPU typings; the
  * page is *served* (an opaque origin loses `navigator.gpu`); the spec
  * **skips** when `requestAdapter()` resolves `null`; and every assertion is a
@@ -19,7 +19,7 @@
  * plan §5.
  */
 
-import { unlitShaderSource } from "@four/render-webgpu";
+import { unlitShaderSource } from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */

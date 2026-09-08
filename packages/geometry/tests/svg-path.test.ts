@@ -32,8 +32,8 @@
  * three documented error types. Nothing else, and nothing that hangs.
  */
 
-import { FourError, SeededRandom } from "@four/core";
-import { Matrix3 } from "@four/math";
+import { FourError, SeededRandom } from "@fourjs/core";
+import { Matrix3 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

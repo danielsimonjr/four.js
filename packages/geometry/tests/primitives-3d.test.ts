@@ -24,7 +24,7 @@
  * Everything else (counts, bounds, validation) is asserted per builder in the
  * ordinary way. The helpers below are the same ones `geometry.test.ts` uses,
  * generalized over an arbitrary primitive; `faceNormal` deliberately does its
- * own cross product rather than calling `@four/math`, so the winding assertions
+ * own cross product rather than calling `@fourjs/math`, so the winding assertions
  * have ground truth independent of the package under test.
  */
 

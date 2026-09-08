@@ -2,7 +2,7 @@
  * The WebGPU node-material pipeline's registration slot (§60, §62; RFC 0001;
  * WP-R1.9) — the lazily-filled module `let` that keeps the WGSL emitter and
  * the node pipeline store out of every bundle that never draws a node
- * material, this backend's twin of `@four/render-webgl`'s
+ * material, this backend's twin of `@fourjs/render-webgl`'s
  * `node-pipeline-registry.ts`.
  *
  * ## Why a registry slot, and why this module is nearly empty
@@ -17,7 +17,7 @@
  * application opts in with
  *
  * ```ts
- * import { registerWebgpuNodeMaterialPipeline } from "@four/render-webgpu";
+ * import { registerWebgpuNodeMaterialPipeline } from "@fourjs/render-webgpu";
  * registerWebgpuNodeMaterialPipeline();
  * ```
  *
@@ -36,13 +36,13 @@
  * rejected by RFC 0001 §4: a graph the author wrote is a specific picture.
  */
 
-import type { Matrix4 } from "@four/math";
+import type { Matrix4 } from "@fourjs/math";
 import type {
   GraphEffect,
   NodeRenderItem,
   RenderItem,
   RenderStatistics,
-} from "@four/render";
+} from "@fourjs/render";
 
 import type {
   GpuDevice,

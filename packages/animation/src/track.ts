@@ -86,8 +86,8 @@
  * must not alias any of the track's keyframe values.
  */
 
-import { FourError } from "@four/core";
-import type { Vector2, Vector3, Vector4 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import type { Vector2, Vector3, Vector4 } from "@fourjs/math";
 
 import type { ColorRGBA, ValueAdapter, ValueKind } from "./values.js";
 
@@ -533,7 +533,7 @@ export class AnimationTrack<T> implements AnimationTrackLike {
    * Catmull-Rom evaluation of span `index` at local parameter `u`.
    *
    * The tangent at a key is the **non-uniform Catmull-Rom finite difference**
-   * used by `@four/motion`'s `CatmullRomTrajectory` (§13), with keyframe times
+   * used by `@fourjs/motion`'s `CatmullRomTrajectory` (§13), with keyframe times
    * standing in for its knots:
    *
    * ```text

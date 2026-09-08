@@ -1,8 +1,8 @@
 /**
  * §54 skinning across the packages that have to agree about it (RFC 0003 —
- * gaps PH-10 + R-22, 2026-08-28): `@four/geometry` carries the influences,
- * `@four/scene` the bones and palette, `@four/animation` the joint and morph
- * tracks, `@four/render` the skinned items, `@four/render-webgl` the lazily
+ * gaps PH-10 + R-22, 2026-08-28): `@fourjs/geometry` carries the influences,
+ * `@fourjs/scene` the bones and palette, `@fourjs/animation` the joint and morph
+ * tracks, `@fourjs/render` the skinned items, `@fourjs/render-webgl` the lazily
  * registered pipeline.
  *
  * Three claims live only in the composition:
@@ -29,16 +29,16 @@ import {
   AnimationTrack,
   numberAdapter,
   quaternionAdapter,
-} from "@four/animation";
-import { planeGeometry } from "@four/geometry";
-import { Quaternion, Vector3 } from "@four/math";
-import { LitMaterial, UnlitMaterial } from "@four/materials";
-import { Mesh, Renderable } from "@four/render";
+} from "@fourjs/animation";
+import { planeGeometry } from "@fourjs/geometry";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import { LitMaterial, UnlitMaterial } from "@fourjs/materials";
+import { Mesh, Renderable } from "@fourjs/render";
 import {
   WebglRenderer,
   clearRegisteredSkinningPipeline,
   registerSkinningPipeline,
-} from "@four/render-webgl";
+} from "@fourjs/render-webgl";
 import {
   Bone,
   MorphWeights,
@@ -48,7 +48,7 @@ import {
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

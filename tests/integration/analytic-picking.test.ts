@@ -1,8 +1,8 @@
 /**
  * §71's analytic `"geometry"` tier across the packages that have to agree
- * about it (A-11, adopted RFC 0005 Q3, 2026-08-29): `@four/geometry`
- * tessellates a §50 shape, `@four/render`'s `Shape2D` owns that geometry,
- * `@four/scene` carries `node.hitTestMode`, `@four/input` runs the exact
+ * about it (A-11, adopted RFC 0005 Q3, 2026-08-29): `@fourjs/geometry`
+ * tessellates a §50 shape, `@fourjs/render`'s `Shape2D` owns that geometry,
+ * `@fourjs/scene` carries `node.hitTestMode`, `@fourjs/input` runs the exact
  * ray/triangle test against the structural `Pickable.triangles`, and `four`'s
  * §79 pair round-trips the mode.
  *
@@ -14,17 +14,17 @@
  * picking code anywhere.
  */
 
-import { pick, type PickHit, type Pickable } from "@four/input";
-import { UnlitMaterial, type Material } from "@four/materials";
-import { Circle } from "@four/render";
-import { OrthographicCamera, Scene } from "@four/scene";
+import { pick, type PickHit, type Pickable } from "@fourjs/input";
+import { UnlitMaterial, type Material } from "@fourjs/materials";
+import { Circle } from "@fourjs/render";
+import { OrthographicCamera, Scene } from "@fourjs/scene";
 import {
   decodeSceneDocument,
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
-} from "@four/serialization";
-import { registerSceneNodeTypes, resourceCatalog } from "four";
+} from "@fourjs/serialization";
+import { registerSceneNodeTypes, resourceCatalog } from "fourJS";
 import { describe, expect, it } from "vitest";
 
 const material = new UnlitMaterial();

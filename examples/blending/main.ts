@@ -166,12 +166,12 @@ import {
   quaternionAdapter,
   vector3Adapter,
   type AnimationTrackLike,
-} from "four/animation";
-import { Application } from "four/application";
-import { circleGeometry2D, planeGeometry } from "four/geometry";
-import { PointerInput, type Pickable } from "four/input";
-import { UnlitMaterial } from "four/materials";
-import { Quaternion, Vector2, Vector3 } from "four/math";
+} from "fourJS/animation";
+import { Application } from "fourJS/application";
+import { circleGeometry2D, planeGeometry } from "fourJS/geometry";
+import { PointerInput, type Pickable } from "fourJS/input";
+import { UnlitMaterial } from "fourJS/materials";
+import { Quaternion, Vector2, Vector3 } from "fourJS/math";
 import {
   Collider,
   HingeJoint,
@@ -179,16 +179,16 @@ import {
   PhysicsWorld,
   RigidBody,
   createPoseTargetCaptureSystem,
-} from "four/physics";
-import { Rapier2dAdapter } from "four/physics-rapier";
-import { Renderable } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
+} from "fourJS/physics";
+import { Rapier2dAdapter } from "fourJS/physics-rapier";
+import { Renderable } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
 import {
   Group,
   OrthographicCamera,
   PoseTarget,
   createFullscreenViewport,
-} from "four/scene";
+} from "fourJS/scene";
 
 // --- surface -----------------------------------------------------------------
 
@@ -787,7 +787,7 @@ function buildScene(): Scene {
   mark.transform.position.set(0, 0, GLYPH_Z);
   plate.add(mark);
 
-  // §71/§72 picking: `@four/input` never reads geometry, so the layer that does
+  // §71/§72 picking: `@fourjs/input` never reads geometry, so the layer that does
   // states each candidate's **local** bounds. The plate never moves, so this is
   // computed once.
   const bounds = plate.geometry.computeBounds();

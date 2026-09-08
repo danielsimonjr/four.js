@@ -6,14 +6,14 @@
  * are one claim about how packages depend on each other, and that claim cannot
  * be checked inside any single package:
  *
- * 1. **A name resolves to a real backend.** `@four/render` holds a registry and
- *    imports no backend; `@four/render-webgl` and `@four/render-webgpu` register
+ * 1. **A name resolves to a real backend.** `@fourjs/render` holds a registry and
+ *    imports no backend; `@fourjs/render-webgl` and `@fourjs/render-webgpu` register
  *    real renderers into it; `Application`, given the §45 string, ends up driving
  *    that renderer against a real GL or WebGPU sequence. Each package's own
  *    tests prove its half against a double — only this file puts the real ones
  *    together.
- * 2. **The same shape works for solvers.** `@four/physics` holds a registry and
- *    imports no solver; `@four/physics-rapier` registers the real adapters;
+ * 2. **The same shape works for solvers.** `@fourjs/physics` holds a registry and
+ *    imports no solver; `@fourjs/physics-rapier` registers the real adapters;
  *    `PhysicsWorld`, given `solver: "auto"`, simulates — under real wasm, with
  *    the dimension driving which adapter was built (§37's capability-driven
  *    selection).
@@ -33,30 +33,30 @@
  * fail depending on file order.
  */
 
-import { isFourError } from "@four/core";
-import { PhysicsWorld, SolverRegistry } from "@four/physics";
+import { isFourError } from "@fourjs/core";
+import { PhysicsWorld, SolverRegistry } from "@fourjs/physics";
 import {
   Rapier2dAdapter,
   Rapier3dAdapter,
   registerRapierSolver,
-} from "@four/physics-rapier";
+} from "@fourjs/physics-rapier";
 import {
   RendererRegistry,
   resolveRenderer,
-} from "@four/render";
-import { WebglRenderer, registerWebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer, registerWebglRenderer } from "@fourjs/render-webgl";
 import {
   WebgpuRenderer,
   registerWebgpuRenderer,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import {
   Group,
   PerspectiveCamera,
   Scene,
   createFullscreenViewport,
-} from "@four/scene";
-import { Collider, RigidBody } from "@four/physics";
-import { Application } from "four/application";
+} from "@fourjs/scene";
+import { Collider, RigidBody } from "@fourjs/physics";
+import { Application } from "fourJS/application";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {

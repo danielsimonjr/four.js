@@ -57,7 +57,7 @@
  * `(0, −9.81, 0)`.
  */
 
-import type { Vector3 } from "@four/math";
+import type { Vector3 } from "@fourjs/math";
 
 /**
  * §27's `ForceField`, as particles consume it. See the module note for the
@@ -232,11 +232,11 @@ export interface ParticleGpuIntegrateExtras {
  *
  * ## Who implements it, and how the pieces meet
  *
- * A compute-capable backend mints one — `@four/render-webgpu`'s
+ * A compute-capable backend mints one — `@fourjs/render-webgpu`'s
  * `WebgpuRenderer.createParticleSimulation({ systemId, capacity })` is the
  * implementor today — and the application binds it with
  * `emitter.bindGpuSimulation(...)`. The interface is **structural**, like
- * {@link ParticleForceField} and `@four/render`'s `ParticleDrawable`, because
+ * {@link ParticleForceField} and `@fourjs/render`'s `ParticleDrawable`, because
  * the frozen §3.1 matrix gives this package `core`, `math`, `scene` and
  * nothing render-shaped: the two declarations are pinned against each other
  * by tests on both sides, never by the compiler.

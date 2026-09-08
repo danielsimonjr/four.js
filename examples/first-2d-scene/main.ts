@@ -122,24 +122,24 @@ import {
   animate,
   quaternionAdapter,
   tween,
-} from "four/animation";
-import { Application } from "four/application";
-import { boxGeometry, circleGeometry2D, planeGeometry } from "four/geometry";
-import { DragManager, PointerInput, type Pickable } from "four/input";
-import { UnlitMaterial } from "four/materials";
-import { Quaternion, Vector3 } from "four/math";
+} from "fourJS/animation";
+import { Application } from "fourJS/application";
+import { boxGeometry, circleGeometry2D, planeGeometry } from "fourJS/geometry";
+import { DragManager, PointerInput, type Pickable } from "fourJS/input";
+import { UnlitMaterial } from "fourJS/materials";
+import { Quaternion, Vector3 } from "fourJS/math";
 import {
   CircularTrajectory,
   KinematicController,
   KinematicSystem,
   MotionComponent,
   MotionSystem,
-} from "four/motion";
-import { Renderable, Texture } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
-import { OrthographicCamera, createFullscreenViewport } from "four/scene";
-import { buildGlyphAtlas } from "four/text";
-import { Text } from "four";
+} from "fourJS/motion";
+import { Renderable, Texture } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
+import { OrthographicCamera, createFullscreenViewport } from "fourJS/scene";
+import { buildGlyphAtlas } from "fourJS/text";
+import { Text } from "fourJS";
 
 // --- surface ---------------------------------------------------------------
 
@@ -331,8 +331,8 @@ app.poses.track(vane);
 
 // --- picking and pointer events (§71, §72) ----------------------------------
 
-// The candidate list picking tests against. `@four/input` never reads geometry
-// — it may not depend on `@four/render` or `@four/geometry` — so the layer that
+// The candidate list picking tests against. `@fourjs/input` never reads geometry
+// — it may not depend on `@fourjs/render` or `@fourjs/geometry` — so the layer that
 // *does* see geometry states each node's box, in that node's own **local**
 // space, which is exactly what `computeBounds()` returns. The ray is
 // transformed into local space per candidate, so the box is tested oriented
@@ -398,7 +398,7 @@ const TUMBLER_COLORS: Palette = [
  * reason the two interactions can share one node at all.
  *
  * The listener is registered with the node's own event API — `Node` extends
- * §6b's typed `EventEmitter`, and `@four/input` widens its event map, so there
+ * §6b's typed `EventEmitter`, and `@fourjs/input` widens its event map, so there
  * is one `on` for hierarchy events and pointer events alike.
  */
 function recolorOnClick(node: Renderable, palette: Palette): void {

@@ -12,8 +12,8 @@
  * therefore stay bit-identical: they never opt into `"local-plane"`.
  */
 
-import { FourError } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
 
 import { widenToVector3, type LocalPlane } from "./descriptors.js";
 
@@ -271,7 +271,7 @@ function isFiniteVec(value: Vector3): boolean {
 
 /**
  * Shepperd's method: rotation whose columns are the images of +X, +Y, +Z.
- * Local copy — `@four/math` keeps the same conversion module-internal.
+ * Local copy — `@fourjs/math` keeps the same conversion module-internal.
  */
 function setFromBasis(
   out: Quaternion,

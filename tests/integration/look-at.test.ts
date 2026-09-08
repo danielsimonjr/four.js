@@ -5,7 +5,7 @@
  * Until this packet the tree had no `lookAt` anywhere: aiming a camera or a
  * light meant hand-composing quaternions, which is what the `first-3d-scene`
  * packet recorded as the roughest edge of writing a 3D scene. The helper is one
- * method on `Node` over one primitive in `@four/math`, and no unit test inside
+ * method on `Node` over one primitive in `@fourjs/math`, and no unit test inside
  * either package can check the thing that actually matters — that the
  * orientation it writes is the *same* −Z convention every consumer already
  * assumes.
@@ -17,7 +17,7 @@
  *    `viewMatrix · projectionMatrix` — i.e. `lookAt` produces exactly the
  *    orientation `Camera.updateViewMatrix` inverts, and exactly the −Z
  *    `Matrix4.setPerspective` projects down (§7a, plan D8).
- * 2. **`@four/render` reads the same axis.** A directional light aimed with
+ * 2. **`@fourjs/render` reads the same axis.** A directional light aimed with
  *    `lookAt` lands in `collectSceneLights`' `direction` unchanged, so one call
  *    aims a camera and a lamp (§68's "the direction a camera looks").
  * 3. **The umbrella exposes it** (§97a): `four.scene.Node` carries both
@@ -27,14 +27,14 @@
  *    is the application writing, not a system claiming ownership.
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 import {
   MotionComponent,
   MotionSystem,
   createTimeState,
   type FixedUpdateContext,
-} from "@four/motion";
-import { collectSceneLights, createSceneLights } from "@four/render";
+} from "@fourjs/motion";
+import { collectSceneLights, createSceneLights } from "@fourjs/render";
 import {
   DirectionalLight,
   Group,
@@ -42,8 +42,8 @@ import {
   Scene,
   SpotLight,
   resolveWorldTransforms,
-} from "@four/scene";
-import * as four from "four";
+} from "@fourjs/scene";
+import * as four from "fourJS";
 import { describe, expect, it, vi } from "vitest";
 
 const ORIGIN = new Vector3(0, 0, 0);
@@ -132,7 +132,7 @@ describe("Node.lookAt through the §47 camera chain", () => {
   });
 });
 
-describe("Node.lookAt and @four/render's light direction (§68)", () => {
+describe("Node.lookAt and @fourjs/render's light direction (§68)", () => {
   it("feeds collectSceneLights the direction the aim implies", () => {
     const scene = new Scene();
     const sun = new DirectionalLight();

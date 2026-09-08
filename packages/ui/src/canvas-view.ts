@@ -18,10 +18,10 @@
  * draw, and never should** (RFC 0004 §2b). `ImageWidget` established the split
  * — the widget owns the box, the intrinsic size, and the logical identity of
  * its content; the {@link WidgetSkin} owns the texture, the material, and the
- * quad, because the skin is application code that can see `@four/render` while
+ * quad, because the skin is application code that can see `@fourjs/render` while
  * this package cannot. A canvas view is `ImageWidget` with two differences:
  * its content has no logical key (the application paints it), and its content
- * changes (so it must say when). Both are expressible with what `@four/ui`
+ * changes (so it must say when). Both are expressible with what `@fourjs/ui`
  * has, so this class names no texture type, adds no dependency, and would
  * compile against nothing §77a provides — an application could even pair it
  * with a hand-rolled repaint recipe (RFC 0004 Q4, adopted).

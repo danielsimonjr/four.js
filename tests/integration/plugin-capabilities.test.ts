@@ -2,8 +2,8 @@
  * A-3 / RFC 0002 — §81's capability grants, against the real registries
  * (2026-08-28).
  *
- * `@four/core`'s unit tests prove the plugin machinery against toy
- * capabilities; `packages/four` proves which capabilities an `Application`
+ * `@fourjs/core`'s unit tests prove the plugin machinery against toy
+ * capabilities; `packages/fourJS` proves which capabilities an `Application`
  * provides. Neither can prove the thing §81 actually promises, because it is a
  * claim about four packages at once: **a plugin can register a renderer
  * backend, a physics solver, a component serializer, and a scene migration
@@ -28,21 +28,21 @@ import {
   type Component,
   type ComponentHost,
   type FourPlugin,
-} from "@four/core";
-import { PhysicsWorld, SolverRegistry } from "@four/physics";
-import { registerRapierSolver } from "@four/physics-rapier";
-import { RendererRegistry, resolveRenderer } from "@four/render";
-import { registerWebglRenderer } from "@four/render-webgl";
+} from "@fourjs/core";
+import { PhysicsWorld, SolverRegistry } from "@fourjs/physics";
+import { registerRapierSolver } from "@fourjs/physics-rapier";
+import { RendererRegistry, resolveRenderer } from "@fourjs/render";
+import { registerWebglRenderer } from "@fourjs/render-webgl";
 import {
   ComponentSerializerRegistry,
   SceneMigrationRegistry,
-} from "@four/serialization";
+} from "@fourjs/serialization";
 import {
   COMPONENT_SERIALIZERS,
   RENDERER_REGISTRY,
   SCENE_MIGRATIONS,
   SOLVER_REGISTRY,
-} from "four";
+} from "fourJS";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { RecordingCanvas, createRecordingGl } from "./helpers/recording-gl.js";

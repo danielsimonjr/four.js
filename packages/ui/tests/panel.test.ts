@@ -7,8 +7,8 @@
  * implementation of the same arithmetic.
  */
 
-import { constructionCount, resetConstructionCount } from "@four/math";
-import { Group } from "@four/scene";
+import { constructionCount, resetConstructionCount } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { Panel } from "../src/panel.js";

@@ -10,9 +10,9 @@
  * `tests/integration/node-materials.test.ts`.
  */
 
-import { resetDevWarnings } from "@four/core";
-import { Matrix4 } from "@four/math";
-import type { ShaderGraph } from "@four/render";
+import { resetDevWarnings } from "@fourjs/core";
+import { Matrix4 } from "@fourjs/math";
+import type { ShaderGraph } from "@fourjs/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

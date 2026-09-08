@@ -10,8 +10,8 @@ import {
   dispatchKeyEvent,
   dispatchPointerEvent,
   type KeyModifiers,
-} from "@four/input";
-import { Group, type Node } from "@four/scene";
+} from "@fourjs/input";
+import { Group, type Node } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { Panel } from "../src/panel.js";

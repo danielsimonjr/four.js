@@ -12,7 +12,7 @@
  * `installPlugins`, and `PluginContext` from this package entirely.
  */
 
-import { bindCapability } from "@four/core";
+import { bindCapability } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import {

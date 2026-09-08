@@ -7,8 +7,8 @@
  * it allocates per step (plan D7).
  */
 
-import { Vector3, constructionCount, resetConstructionCount } from "@four/math";
-import { Group } from "@four/scene";
+import { Vector3, constructionCount, resetConstructionCount } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

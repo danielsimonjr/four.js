@@ -77,9 +77,9 @@
  * {@link Slider.setValueFromLocalPoint}.
  */
 
-import type { ScenePointerEvent, SceneKeyEvent } from "@four/input";
-import { Matrix4, Vector3 } from "@four/math";
-import { resolveWorldTransform } from "@four/scene";
+import type { ScenePointerEvent, SceneKeyEvent } from "@fourjs/input";
+import { Matrix4, Vector3 } from "@fourjs/math";
+import { resolveWorldTransform } from "@fourjs/scene";
 
 import { fractionOf, requireFinite, resolveValue } from "./numbers.js";
 import { Panel, type PanelOptions } from "./panel.js";

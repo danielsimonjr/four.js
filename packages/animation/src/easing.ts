@@ -55,7 +55,7 @@
  * curve is a damped-oscillator step response; see {@link springOut}.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 /**
  * Maps progress in `[0, 1]` to an eased value, `ease(0) === 0` and
@@ -494,7 +494,7 @@ export const elasticInOut: EasingFunction = (t) => {
  * ω_d  = ωₙ·√(1 − ζ²)            (damped angular frequency)
  * ```
  *
- * — the same envelope `@four/motion`'s `DampedSpringTrajectory` uses, here in
+ * — the same envelope `@fourjs/motion`'s `DampedSpringTrajectory` uses, here in
  * normalized progress rather than seconds. The parameters are pinned as
  * {@link SPRING_DAMPING_RATIO} (`ζ`) and {@link SPRING_OSCILLATIONS} (`N`, with
  * `ω_d = 2πN`) instead of a stiffness/mass pair, because an easing curve has no

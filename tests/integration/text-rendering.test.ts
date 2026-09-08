@@ -1,7 +1,7 @@
 /**
  * §49/§56's `Text` across the packages that have to agree about it (R-28,
- * 2026-08-13) — `@four/text` lays the string out, `four` assembles the node,
- * `@four/render` lists and batches it, `@four/render-webgl` issues the draw.
+ * 2026-08-13) — `@fourjs/text` lays the string out, `four` assembles the node,
+ * `@fourjs/render` lists and batches it, `@fourjs/render-webgl` issues the draw.
  *
  * Six claims live only in the composition, which is why they are here rather
  * than in any package's unit suite:
@@ -24,8 +24,8 @@
  *    four calls it uploaded before the fields existed.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   RenderBatcher,
   Renderable,
@@ -33,17 +33,17 @@ import {
   buildRenderList,
   createRenderStatistics,
   resetRenderStatistics,
-} from "@four/render";
-import { WebglRenderer, createGlBatching } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer, createGlBatching } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
-import { buildGlyphAtlas } from "@four/text";
-import { Text } from "four";
+} from "@fourjs/scene";
+import { buildGlyphAtlas } from "@fourjs/text";
+import { Text } from "fourJS";
 import { describe, expect, it } from "vitest";
 
 import {

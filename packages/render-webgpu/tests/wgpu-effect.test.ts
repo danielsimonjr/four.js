@@ -4,7 +4,7 @@
  * feedback refusal restated for a pass.
  *
  * Driven by the recording device double; the effect *descriptors* are the real
- * `@four/render` objects (`COPY_EFFECT` and friends), because the pass this
+ * `@fourjs/render` objects (`COPY_EFFECT` and friends), because the pass this
  * backend receives is exactly what `RenderGraph` forwards unchanged.
  */
 
@@ -16,7 +16,7 @@ import {
   supportsScreenEffects,
   type EffectRenderPass,
   type ScreenEffect,
-} from "@four/render";
+} from "@fourjs/render";
 import { describe, expect, it, vi } from "vitest";
 
 import {

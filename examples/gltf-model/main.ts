@@ -22,11 +22,11 @@
  * material, one external buffer, no images — the smallest file that still
  * exercises the buffer path that trips people up.
  */
-import { Application } from "four/application";
-import { AssetManager, createGltfLoader } from "four/assets";
-import { instantiateGltf } from "four";
-import { PerspectiveCamera, createFullscreenViewport } from "four/scene";
-import { WebglRenderer } from "four/render-webgl";
+import { Application } from "fourJS/application";
+import { AssetManager, createGltfLoader } from "fourJS/assets";
+import { instantiateGltf } from "fourJS";
+import { PerspectiveCamera, createFullscreenViewport } from "fourJS/scene";
+import { WebglRenderer } from "fourJS/render-webgl";
 
 /** The example's drawing surface. */
 const canvas = document.querySelector<HTMLCanvasElement>("#scene");

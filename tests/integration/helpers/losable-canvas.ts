@@ -29,7 +29,7 @@
  * double would hide. The real-driver half is `tests/browser/context-loss.spec.ts`.
  */
 
-import type { WebglCanvas } from "@four/render-webgl";
+import type { WebglCanvas } from "@fourjs/render-webgl";
 
 /** The one member of a `webglcontextlost` event this backend reads. */
 interface ContextEvent {

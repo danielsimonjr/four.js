@@ -113,8 +113,8 @@
  * cannot be registered again; build a new one.
  */
 
-import { EventEmitter, FourError } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
+import { EventEmitter, FourError } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
 
 import type { SolverJointMotor } from "./body-access.js";
 

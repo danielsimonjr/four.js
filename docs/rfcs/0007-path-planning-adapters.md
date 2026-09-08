@@ -13,7 +13,7 @@ gate: they need an adapter RFC before a packet. That residue is still open.
 
 Verified against the tree (2026-09-06):
 
-- `@four/motion` ships Reynolds steering (`seek`, `flee`, `pursue`, `evade`,
+- `@fourjs/motion` ships Reynolds steering (`seek`, `flee`, `pursue`, `evade`,
   `arrive`, `wander` / `wanderSpherical`, flocking) as **pure functions that
   write an acceleration** (plan P8-2). The caller applies it. Nothing in
   `steering.ts` owns a node, reads a clock, or writes a transform.
@@ -42,8 +42,8 @@ actually ship, and they share one output shape:
 | Navmesh   | walkable triangles (2D or 3.5D) plus off-mesh links                   | funnel / string-pull, A\* on the dual     |
 | Waypoint  | directed graph of named points, optional radii / portals              | A\* / Dijkstra on the graph               |
 
-`@four/motion`'s frozen §3.1 row is `core, math, scene`. A planner that imported
-`@four/physics` (collider occupancy) or `@four/geometry` (navmesh tessellation)
+`@fourjs/motion`'s frozen §3.1 row is `core, math, scene`. A planner that imported
+`@fourjs/physics` (collider occupancy) or `@fourjs/geometry` (navmesh tessellation)
 would add an edge the matrix forbids. The seam therefore has to be
 **structural**: motion names the query and the path; the host or a plugin
 supplies occupancy, triangles, or a graph.
@@ -58,7 +58,7 @@ common case.
 ### 1. Home and layering
 
 The adapter interface, the path record, and the steering consumer live in
-`@four/motion` (`packages/motion/src/path-planning.ts`, beside `steering.ts`).
+`@fourjs/motion` (`packages/motion/src/path-planning.ts`, beside `steering.ts`).
 No new §98 package. No new §3.1 edge.
 
 A planner implementation that needs physics queries or geometry processing is
@@ -167,7 +167,7 @@ different seam.
 
 ### 5. Built-in waypoint planner; grid and navmesh as adapters
 
-`@four/motion` ships **one** built-in: a waypoint-graph planner
+`@fourjs/motion` ships **one** built-in: a waypoint-graph planner
 (`WaypointGraphPlanner`) over an insertion-ordered list of nodes and
 directed edges. A\*, binary heap, optional edge costs. Enough to exercise
 the interface and to cover "named points in a facility / level".
@@ -180,7 +180,7 @@ built-ins:
   The cost callback, if used, is fixed at construction.
 - A navmesh planner accepts a structural triangle soup
   `{ positions: Float64Array, indices: Uint32Array }` plus optional off-mesh
-  links. Tessellation stays in `@four/geometry` or the application; motion
+  links. Tessellation stays in `@fourjs/geometry` or the application; motion
   only searches.
 
 Neither implementation is required to land with the interface packet. The
@@ -192,7 +192,7 @@ packet.
 
 §81 has no "path planners" row. This RFC does **not** add one to the
 specification (that is an amendments-table change after acceptance). The
-in-repo registration path is a new capability token in `@four/motion`,
+in-repo registration path is a new capability token in `@fourjs/motion`,
 declared the way `SIMULATION_SYSTEMS` already is:
 
 ```ts
@@ -231,7 +231,7 @@ point and stops, checksum identity of two plans of the same query).
 
 **Deferred:** grid A\* if it does not fit the interface packet; navmesh
 funnel; dynamic / moving-obstacle replanning; hierarchical (HPA\*)
-planners; any occupancy built by reading `@four/physics` colliders
+planners; any occupancy built by reading `@fourjs/physics` colliders
 (application or plugin code). Robotic joint commands stay declined.
 
 ## Alternatives
@@ -244,13 +244,13 @@ that must still flee, separate, and arrive. Steering outputs a
 *contribution*; kinematics replaces the channel. Both consumers are
 real; only a waypoint record serves both.
 
-**B. Put planners in `@four/physics`.** Attractive for "occupancy is
+**B. Put planners in `@fourjs/physics`.** Attractive for "occupancy is
 colliders". It loses on layering: physics is wave 4 and already depends
 on motion; a planner that steering must call cannot live above it
 without a cycle. Occupancy derived from colliders is a plugin that
 implements `PathPlannerAdapter`, not a reason to move the interface.
 
-**C. A new `@four/navigation` package.** Clean isolation, and navmesh
+**C. A new `@fourjs/navigation` package.** Clean isolation, and navmesh
 generation is large enough to want one. It loses on §98 and plan §3.1:
 new top-level packages need an owner amendment. This RFC can be accepted
 without that. If a navmesh packet later needs its own home, that is a
@@ -292,7 +292,7 @@ determinism is the floor.
 
 Rows in `docs/COMPATIBILITY.md` this RFC moves:
 
-- **Public API (§90).** Additive. New exports from `@four/motion`
+- **Public API (§90).** Additive. New exports from `@fourjs/motion`
   (`PathPlannerAdapter`, `PathQuery`, `PlannedPath`,
   `WaypointGraphPlanner`, `followWaypoints`, `plannedPathToTrajectory`,
   `PATH_PLANNERS`). Re-exported through the umbrella barrels per §97a.

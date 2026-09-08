@@ -1,4 +1,4 @@
-export const PACKAGE_NAME = "@four/input";
+export const PACKAGE_NAME = "@fourjs/input";
 
 export type { DragListener, DragManagerOptions } from "./drag.js";
 export { DragManager } from "./drag.js";

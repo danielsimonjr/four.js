@@ -20,9 +20,9 @@
  *    says so.
  */
 
-import { DEFAULT_SPACE_MODE, isFourError, type SpaceMode } from "@four/core";
-import { Vector3 } from "@four/math";
-import { Group } from "@four/scene";
+import { DEFAULT_SPACE_MODE, isFourError, type SpaceMode } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import type { RigidBodyDocument } from "../src/index.js";

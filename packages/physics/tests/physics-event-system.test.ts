@@ -8,8 +8,8 @@
  * ways to get it wrong are refused or announced rather than silently accepted.
  */
 
-import { isFourError } from "@four/core";
-import { Vector3 } from "@four/math";
+import { isFourError } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
 import {
   PRIORITY_CONSTRAINTS,
   PRIORITY_EVENT_DISPATCH,
@@ -17,8 +17,8 @@ import {
   createTimeState,
   type FixedUpdateContext,
   type SimulationSystem,
-} from "@four/motion";
-import { Group } from "@four/scene";
+} from "@fourjs/motion";
+import { Group } from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CollisionEvent, PhysicsBodyHandle } from "../src/index.js";

@@ -13,8 +13,8 @@
  * distinguishes a real hole from two overlapping fills.
  */
 
-import { UnlitMaterial } from "@four/materials";
-import { Path } from "@four/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
+import { Path } from "@fourjs/geometry";
 import { describe, expect, it } from "vitest";
 
 import {

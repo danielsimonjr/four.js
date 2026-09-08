@@ -62,21 +62,21 @@
  * is **not** claimed.
  */
 
-import { createChecksum } from "@four/diagnostics";
-import { Vector2, Vector3 } from "@four/math";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Vector2, Vector3 } from "@fourjs/math";
 import {
   PRIORITY_FORCES,
   PRIORITY_PHYSICS_SOLVE,
   SystemRegistry,
   createTimeState,
-} from "@four/motion";
+} from "@fourjs/motion";
 import {
   dragField,
   radialField,
   volumeField,
   vortexField,
   type FieldVolume,
-} from "@four/particles";
+} from "@fourjs/particles";
 import {
   Collider,
   ForceFieldSystem,
@@ -84,9 +84,9 @@ import {
   PhysicsWorld,
   RigidBody,
   type ForceField,
-} from "@four/physics";
-import { Rapier2dAdapter } from "@four/physics-rapier";
-import { Group } from "@four/scene";
+} from "@fourjs/physics";
+import { Rapier2dAdapter } from "@fourjs/physics-rapier";
+import { Group } from "@fourjs/scene";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 export const FIXED_TIME_STEP = 1 / 60;

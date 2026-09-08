@@ -85,8 +85,8 @@ describe("`blended` is assignable since WP-7.3 (§42, §19)", () => {
 
   /*
    * The trio §19 needs — "blended" authority, a RigidBody registered with a
-   * PhysicsWorld, and a PoseTarget — cannot be checked here: `@four/scene`
-   * knows nothing about worlds or bodies. `@four/physics`'s
+   * PhysicsWorld, and a PoseTarget — cannot be checked here: `@fourjs/scene`
+   * knows nothing about worlds or bodies. `@fourjs/physics`'s
    * `tests/world-blend.test.ts` owns that enforcement, and this test only pins
    * the half `Node` is responsible for: the value assigns.
    */

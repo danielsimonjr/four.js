@@ -4,19 +4,19 @@
  * worlds in both §21 dimensions.
  *
  * Everything here goes through the **public API** — `four/application`,
- * `@four/physics`, `@four/physics-rapier` — because that is what the packet is
- * for: `@four/physics` has its own structural fake solver and
- * `@four/physics-rapier` has its own wasm-backed unit tests, and neither proves
+ * `@fourjs/physics`, `@fourjs/physics-rapier` — because that is what the packet is
+ * for: `@fourjs/physics` has its own structural fake solver and
+ * `@fourjs/physics-rapier` has its own wasm-backed unit tests, and neither proves
  * that the two halves compose. This file builds the composition once so each
  * case in `../physics-rapier.test.ts` states only its own physics.
  *
  * ## The one thing this file asserts by existing (§37, WP-5.5)
  *
  * {@link DimensionKit.createAdapter} is declared to return
- * `PhysicsWorldAdapter` — `@four/physics`'s `PhysicsSolverAdapter &
+ * `PhysicsWorldAdapter` — `@fourjs/physics`'s `PhysicsSolverAdapter &
  * SolverBodyAccess` — and {@link KIT_2D} and {@link KIT_3D} return a
- * `Rapier2dAdapter` and a `Rapier3dAdapter` from it. `@four/physics-rapier`
- * declares its own `RapierBodyAccess` (it may not import `@four/physics`), so
+ * `Rapier2dAdapter` and a `Rapier3dAdapter` from it. `@fourjs/physics-rapier`
+ * declares its own `RapierBodyAccess` (it may not import `@fourjs/physics`), so
  * the two per-handle interfaces are only *structurally* identical, and nothing
  * had checked the 3D one. These two functions are that check: if
  * `Rapier3dAdapter` drifted from `SolverBodyAccess` by one signature,
@@ -31,7 +31,7 @@
  * `Application.step(DT)` with a constant, injected delta.
  */
 
-import { Quaternion, Vector2, Vector3 } from "@four/math";
+import { Quaternion, Vector2, Vector3 } from "@fourjs/math";
 import {
   Collider,
   PhysicsSystem,
@@ -41,10 +41,10 @@ import {
   type PhysicsDimension,
   type PhysicsWorldAdapter,
   type WorldPhysicsEvent,
-} from "@four/physics";
-import { Rapier2dAdapter, Rapier3dAdapter } from "@four/physics-rapier";
-import { Group, type Node } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/physics";
+import { Rapier2dAdapter, Rapier3dAdapter } from "@fourjs/physics-rapier";
+import { Group, type Node } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 
 /** One fixed step in **seconds** (§7a, §10; Appendix A's 1/60). */
 export const DT = 1 / 60;
@@ -274,7 +274,7 @@ export interface BodyParts {
 
 /**
  * Density in kg/m³ (3D) or kg/m² (2D) that a collider here is given when it
- * names none — `@four/physics`'s `DEFAULT_DENSITY`, restated rather than
+ * names none — `@fourjs/physics`'s `DEFAULT_DENSITY`, restated rather than
  * imported so the expected masses below can be read next to the shapes that
  * produce them (§24, §25).
  *

@@ -2,7 +2,7 @@
  * The metallic-roughness pipeline (§59, §68) — this backend's sixth program,
  * added by R-13 on 2026-08-08.
  *
- * `@four/materials`' `StandardMaterial` says *what* the surface is; this module
+ * `@fourjs/materials`' `StandardMaterial` says *what* the surface is; this module
  * says how WebGL 2 shades it. The division is `gl-program.ts`'s throughout:
  * the material carries numbers and a texture, the program carries the uniform
  * locations and the two shader stages, and `webgl-renderer.ts` carries the draw
@@ -65,17 +65,17 @@
  * in: plain 0…1 numbers, straight (non-premultiplied) alpha, and no encode of
  * its own. The note here used to say the space was "untagged" and that no
  * output transform existed anywhere; both halves are superseded by R-15
- * (2026-08-08) — §60a's working-space policy is written down (`@four/math`'s
+ * (2026-08-08) — §60a's working-space policy is written down (`@fourjs/math`'s
  * `color.ts`), and its output transform ships as the final render-graph pass
- * (`@four/render`'s `OutputTransformEffect`), which is exactly why *this* stage
+ * (`@fourjs/render`'s `OutputTransformEffect`), which is exactly why *this* stage
  * still encodes nothing. The standard and lit stages therefore write comparable
  * values into one framebuffer, which is the property that lets a scene mix
  * them. Tone mapping — §60a's other half — waits on HDR float targets.
  */
 
-import type { Disposable } from "@four/core";
-import type { Matrix4, Vector3 } from "@four/math";
-import type { SceneLights } from "@four/render";
+import type { Disposable } from "@fourjs/core";
+import type { Matrix4, Vector3 } from "@fourjs/math";
+import type { SceneLights } from "@fourjs/render";
 
 import {
   MAP_TEXTURE_UNIT,
@@ -106,7 +106,7 @@ import {
  * The normal is transformed by the **inverse transpose** of the model matrix's
  * upper 3×3, the standard fix for non-uniform scale, derived in the shader for
  * the reason `LIT_VERTEX_SHADER_SOURCE` records — and staged with it: when
- * `@four/math`'s `Matrix3` grows a normal-matrix utility both stages hoist it
+ * `@fourjs/math`'s `Matrix3` grows a normal-matrix utility both stages hoist it
  * to a per-draw uniform together.
  */
 const STANDARD_VERTEX_SHADER_SOURCE = `#version 300 es

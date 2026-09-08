@@ -1,5 +1,5 @@
 /**
- * `@four/physics` — the stable, solver-independent physics API (§101, Part IV).
+ * `@fourjs/physics` — the stable, solver-independent physics API (§101, Part IV).
  *
  * Application code targets this package and never a solver directly (§20); a
  * concrete engine reaches it through `PhysicsSolverAdapter` (§37).
@@ -26,7 +26,7 @@
  * 2026-08-06 adds the §79 component serializers (`PH-17`):
  * `RIGID_BODY_SERIALIZER` and `COLLIDER_SERIALIZER`, typed against the
  * structural `ComponentSerializerShape` so registering them into
- * `@four/serialization`'s registry needs no new §3.1 edge.
+ * `@fourjs/serialization`'s registry needs no new §3.1 edge.
  *
  * `PH-11b` (2026-08-21) adds §12's **solver-backed** character controller:
  * `SweptCharacterController` — a capsule swept through `PhysicsWorld.shapeCast`
@@ -38,10 +38,10 @@
  * Named exports only, alphabetical within each module group.
  */
 
-export const PACKAGE_NAME = "@four/physics";
+export const PACKAGE_NAME = "@fourjs/physics";
 
 // §81's physics-side capability token (RFC 0002), declared by the package
-// that owns the §37 registry; `@four/four`'s `plugins.ts` re-exports the same
+// that owns the §37 registry; `@fourjs/four`'s `plugins.ts` re-exports the same
 // object, so both import paths hand out one identity.
 export { SOLVER_REGISTRY } from "./capabilities.js";
 
@@ -124,7 +124,7 @@ export type {
 } from "./events.js";
 // §26/§27 force generation for rigid bodies (PH-8, 2026-08-09) — §39's step-5
 // occupant. `ForceField` is §27's interface, structurally identical to
-// `@four/particles`' `ParticleForceField`, so a field written for either pillar
+// `@fourjs/particles`' `ParticleForceField`, so a field written for either pillar
 // works in both with no dependency edge between them.
 export type {
   ForceField,

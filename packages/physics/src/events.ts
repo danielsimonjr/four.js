@@ -28,7 +28,7 @@
  *
  * but the same payload exists one layer down, where an adapter has only the
  * opaque handles it minted (§37) — the `RigidBody` and `Collider` *components*
- * (§6a, WP-5.2) are `@four/physics`'s, not the solver's. Rather than declare
+ * (§6a, WP-5.2) are `@fourjs/physics`'s, not the solver's. Rather than declare
  * two near-identical families, each payload here is **parameterized** over how
  * bodies and colliders are referenced, and defaults to the handle form:
  *
@@ -61,7 +61,7 @@
  * This module is types only — it ships no runtime code.
  */
 
-import type { Vector3 } from "@four/math";
+import type { Vector3 } from "@fourjs/math";
 
 import type {
   PhysicsBodyHandle,
@@ -239,7 +239,7 @@ export interface SleepEvent<TBody = PhysicsBodyHandle> {
  *
  * ## Who produces this (plan P6-2)
  *
- * `PhysicsWorld`, not the solver. Break thresholds live at the `@four/physics`
+ * `PhysicsWorld`, not the solver. Break thresholds live at the `@fourjs/physics`
  * layer: after each fixed step the world reads every breakable joint's reaction
  * through `SolverJointAccess`, compares it against the thresholds, and destroys
  * the joints that exceeded them — so the same threshold means the same thing on

@@ -2,7 +2,7 @@
  * §70's full-screen effects in hand-written WGSL — the blit, the colour grade,
  * and §60a's output transform (WP-R1.6; the WGSL port of `gl-effect.ts`).
  *
- * `@four/render`'s `effect-pass.ts` owns the *policy* — which of §70's ten
+ * `@fourjs/render`'s `effect-pass.ts` owns the *policy* — which of §70's ten
  * effects this tier ships and what each staged one waits on — and this module
  * owns the WGSL. What the port keeps: the full-screen triangle generated from
  * the vertex index with no vertex buffer at all, the exact grading arithmetic
@@ -147,7 +147,7 @@ fn ${VERTEX_ENTRY_POINT}(@builtin(vertex_index) index : u32) -> EffectOutput {
  *   `rgba8` destination saturates on write; a future float target must not be
  *   silently clamped into agreeing with it).
  * - **`"output-transform"`** encodes linear-light RGB as sRGB — the piecewise
- *   IEC 61966-2-1 curve `@four/math`'s `linearToSrgb` computes on the CPU,
+ *   IEC 61966-2-1 curve `@fourjs/math`'s `linearToSrgb` computes on the CPU,
  *   odd-extended below zero by taking the magnitude and restoring the sign so
  *   a negative texel never reaches `pow` (undefined for a negative base).
  *   Alpha is a coverage fraction, not a light quantity, and is not encoded.

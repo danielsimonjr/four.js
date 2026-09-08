@@ -3,7 +3,7 @@
  * (2026-08-07).
  *
  * §85 closes with *"Production builds may disable expensive validation while
- * preserving essential safety checks."* `@four/core`'s `DEV` is the mechanism;
+ * preserving essential safety checks."* `@fourjs/core`'s `DEV` is the mechanism;
  * `packages/core/tests/dev.test.ts` proves its *semantics* by evaluating both
  * builds. That is not the same claim as the one this packet actually makes,
  * which is about **bytes**: that a real bundler, given
@@ -61,8 +61,8 @@ const scratchDirectory = join(
  * case — and `addComponent` twice reaches §6a's duplicate warning.
  */
 const ENTRY_SOURCE = `
-import { Application } from "four/application";
-import { Group } from "four/scene";
+import { Application } from "fourJS/application";
+import { Group } from "fourJS/scene";
 
 class Marker {
   static readonly typeName = "probe.marker";
@@ -84,7 +84,7 @@ export function boot(): Application {
  * Each is a literal that survives minification (a property name a record is
  * built with, or message text), so finding it in the output means the code that
  * produces it was shipped. They are deliberately specific: `drawCalls` would
- * have been a bad probe, because `@four/render`'s own statistics record uses
+ * have been a bad probe, because `@fourjs/render`'s own statistics record uses
  * that name on a path this packet does *not* gate.
  */
 const GATED_MARKERS: ReadonlyArray<readonly [string, string]> = [
@@ -96,7 +96,7 @@ const GATED_MARKERS: ReadonlyArray<readonly [string, string]> = [
   ["already attached", "§6a's duplicate-component warning"],
   [
     "performance",
-    "the §84 monotonic clock — the last thing holding @four/diagnostics in",
+    "the §84 monotonic clock — the last thing holding @fourjs/diagnostics in",
   ],
 ];
 
@@ -215,7 +215,7 @@ const GATED: ReadonlyMap<string, string> = new Map([
   ],
   [
     join("packages", "core", "src", "leak-registry.ts"),
-    "§83's FinalizationRegistry leak bookkeeping — every public function is a no-op when DEV is false; the only output is a warning text. Core, not simulation: geometry / render / materials call it at construction so they never import @four/diagnostics",
+    "§83's FinalizationRegistry leak bookkeeping — every public function is a no-op when DEV is false; the only output is a warning text. Core, not simulation: geometry / render / materials call it at construction so they never import @fourjs/diagnostics",
   ],
   [
     join("packages", "geometry", "src", "resource-memory.ts"),
@@ -242,16 +242,16 @@ const GATED: ReadonlyMap<string, string> = new Map([
     "§85's validation catalogue — named checks and devAssert scans; no simulation numbers",
   ],
   [
-    join("packages", "four", "src", "application.ts"),
+    join("packages", "fourJS", "src", "application.ts"),
     "§84's statistics wiring (A-1). Measurement only: `stats` is read by nobody inside the engine, and the frame's event order, transforms and draw calls are identical either way",
   ],
   [
     join("packages", "input", "src", "keyboard-input.ts"),
-    "KeyboardInput's malformed-options refusal (2026-09-06). Refusal only, and it is unreachable from any well-formed call: the constructor requires (surface, { focusTarget }) in both builds, and every caller that passes a function keeps running identically whatever the flag says. What the guard drops is the *diagnostic* for a call that could not have worked anyway — a production build answers it with the same TypeError the field access always raised. Gated because the message names the call shape, `@four/ui`'s keyboardFocusTarget and the DOM-listener alternative, and shipping that prose put examples/ui-demo 245 B over its §86 budget. `@four/input` is not a simulation package: no number a replay reproduces passes through it (§33)",
+    "KeyboardInput's malformed-options refusal (2026-09-06). Refusal only, and it is unreachable from any well-formed call: the constructor requires (surface, { focusTarget }) in both builds, and every caller that passes a function keeps running identically whatever the flag says. What the guard drops is the *diagnostic* for a call that could not have worked anyway — a production build answers it with the same TypeError the field access always raised. Gated because the message names the call shape, `@fourjs/ui`'s keyboardFocusTarget and the DOM-listener alternative, and shipping that prose put examples/ui-demo 245 B over its §86 budget. `@fourjs/input` is not a simulation package: no number a replay reproduces passes through it (§33)",
   ],
   [
     join("packages", "render", "src", "render-list.ts"),
-    "§85's layer-mask refusal (R-38). Refusal only: a well-formed mask — the only kind `layerMask()` can build — passes the check untouched, so the list, its order, and every item in it are identical either way. What the guard drops is the *diagnostic* for a `NaN` or fractional mask, which a production build answers with the empty view it would have drawn anyway. `@four/scene`'s `assertLayerMask` is unconditional, because §33 forbids that package from branching on the build mode at all; this is the render tier's copy of the call, gated because it costs ~115 B gzip in every shipped bundle. R-23 (2026-08-28) added §67's clip-on-a-non-drawable warning under the same rule: the clip is inert in both builds — the subtree is not narrowed either way — and only the message moves with the flag",
+    "§85's layer-mask refusal (R-38). Refusal only: a well-formed mask — the only kind `layerMask()` can build — passes the check untouched, so the list, its order, and every item in it are identical either way. What the guard drops is the *diagnostic* for a `NaN` or fractional mask, which a production build answers with the empty view it would have drawn anyway. `@fourjs/scene`'s `assertLayerMask` is unconditional, because §33 forbids that package from branching on the build mode at all; this is the render tier's copy of the call, gated because it costs ~115 B gzip in every shipped bundle. R-23 (2026-08-28) added §67's clip-on-a-non-drawable warning under the same rule: the clip is inert in both builds — the subtree is not narrowed either way — and only the message moves with the flag",
   ],
   [
     join("packages", "render", "src", "clip.ts"),
@@ -279,14 +279,14 @@ const GATED: ReadonlyMap<string, string> = new Map([
   ],
   [
     join("packages", "assets", "src", "asset-manager.ts"),
-    "§83's settled-slot duplicate-load warning (2026-09-06). Message only: a second load of a decoded (url, loader) slot still returns the same cached promise in both builds — in-flight coalescing is silent and unconditional — and only the console.warn naming the pair moves with the flag. `@four/assets` is IO, not a simulation package: no number a replay reproduces passes through it (§33)",
+    "§83's settled-slot duplicate-load warning (2026-09-06). Message only: a second load of a decoded (url, loader) slot still returns the same cached promise in both builds — in-flight coalescing is silent and unconditional — and only the console.warn naming the pair moves with the flag. `@fourjs/assets` is IO, not a simulation package: no number a replay reproduces passes through it (§33)",
   ],
   [
     join("packages", "assets", "src", "gltf.ts"),
     "§78's ignored-feature notices (A-19, 2026-08-29). Message only: every ignored feature is recorded unconditionally in GltfAsset.ignored — the §33 evidence is the determinism suite's pinned digest, which is computed over the parse output and holds in both builds — and only the console.warn naming each feature moves with the flag. Parsing is IO, runs before any fixed step, and its output is a pure function of the input bytes either way",
   ],
   [
-    join("packages", "four", "src", "gltf.ts"),
+    join("packages", "fourJS", "src", "gltf.ts"),
     "§78's ignored-texture-slot warning at instantiation (A-19, 2026-08-29). Message only: the instantiated nodes, materials (factors applied, unsampleable slots absent), and clips are identical in both builds — the slot list itself is parse data on the material record — and only the console.warn saying the base map is the one sampled moves with the flag. Assembly runs outside the fixed step and writes nothing any simulation reads",
   ],
   [

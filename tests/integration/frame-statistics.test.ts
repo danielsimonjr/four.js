@@ -4,12 +4,12 @@
  * §84 is a claim about four packages agreeing, and no unit test inside any one
  * of them can check it:
  *
- * 1. `@four/diagnostics` owns the {@link FrameStats} record (§98 gives it
+ * 1. `@fourjs/diagnostics` owns the {@link FrameStats} record (§98 gives it
  *    "statistics, overlays, validation") and may import neither `render` nor
  *    `physics` — so its render counters arrive through a *transcribed* shape;
- * 2. `@four/render` declares the optional `Renderer.statistics` capability
+ * 2. `@fourjs/render` declares the optional `Renderer.statistics` capability
  *    without knowing what a draw call is made of;
- * 3. `@four/render-webgl` counts the draws it actually submits to GL;
+ * 3. `@fourjs/render-webgl` counts the draws it actually submits to GL;
  * 4. `four`'s `Application` owns one record, resets it at the frame boundary,
  *    measures the two times it can measure, and copies the backend's counters
  *    back.
@@ -26,22 +26,22 @@
  * assertion above it and be wrong exactly when a frame is interesting.
  */
 
-import { geometryMemoryBytes, planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { geometryMemoryBytes, planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   RenderTarget,
   Renderable,
   Texture,
   textureMemoryBytes,
-} from "@four/render";
+} from "@fourjs/render";
 import {
   GL,
   WebglRenderer,
   type ParticleGlContext,
   type WebglCanvas,
-} from "@four/render-webgl";
-import { OrthographicCamera, createFullscreenViewport } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/render-webgl";
+import { OrthographicCamera, createFullscreenViewport } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 import { describe, expect, it } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -361,8 +361,8 @@ describe("A-1 — §84 statistics through the whole stack", () => {
 
   it("reports §83's live-resource totals as textureMemory/bufferMemory (A-5)", async () => {
     // The A-5 half of the same claim, and the same shape of end-to-end check:
-    // `@four/geometry` and `@four/render` each keep a process-wide total of
-    // what their live resources hold, `@four/diagnostics` transcribes the pair
+    // `@fourjs/geometry` and `@fourjs/render` each keep a process-wide total of
+    // what their live resources hold, `@fourjs/diagnostics` transcribes the pair
     // it may not import, and `Application` reads them at the frame boundary.
     const { app } = await harness(3, { stats: true });
 

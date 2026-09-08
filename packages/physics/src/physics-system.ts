@@ -59,12 +59,12 @@
  * §10), and the tracked worlds are iterated in insertion order only (§33).
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 import {
   PRIORITY_PHYSICS_SOLVE,
   type FixedUpdateContext,
   type SimulationSystem,
-} from "@four/motion";
+} from "@fourjs/motion";
 
 import type { PhysicsWorld } from "./world.js";
 

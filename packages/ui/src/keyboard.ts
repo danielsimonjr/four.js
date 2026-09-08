@@ -10,8 +10,8 @@
  * ```
  *
  * This module is the half of §75's "keyboard navigation, focus order" that was
- * staged from 2026-08-02 until `@four/input` gained a key source. The staging
- * note named exactly one blocker — "§72 lists keyboard events and @four/input
+ * staged from 2026-08-02 until `@fourjs/input` gained a key source. The staging
+ * note named exactly one blocker — "§72 lists keyboard events and @fourjs/input
  * implements none — it has no key source at all" — and A-10 removed it. Nothing
  * else about the design changed: focus was always this package's (`focus()`,
  * `blur()`, one owner per scene root), and `Button.activate()` was always
@@ -42,9 +42,9 @@
  * one function type, which is why the frozen matrix needed no amendment.
  */
 
-import type { Unsubscribe } from "@four/core";
-import type { SceneKeyEvent } from "@four/input";
-import type { Node } from "@four/scene";
+import type { Unsubscribe } from "@fourjs/core";
+import type { SceneKeyEvent } from "@fourjs/input";
+import type { Node } from "@fourjs/scene";
 
 import { UIWidget, focusedWidget } from "./widget.js";
 

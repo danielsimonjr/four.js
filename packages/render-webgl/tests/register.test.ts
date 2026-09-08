@@ -1,5 +1,5 @@
-import { isFourError } from "@four/core";
-import { RendererRegistry, registeredRenderers } from "@four/render";
+import { isFourError } from "@fourjs/core";
+import { RendererRegistry, registeredRenderers } from "@fourjs/render";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {

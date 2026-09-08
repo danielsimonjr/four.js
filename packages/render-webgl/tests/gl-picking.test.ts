@@ -5,14 +5,14 @@
  * write, and every read-back path (fence, stall, refusals) is reachable on a
  * fake context with no GPU.
  *
- * The scene objects are `@four/render`'s real `Renderable` over structural
+ * The scene objects are `@fourjs/render`'s real `Renderable` over structural
  * geometry/material doubles — `webgl-renderer.test.ts`'s argument: `core`,
  * `math`, `render` is this package's whole dependency row (plan §3.1), so
- * `@four/scene` and `@four/geometry` may not appear even in a test.
+ * `@fourjs/scene` and `@fourjs/geometry` may not appear even in a test.
  */
 
-import { isFourError, resetDevWarnings } from "@four/core";
-import { Matrix4 } from "@four/math";
+import { isFourError, resetDevWarnings } from "@fourjs/core";
+import { Matrix4 } from "@fourjs/math";
 import {
   MAX_PICK_CANDIDATES,
   Renderable,
@@ -20,7 +20,7 @@ import {
   type PickingService,
   type RenderItem,
   type UnlitRenderItem,
-} from "@four/render";
+} from "@fourjs/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

@@ -52,7 +52,7 @@
  * the default metre/kilogram unit system.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import type { CombineMode } from "./types.js";
 

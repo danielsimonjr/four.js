@@ -24,14 +24,14 @@
  *    contribution is dropped *and reported*, never turned into a `NaN` force.
  */
 
-import { Vector3, constructionCount, resetConstructionCount } from "@four/math";
-import { Group } from "@four/scene";
+import { Vector3, constructionCount, resetConstructionCount } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import {
   PRIORITY_FORCES,
   SystemRegistry,
   createTimeState,
   type FixedUpdateContext,
-} from "@four/motion";
+} from "@fourjs/motion";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ForceField } from "../src/index.js";

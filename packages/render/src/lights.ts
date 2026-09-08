@@ -16,7 +16,7 @@
  * - the first visible, enabled **directional** light — the sun. Exactly one,
  *   still: further directional lights are ignored, deterministically
  *   (scene-graph order decides which one wins, §33), for the reason
- *   `@four/scene`'s `light.ts` records;
+ *   `@fourjs/scene`'s `light.ts` records;
  * - up to {@link MAX_PUNCTUAL_LIGHTS} **point and spot** lights, flattened
  *   into the four packed arrays a backend uploads as uniform arrays.
  *
@@ -24,11 +24,11 @@
  * when it is asked to (§69): a view-projection, a map size, and two biases,
  * which together are everything a backend needs to render a depth map and
  * compare against it. Only the *directional* light casts at this tier — see
- * `@four/scene`'s `DirectionalLightShadow` for §69's staged remainder.
+ * `@fourjs/scene`'s `DirectionalLightShadow` for §69's staged remainder.
  *
  * §68's hemisphere and rectangular-area types are staged, and so are light
  * layers, IBL, and the clustered/forward-plus path for *many* lights — see
- * `@four/scene`'s `light.ts`, which owns that list.
+ * `@fourjs/scene`'s `light.ts`, which owns that list.
  *
  * ## Order, and what happens past the bound
  *
@@ -42,7 +42,7 @@
  * would flicker as a light animates). Sort by moving the nodes.
  *
  * The overflow is reported **once per root**. Development builds go
- * through {@link @four/core!devWarnOnce} (A-4). Production keeps an
+ * through {@link @fourjs/core!devWarnOnce} (A-4). Production keeps an
  * unconditional `console.warn`: a scene that quietly drops a lamp is
  * the bug nobody finds, and that message is worth more in a shipped
  * build than the bytes it costs (the 2026-08 decision, still in
@@ -54,22 +54,22 @@
  * ambient term is read off the root through {@link AmbientLightSource} —
  * duck-typing rather than `instanceof DirectionalLight` / `instanceof Scene`,
  * even though (unlike the particle case) the render → scene edge exists in
- * the frozen §3.1 matrix. The reason is one layer down: `@four/render-webgl`
+ * the frozen §3.1 matrix. The reason is one layer down: `@fourjs/render-webgl`
  * may depend on `core`, `math`, and `render` only, so its unit tests build
  * scenes from typed doubles, and an `instanceof` here would make a fake light
  * impossible to write there. Unlike the particle contract, drift *is* caught
- * at type level: this package depends on `@four/scene`, and its unit tests
+ * at type level: this package depends on `@fourjs/scene`, and its unit tests
  * pin the real `DirectionalLight` and `Scene` against these shapes with plain
  * assignments.
  */
 
-import { DEV, devWarnOnce } from "@four/core";
-import { Matrix4, Vector3 } from "@four/math";
-import type { Node } from "@four/scene";
+import { DEV, devWarnOnce } from "@fourjs/core";
+import { Matrix4, Vector3 } from "@fourjs/math";
+import type { Node } from "@fourjs/scene";
 
 /**
  * What the light collector reads from a directional light node — the
- * structural contract `@four/scene`'s `DirectionalLight` satisfies (§68).
+ * structural contract `@fourjs/scene`'s `DirectionalLight` satisfies (§68).
  */
 export interface DirectionalLightSource {
   /**
@@ -83,7 +83,7 @@ export interface DirectionalLightSource {
    * Straight RGB in 0…1, in §60a's **linear-light working space** — uploaded to
    * the shader as it stands (the "no colour space attached" deferral this line
    * carried is resolved by R-15, 2026-08-08; an author with a CSS string decodes
-   * it with `@four/math`'s `srgbToLinearRGB(parseColorRGB(css), out)`).
+   * it with `@fourjs/math`'s `srgbToLinearRGB(parseColorRGB(css), out)`).
    */
   readonly color: readonly [number, number, number];
 
@@ -92,7 +92,7 @@ export interface DirectionalLightSource {
 
   /**
    * Writes the world-space unit vector the light travels along into `out`
-   * and returns it. `@four/scene`'s implementation derives it from the
+   * and returns it. `@fourjs/scene`'s implementation derives it from the
    * node's world −Z axis; a double supplies whatever the test needs.
    */
   getWorldDirection(out: Vector3): Vector3;
@@ -102,7 +102,7 @@ export interface DirectionalLightSource {
    * every member below — reads as `false`.
    *
    * **Optional, and that is the compatibility contract**, not laziness: this
-   * interface is satisfied structurally, and the doubles `@four/render-webgl`'s
+   * interface is satisfied structurally, and the doubles `@fourjs/render-webgl`'s
    * unit tests build were written before §69 existed. A required member here
    * would have broken every one of them at *compile* time, and a host's own
    * minimal light object at run time — while an optional one reads `undefined`,
@@ -113,7 +113,7 @@ export interface DirectionalLightSource {
 
   /**
    * Resolution and bias of this light's shadow map (§69) — the half
-   * {@link SceneLights} carries through to a backend. `@four/scene`'s
+   * {@link SceneLights} carries through to a backend. `@fourjs/scene`'s
    * `DirectionalLightShadow` satisfies it; the volume controls it also carries
    * (`extent`, `near`, `far`) are consumed by
    * {@link DirectionalLightSource.computeShadowMatrix} and never reach a
@@ -123,7 +123,7 @@ export interface DirectionalLightSource {
 
   /**
    * Writes the light's world-space **shadow view-projection** into `out` and
-   * returns it (§69) — see `@four/scene`'s `DirectionalLight` for the
+   * returns it (§69) — see `@fourjs/scene`'s `DirectionalLight` for the
    * derivation. A light that offers no such method never casts, whatever
    * {@link DirectionalLightSource.castShadow} says: the matrix is the shadow.
    */
@@ -132,7 +132,7 @@ export interface DirectionalLightSource {
 
 /**
  * The two shadow numbers a backend needs per frame (§69) — the structural half
- * of `@four/scene`'s `DirectionalLightShadow`.
+ * of `@fourjs/scene`'s `DirectionalLightShadow`.
  *
  * `mapSize` is here rather than derived because a backend has to *allocate* a
  * surface of that size before it can render into one, and `bias`/`normalBias`
@@ -180,10 +180,10 @@ export const MAX_PUNCTUAL_LIGHTS = 8;
 
 /**
  * What the collector reads from **any** of §68's positional lights — the half
- * `@four/scene`'s `PunctualLight` base class satisfies (R-17, 2026-08-09).
+ * `@fourjs/scene`'s `PunctualLight` base class satisfies (R-17, 2026-08-09).
  *
  * Structural, exactly like {@link DirectionalLightSource} and for exactly the
- * same reason: `@four/render-webgl` may depend on `core`, `math`, and `render`
+ * same reason: `@fourjs/render-webgl` may depend on `core`, `math`, and `render`
  * only, so its unit tests build lights as typed doubles.
  */
 export interface PunctualLightSourceBase {
@@ -198,13 +198,13 @@ export interface PunctualLightSourceBase {
 
   /**
    * Scalar multiplier on the colour: the irradiance, over π, at **unit
-   * distance** (§68; see `@four/scene`'s `light.ts` for the convention).
+   * distance** (§68; see `@fourjs/scene`'s `light.ts` for the convention).
    */
   readonly intensity: number;
 
   /**
    * Distance at which the contribution reaches zero, or `0` for unbounded —
-   * the `KHR_lights_punctual` window `@four/scene`'s `PunctualLight` documents.
+   * the `KHR_lights_punctual` window `@fourjs/scene`'s `PunctualLight` documents.
    */
   readonly range: number;
 
@@ -336,7 +336,7 @@ export interface SceneLights {
    * The reciprocal in `z` is precomputed **here**, once per light per frame,
    * rather than in the shader once per light per *fragment*; the `max` is what
    * makes an `inner ≥ outer` cone a hard edge instead of a division by zero
-   * (see `@four/scene`'s `SpotLight`).
+   * (see `@fourjs/scene`'s `SpotLight`).
    */
   readonly punctualParams: Float32Array;
 
@@ -530,7 +530,7 @@ function writePunctualLight(
     const cosInner = Math.cos(light.innerConeAngle);
     out.punctualParams[params + 1] = cosOuter;
     // The floor is what makes `inner >= outer` a hard edge instead of a
-    // division by zero; see `@four/scene`'s `SpotLight`.
+    // division by zero; see `@fourjs/scene`'s `SpotLight`.
     out.punctualParams[params + 2] = 1 / Math.max(cosInner - cosOuter, 1e-6);
     out.punctualParams[params + 3] = 1;
   }

@@ -27,10 +27,10 @@
  *
  * ## Where this lives, and why
  *
- * `@four/materials` is the home §98 assigns ("material families, paints, node
+ * `@fourjs/materials` is the home §98 assigns ("material families, paints, node
  * materials"), and its §3.1 row is `core, math` — a pure data IR adds no
- * edge. Backends read the IR through the types and functions `@four/render`
- * re-exports, so `@four/render-webgl`'s frozen `core, math, render` row is
+ * edge. Backends read the IR through the types and functions `@fourjs/render`
+ * re-exports, so `@fourjs/render-webgl`'s frozen `core, math, render` row is
  * untouched (the same legality argument the §62 registry made).
  *
  * ## Determinism (§33)

@@ -9,7 +9,7 @@
  * what Rapier does with the six seam methods — and nowhere composed. What this
  * file pins is the sentence the gap analysis said was false: *a property
  * written between steps takes effect at the next one*, through
- * `Application` + `@four/physics` + `@four/physics-rapier`, in both dimensions,
+ * `Application` + `@fourjs/physics` + `@fourjs/physics-rapier`, in both dimensions,
  * with nothing reaching into a package's internals.
  *
  * It also pins the two properties the closure had to preserve:
@@ -21,8 +21,8 @@
  *   the same checksum stream twice.
  */
 
-import { Vector3 } from "@four/math";
-import { Collider, type PhysicsWorld } from "@four/physics";
+import { Vector3 } from "@fourjs/math";
+import { Collider, type PhysicsWorld } from "@fourjs/physics";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {

@@ -13,10 +13,10 @@
  * // manifest.robot.hash (§96).
  * ```
  *
- * ## Why it lives here and not in `@four/four`
+ * ## Why it lives here and not in `@fourjs/four`
  *
  * A manifest is an *asset-manager* concept: it resolves keys to URLs and hands
- * the hash to the verification path in `asset-manager.ts`. What `@four/four`'s
+ * the hash to the verification path in `asset-manager.ts`. What `@fourjs/four`'s
  * scene serializers need (A-16) is the other end — a `SceneResourceCatalog`
  * whose `get(key)` answers a **already-loaded** `BufferGeometry` or `Material`,
  * synchronously, because deserialization is synchronous. So the wiring is
@@ -39,7 +39,7 @@
  * it cannot keep.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import type { AssetLoader, AssetLoadOptions } from "./asset-manager.js";
 import { AssetManager } from "./asset-manager.js";

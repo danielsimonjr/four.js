@@ -1,4 +1,4 @@
-import { Matrix4, Vector3, srgbToLinear } from "@four/math";
+import { Matrix4, Vector3, srgbToLinear } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,7 +23,7 @@ describe("DirectionalLight (§68)", () => {
     expect(light.intensity).toBe(1);
   });
 
-  it("carries the structural brand @four/render recognises", () => {
+  it("carries the structural brand @fourjs/render recognises", () => {
     expect(new DirectionalLight().isDirectionalLight).toBe(true);
   });
 
@@ -175,7 +175,7 @@ describe("PointLight (§68, R-17)", () => {
     expect(light.lightType).toBe("point");
   });
 
-  it("carries the structural brand @four/render recognises", () => {
+  it("carries the structural brand @fourjs/render recognises", () => {
     expect(new PointLight().isPunctualLight).toBe(true);
   });
 

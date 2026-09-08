@@ -9,7 +9,7 @@
  * frame (`wgpu-caches.test.ts`'s argument).
  */
 
-import { MAX_PUNCTUAL_LIGHTS, createSceneLights } from "@four/render";
+import { MAX_PUNCTUAL_LIGHTS, createSceneLights } from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 import { createRecordingGpu } from "../../../tests/integration/helpers/recording-gpu.js";

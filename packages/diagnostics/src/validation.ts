@@ -2,7 +2,7 @@
  * §85's validation catalogue (A-4 remainder step 2, 2026-09-06).
  */
 
-import { DEV, devAssert, devWarnOnce } from "@four/core";
+import { DEV, devAssert, devWarnOnce } from "@fourjs/core";
 
 export const COORDINATE_ENVELOPE = 1e5;
 export const UNSTABLE_SCALE_RATIO = 1e4;
@@ -124,7 +124,7 @@ export function assertFinite(
 
 /**
  * §85 NaN/infinity check for a structural `{ x, y, z }`. Does not import
- * `@four/math` — callers pass any vec3-shaped record.
+ * `@fourjs/math` — callers pass any vec3-shaped record.
  */
 export function assertFiniteVec3(
   value: { readonly x: number; readonly y: number; readonly z: number },

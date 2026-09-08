@@ -4,7 +4,7 @@
  *
  * ## What only a browser can answer
  *
- * `packages/four/tests/text-node.test.ts` proves the quads a string becomes and
+ * `packages/fourJS/tests/text-node.test.ts` proves the quads a string becomes and
  * `tests/integration/text-rendering.test.ts` proves that a label issues one
  * `drawElements` through the pipeline a textured `Renderable` already used.
  * Neither rasterises anything, so neither can say that **the letters appear**.

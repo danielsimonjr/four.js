@@ -6,7 +6,7 @@
  * reaching hardware on clipless frames — lives in `webgpu-renderer.test.ts`.
  */
 
-import type { RenderItem } from "@four/render";
+import type { RenderItem } from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 import {

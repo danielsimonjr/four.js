@@ -11,14 +11,14 @@
  * ## Which half of the row this is, and which half it is not
  *
  * §86 asks for 5 000 retained UI nodes. A frame of that costs two things:
- * **laying the tree out** and **drawing it**. `@four/ui`'s frozen dependency
+ * **laying the tree out** and **drawing it**. `@fourjs/ui`'s frozen dependency
  * matrix gives it `core`, `math`, `scene`, `input` and `text` and no renderer —
  * widgets own hierarchy, size, hit area and state, and the application supplies
  * every pixel through a `WidgetSkin` — so the two halves are separable in the
  * engine, not merely in this file.
  *
  * This script measures the first half only: `root.layout()` over a retained
- * tree of N widgets, which is the whole of what `@four/ui` does per frame. The
+ * tree of N widgets, which is the whole of what `@fourjs/ui` does per frame. The
  * drawing half is not measured here and is not measurable headless: the shipped
  * skin path turns each glyph cell into its own `Texture` (§55's `frame`
  * sub-rectangle has not landed) and issues a draw call per quad, so a headless
@@ -31,7 +31,7 @@
  *
  * One iteration is **`root.layout()`** — §74's two passes over the whole tree:
  * a bottom-up `measure()` (each `Label` measuring its text through
- * `@four/text`, each `Panel` the extent of its children) and a top-down
+ * `@fourjs/text`, each `Panel` the extent of its children) and a top-down
  * `arrange()` that writes every widget's position into its `Transform`.
  *
  * There is **no dirty tracking in §74's layout**: `layout()` always measures
@@ -70,14 +70,14 @@
  *
  * The tree, the label strings and the churned values all come from {@link SEED}
  * through a small LCG, so two runs build the identical UI (§33). No clock
- * reaches `@four/ui`: `performance.now()` lives in `harness.mjs`, `layout()`
+ * reaches `@fourjs/ui`: `performance.now()` lives in `harness.mjs`, `layout()`
  * takes no time argument at all, and deleting every timer would leave every
  * resolved position bit-identical.
  *
  * Recorded, never gated — see `benchmarks/README.md`.
  */
 
-import { buildGlyphAtlas } from "@four/text";
+import { buildGlyphAtlas } from "@fourjs/text";
 import {
   Button,
   Checkbox,
@@ -87,7 +87,7 @@ import {
   Slider,
   UIWidget,
   UI_LAYOUT_AUTHORITY,
-} from "@four/ui";
+} from "@fourjs/ui";
 
 import {
   MEASUREMENT_NOTE,
@@ -526,7 +526,7 @@ const record = {
   iteration:
     "one iteration is root.layout() — §74's bottom-up measure pass plus top-down arrange pass over the whole retained tree",
   rowNote:
-    "This is the layout-and-state half of §86's retained-UI row. The drawing half is not measured: @four/ui has no renderer dependency by design, and the shipped skin path cuts one Texture per glyph cell (§55 frame sub-rectangle unshipped), so a headless draw number would describe the workaround rather than the engine.",
+    "This is the layout-and-state half of §86's retained-UI row. The drawing half is not measured: @fourjs/ui has no renderer dependency by design, and the shipped skin path cuts one Texture per glyph cell (§55 frame sub-rectangle unshipped), so a headless draw number would describe the workaround rather than the engine.",
   targetNote:
     "§86 gives this row a count (5 000) and no rate; 60 Hz is this file's reading of the table's neighbouring rows, not a rate the specification states for this row.",
   passKinds: {

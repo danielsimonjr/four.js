@@ -43,7 +43,7 @@ function face(
 /**
  * `(b - a) × (c - a)` — the un-normalized face normal, computed here rather
  * than with `Vector3.cross` so the winding assertions have ground truth
- * independent of `@four/math`.
+ * independent of `@fourjs/math`.
  */
 function faceNormal(a: Point, b: Point, c: Point): Point {
   const ux = b.x - a.x;
@@ -787,7 +787,7 @@ describe("planeGeometry", () => {
     expect([...(geometry.uvs ?? [])]).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
     // The uv of every vertex agrees with its position in the quad, which is
     // what makes a textured plane and a same-sized `Sprite` show a texture
-    // identically (see `@four/render`'s `sprite.ts`).
+    // identically (see `@fourjs/render`'s `sprite.ts`).
     for (let i = 0; i < geometry.vertexCount; i += 1) {
       const v = vertex(geometry, i);
       expect(geometry.uvs?.[i * 2]).toBeCloseTo((v.x + 2) / 4, 12);

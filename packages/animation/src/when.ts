@@ -17,7 +17,7 @@
  * name, a kind mismatch, or a syntax error — throws at construction.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import type { NumericComparison, TransitionCondition } from "./controller.js";
 

@@ -1,4 +1,4 @@
-# @four/motion
+# @fourjs/motion
 
 Motion system — time, the fixed-step loop, kinematics, and controllers. Part of [fourJS](../../README.md).
 
@@ -23,4 +23,4 @@ Implements §9–§13, §38–§39, and the §111 advanced-motion tier (§99, Pa
 
 Unit tests are colocated in `tests/` per §92.
 
-Workspace name `@four/motion`; publishes as `@danielsimonjr/fourjs-motion`.
+Workspace name `@fourjs/motion`; publishes as `@danielsimonjr/fourjs-motion`.

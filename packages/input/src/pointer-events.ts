@@ -29,14 +29,14 @@
  * EventEmitter<NodeEventMap>`, with no generic parameter of its own (plan D1).
  * A package that adds node events therefore cannot re-parameterize the emitter
  * — it must widen the *map*, and `NodeEventMap` is an `interface` for exactly
- * that reason (see its documentation in `@four/scene`: "later packets add their
+ * that reason (see its documentation in `@fourjs/scene`: "later packets add their
  * keys here (or, for out-of-package events, by declaration merging)").
  *
  * This module is the first out-of-package case, so it uses the mechanism the
  * scene package designed for it:
  *
  * ```ts
- * declare module "@four/scene" {
+ * declare module "@fourjs/scene" {
  *   interface NodeEventMap {
  *     pointerdown: ScenePointerEvent;
  *     // …
@@ -48,13 +48,13 @@
  * with, so `node.on("pointerdown", …)` type-checks with a fully typed event and
  * `node.on("nope", …)` is still rejected — verified by the type-level
  * assertions in this package's tests. It is a **global** widening: importing
- * `@four/input` anywhere in a program adds these keys to every node's map. That
+ * `@fourjs/input` anywhere in a program adds these keys to every node's map. That
  * is the intended semantics (an input event is a node event, not an
  * input-package event) and it is additive, so no existing listener, subclass, or
  * downstream build changes meaning.
  *
  * The rejected alternative was a private listener registry inside
- * `@four/input`, keyed by node. It would have given input events their own
+ * `@fourjs/input`, keyed by node. It would have given input events their own
  * `on`/`off` surface — two event APIs on one object, which is precisely what
  * §6b's "nodes and the application expose one typed event API" forbids.
  *
@@ -99,8 +99,8 @@
  * {@link SceneInputEvent}, which is where their documentation lives).
  */
 
-import type { Vector3 } from "@four/math";
-import type { Node } from "@four/scene";
+import type { Vector3 } from "@fourjs/math";
+import type { Node } from "@fourjs/scene";
 
 import { SceneInputEvent, dispatchThreePhase } from "./propagation.js";
 
@@ -270,12 +270,12 @@ const CAPTURE_KEYS = {
  */
 export const CAPTURE_KEY_PREFIX = "capture:";
 
-declare module "@four/scene" {
+declare module "@fourjs/scene" {
   // Pointer events (§72), merged into the one node event map (§6b) by
   // declaration merging — see this module's documentation for why this is the
   // widening mechanism and why the capture phase gets its own keys.
   // Deliberately NOT a doc comment: TypeDoc warns when two declarations of one
-  // merged interface both carry one, and `@four/scene`'s declaration is the
+  // merged interface both carry one, and `@fourjs/scene`'s declaration is the
   // documented one.
   interface NodeEventMap {
     /** Pointer pressed. Capture, target, bubble. */

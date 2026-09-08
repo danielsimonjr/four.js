@@ -9,8 +9,8 @@
  * `Transform`, already resolves through `resolveWorldTransform`, already
  * carries `transformAuthority` (§42), already participates in §19's
  * `"blended"` physics-animation pipeline, is already a legal target for
- * `@four/motion`'s two-bone IK, already serializes as a node type (§79), and is
- * already animatable by everything `@four/animation` ships. The recorded cost —
+ * `@fourjs/motion`'s two-bone IK, already serializes as a node type (§79), and is
+ * already animatable by everything `@fourjs/animation` ships. The recorded cost —
  * a 60-bone rig is 60 more nodes resolved per frame — is stated in RFC 0003's
  * Consequences, with the measurement that keeps the alternative (a private
  * transform array) honest filed beside it.
@@ -22,7 +22,7 @@
  * convention the authoring tool used, so the *data model* needs no axis. **+Y
  * as the bone's length axis is a helper convention only** — for future
  * procedural-rig, look-down-a-bone, and angle-producing IK helpers, matching
- * §7a's Y-up world — and never a format requirement. `@four/motion`'s
+ * §7a's Y-up world — and never a format requirement. `@fourjs/motion`'s
  * `solveTwoBoneIK` returns positions rather than angles for exactly this
  * reason, and stays correct as written.
  *
@@ -39,11 +39,11 @@
  *
  * ## Morph weights are a component, not a `Mesh` field (RFC 0003 §1c)
  *
- * §54 declares `morphTargetWeights` on `Mesh`, which lives in `@four/render` —
- * a package `@four/animation` may never see under the frozen §3.1 matrix, so
+ * §54 declares `morphTargetWeights` on `Mesh`, which lives in `@fourjs/render` —
+ * a package `@fourjs/animation` may never see under the frozen §3.1 matrix, so
  * §14's required morph-target animation had no legal way to bind the field.
  * {@link MorphWeights} is the resolution the specification records in §54
- * (revision 1.8): the storage is a §6a component here in `@four/scene`, the
+ * (revision 1.8): the storage is a §6a component here in `@fourjs/scene`, the
  * animation system reaches it through `node.getComponent(MorphWeights)` (or a
  * `Mesh`'s `morphTargetWeights` accessor over it, which keeps §54's spelling),
  * and the renderer snapshots the same array onto the render item.
@@ -54,8 +54,8 @@ import {
   type Component,
   type ComponentHost,
   type JsonValue,
-} from "@four/core";
-import { Matrix4 } from "@four/math";
+} from "@fourjs/core";
+import { Matrix4 } from "@fourjs/math";
 
 import { Node } from "./node.js";
 import { resolveWorldTransform } from "./world-transforms.js";
@@ -75,7 +75,7 @@ import { resolveWorldTransform } from "./world-transforms.js";
  * requires a component serializer for it, and a bone is a node, not a
  * component. Its §79 identity is the registered node type `"scene:bone"`,
  * matched by constructor identity like every other node class (see
- * `packages/four/src/scene-serializers.ts`).
+ * `packages/fourJS/src/scene-serializers.ts`).
  *
  * No bone-axis convention is imposed — see the module header.
  */
@@ -108,7 +108,7 @@ function invalidSkeleton(
  * root.add(tip);
  *
  * const skeleton = new Skeleton([root, tip], inverseBindMatrices);
- * mesh.skeleton = skeleton;              // @four/render's Mesh (§54)
+ * mesh.skeleton = skeleton;              // @fourjs/render's Mesh (§54)
  * // per frame, after transform resolution (the render list does this):
  * skeleton.update(mesh);
  * upload(skeleton.jointMatrices);
@@ -137,7 +137,7 @@ function invalidSkeleton(
  * exactly as a `BufferGeometry` is referenced by `Renderable.geometry`. In a
  * §79 document it is written inline on the mesh as bone **ids** plus the
  * inverse bind matrices (intra-file references are by id, §79), and resolved
- * against the reloaded bones on first read — see `@four/render`'s `Mesh`.
+ * against the reloaded bones on first read — see `@fourjs/render`'s `Mesh`.
  */
 export class Skeleton {
   /**
@@ -299,20 +299,20 @@ export class Skeleton {
 /**
  * Per-node morph-target weights (§54, §14, §17; RFC 0003 §1c) — the storage
  * behind `Mesh.morphTargetWeights`, placed where the frozen §3.1 matrix lets
- * `@four/animation` bind it.
+ * `@fourjs/animation` bind it.
  *
  * ```ts
  * const weights = mesh.addComponent(new MorphWeights(2)); // two targets, at 0
  * weights.weights[0] = 0.5;                               // authored write
  *
  * // §17's morph-weight track is a number track over one element (see
- * // @four/animation's binding.ts — "weights.0" addresses weights[0]):
+ * // @fourjs/animation's binding.ts — "weights.0" addresses weights[0]):
  * new AnimationTrack({ path: "weights.0", adapter: numberAdapter, ... });
  * ```
  *
  * One per node (§6a). Holds authored state only: which morph target the
  * weights *mean* is the geometry's business (the GPU morph path — additional
- * vertex streams — is deferred by RFC 0003 §7 and staged in `@four/render`'s
+ * vertex streams — is deferred by RFC 0003 §7 and staged in `@fourjs/render`'s
  * `Mesh`; this component, the binding form, and the render-item snapshot are
  * the plumbing that ships now, so §14's morph-target animation is expressible
  * and a document can carry the weights).
@@ -387,10 +387,10 @@ export class MorphWeights implements Component {
 }
 
 /**
- * The structural shape of `@four/serialization`'s `ComponentSerializer<T>` —
+ * The structural shape of `@fourjs/serialization`'s `ComponentSerializer<T>` —
  * declared here rather than imported because the frozen §3.1 matrix has no
  * scene → serialization edge (that package sits *above* this one). The same
- * documented duck-typing move `@four/motion`'s serializers make, with the same
+ * documented duck-typing move `@fourjs/motion`'s serializers make, with the same
  * honest cost: nothing type-checks the two declarations against each other
  * beyond the umbrella's registration call.
  */

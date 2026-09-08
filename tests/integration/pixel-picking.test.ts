@@ -1,8 +1,8 @@
 /**
  * §71's pixel/GPU-id picking across the packages that have to agree about it
- * (RFC 0005, 2026-08-28): `@four/render` owns the seam and the §33 table
- * rules, `@four/render-webgl` the registered id pass and read-back,
- * `@four/input` the render-free `PickProvider` shape, `@four/four` the
+ * (RFC 0005, 2026-08-28): `@fourjs/render` owns the seam and the §33 table
+ * rules, `@fourjs/render-webgl` the registered id pass and read-back,
+ * `@fourjs/input` the render-free `PickProvider` shape, `@fourjs/four` the
  * adapter between the last two.
  *
  * Three claims live only in the composition:
@@ -18,37 +18,37 @@
  *    read-back (simulated at the `readPixels` seam — pixels themselves are
  *    the browser gate's evidence, `tests/browser/picking.spec.ts`), and the
  *    id decodes through the traversal-ordered table into `Node.id` — reaching
- *    a pointer handler through `@four/four`'s `createPickProvider` without
- *    `@four/input` ever naming a render type.
+ *    a pointer handler through `@fourjs/four`'s `createPickProvider` without
+ *    `@fourjs/input` ever naming a render type.
  * 3. **§33's table obligations across a scene edit**: the table is rebuilt
  *    per pass in traversal order, so the same node can carry a different
  *    texel value after the scene changes while the *result* — a stable
  *    `Node.id` string — never shifts identity.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   Renderable,
   decodePickId,
   encodePickId,
   supportsPicking,
   type PickingService,
-} from "@four/render";
+} from "@fourjs/render";
 import {
   GL,
   WebglRenderer,
   clearRegisteredPickingPipeline,
   registerPickingPipeline,
-} from "@four/render-webgl";
-import { createPickProvider } from "four";
+} from "@fourjs/render-webgl";
+import { createPickProvider } from "fourJS";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {

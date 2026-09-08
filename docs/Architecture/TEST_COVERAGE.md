@@ -72,29 +72,29 @@ gate on all four metrics.
 
 | Package                 | % Stmts | % Branch | % Funcs | % Lines |     Tests |
 | ----------------------- | ------: | -------: | ------: | ------: | --------: |
-| `@four/core`            |   99.01 |    98.44 |     100 |   99.01 |        91 |
-| `@four/math`            |   98.87 |    97.51 |     100 |   98.87 |       154 |
-| `@four/scene`           |   99.67 |    99.41 |     100 |   99.67 |       191 |
-| `@four/motion`          |   99.77 |    99.24 |     100 |   99.77 |       363 |
-| `@four/animation`       |     100 |      100 |     100 |     100 |       367 |
-| `@four/physics`         |     100 |      100 |     100 |     100 |       482 |
-| `@four/physics-rapier`  |   98.07 |    96.47 |   99.47 |   98.07 |       276 |
-| `@four/physics-box2d` † |     100 |      100 |     100 |     100 |         1 |
-| `@four/physics-soft` †  |     100 |      100 |     100 |     100 |         1 |
-| `@four/particles`       |     100 |      100 |     100 |     100 |       174 |
-| `@four/geometry`        |     100 |      100 |     100 |     100 |        36 |
-| `@four/materials`       |     100 |      100 |     100 |     100 |        31 |
-| `@four/render`          |   99.63 |    99.29 |     100 |   99.63 |       119 |
-| `@four/render-webgl`    |   99.47 |    98.99 |     100 |   99.47 |       177 |
-| `@four/render-webgpu` † |     100 |      100 |     100 |     100 |         1 |
-| `@four/render-canvas` † |     100 |      100 |     100 |     100 |         1 |
-| `@four/render-svg` †    |     100 |      100 |     100 |     100 |         1 |
-| `@four/input`           |     100 |      100 |     100 |     100 |        80 |
-| `@four/assets`          |     100 |      100 |     100 |     100 |        33 |
-| `@four/text`            |     100 |      100 |     100 |     100 |        48 |
-| `@four/ui`              |     100 |      100 |     100 |     100 |        91 |
-| `@four/serialization`   |     100 |      100 |     100 |     100 |        84 |
-| `@four/diagnostics`     |     100 |      100 |     100 |     100 |       214 |
+| `@fourjs/core`            |   99.01 |    98.44 |     100 |   99.01 |        91 |
+| `@fourjs/math`            |   98.87 |    97.51 |     100 |   98.87 |       154 |
+| `@fourjs/scene`           |   99.67 |    99.41 |     100 |   99.67 |       191 |
+| `@fourjs/motion`          |   99.77 |    99.24 |     100 |   99.77 |       363 |
+| `@fourjs/animation`       |     100 |      100 |     100 |     100 |       367 |
+| `@fourjs/physics`         |     100 |      100 |     100 |     100 |       482 |
+| `@fourjs/physics-rapier`  |   98.07 |    96.47 |   99.47 |   98.07 |       276 |
+| `@fourjs/physics-box2d` † |     100 |      100 |     100 |     100 |         1 |
+| `@fourjs/physics-soft` †  |     100 |      100 |     100 |     100 |         1 |
+| `@fourjs/particles`       |     100 |      100 |     100 |     100 |       174 |
+| `@fourjs/geometry`        |     100 |      100 |     100 |     100 |        36 |
+| `@fourjs/materials`       |     100 |      100 |     100 |     100 |        31 |
+| `@fourjs/render`          |   99.63 |    99.29 |     100 |   99.63 |       119 |
+| `@fourjs/render-webgl`    |   99.47 |    98.99 |     100 |   99.47 |       177 |
+| `@fourjs/render-webgpu` † |     100 |      100 |     100 |     100 |         1 |
+| `@fourjs/render-canvas` † |     100 |      100 |     100 |     100 |         1 |
+| `@fourjs/render-svg` †    |     100 |      100 |     100 |     100 |         1 |
+| `@fourjs/input`           |     100 |      100 |     100 |     100 |        80 |
+| `@fourjs/assets`          |     100 |      100 |     100 |     100 |        33 |
+| `@fourjs/text`            |     100 |      100 |     100 |     100 |        48 |
+| `@fourjs/ui`              |     100 |      100 |     100 |     100 |        91 |
+| `@fourjs/serialization`   |     100 |      100 |     100 |     100 |        84 |
+| `@fourjs/diagnostics`     |     100 |      100 |     100 |     100 |       214 |
 | `four` (umbrella)       |     100 |      100 |     100 |     100 |        65 |
 | **Total**               |         |          |         |         | **3,081** |
 
@@ -103,8 +103,8 @@ export, so their 100% is trivial, not evidence. See
 [what is deliberately not covered](#what-is-deliberately-not-covered).
 
 On the sub-100 rows: the gaps are defensive branches and platform-boundary
-code, not untested features — e.g. `@four/render`'s remainder sits in two
-defensive branches of `lights.ts`, and `@four/physics-rapier`'s in the
+code, not untested features — e.g. `@fourjs/render`'s remainder sits in two
+defensive branches of `lights.ts`, and `@fourjs/physics-rapier`'s in the
 verified transcribed typings subset around the wasm boundary (`init.ts`,
 recorded in [MEMORY.md](../../MEMORY.md)). Functions coverage is 100% in 23
 of 24 packages.
@@ -122,7 +122,7 @@ From `bun run test:suites` — `Test Files 15 passed (15)`,
 decoded in-process), not fakes — the replay rig reads origins, velocities,
 centers of mass, and contact impulses per step, and the round-trip suite
 carries the reference `RigidBody`/`Collider` serializers
-(shipped as `RIGID_BODY_SERIALIZER`/`COLLIDER_SERIALIZER` from `@four/physics` since
+(shipped as `RIGID_BODY_SERIALIZER`/`COLLIDER_SERIALIZER` from `@fourjs/physics` since
 2026-08-06; the helper now registers the shipped serializers).
 
 **`tests/determinism/`** (8 files): `phase1-headless-stepping`,

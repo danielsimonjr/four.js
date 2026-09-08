@@ -10,9 +10,9 @@ import {
   dispatchKeyEvent,
   dispatchPointerEvent,
   type KeyModifiers,
-} from "@four/input";
-import { Vector3 } from "@four/math";
-import { Group, type Node } from "@four/scene";
+} from "@fourjs/input";
+import { Vector3 } from "@fourjs/math";
+import { Group, type Node } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { Slider, type SliderOptions } from "../src/slider.js";

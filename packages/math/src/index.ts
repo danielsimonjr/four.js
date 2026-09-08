@@ -1,4 +1,4 @@
-export const PACKAGE_NAME = "@four/math";
+export const PACKAGE_NAME = "@fourjs/math";
 
 export { constructionCount, resetConstructionCount } from "./alloc-counter.js";
 export type { ColorRGB, ColorRGBA, ColorSpace } from "./color.js";

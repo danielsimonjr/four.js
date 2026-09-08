@@ -41,8 +41,8 @@
  * is loose buffers, so the honest unit of need is the draw.)
  */
 
-import type { RenderItem } from "@four/render";
-import { warnDisposedInUse } from "@four/render";
+import type { RenderItem } from "@fourjs/render";
+import { warnDisposedInUse } from "@fourjs/render";
 
 import {
   GPU_BUFFER_USAGE,

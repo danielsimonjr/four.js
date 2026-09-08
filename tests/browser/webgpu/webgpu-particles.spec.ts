@@ -10,7 +10,7 @@
  * compile-and-rasterise line.
  *
  * Mechanics follow the sibling specs' recorded decisions verbatim: the WGSL
- * and layout constants are **imported** from `@four/render-webgpu`, never
+ * and layout constants are **imported** from `@fourjs/render-webgpu`, never
  * retyped; the page program is a string because this repository pins no
  * WebGPU typings; the page is *served* (an opaque origin loses
  * `navigator.gpu`); the spec **skips** when `requestAdapter()` resolves
@@ -28,7 +28,7 @@ import {
   PARTICLE_INSTANCE_BUFFER_LAYOUT,
   PARTICLE_SHADER_SOURCE,
   PARTICLE_UNIFORM_BYTES,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */
@@ -100,7 +100,7 @@ const PAGE_SCRIPT = `async (options) => {
     ],
   });
 
-  // The shared unit quad, exactly as @four/render's particleQuadGeometry
+  // The shared unit quad, exactly as @fourjs/render's particleQuadGeometry
   // authors it: six vertices, corner offsets in [-0.5, 0.5].
   const corners = new Float32Array([
     -0.5, -0.5, 0,  0.5, -0.5, 0,  0.5, 0.5, 0,
@@ -112,7 +112,7 @@ const PAGE_SCRIPT = `async (options) => {
   });
   device.queue.writeBuffer(cornerBuffer, 0, corners);
 
-  // Three instances of @four/render's 8-float stride: centre, size, RGBA.
+  // Three instances of @fourjs/render's 8-float stride: centre, size, RGBA.
   const instances = new Float32Array([
     -0.5, -0.5, 0,  0.4,  1, 0, 0, 1,
      0.5,  0.5, 0,  0.4,  0, 1, 0, 1,

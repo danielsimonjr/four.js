@@ -21,7 +21,7 @@
  * WP-3.3 deliberately deferred this class — every field of it is render state
  * whose meaning is fixed by the backend that translates it into draw-time
  * calls, and the backend packet had not been written. It has been since
- * (`@four/render-webgl`), so the base landed here (2026-08-06) with six of
+ * (`@fourjs/render-webgl`), so the base landed here (2026-08-06) with six of
  * §57's seven members; the seventh, `stencil`, joined them on 2026-08-11 (R-7).
  *
  * ## What lives here, and what does not
@@ -98,7 +98,7 @@
  * This is the substrate it will be expressed in.
  */
 
-import type { Disposable } from "@four/core";
+import type { Disposable } from "@fourjs/core";
 
 import {
   noteMaterial,
@@ -198,7 +198,7 @@ const BLEND_MODES: readonly BlendMode[] = [
 /**
  * Rejects a value outside {@link BlendMode}.
  *
- * The backend indexes a four-entry table with this string (`@four/render-webgl`,
+ * The backend indexes a four-entry table with this string (`@fourjs/render-webgl`,
  * `BLEND_FUNCTIONS`), so an unknown mode has to fail here, where the assignment
  * that caused it is on the stack, rather than at draw time inside a frame.
  */
@@ -383,7 +383,7 @@ export abstract class Material implements Disposable {
    *
    * A backend that cannot allocate a stencil buffer honours this by drawing
    * without the mask, never by failing the frame (§61) — see
-   * `@four/render-webgl`'s `RendererOptions.stencil`.
+   * `@fourjs/render-webgl`'s `RendererOptions.stencil`.
    */
   stencil: StencilState | undefined;
 

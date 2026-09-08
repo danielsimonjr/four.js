@@ -78,24 +78,24 @@
  * a colour and those margins change with it.
  */
 
-import { AnimationSystem, animate } from "four/animation";
-import { Application } from "four/application";
+import { AnimationSystem, animate } from "fourJS/animation";
+import { Application } from "fourJS/application";
 import {
   capsuleGeometry,
   planeGeometry,
   sphereGeometry,
   torusGeometry,
-} from "four/geometry";
-import { LitMaterial } from "four/materials";
-import { Vector3 } from "four/math";
-import { MotionComponent, MotionSystem } from "four/motion";
-import { Renderable } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
+} from "fourJS/geometry";
+import { LitMaterial } from "fourJS/materials";
+import { Vector3 } from "fourJS/math";
+import { MotionComponent, MotionSystem } from "fourJS/motion";
+import { Renderable } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
 import {
   DirectionalLight,
   PerspectiveCamera,
   createFullscreenViewport,
-} from "four/scene";
+} from "fourJS/scene";
 
 // --- surface ---------------------------------------------------------------
 
@@ -186,7 +186,7 @@ app.scene.add(camera);
 
 /**
  * The scene-wide ambient term (§68's "ambient", a `Scene` property rather than
- * a node — see `@four/scene`'s `light.ts`). Cool and modest: it is what keeps
+ * a node — see `@fourjs/scene`'s `light.ts`). Cool and modest: it is what keeps
  * a surface facing away from the sun readable instead of black, and every
  * "dark side" number quoted in this file is `color × ambient`.
  */

@@ -60,15 +60,15 @@
  * Recorded, never gated — see `benchmarks/README.md`.
  */
 
-import { Frustum, Matrix4 } from "@four/math";
-import { UnlitMaterial } from "@four/materials";
-import { Rectangle, buildRenderList, buildViewRenderList } from "@four/render";
+import { Frustum, Matrix4 } from "@fourjs/math";
+import { UnlitMaterial } from "@fourjs/materials";
+import { Rectangle, buildRenderList, buildViewRenderList } from "@fourjs/render";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 import {
   MEASUREMENT_NOTE,

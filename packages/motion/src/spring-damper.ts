@@ -91,7 +91,7 @@
  * never change a result, only its cost.
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 
 /** Spring described by its coefficients: `x'' = −stiffness·(x−target) − damping·x'`. */
 export interface SpringDamperCoefficientOptions {

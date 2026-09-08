@@ -26,19 +26,19 @@
  *
  * ## Why the scene objects are doubles too
  *
- * `@four/render-webgl`'s dependencies are `core`, `math`, and `render` (plan
+ * `@fourjs/render-webgl`'s dependencies are `core`, `math`, and `render` (plan
  * §3.1, frozen — a worker may not add an edge). Cameras, `BufferGeometry`, and
- * `UnlitMaterial` live in `@four/scene`, `@four/geometry`, and
- * `@four/materials`, so importing them here — even in a test — would be a
+ * `UnlitMaterial` live in `@fourjs/scene`, `@fourjs/geometry`, and
+ * `@fourjs/materials`, so importing them here — even in a test — would be a
  * phantom dependency outside the matrix. They are therefore typed doubles,
  * derived from the very types the renderer consumes
  * (`RenderItem["geometry"]`, `Parameters<Renderer["render"]>`), which keeps
  * them structurally exact while adding no edge. `Renderable` and
- * `buildRenderList` are used for real: `@four/render` *is* a dependency.
+ * `buildRenderList` are used for real: `@fourjs/render` *is* a dependency.
  */
 
-import { FourError, isFourError, resetDevWarnings } from "@four/core";
-import { Matrix4, Quaternion, Rectangle2, Vector3 } from "@four/math";
+import { FourError, isFourError, resetDevWarnings } from "@fourjs/core";
+import { Matrix4, Quaternion, Rectangle2, Vector3 } from "@fourjs/math";
 import {
   MAX_PUNCTUAL_LIGHTS,
   PARTICLE_INSTANCE_FLOATS,
@@ -62,7 +62,7 @@ import {
   type SpriteRenderItem,
   type StandardRenderItem,
   type UnlitRenderItem,
-} from "@four/render";
+} from "@fourjs/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -919,7 +919,7 @@ class TestMaterial {
  * discriminant the render list branches on, and the color the lit pipeline
  * uploads. That the discriminant is a plain readable property — not an
  * `instanceof` — is exactly what makes this double possible; see
- * `@four/render`'s `lights.ts` header.
+ * `@fourjs/render`'s `lights.ts` header.
  */
 class TestLitMaterial {
   readonly kind = "lit" as const;
@@ -983,7 +983,7 @@ let nextTestTextureId = 0;
 /**
  * A `Texture` reduced to the `SpriteTexture` read surface a backend sees (§77).
  *
- * The concrete class lives in `@four/render`, which *is* a dependency — but the
+ * The concrete class lives in `@fourjs/render`, which *is* a dependency — but the
  * cache is typed against `SpriteRenderItem["material"]["texture"]`, i.e. the
  * structural contract, and a double is what proves the cache reads nothing
  * outside it. It also makes the failure paths reachable: a real texture cannot
@@ -1155,9 +1155,9 @@ class TestCamera {
  * A `PoseBuffer` reduced to the one method the interpolated render list calls
  * (§43).
  *
- * `PoseBuffer` lives in `@four/scene`, outside this package's dependency
+ * `PoseBuffer` lives in `@fourjs/scene`, outside this package's dependency
  * matrix, so — like the camera, geometry, and material above — it is a double.
- * The interpolation *arithmetic* under test is `@four/render`'s real
+ * The interpolation *arithmetic* under test is `@fourjs/render`'s real
  * `buildInterpolatedRenderList`; what this double supplies is the pair of poses
  * a simulation would have captured, so the assertion is about which list the
  * backend built and what it uploaded, not about lerp.
@@ -1240,7 +1240,7 @@ function renderable(
 }
 
 /**
- * A real `Sprite` — `@four/render` is a dependency, and the quad it builds from
+ * A real `Sprite` — `@fourjs/render` is a dependency, and the quad it builds from
  * its anchor and size is exactly what the `quad` uniform assertions are about.
  * Only the material and the texture are doubles.
  */
@@ -1275,7 +1275,7 @@ function uploadsAt(gl: FakeGl, location: object | undefined): unknown[] {
 /**
  * A container node.
  *
- * `Group`/`Scene` live in `@four/scene`, which is outside this package's
+ * `Group`/`Scene` live in `@fourjs/scene`, which is outside this package's
  * dependency matrix, so the root is a `Renderable` carrying an *empty*
  * geometry: it generates a render item, the geometry cache reports "nothing to
  * draw", and it contributes no GL call — a container in everything but name.
@@ -1286,10 +1286,10 @@ function createRoot(): Renderable {
 
 /**
  * A directional light double (§68): the structural
- * `DirectionalLightSource` contract from `@four/render`'s `lights.ts`,
+ * `DirectionalLightSource` contract from `@fourjs/render`'s `lights.ts`,
  * carried by a container node (see {@link createRoot} for why the node base
  * is an empty `Renderable` — `DirectionalLight` itself lives in
- * `@four/scene`, outside this package's dependency matrix). The empty
+ * `@fourjs/scene`, outside this package's dependency matrix). The empty
  * geometry keeps it from contributing any draw of its own.
  */
 class TestLight extends Renderable {
@@ -3890,8 +3890,8 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
 // Particles (§36, §64 stage 6, plan P9-3).
 //
 // The emitting node is a double for the same reason the camera and the pose
-// buffer are: `@four/particles`' `ParticleRenderable` is outside this package's
-// dependency matrix — and, by design, outside `@four/render`'s too. What
+// buffer are: `@fourjs/particles`' `ParticleRenderable` is outside this package's
+// dependency matrix — and, by design, outside `@fourjs/render`'s too. What
 // `buildRenderList` recognises is the *structural* `ParticleDrawable` contract,
 // so a double implementing that contract is not a shortcut here: it is the
 // contract, exercised exactly as the real class will be.
@@ -3901,7 +3901,7 @@ let nextTestParticlesId = 0;
 
 /**
  * A particle system node reduced to what the render list reads: §6's traversal
- * flags plus `@four/render`'s `ParticleDrawable` contract.
+ * flags plus `@fourjs/render`'s `ParticleDrawable` contract.
  *
  * The instance array is filled with recognisable values — particle `i` sits at
  * `(i, i + 0.5, 0)` with size `i + 1` and colour `(i, 0, 0, 0.5)` — so an
@@ -3973,7 +3973,7 @@ class TestParticles {
  * A container node reduced to §6's traversal surface, so a test can put a
  * particle double and a real `Renderable` under one root.
  *
- * `Group` lives in `@four/scene` (outside the matrix) and `createRoot`'s
+ * `Group` lives in `@fourjs/scene` (outside the matrix) and `createRoot`'s
  * `Renderable` cannot adopt a double, since `Node.add` takes a real node.
  */
 class TestGroup {
@@ -8828,7 +8828,7 @@ describe("PunctualLightUniforms — the light set (§68, R-17)", () => {
  * optional members `DirectionalLightSource` declares for §69.
  *
  * The matrix it hands back is a plain scale, not a real orthographic volume:
- * `@four/scene` owns the derivation and tests it, and what this package has to
+ * `@fourjs/scene` owns the derivation and tests it, and what this package has to
  * prove is that whatever matrix arrives is the one uploaded, unchanged.
  */
 class TestShadowLight extends TestLight {
@@ -9578,7 +9578,7 @@ describe("WebglRenderer — §65 batching, opt-in (R-9)", () => {
     const material = new TestMaterial();
     const near = new Renderable(quadGeometry().asGeometry, material.asMaterial);
     const far = new Renderable(quadGeometry().asGeometry, material.asMaterial);
-    // The §7 resolve pass lives in `@four/scene`, which is not a dependency of
+    // The §7 resolve pass lives in `@fourjs/scene`, which is not a dependency of
     // this package, so the world matrix is written the way every other test in
     // this file writes one.
     far.transform.worldMatrix.fromArray([
@@ -9994,7 +9994,7 @@ class BoundedTestGeometry extends TestGeometry {
  * A bounded unit quad at `(x, 0, 0)` in world space.
  *
  * The world matrix is written directly, as every other positioned double in
- * this file does: `resolveWorldTransforms` lives in `@four/scene`, which is
+ * this file does: `resolveWorldTransforms` lives in `@fourjs/scene`, which is
  * outside this package's dependency matrix (plan §3.1, frozen).
  */
 function boundedAt(x: number, material = new TestMaterial()): Renderable {
@@ -10424,7 +10424,7 @@ describe("RenderTargetCache — the packed stencil attachment (§67, R-7)", () =
 // ---------------------------------------------------------------------------
 // §67's engine-composed clips (R-23, 2026-08-28).
 //
-// The render list composes the records (`@four/render`'s `clip.ts` — mask
+// The render list composes the records (`@fourjs/render`'s `clip.ts` — mask
 // draws first, one shared test per subtree); what this backend owes them is
 // three things, and this block pins each: a mask pass draws colourlessly,
 // depthlessly, writing exactly its bit plane; a clipped draw's record replaces
@@ -10581,7 +10581,7 @@ describe("WebglRenderer.render — §67 clips (R-23)", () => {
 /**
  * A `Skeleton` reduced to what the backend's render list and draw path read
  * (§54): the bone count, the palette, and `update` — a double for the reason
- * every scene-side object here is one (`@four/scene` is outside the frozen
+ * every scene-side object here is one (`@fourjs/scene` is outside the frozen
  * dependency matrix). The palette starts at per-joint identities and a test
  * writes recognisable values into it directly.
  */

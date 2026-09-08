@@ -5,7 +5,7 @@
  * through the plane basis. This file is the §33 golden, in the three forms
  * WP-1.14 established:
  *
- * 1. Headless — `@four/physics` + `@four/physics-rapier`, no renderer.
+ * 1. Headless — `@fourjs/physics` + `@fourjs/physics-rapier`, no renderer.
  * 2. Deterministic in-process — two independent runs agree bit-for-bit.
  * 3. Deterministic across processes, against `golden/local-plane.json`.
  *

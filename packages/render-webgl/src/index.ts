@@ -1,18 +1,18 @@
 /**
- * `@four/render-webgl` — the WebGL 2 backend (§62 backend 2, §120's MVP tier).
+ * `@fourjs/render-webgl` — the WebGL 2 backend (§62 backend 2, §120's MVP tier).
  *
  * The public surface is one class, {@link WebglRenderer}, which implements
- * `@four/render`'s `Renderer`. Everything else exported here is exported
+ * `@fourjs/render`'s `Renderer`. Everything else exported here is exported
  * because a *test*, a diagnostic, or a future second pipeline in this package
  * needs it — `GL`, `WebglContext`, `UnlitProgram`, and `GeometryCache` are the
  * seams that let the whole backend be unit-tested against a hand-rolled fake
  * context with no GPU and no browser (see `tests/webgl-renderer.test.ts`).
  *
- * Applications select a backend at the edge (§62); nothing in `@four/scene`,
- * `@four/motion`, or `@four/physics` may name anything in this package.
+ * Applications select a backend at the edge (§62); nothing in `@fourjs/scene`,
+ * `@fourjs/motion`, or `@fourjs/physics` may name anything in this package.
  */
 
-export const PACKAGE_NAME = "@four/render-webgl";
+export const PACKAGE_NAME = "@fourjs/render-webgl";
 
 export type { BatchGlContext, RenderBatching } from "./gl-batch.js";
 export { GlBatching, createGlBatching } from "./gl-batch.js";

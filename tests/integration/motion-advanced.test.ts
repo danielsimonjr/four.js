@@ -60,7 +60,7 @@
  *    detector; the case compares the two runs' peak commands instead.
  */
 
-import { PIDController, SpringDamper } from "@four/motion";
+import { PIDController, SpringDamper } from "@fourjs/motion";
 import { describe, expect, it } from "vitest";
 
 import {

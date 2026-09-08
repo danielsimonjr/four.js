@@ -46,10 +46,10 @@ unchanged on the main thread today and in a worker later:
 
 ```ts
 // simulation.ts — no DOM access anywhere below this line.
-import { Application } from "four/application";
-import { Vector3 } from "four/math";
-import { MotionComponent, MotionSystem } from "four/motion";
-import { Group } from "four/scene";
+import { Application } from "fourJS/application";
+import { Vector3 } from "fourJS/math";
+import { MotionComponent, MotionSystem } from "fourJS/motion";
+import { Group } from "fourJS/scene";
 
 export function createSimulation() {
   const app = new Application({ fixedTimeStep: 1 / 60 });

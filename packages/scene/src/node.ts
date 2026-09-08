@@ -13,9 +13,9 @@
  *
  * `abstract class Node extends EventEmitter<NodeEventMap>` — single
  * inheritance, no mixins. Components are **composed**, not inherited: every
- * node owns a private `ComponentRegistry` (`@four/core`) and delegates
+ * node owns a private `ComponentRegistry` (`@fourjs/core`) and delegates
  * `addComponent` / `getComponent` / `removeComponent` to it, passing *itself*
- * as the registry's host. `@four/core` cannot name `Node` (the dependency runs
+ * as the registry's host. `@fourjs/core` cannot name `Node` (the dependency runs
  * the other way, plan §3.1), so it describes the host structurally as
  * `ComponentHost`; `Node` implements that interface, which is what makes
  * `component.host` the owning node at runtime. §6a's `Component.node` is that
@@ -37,8 +37,8 @@ import {
   type Component,
   type ComponentHost,
   type ComponentType,
-} from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
+} from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
 
 import {
   DEFAULT_TRANSFORM_AUTHORITY,
@@ -242,7 +242,7 @@ export interface NodeOptions {
  *
  * Prefer the constructor option: it is checked, it needs no mutation of a
  * `readonly` field, and it is available to every node class. This function
- * exists because `@four/serialization`'s `nodeFactory` contract lets an
+ * exists because `@fourjs/serialization`'s `nodeFactory` contract lets an
  * application construct its own classes with no id parameter at all, and §79
  * still requires those nodes to reload under their saved ids.
  *
@@ -335,7 +335,7 @@ export abstract class Node
    * §50 `Shape` clips to its path, a rectangle clips to a rectangle, and a
    * `Sprite` clips to its quad — §67's "path masks" and "UI overflow clipping"
    * with no second authoring surface and nothing new to build a region out of.
-   * `@four/render`'s `clip.ts` states the tier and what it deliberately leaves
+   * `@fourjs/render`'s `clip.ts` states the tier and what it deliberately leaves
    * to a later packet (alpha masks, 3D clipping planes, true scissor
    * rectangles).
    *
@@ -379,7 +379,7 @@ export abstract class Node
    * ```
    *
    * The node carries only the **choice**; the data each strategy needs rides
-   * the `Pickable` candidate (`@four/input` may not import `@four/geometry` or
+   * the `Pickable` candidate (`@fourjs/input` may not import `@fourjs/geometry` or
    * a render type, plan §3.1 — the recorded reason picking takes a structural
    * candidate list). Under `null`, `pick()` runs the bounding-volume test and
    * refines it by whatever the candidate carries — triangles, an alpha mask,
@@ -696,7 +696,7 @@ export abstract class Node
    * by a `FourError("NOT_IMPLEMENTED")` between WP-2.3 and WP-7.3, because
    * nothing implemented §19's physics-animation pipeline and a node claiming
    * it would have been owned by a system that did not exist. `PhysicsWorld`
-   * now runs that pipeline (`@four/physics`, plan P7-4), so the guard is gone
+   * now runs that pipeline (`@fourjs/physics`, plan P7-4), so the guard is gone
    * and the value means what §42 says it means.
    *
    * A `"blended"` node is driven by §19's pipeline, which needs two more things
@@ -811,10 +811,10 @@ export abstract class Node
    * *has*; it can only probe for what it knows about, and a component whose
    * type has no registered serializer is then dropped from the document with
    * nobody able to notice — a save that silently loses state, which is the one
-   * failure mode that design could not warn about. `@four/serialization` walks
+   * failure mode that design could not warn about. `@fourjs/serialization` walks
    * this getter and refuses an unserializable component by name.
    *
-   * `ComponentHost` (§6a, `@four/core`) does not declare it: the host contract
+   * `ComponentHost` (§6a, `@fourjs/core`) does not declare it: the host contract
    * is what a *component* sees of its owner, and a component enumerating its
    * siblings is not something §6a sanctions.
    */
@@ -881,7 +881,7 @@ export abstract class Node
     const listeners = child.listenerCountAll();
     if (listeners > 0 && !detachedListenerWarned.has(child)) {
       detachedListenerWarned.add(child);
-      // Unconditional: `@four/scene` is a §33 simulation package and must not
+      // Unconditional: `@fourjs/scene` is a §33 simulation package and must not
       // import DEV / `devWarnOnce` (`dev-build-mode.test.ts`). The WeakSet is
       // the once-per-node suppress; production prints the first detach.
       console.warn(

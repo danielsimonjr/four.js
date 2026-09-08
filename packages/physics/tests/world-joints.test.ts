@@ -1,6 +1,6 @@
-import { isFourError } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
-import { Group } from "@four/scene";
+import { isFourError } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {

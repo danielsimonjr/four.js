@@ -46,8 +46,8 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { emitShaderGraphWgsl } from "@four/render-webgpu";
-import type { ShaderGraph } from "@four/render";
+import { emitShaderGraphWgsl } from "@fourjs/render-webgpu";
+import type { ShaderGraph } from "@fourjs/render";
 import { expect, test } from "@playwright/test";
 import { build } from "vite";
 

@@ -49,7 +49,7 @@ in `integration/helpers/`.
 
 | suite                             | what it crosses                                                                                                                       |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `physics-rapier.test.ts`          | `@four/physics` ↔ the Rapier adapter, both dimensions                                                                                 |
+| `physics-rapier.test.ts`          | `@fourjs/physics` ↔ the Rapier adapter, both dimensions                                                                                 |
 | `physics-joints.test.ts`          | joints and motors across scene + physics                                                                                              |
 | `physics-blending.test.ts`        | §19 animation → kinematic → physics → interpolated render                                                                             |
 | `physics-replay.test.ts`          | §34 snapshot, restore and replay across packages                                                                                      |
@@ -99,7 +99,7 @@ Dated 2026-08-05. Each line is a statement of absence, not a plan.
 - **Cross-browser coverage.** Chromium only. No Firefox or WebKit project exists.
 - **Accessibility (§75).** The UI focus/keyboard path is exercised by `browser/ui.spec.ts`,
   but there is no axe/ARIA audit and no screen-reader assertion.
-- **Asset-loading integration (§76–§78).** `@four/assets` has unit tests; no root suite
+- **Asset-loading integration (§76–§78).** `@fourjs/assets` has unit tests; no root suite
   crosses assets with materials or geometry, and glTF is staged entirely
   (`docs/AUDIT-120.md` S-7).
 - **Fuzz, soak and stress.** No long-running stability suite and no randomised-input

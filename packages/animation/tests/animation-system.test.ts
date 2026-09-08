@@ -1,4 +1,4 @@
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 import {
   DEFAULT_FIXED_DELTA_TIME,
   MotionComponent,
@@ -10,8 +10,8 @@ import {
   createTimeState,
   type FixedUpdateContext,
   type ReadonlyTimeState,
-} from "@four/motion";
-import { Group, Node } from "@four/scene";
+} from "@fourjs/motion";
+import { Group, Node } from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

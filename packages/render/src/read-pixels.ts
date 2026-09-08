@@ -8,7 +8,7 @@
  * discipline `effect-pass.ts` set for `renderEffect`:
  *
  * - the structural capability interface and its duck-typed guard, so a caller
- *   can narrow the optional member without `@four/render` naming any backend
+ *   can narrow the optional member without `@fourjs/render` naming any backend
  *   (§61);
  * - the §85 region check, shared so every backend refuses the same malformed
  *   region with the same words — one refusal, stated once, exactly as
@@ -19,7 +19,7 @@
  * there; this module only checks the numbers.
  */
 
-import type { Rectangle2 } from "@four/math";
+import type { Rectangle2 } from "@fourjs/math";
 
 import type { RenderTarget } from "./render-target.js";
 
@@ -49,7 +49,7 @@ export interface PixelReader {
  * {@link PixelReader.readPixels} can be called.
  *
  * A property test rather than an `instanceof`: backends are separate packages
- * and `@four/render` must not name any of them (§61) — the same duck-typed
+ * and `@fourjs/render` must not name any of them (§61) — the same duck-typed
  * discipline as {@link supportsScreenEffects} and
  * {@link supportsRenderStatistics}.
  */

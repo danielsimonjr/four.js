@@ -127,11 +127,11 @@
  *   z = 0 as §21 requires, and scenery is pushed behind them.
  */
 
-import { Application } from "four/application";
-import { circleGeometry2D, planeGeometry } from "four/geometry";
-import { PointerInput, type Pickable } from "four/input";
-import { UnlitMaterial } from "four/materials";
-import { Vector2, Vector3 } from "four/math";
+import { Application } from "fourJS/application";
+import { circleGeometry2D, planeGeometry } from "fourJS/geometry";
+import { PointerInput, type Pickable } from "fourJS/input";
+import { UnlitMaterial } from "fourJS/materials";
+import { Vector2, Vector3 } from "fourJS/math";
 import {
   Collider,
   HingeJoint,
@@ -140,11 +140,11 @@ import {
   RigidBody,
   SliderJoint,
   SpringJoint,
-} from "four/physics";
-import { Rapier2dAdapter } from "four/physics-rapier";
-import { Renderable } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
-import { OrthographicCamera, createFullscreenViewport } from "four/scene";
+} from "fourJS/physics";
+import { Rapier2dAdapter } from "fourJS/physics-rapier";
+import { Renderable } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
+import { OrthographicCamera, createFullscreenViewport } from "fourJS/scene";
 
 // --- surface -----------------------------------------------------------------
 
@@ -743,7 +743,7 @@ function buildMechanism(): Mechanism {
     slowerPlate,
     fasterPlate,
     plates: [motorPlate, slowerPlate, fasterPlate].map((node) => {
-      // §71/§72 picking: `@four/input` never reads geometry, so the layer that
+      // §71/§72 picking: `@fourjs/input` never reads geometry, so the layer that
       // does states each candidate's **local** bounds. The plates never move,
       // so this list is built once.
       const bounds = node.geometry.computeBounds();

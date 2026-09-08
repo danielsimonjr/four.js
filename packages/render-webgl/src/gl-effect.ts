@@ -8,7 +8,7 @@
  * with no vertex buffer, no vertex array, and no attributes at all. What it
  * samples is a render target's colour attachment, which `gl-render-target.ts`
  * already allocates and caches; what it writes is another target, or the
- * drawing buffer. `@four/render`'s `effect-pass.ts` owns the *policy* — which
+ * drawing buffer. `@fourjs/render`'s `effect-pass.ts` owns the *policy* — which
  * of §70's ten effects this tier ships, and what each staged one is waiting on
  * — and this module owns the GL.
  *
@@ -44,7 +44,7 @@
  * bit-exact blit its documentation promises.
  */
 
-import type { Disposable } from "@four/core";
+import type { Disposable } from "@fourjs/core";
 
 import {
   createLinkedProgram,
@@ -108,7 +108,7 @@ void main() {
  * have.
  *
  * With `useEncode` on, the linear-light RGB is encoded as sRGB — §60a's output
- * transform, and the same curve `@four/math`'s `linearToSrgb` computes on the
+ * transform, and the same curve `@fourjs/math`'s `linearToSrgb` computes on the
  * CPU: the piecewise IEC 61966-2-1 function (`m * 12.92` below the `0.0031308`
  * breakpoint, `1.055 · m^(1/2.4) − 0.055` above it), **odd-extended below zero**
  * by taking the magnitude and restoring the sign, so a negative texel is not

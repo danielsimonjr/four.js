@@ -42,7 +42,7 @@
  * test can assert the key rather than infer it from a cache hit.
  */
 
-import type { RenderItemStencil } from "@four/render";
+import type { RenderItemStencil } from "@fourjs/render";
 
 import {
   type GpuBindGroupLayout,

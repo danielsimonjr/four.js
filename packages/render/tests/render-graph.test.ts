@@ -23,9 +23,9 @@
  * not do.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { EventEmitter, FourError } from "@four/core";
-import { LitMaterial, SpriteMaterial, UnlitMaterial } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { EventEmitter, FourError } from "@fourjs/core";
+import { LitMaterial, SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
 import {
   Node,
   OrthographicCamera,
@@ -33,7 +33,7 @@ import {
   Scene,
   createFullscreenViewport,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

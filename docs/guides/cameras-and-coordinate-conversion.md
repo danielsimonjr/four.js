@@ -13,7 +13,7 @@ projection. Two projections ship: `OrthographicCamera` and
 after changing a projection parameter, call `updateProjectionMatrix()`:
 
 ```ts
-import { OrthographicCamera, PerspectiveCamera } from "four/scene";
+import { OrthographicCamera, PerspectiveCamera } from "fourJS/scene";
 
 const ortho = new OrthographicCamera({
   left: -8,
@@ -77,7 +77,7 @@ outOrigin, outDirection)` — the camera's world transform composed with its
 ## Picking and pointer input, complete (§71, §72)
 
 ```ts
-import { PointerInput, type Pickable } from "four/input";
+import { PointerInput, type Pickable } from "fourJS/input";
 
 // The input package never reads geometry (its dependency matrix forbids it),
 // so the layer that does states each node's local-space bounds:
@@ -112,7 +112,7 @@ transform; what a drag _means_ is your decision, and writing the transform
 needs a §42 authority handover:
 
 ```ts
-import { DragManager } from "four/input";
+import { DragManager } from "fourJS/input";
 
 const drags = new DragManager({
   pointerInput,
@@ -137,7 +137,7 @@ handover is untrack + authority write, in that order.
 
 ## Camera rigs (§44)
 
-§44 lists seven camera controls; most ship as components in `@four/motion`
+§44 lists seven camera controls; most ship as components in `@fourjs/motion`
 (`OrbitRig`, `FollowRig`, `LookAtConstraint` + `ConstraintSystem` at §39 step
 7) or as composition (path animation, physics attachment — see
 `tests/integration/camera-rigs.test.ts`). Rigs never read input: they take
@@ -146,7 +146,7 @@ handover is untrack + authority write, in that order.
 ### Orbit and follow
 
 ```ts
-import { ConstraintSystem, LookAtConstraint, OrbitRig } from "four/motion";
+import { ConstraintSystem, LookAtConstraint, OrbitRig } from "fourJS/motion";
 
 const rig = camera.addComponent(new OrbitRig({ target: player, distance: 6 }));
 camera.addComponent(new LookAtConstraint({ target: player }));
@@ -159,17 +159,17 @@ rig.dolly(-wheelDelta * 0.01);
 ```
 
 `FollowRig` switches between a follow target and a spring arm with its
-`frame` option; see `@four/motion`'s README and `packages/motion/tests/camera-rigs.test.ts`.
+`frame` option; see `@fourjs/motion`'s README and `packages/motion/tests/camera-rigs.test.ts`.
 
-### Trackball (`@four/scene`)
+### Trackball (`@fourjs/scene`)
 
 `TrackballRig` shipped with R-37 (2026-08-21). It is defined over a viewport in
-**screen space**, so it lives in `@four/scene` rather than `@four/motion`, and
+**screen space**, so it lives in `@fourjs/scene` rather than `@fourjs/motion`, and
 it is event-driven — call `applyTo` from the pointer handler under §42's
 `"manual"` authority, not from `ConstraintSystem`:
 
 ```ts
-import { TrackballRig } from "four/scene";
+import { TrackballRig } from "fourJS/scene";
 
 const trackball = new TrackballRig({ width: 960, height: 540, distance: 6 });
 camera.transformAuthority = "manual";
@@ -189,9 +189,9 @@ Tests: `packages/scene/tests/trackball.test.ts`.
 over the same spherical direction `OrbitRig` uses for placement:
 
 ```ts
-import { OrbitRig } from "four/motion";
-import { PerspectiveCamera } from "four/scene";
-import { Vector3 } from "four/math";
+import { OrbitRig } from "fourJS/motion";
+import { PerspectiveCamera } from "fourJS/scene";
+import { Vector3 } from "fourJS/math";
 
 const camera = new PerspectiveCamera({ fieldOfView: Math.PI / 4, aspect: 16 / 9, near: 0.1, far: 200 });
 const rig = new OrbitRig(); // state only — no target, no ConstraintSystem
@@ -215,9 +215,9 @@ choosing an interpolated value-noise function rather than per-step white noise
 
 ## Honest state
 
-- Camera **rigs** ship in `@four/motion` (`OrbitRig`, `FollowRig`,
+- Camera **rigs** ship in `@fourjs/motion` (`OrbitRig`, `FollowRig`,
   `LookAtConstraint`, `FirstPersonLook` + `CharacterController`) and
-  `TrackballRig` in `@four/scene`. Fly is the application snippet above; shake
+  `TrackballRig` in `@fourjs/scene`. Fly is the application snippet above; shake
   is still staged.
 - `PerspectiveCamera` is exercised by exactly one example,
   `examples/first-3d-scene` (written 2026-08-07); every other shipped example

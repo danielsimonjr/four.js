@@ -44,7 +44,7 @@ import type {
   GpuRenderPassEncoder,
   GpuTexture,
   WebgpuCanvas,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 
 /** One recorded entry point call, with the arguments it was given. */
 export interface RecordedGpuCall {

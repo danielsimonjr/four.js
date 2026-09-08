@@ -7,7 +7,7 @@
  * for this environment: the 100 000-particle **CPU** cost is measured headlessly
  * and recorded by `benchmarks/particles-100k.mjs`, never asserted on wall time
  * in CI; the **rendering** half — one batched draw call per system — is pinned
- * structurally by `@four/render`'s and `@four/render-webgl`'s suites; and *this*
+ * structurally by `@fourjs/render`'s and `@fourjs/render-webgl`'s suites; and *this*
  * file answers the remaining question, which neither of those can: does a
  * particle system actually reach a real WebGL 2 framebuffer, keep moving, obey
  * §36's collision plane, and respond to a user?

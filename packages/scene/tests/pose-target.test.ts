@@ -1,10 +1,10 @@
-import { ComponentRegistry } from "@four/core";
+import { ComponentRegistry } from "@fourjs/core";
 import {
   Quaternion,
   Vector3,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
+} from "@fourjs/math";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Group, PoseTarget, Transform } from "../src/index.js";

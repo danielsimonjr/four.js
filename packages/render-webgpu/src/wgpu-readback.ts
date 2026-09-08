@@ -12,7 +12,7 @@
  * `WebgpuRenderer.readPixels` implements exactly that sketch. WP-R1.6 shipped
  * the whole-target form (shipping it rather than inventing a rectangle type
  * was the plan's explicit instruction); the `region` form arrived 2026-08-29
- * with `Rectangle2` in `@four/math` (RFC 0005's named prerequisite, cleared).
+ * with `Rectangle2` in `@fourjs/math` (RFC 0005's named prerequisite, cleared).
  * A region copies only its own rectangle — `copyTextureToBuffer`'s `origin` —
  * and rides the very same alignment, strip, and flip machinery: a region's
  * rows are simply shorter, so the repack below never distinguishes the cases.
@@ -43,7 +43,7 @@
  * this function performs anyway and costs no extra pass.
  */
 
-import type { Rectangle2 } from "@four/math";
+import type { Rectangle2 } from "@fourjs/math";
 
 import {
   GPU_BUFFER_USAGE,
@@ -82,7 +82,7 @@ export function readbackBytesPerRow(width: number): number {
  * `region` is measured in texels from the texture's **bottom-left** corner
  * (§7a, the space the result's rows are defined in) and must already be
  * validated against `width` × `height` — `validateReadbackRegion` in
- * `@four/render` is the shared §85 check, and `WebgpuRenderer.readPixels`
+ * `@fourjs/render` is the shared §85 check, and `WebgpuRenderer.readPixels`
  * runs it before calling here. The conversion to WebGPU's top-first `origin`
  * happens in exactly one place, below.
  *

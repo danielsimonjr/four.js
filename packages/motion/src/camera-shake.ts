@@ -6,7 +6,7 @@
  * Staged in `camera-rigs.ts` (R-36/R-37 residue) until this packet: a per-step
  * white-noise kick would change with `fixedDeltaTime`, which is exactly the
  * character a replay or a retuned accumulator must not have. The field is the
- * same hash / quintic-fade value noise `@four/particles` uses for turbulence
+ * same hash / quintic-fade value noise `@fourjs/particles` uses for turbulence
  * — ported here, not imported, because the §3.1 matrix has no motion →
  * particles edge.
  *
@@ -47,9 +47,9 @@
  * `Math.random`, no per-step allocation.
  */
 
-import type { Component, ComponentHost } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
-import type { Node } from "@four/scene";
+import type { Component, ComponentHost } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import type { Node } from "@fourjs/scene";
 
 import { SeededRandom } from "./random.js";
 import { placeAtWorldPosition, worldPositionOf } from "./rig-target.js";
@@ -322,7 +322,7 @@ const AXIS_Y = /* @__PURE__ */ new Vector3(0, 1, 0);
 const AXIS_Z = /* @__PURE__ */ new Vector3(0, 0, 1);
 
 // ---------------------------------------------------------------------------
-// Interpolated hash value-noise — ported from `@four/particles` `fields.ts`
+// Interpolated hash value-noise — ported from `@fourjs/particles` `fields.ts`
 // (`valueNoise` / `hashCell`). Integer-only hashing, quintic fade, so the
 // field is C² and bit-identical on every engine (§33). Not exported: pinning
 // it as public API would freeze the algorithm the way the particles copy

@@ -1,11 +1,11 @@
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import {
   Quaternion,
   Vector3,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
-import { Group, Node } from "@four/scene";
+} from "@fourjs/math";
+import { Group, Node } from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 import { cubicOut } from "../src/easing.js";

@@ -39,20 +39,20 @@
  * conjunction.
  */
 
-import { UnlitMaterial } from "@four/materials";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   Rectangle,
   createRenderStatistics,
   resetRenderStatistics,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /** Canvas size the spec creates and this file reads back. */
 const WIDTH = 320;

@@ -2,7 +2,7 @@
  * `ReplayPlayer` (§33–34, §113; plan P10-3) — playback and inspection.
  *
  * The target is a fake for the same reason `recorder.test.ts`'s is:
- * `@four/diagnostics` cannot import `@four/physics`, and {@link ReplayTarget}
+ * `@fourjs/diagnostics` cannot import `@fourjs/physics`, and {@link ReplayTarget}
  * exists so that it does not have to. {@link FakeWorld} below is a deterministic
  * counter state machine — its state is a uint32 mixed forward by each step, its
  * `bias` is moved by applied inputs, its snapshot is those two numbers, and its
@@ -17,7 +17,7 @@
  * of the format meet here.
  */
 
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import {

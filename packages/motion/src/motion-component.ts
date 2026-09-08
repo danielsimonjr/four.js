@@ -107,7 +107,7 @@
  * node only while `node.transformAuthority === "kinematic"`. A tracked node
  * owned by anything else is **skipped** and reported once through
  * `warnAuthorityConflict` (§42: exactly one system owns a transform; conflicts
- * warn and the owner keeps the transform — see `@four/scene`'s `authority.ts`
+ * warn and the owner keeps the transform — see `@fourjs/scene`'s `authority.ts`
  * for why the refusal, not just the warning, is the enforcement).
  *
  * A skipped node's `MotionComponent` is not integrated either — not its
@@ -120,9 +120,9 @@
  * it.
  */
 
-import type { Component, ComponentHost } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
-import { warnAuthorityConflict, type Node } from "@four/scene";
+import type { Component, ComponentHost } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import { warnAuthorityConflict, type Node } from "@fourjs/scene";
 
 import {
   PRIORITY_KINEMATICS,

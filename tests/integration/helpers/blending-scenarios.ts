@@ -1,8 +1,8 @@
 /**
  * Shared builders and measurement for the §19 physics-animation blending
  * integration suite (WP-7.5): §19's four worked examples assembled from the
- * **public** API — `four/application` + `@four/animation` + `@four/physics` +
- * `@four/physics-rapier` — and driven through a real Rapier solver.
+ * **public** API — `four/application` + `@fourjs/animation` + `@fourjs/physics` +
+ * `@fourjs/physics-rapier` — and driven through a real Rapier solver.
  *
  * This file is to Phase 7 what `joint-scenarios.ts` is to Phase 6, and it
  * builds on `physics-scenarios.ts` (WP-5.6) rather than restating it: the
@@ -48,7 +48,7 @@
  * difference, and the closed forms can.
  */
 
-import { Quaternion, Vector3 } from "@four/math";
+import { Quaternion, Vector3 } from "@fourjs/math";
 import {
   AnimationClip,
   AnimationMixer,
@@ -60,11 +60,11 @@ import {
   tween,
   vector3Adapter,
   type AnimationTrackLike,
-} from "@four/animation";
+} from "@fourjs/animation";
 import {
   PRIORITY_ANIMATION_TARGETS,
   type SimulationSystem,
-} from "@four/motion";
+} from "@fourjs/motion";
 import {
   Collider,
   HingeJoint,
@@ -74,9 +74,9 @@ import {
   createPoseTargetCaptureSystem,
   type BodyType,
   type CollisionShape,
-} from "@four/physics";
-import { Group, PoseTarget, type Node } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/physics";
+import { Group, PoseTarget, type Node } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 
 import {
   DT,

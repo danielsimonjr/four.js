@@ -15,7 +15,7 @@
  * application opts in with
  *
  * ```ts
- * import { registerNodeMaterialPipeline } from "@four/render-webgl";
+ * import { registerNodeMaterialPipeline } from "@fourjs/render-webgl";
  * registerNodeMaterialPipeline();
  * ```
  *
@@ -40,8 +40,8 @@
  * "a JSON value must not become a different picture" in the material domain.
  */
 
-import type { Matrix4 } from "@four/math";
-import type { NodeRenderItem, ShaderGraph } from "@four/render";
+import type { Matrix4 } from "@fourjs/math";
+import type { NodeRenderItem, ShaderGraph } from "@fourjs/render";
 
 import type { WebglContext } from "./gl-program.js";
 

@@ -1,5 +1,5 @@
 /**
- * Phase 5 cross-integration: `@four/physics` **driven through a real Rapier
+ * Phase 5 cross-integration: `@fourjs/physics` **driven through a real Rapier
  * solver**, in both §21 dimensions, through the public API only (WP-5.6;
  * §29–§30, §33–§34, §42–§43, §108).
  *
@@ -9,7 +9,7 @@
  * structural fake solver, and `packages/physics-rapier/tests/` drives the two
  * adapters against the real wasm without a scene, a node, an authority, or an
  * application. Everything below therefore goes through
- * `four/application` + `@four/physics` + `@four/physics-rapier` and never
+ * `four/application` + `@fourjs/physics` + `@fourjs/physics-rapier` and never
  * reaches into a package's internals: an `Application` is composed headlessly
  * the way `tests/determinism/*` compose one, a `PhysicsSystem` is registered on
  * it, and worlds are built on real `Rapier2dAdapter` / `Rapier3dAdapter`
@@ -36,10 +36,10 @@
  * exactly (§34's strong replay property).
  */
 
-import { FourError } from "@four/core";
-import { Vector3 } from "@four/math";
-import { Collider, RigidBody, type PhysicsWorld } from "@four/physics";
-import { Group } from "@four/scene";
+import { FourError } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
+import { Collider, RigidBody, type PhysicsWorld } from "@fourjs/physics";
+import { Group } from "@fourjs/scene";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
@@ -93,8 +93,8 @@ beforeAll(async () => {
 });
 
 describe("the §37 seam is dimension-independent (WP-5.5 verification)", () => {
-  it("types both Rapier adapters as @four/physics's PhysicsWorldAdapter", () => {
-    // `@four/physics-rapier` may not import `@four/physics`, so its
+  it("types both Rapier adapters as @fourjs/physics's PhysicsWorldAdapter", () => {
+    // `@fourjs/physics-rapier` may not import `@fourjs/physics`, so its
     // `RapierBodyAccess` is only *structurally* identical to `SolverBodyAccess`.
     // WP-5.4 had the compiler verify the 2D adapter; the 3D one had never been
     // assigned to `PhysicsWorldAdapter` anywhere. `PHYSICS_WORLD_ADAPTERS`

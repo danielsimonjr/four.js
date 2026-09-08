@@ -229,13 +229,13 @@ export function boxGeometry(options: BoxGeometryOptions = {}): BufferGeometry {
  * Every vertex carries the `+Z` normal the plane faces (§68, 2026-08-04) —
  * the node's transform reorients it with the plane, so the rotated floor
  * above lights from `+Y` as expected. The back side is a legitimate view
- * (back-face culling is off, see `@four/render-webgl`) but Lambert-dark:
+ * (back-face culling is off, see `@fourjs/render-webgl`) but Lambert-dark:
  * a face lit from behind receives its ambient term only.
  *
  * Uv (§53, R-19) is the quad's own unit square seen from +Z: `(0, 0)` at the
  * bottom-left corner, `u` growing with `+x`, `v` growing with `+y`. That is the
  * same mapping the sprite pipeline derives from a quad's local rectangle
- * (`@four/render-webgl`), so a textured plane and a `Sprite` of the same size
+ * (`@fourjs/render-webgl`), so a textured plane and a `Sprite` of the same size
  * show a texture identically — which is what makes the derived-uv workaround
  * safe to retire when its packet gets to it.
  */

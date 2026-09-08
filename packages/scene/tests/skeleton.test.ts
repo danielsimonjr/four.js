@@ -9,8 +9,8 @@
  * authority input); and every §85 refusal names its rule.
  */
 
-import { isFourError } from "@four/core";
-import { Matrix4, Vector3 } from "@four/math";
+import { isFourError } from "@fourjs/core";
+import { Matrix4, Vector3 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

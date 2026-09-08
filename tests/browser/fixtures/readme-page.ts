@@ -20,7 +20,7 @@
  * 1. **Imports.** The README writes `four/application`, `four/geometry`, …
  *    — the umbrella subpaths an examples/ Vite config resolves. Fixture
  *    pages resolve workspace packages the same way `batching-page.ts` does
- *    (`@four/geometry`, `@four/materials`, …). `Application` lives on the
+ *    (`@fourjs/geometry`, `@fourjs/materials`, …). `Application` lives on the
  *    umbrella package, so that one import stays `four/application`.
  * 2. **Ready flag.** After `start()` the fixture sets
  *    `body[data-readme-ready]`, which the spec waits for. The README has
@@ -30,12 +30,12 @@
  * loop — is the README's.
  */
 
-import { Application } from "four/application";
-import { circleGeometry2D } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
-import { Renderable } from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
-import { OrthographicCamera, createFullscreenViewport } from "@four/scene";
+import { Application } from "fourJS/application";
+import { circleGeometry2D } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
+import { Renderable } from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
+import { OrthographicCamera, createFullscreenViewport } from "@fourjs/scene";
 
 const canvas = document.querySelector("canvas")!;
 const renderer = new WebglRenderer();

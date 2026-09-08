@@ -4,27 +4,27 @@
  *
  * ## Why the drawable is a test double rather than the real class
  *
- * `@four/particles`' `ParticleRenderable` is the production implementation, and
+ * `@fourjs/particles`' `ParticleRenderable` is the production implementation, and
  * this package cannot import it: the frozen §3.1 dependency matrix has no edge
  * between `render` and `particles` in either direction (they are in the same
  * dispatch wave). That is the whole reason `ParticleDrawable` is a *structural*
  * contract, so exercising it with a double is not a shortcut here — the double
  * is exactly what any conforming node is, and these tests are the render-side
  * half of the pair that pins the contract. The other half lives in
- * `@four/particles`' `tests/particle-renderable.test.ts` and asserts the same
+ * `@fourjs/particles`' `tests/particle-renderable.test.ts` and asserts the same
  * member names and the same interleaved layout from the producing side.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { Vector3, constructionCount, resetConstructionCount } from "@four/math";
-import { SpriteMaterial, UnlitMaterial } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { Vector3, constructionCount, resetConstructionCount } from "@fourjs/math";
+import { SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
 import {
   DEFAULT_LAYER_MASK,
   Node,
   PoseBuffer,
   Scene,
   resolveWorldTransforms,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -52,8 +52,8 @@ import {
  * and the §43 pose path are the real ones) implementing `ParticleDrawable`
  * structurally.
  *
- * `implements ParticleDrawable` is written out here — inside `@four/render`,
- * where the interface is visible — precisely because `@four/particles` cannot
+ * `implements ParticleDrawable` is written out here — inside `@fourjs/render`,
+ * where the interface is visible — precisely because `@fourjs/particles` cannot
  * write it. If this compiles and the member list matches the one the other
  * package's tests assert, the contract holds at both ends.
  */

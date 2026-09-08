@@ -44,23 +44,23 @@
  * the transfer curve.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   CanvasTexture,
   Renderable,
   createRenderStatistics,
   resetRenderStatistics,
   type RasterSource,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /** Canvas size the spec restates and this file reads back. */
 const WIDTH = 320;

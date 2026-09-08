@@ -8,8 +8,8 @@
  * curve), and this file is the gate on it, in the four forms the phase suites
  * established:
  *
- * 1. **Headless and dependency-free.** The scenario imports `@four/geometry`,
- *    `@four/core` and `@four/diagnostics` — no renderer, no application, no
+ * 1. **Headless and dependency-free.** The scenario imports `@fourjs/geometry`,
+ *    `@fourjs/core` and `@fourjs/diagnostics` — no renderer, no application, no
  *    canvas, no DOM. Parsing a string is a pure function; there is no clock to
  *    inject and nothing to mock.
  * 2. **Deterministic in-process.** Two independent runs produce identical
@@ -51,7 +51,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { formatSvgPathData, parseSvgPathData } from "@four/geometry";
+import { formatSvgPathData, parseSvgPathData } from "@fourjs/geometry";
 import { beforeAll, describe, expect, test } from "vitest";
 
 import {

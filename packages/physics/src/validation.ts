@@ -37,8 +37,8 @@
  * or a test with no world in existence.
  */
 
-import { FourError } from "@four/core";
-import type { Matrix3 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import type { Matrix3 } from "@fourjs/math";
 
 import type {
   AngularJointMotor,

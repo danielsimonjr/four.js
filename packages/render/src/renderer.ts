@@ -18,11 +18,11 @@
  *
  * and the sentence that gives this package its reason to exist: *"the logical
  * scene shall remain independent of the selected backend."* Nothing in
- * `@four/scene`, `@four/motion`, or `@four/physics` may name a GL context, a
+ * `@fourjs/scene`, `@fourjs/motion`, or `@fourjs/physics` may name a GL context, a
  * WebGPU device, or a canvas; a backend is chosen at the application edge and
  * reaches the engine only through this interface. That is why the interface
- * lives here, in the backend-independent `@four/render`, and why
- * `@four/render-webgl` (WP-3.5) depends on this package rather than the other
+ * lives here, in the backend-independent `@fourjs/render`, and why
+ * `@fourjs/render-webgl` (WP-3.5) depends on this package rather than the other
  * way round.
  *
  * ## What this packet ships, and what it defers
@@ -55,10 +55,10 @@
  *   backend stateless about time, lets one renderer serve two applications, and
  *   keeps the non-interpolated path (an editor preview, a single-step
  *   screenshot) a matter of omitting an argument (decision, WP-3.6).
- * - **`render` takes a fourth, optional {@link @four/render!RenderTarget | RenderTarget}
+ * - **`render` takes a fourth, optional {@link @fourjs/render!RenderTarget | RenderTarget}
  *   argument** (R-4, 2026-08-07). §48 puts the target on the *viewport*
  *   (`Viewport.renderTarget`), which is where it belongs and where it will
- *   land; `Viewport` is `@four/scene`'s type and R-4's file set did not include
+ *   land; `Viewport` is `@fourjs/scene`'s type and R-4's file set did not include
  *   that package, so the minimal tier routes the target through the render call
  *   instead. The two are compatible rather than competing: a per-view target is
  *   a loop around this argument, so the packet that adds the field implements
@@ -83,10 +83,10 @@
  * see {@link Renderer.render}.
  */
 
-import type { Disposable } from "@four/core";
-import { EventEmitter, FourError } from "@four/core";
-import type { Rectangle2 } from "@four/math";
-import type { Node, PoseBuffer, Viewport } from "@four/scene";
+import type { Disposable } from "@fourjs/core";
+import { EventEmitter, FourError } from "@fourjs/core";
+import type { Rectangle2 } from "@fourjs/math";
+import type { Node, PoseBuffer, Viewport } from "@fourjs/scene";
 
 import type { ComputePassDescriptor } from "./compute.js";
 import type { EffectRenderPass } from "./effect-pass.js";
@@ -184,13 +184,13 @@ export interface RendererCapabilities {
    * `undefined` means "not queried yet", which is the construction-time
    * answer on the GPU backends. Reading the WebGL extension at
    * `initialize` would move landed GL transcripts (R-30b's lazy-query
-   * law), so {@link @four/render-webgl!WebglRenderer} resolves this on
+   * law), so {@link @fourjs/render-webgl!WebglRenderer} resolves this on
    * the first read of the field, after init, not during it.
    */
   readonly maxAnisotropy?: number;
 
   /**
-   * §62 "texture formats": the {@link @four/render!RenderTarget | render-target}
+   * §62 "texture formats": the {@link @fourjs/render!RenderTarget | render-target}
    * and texture formats this backend accepts, by their engine-side names.
    *
    * Engine names, not backend names — `"rgba8"` means "eight-bit unsigned
@@ -278,7 +278,7 @@ export interface RendererCapabilities {
    * RFC predates the widening law WP-R1.1 landed (*every added member is
    * optional, absent means not reported*), and a required member here would
    * break every third-party `Renderer` for a number most backends answer with
-   * a constant. The WebGL 2 backend reports `@four/render`'s declared
+   * a constant. The WebGL 2 backend reports `@fourjs/render`'s declared
    * `MAX_SKINNING_JOINTS` (see `mesh.ts` for the portability arithmetic); a
    * skinned draw against it additionally requires its
    * `registerSkinningPipeline()` — the capability says what the backend *can*
@@ -301,7 +301,7 @@ export interface RendererOptions {
    * The surface to draw into.
    *
    * **Deliberately typed `unknown`, not `HTMLCanvasElement | OffscreenCanvas`**
-   * (decision, WP-3.4). This package compiles with no DOM lib: `@four/render`
+   * (decision, WP-3.4). This package compiles with no DOM lib: `@fourjs/render`
    * is the backend-independent layer and must be usable — and type-checkable —
    * in Node, in a worker, and in a headless test, where those DOM types do not
    * exist. Naming them here would drag `lib.dom` into every consumer of the
@@ -361,7 +361,7 @@ export interface RendererEventMap {
    *
    * Emitted **after** the renderer has marked itself lost, so a listener
    * observing the renderer sees the lost state. Not an error: nothing is
-   * thrown, no {@link @four/core!FourError | FourError} is raised, and the application keeps running.
+   * thrown, no {@link @fourjs/core!FourError | FourError} is raised, and the application keeps running.
    */
   contextlost: { renderer: Renderer };
 
@@ -462,7 +462,7 @@ export interface RenderInterpolation {
  *
  * These are part of §61 and are **not** part of this interface. The list is
  * shorter again — `readPixels` joined the interface when `Rectangle2` landed
- * in `@four/math` (2026-08-29; RFC 0005's recorded prerequisite, cleared) —
+ * in `@fourjs/math` (2026-08-29; RFC 0005's recorded prerequisite, cleared) —
  * but the two *factories* stay deferred **by decision, not by absence**
  * (R-4, 2026-08-07):
  *
@@ -472,7 +472,7 @@ export interface RenderInterpolation {
  * // Both types exist. A renderer-*owned* resource, though, cannot be built
  * // before a renderer, has to be built once per renderer, and has to be
  * // re-created by hand after a §61 context loss. `GeometryCache` and
- * // `TextureCache` in @four/render-webgl are the standing proof that the
+ * // `TextureCache` in @fourjs/render-webgl are the standing proof that the
  * // alternative works: the resource is a CPU-side descriptor with an id and a
  * // version, GPU residency is a backend cache, and a context loss is handled
  * // by dropping that cache. `texture.ts` and `render-target.ts` each carry the
@@ -563,7 +563,7 @@ export interface Renderer extends Disposable {
    *
    * Asynchronous because WebGPU adapter/device acquisition is (§45's
    * `await app.initialize()`), and because a backend may compile pipelines
-   * up front. Rejects with a {@link @four/core!FourError | FourError} carrying
+   * up front. Rejects with a {@link @fourjs/core!FourError | FourError} carrying
    * `RENDERER_INITIALIZATION_FAILED` (§62, §89) when the backend cannot start —
    * explicitly, rather than silently downgrading; backend *selection* and its
    * `"auto"` fallback are the application's job (§62), not an individual
@@ -612,7 +612,7 @@ export interface Renderer extends Disposable {
    * With `interpolation` present the backend draws each node at its §43 render
    * pose — the previous and current fixed-step poses blended at
    * `interpolation.alpha`, positions lerped and rotations slerped — instead of
-   * at its resolved world transform. In `@four/render` terms that is
+   * at its resolved world transform. In `@fourjs/render` terms that is
    * {@link buildInterpolatedRenderList} rather than {@link buildRenderList},
    * and it is what makes motion smooth when the display rate and the fixed
    * simulation rate disagree (§10). Nodes the buffer does not track are drawn
@@ -790,7 +790,7 @@ export interface Renderer extends Disposable {
    *   called inside a frame and its caller is awaiting a value, so a lost
    *   context, a disposed renderer or target, and a device without the
    *   readback entry points all reject with a
-   *   {@link @four/core!FourError | FourError} (`DEVICE_LOST` /
+   *   {@link @fourjs/core!FourError | FourError} (`DEVICE_LOST` /
    *   `CONTEXT_LOST`, `INVALID_APPLICATION_STATE`,
    *   `UNSUPPORTED_GPU_FEATURE`; §89) — a silently empty buffer would be
    *   undefined content by another name.
@@ -895,7 +895,7 @@ const LIFECYCLE_ERROR_CODE = "INVALID_APPLICATION_STATE";
  * ## Lifecycle
  *
  * `dispose()` is idempotent and **terminal**, and every other method throws a
- * {@link @four/core!FourError | FourError} with `INVALID_APPLICATION_STATE` afterwards — the same
+ * {@link @fourjs/core!FourError | FourError} with `INVALID_APPLICATION_STATE` afterwards — the same
  * contract `Application` uses (§45, §83). A silent no-op after disposal would
  * let a test record zero calls and pass for the wrong reason (decision,
  * WP-3.4). Note the deliberate asymmetry with a *lost context*, which is
@@ -975,7 +975,7 @@ export class NullRenderer implements Renderer {
   lastInterpolation: RenderInterpolation | null = null;
 
   /**
-   * The {@link @four/render!RenderTarget | RenderTarget} of the most recent
+   * The {@link @fourjs/render!RenderTarget | RenderTarget} of the most recent
    * `render`, or `null` when that call passed none (R-4) — cleared per call for
    * the same reason {@link NullRenderer.lastInterpolation} is: a later
    * on-screen frame must not leave the previous off-screen pass's target

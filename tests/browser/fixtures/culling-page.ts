@@ -24,21 +24,21 @@
  * changed one pixel would be a cull that removed something visible.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   Renderable,
   createRenderStatistics,
   resetRenderStatistics,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   type Viewport,
   resolveWorldTransforms,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /** Canvas size the spec creates and this file reads back. */
 const WIDTH = 320;

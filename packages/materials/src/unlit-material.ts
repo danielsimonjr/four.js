@@ -16,7 +16,7 @@
  * - an abstract class with a single subclass constrains nothing and would have
  *   to be re-opened anyway when `ShapeMaterial` and `StandardMaterial` arrive.
  *
- * `Renderable.material` (`@four/render`) is therefore typed as `UnlitMaterial`
+ * `Renderable.material` (`@fourjs/render`) is therefore typed as `UnlitMaterial`
  * for now, and widens to `Material | Material[]` (§49) when the base lands. The
  * deferral is deliberate and reported as a WP-3.3 decision.
  *
@@ -61,7 +61,7 @@
  * pipeline run in. The numbers did not move — an unlit draw multiplied them
  * unchanged before and multiplies them unchanged now — but they are named
  * rather than untagged, and the transfer functions that convert *into* this
- * space ship in `@four/math` (`srgbToLinearRGBA`, `parseColor`; see that
+ * space ship in `@fourjs/math` (`srgbToLinearRGBA`, `parseColor`; see that
  * package's `color.ts` header for the policy in full).
  *
  * There is still no colour-space **field** here, and that is now a decision
@@ -73,7 +73,7 @@
  * WP-3.3) — clamping would silently rewrite authored data, and extended-range
  * colours are exactly what §60a carries — but non-finite components are
  * rejected (§85). The encode on the way out is §60a's *final render-graph pass*
- * (`@four/render`'s `OutputTransformEffect`), never a step in this material.
+ * (`@fourjs/render`'s `OutputTransformEffect`), never a step in this material.
  *
  * ## Texture and vertex colors (R-19, 2026-08-07)
  *
@@ -89,20 +89,20 @@
  * Both are **off by default and cost nothing when off**: the backend leaves the
  * shader's two feature uniforms at GL's `0` and issues no extra call, so a
  * scene that names neither draws the byte-identical GL sequence it drew before
- * either existed (see `@four/render-webgl`). That property is what let this
+ * either existed (see `@fourjs/render-webgl`). That property is what let this
  * land under the pixel-golden gate, and it is why the fields are a uniform
  * switch rather than a second material family.
  */
 
-import type { ColorRGBA } from "@four/math";
+import type { ColorRGBA } from "@fourjs/math";
 
 import { Material, type MaterialOptions } from "./material.js";
 import type { MaterialTexture } from "./texture.js";
 
 /**
  * Straight (non-premultiplied) RGBA, each component nominally in 0…1 —
- * `@four/math`'s {@link ColorRGBA}, re-exported (hoisted 2026-08-04;
- * `@four/animation` tweens the same tuple and §3.1 has no edge between the
+ * `@fourjs/math`'s {@link ColorRGBA}, re-exported (hoisted 2026-08-04;
+ * `@fourjs/animation` tweens the same tuple and §3.1 has no edge between the
  * two packages).
  *
  * A mutable 4-tuple rather than a `Vector4`: a color is not a geometric vector
@@ -110,7 +110,7 @@ import type { MaterialTexture } from "./texture.js";
  * surface means anything here), and a plain array uploads to
  * `uniform4fv`/`Float32Array.set` without an adapter.
  */
-export type { ColorRGBA } from "@four/math";
+export type { ColorRGBA } from "@fourjs/math";
 
 /**
  * Construction arguments of {@link UnlitMaterial} — its own colour, plus §57's

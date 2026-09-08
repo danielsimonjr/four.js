@@ -11,8 +11,8 @@
  * that was never created.
  *
  * This module is the minimal tier that answers both questions for
- * `@four/geometry`. `@four/render`'s `resource-memory.ts` is its twin for
- * textures and render targets, and `@four/diagnostics` bridges the two into
+ * `@fourjs/geometry`. `@fourjs/render`'s `resource-memory.ts` is its twin for
+ * textures and render targets, and `@fourjs/diagnostics` bridges the two into
  * §84's `bufferMemory`/`textureMemory` through `recordResourceMemory`.
  *
  * ## Numbers, not references — which is why it cannot leak
@@ -60,7 +60,7 @@
  * approximate.
  */
 
-import { DEV, disposeTracked, trackDisposable } from "@four/core";
+import { DEV, disposeTracked, trackDisposable } from "@fourjs/core";
 
 /** Live (constructed, undisposed) {@link BufferGeometry} instances. */
 let liveGeometries = 0;
@@ -73,8 +73,8 @@ let liveGeometryBytes = 0;
  * construction, `-1` at disposal, and `0` for a mutation; `bytes` is the signed
  * change in held bytes.
  *
- * Internal to `@four/geometry` — exported so `buffer-geometry.ts` can reach it,
- * deliberately absent from the package index, exactly as `@four/math`'s
+ * Internal to `@fourjs/geometry` — exported so `buffer-geometry.ts` can reach it,
+ * deliberately absent from the package index, exactly as `@fourjs/math`'s
  * `noteConstruction` is (`alloc-counter.ts`).
  */
 export function noteGeometry(instances: number, bytes: number): void {

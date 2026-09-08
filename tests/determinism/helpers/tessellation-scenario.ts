@@ -52,9 +52,9 @@
  * properties and decorators are not.
  */
 
-import { SeededRandom } from "@four/core";
-import { createChecksum } from "@four/diagnostics";
-import { triangulatePolygon, type Point2D } from "@four/geometry";
+import { SeededRandom } from "@fourjs/core";
+import { createChecksum } from "@fourjs/diagnostics";
+import { triangulatePolygon, type Point2D } from "@fourjs/geometry";
 
 /** Seed of the random half of the catalogue. Fixed forever; it is the input. */
 export const SEED = 0x4f5231a7;

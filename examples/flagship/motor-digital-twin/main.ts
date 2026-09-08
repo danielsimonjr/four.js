@@ -26,9 +26,9 @@
  * | temperature indicators | a first-order thermal model integrated on the fixed step ({@link updateThermalModel}), shown as a bar, a trace, a numeric readout and a trip lamp |
  * | waveform charts | two scrolling strip charts, four traces, **one draw call** — a `"lines"` `BufferGeometry` with per-vertex colours (see "What the charts cost", below) |
  * | fault injection | two, both physical rather than cosmetic: a **bearing rub** that drives a §28 *slider* motor's pad onto the rotor, and a **drive sag** that clamps the actuator below the setpoint |
- * | PID speed controller | `PIDController` from `@four/motion`, closing on the rotor's measured `angularVelocity.z` and commanding the hinge motor's `targetVelocity` |
+ * | PID speed controller | `PIDController` from `@fourjs/motion`, closing on the rotor's measured `angularVelocity.z` and commanding the hinge motor's `targetVelocity` |
  * | pause and replay | `app.pause()`, an exact single step, and a §34 `ReplayRecorder`/`ReplayPlayer` audit that seeks into the recorded run and verifies it bit-for-bit |
- * | force and torque vector overlays | the §113 debug overlay: body origins and velocities from `@four/diagnostics`' own streams, plus a torque arc and a mount-reaction arrow this page draws (see "Whose numbers the overlay draws") |
+ * | force and torque vector overlays | the §113 debug overlay: body origins and velocities from `@fourjs/diagnostics`' own streams, plus a torque arc and a mount-reaction arrow this page draws (see "Whose numbers the overlay draws") |
  *
  * Three things §119 does not list are here because the task of a twin is not
  * finished without them, and each is a **first** for this repository's examples:
@@ -37,7 +37,7 @@
  *   `app.stats` — draw calls, triangles, CPU frame time, resource bytes, and
  *   §32's awake-body count, which the application fills itself because §45 has
  *   no `app.physics` yet (gap `A-6`).
- * - **§40 unit display.** The first example to use `@four/core`'s conversion
+ * - **§40 unit display.** The first example to use `@fourjs/core`'s conversion
  *   helpers. The engine stays in radians and seconds; the *readouts* are in
  *   degrees, millimetres and milliseconds, converted once at the edge.
  * - **§79 save and load.** `registerSceneNodeTypes` + `registerRenderSerializers`
@@ -70,7 +70,7 @@
  *   also means the geometry keys the §79 catalog publishes are honest names
  *   rather than asset URLs.
  * - **Whose numbers the overlay draws.** §113's body origins and velocities come
- *   from `@four/diagnostics` reading the solver (`R-35`, shipped). The **torque
+ *   from `@fourjs/diagnostics` reading the solver (`R-35`, shipped). The **torque
  *   arc and the mount-reaction arrow do not**: no `PhysicsSolverAdapter` here
  *   reports joint reactions — both Rapier adapters declare
  *   `reportsJointReactions: false`, and `PhysicsWorld` exposes no reaction
@@ -206,14 +206,14 @@
  * a real Rapier hinge in Phase 8.
  */
 
-import { Application } from "four/application";
+import { Application } from "fourJS/application";
 import {
   angleToDisplay,
   lengthToDisplay,
   resolveUnitSystem,
   timeToDisplay,
   unitSymbol,
-} from "four/core";
+} from "fourJS/core";
 import {
   DebugDrawBuffer,
   applyDebugDrawStreams,
@@ -229,22 +229,22 @@ import {
   type ReplaySnapshot,
   type ReplayTarget,
   type SolverStatistics,
-} from "four/diagnostics";
+} from "fourJS/diagnostics";
 import {
   BufferGeometry,
   boxGeometry,
   cylinderGeometry,
   planeGeometry,
   torusGeometry,
-} from "four/geometry";
-import { KeyboardInput, PointerInput, type Pickable } from "four/input";
-import { LitMaterial, UnlitMaterial, type Material } from "four/materials";
-import { Quaternion, Vector3 } from "four/math";
+} from "fourJS/geometry";
+import { KeyboardInput, PointerInput, type Pickable } from "fourJS/input";
+import { LitMaterial, UnlitMaterial, type Material } from "fourJS/materials";
+import { Quaternion, Vector3 } from "fourJS/math";
 import {
   PIDController,
   PRIORITY_COMMANDS,
   type SimulationSystem,
-} from "four/motion";
+} from "fourJS/motion";
 import {
   Collider,
   HingeJoint,
@@ -253,10 +253,10 @@ import {
   RigidBody,
   SliderJoint,
   SpringJoint,
-} from "four/physics";
-import { Rapier3dAdapter } from "four/physics-rapier";
-import { Renderable, Texture } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
+} from "fourJS/physics";
+import { Rapier3dAdapter } from "fourJS/physics-rapier";
+import { Renderable, Texture } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
 import {
   DEFAULT_LAYER_MASK,
   DirectionalLight,
@@ -269,14 +269,14 @@ import {
   defineLayer,
   layerMask,
   resolveWorldTransform,
-} from "four/scene";
+} from "fourJS/scene";
 import {
   decodeSceneDocument,
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
-} from "four/serialization";
-import { buildGlyphAtlas } from "four/text";
+} from "fourJS/serialization";
+import { buildGlyphAtlas } from "fourJS/text";
 import {
   Button,
   Label,
@@ -288,8 +288,8 @@ import {
   keyboardFocusTarget,
   type UIWidget,
   type WidgetSkin,
-} from "four/ui";
-import { Text, registerSceneNodeTypes, resourceCatalog } from "four";
+} from "fourJS/ui";
+import { Text, registerSceneNodeTypes, resourceCatalog } from "fourJS";
 
 // --- surface -----------------------------------------------------------------
 
@@ -323,7 +323,7 @@ type Rgba = readonly [number, number, number, number];
 /**
  * The one `UnitSystem` this page declares (§40), and the whole of §40's effect.
  *
- * Read the header of `@four/core`'s `units` module before changing anything
+ * Read the header of `@fourjs/core`'s `units` module before changing anything
  * here: **declaring a unit system does not change what the engine computes.**
  * There is no unit mode, no `ApplicationOptions.units`, and no signature
  * anywhere that takes one. Internally and at every API boundary this file is
@@ -2693,7 +2693,7 @@ function singleStep(): void {
 /**
  * The overlay's line buffer, and the two `Float32Array`s it publishes.
  *
- * `@four/diagnostics` has no `geometry` edge in the frozen §3.1 matrix, so it
+ * `@fourjs/diagnostics` has no `geometry` edge in the frozen §3.1 matrix, so it
  * emits streams whose field names spread straight into `BufferGeometryOptions`
  * and the assembly happens here — the one place that may see both packages
  * (`R-35`).
@@ -2966,8 +2966,8 @@ function runReplayAudit(): void {
  *
  * The registration is one call — `registerSceneNodeTypes` from the umbrella
  * package — and it is the only place in this repository that could make it,
- * because §3.1 forbids `@four/serialization` from seeing `@four/ui`,
- * `@four/render` or `@four/physics`. What it hands back is a component registry
+ * because §3.1 forbids `@fourjs/serialization` from seeing `@fourjs/ui`,
+ * `@fourjs/render` or `@fourjs/physics`. What it hands back is a component registry
  * that already knows `RigidBody`, `Collider`, `MotionComponent` and
  * `KinematicController`, plus the `nodeTypeOf`/`nodeFactory` pair that knows the
  * nine §73 widgets and the five drawing-tier classes

@@ -1,11 +1,11 @@
 /**
  * The WebGPU surface this backend touches, described structurally (§61, §62).
  *
- * This is the twin of `@four/render-webgl`'s `WebglContext`, and it exists for
+ * This is the twin of `@fourjs/render-webgl`'s `WebglContext`, and it exists for
  * the same two reasons, both of which matter more here than they did there:
  *
  * 1. **The package compiles without `lib.dom` and without `@webgpu/types`.**
- *    `@four/render` types `RendererOptions.canvas` as `unknown` precisely so a
+ *    `@fourjs/render` types `RendererOptions.canvas` as `unknown` precisely so a
  *    backend narrows it where it can validate it, and the §3.2 pin set carries
  *    no WebGPU typings — adding one would be a new toolchain dependency for
  *    declarations the engine can write itself in a page (ground rule 7).

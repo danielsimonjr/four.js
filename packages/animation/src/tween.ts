@@ -69,10 +69,10 @@
  * iterators over the entry array.
  */
 
-import { FourError } from "@four/core";
-import type { Quaternion, Vector2, Vector3, Vector4 } from "@four/math";
-import { Node, warnAuthorityConflict } from "@four/scene";
-import type { TransformAuthority } from "@four/scene";
+import { FourError } from "@fourjs/core";
+import type { Quaternion, Vector2, Vector3, Vector4 } from "@fourjs/math";
+import { Node, warnAuthorityConflict } from "@fourjs/scene";
+import type { TransformAuthority } from "@fourjs/scene";
 
 import { createBinding, type PropertyBinding } from "./binding.js";
 import {

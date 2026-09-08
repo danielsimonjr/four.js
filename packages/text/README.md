@@ -1,8 +1,8 @@
-# @four/text
+# @fourjs/text
 
 Text at §56's MVP bitmap tier. Part of [fourJS](../../README.md).
 
-Implements the MVP text tier of §56 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 3a (§106a). Three pieces, each usable on its own; the package **produces data, never nodes** — its dependencies are `core`, `math`, and `geometry` only, so the atlas is emitted in exactly the shape `@four/render`'s `TextureSource` accepts and node assembly happens elsewhere.
+Implements the MVP text tier of §56 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 3a (§106a). Three pieces, each usable on its own; the package **produces data, never nodes** — its dependencies are `core`, `math`, and `geometry` only, so the atlas is emitted in exactly the shape `@fourjs/render`'s `TextureSource` accepts and node assembly happens elsewhere.
 
 ## What's here
 
@@ -18,4 +18,4 @@ Implements the MVP text tier of §56 in [`docs/SPECIFICATION.md`](../../docs/SPE
 
 Unit tests are colocated in `tests/` per §92.
 
-Workspace name `@four/text`; publishes as `@danielsimonjr/fourjs-text`.
+Workspace name `@fourjs/text`; publishes as `@danielsimonjr/fourjs-text`.

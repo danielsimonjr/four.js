@@ -3,7 +3,7 @@ import {
   Matrix4,
   resetConstructionCount,
   Vector3,
-} from "@four/math";
+} from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

@@ -2,8 +2,8 @@
  * `pointerType` across packages (§72, §73 — A-9 remainder, 2026-08-09).
  *
  * The unit suite in `packages/input/tests/pointer-type.test.ts` proves the
- * field and the hover rule inside `@four/input`. This one proves the
- * consequence that made the gap worth closing: a `@four/ui` widget's hover
+ * field and the hover rule inside `@fourjs/input`. This one proves the
+ * consequence that made the gap worth closing: a `@fourjs/ui` widget's hover
  * highlight is driven by `pointerenter`/`pointerleave`, so before the device
  * was known, **clicking a button with a mouse un-highlighted it** until the
  * next mouse move. It also pins the assignability property that decided the
@@ -17,9 +17,9 @@ import {
   type SurfacePointerEvent,
   type SurfacePointerListener,
   type SurfaceRect,
-} from "@four/input";
-import { OrthographicCamera } from "@four/scene";
-import { Button, collectPickables } from "@four/ui";
+} from "@fourjs/input";
+import { OrthographicCamera } from "@fourjs/scene";
+import { Button, collectPickables } from "@fourjs/ui";
 import { describe, expect, it } from "vitest";
 
 /** A surface with no DOM behind it, able to report a device per event. */
@@ -137,7 +137,7 @@ describe("§72 pointerType and §73 hover state", () => {
   it("accepts a DOM-shaped event whose pointerType is a bare string", () => {
     // `lib.dom` declares `PointerEvent.pointerType: string`. Narrowing the
     // seam's field to the three-device union would make this assignment fail —
-    // which is why the narrowing happens inside `@four/input` instead.
+    // which is why the narrowing happens inside `@fourjs/input` instead.
     const domShaped: {
       clientX: number;
       clientY: number;

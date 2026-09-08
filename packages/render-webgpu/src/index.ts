@@ -1,8 +1,8 @@
 /**
- * `@four/render-webgpu` — the WebGPU backend (§62 backend 1).
+ * `@fourjs/render-webgpu` — the WebGPU backend (§62 backend 1).
  *
  * The public surface is one class, {@link WebgpuRenderer}, which implements
- * `@four/render`'s `Renderer`, plus {@link registerWebgpuRenderer} for §62's
+ * `@fourjs/render`'s `Renderer`, plus {@link registerWebgpuRenderer} for §62's
  * registry. Everything else exported here is exported because a *test*, a
  * diagnostic, or a later packet in this package needs it — the structural
  * device surface, the pipeline cache and its key function, the bind-group
@@ -10,14 +10,14 @@
  * be unit-tested against a fake device with no GPU and no browser (Node has no
  * `navigator.gpu` at all; see `tests/integration/helpers/recording-gpu.ts`).
  *
- * Applications select a backend at the edge (§62); nothing in `@four/scene`,
- * `@four/motion`, or `@four/physics` may name anything in this package. Note
+ * Applications select a backend at the edge (§62); nothing in `@fourjs/scene`,
+ * `@fourjs/motion`, or `@fourjs/physics` may name anything in this package. Note
  * that **calling `registerWebgpuRenderer()` moves an application off WebGL 2**,
  * because `AUTO_RENDERER_ORDER` prefers WebGPU — `register.ts` has the full
  * note.
  */
 
-export const PACKAGE_NAME = "@four/render-webgpu";
+export const PACKAGE_NAME = "@fourjs/render-webgpu";
 
 export type {
   Gpu,

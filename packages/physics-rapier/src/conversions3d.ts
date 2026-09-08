@@ -2,10 +2,10 @@
  * The §21/P5-3 mapping between the engine's 3D-typed physics API and Rapier's
  * three-dimensional one.
  *
- * `@four/physics` is typed **once, in 3D** (`Vector3` positions, `Quaternion`
+ * `@fourjs/physics` is typed **once, in 3D** (`Vector3` positions, `Quaternion`
  * rotations) for both dimensions — §21 and plan P5-3 — so in three dimensions
  * this module has far less to do than its 2D sibling: the mapping is essentially
- * an identity, and its job is to move numbers between `@four/math` types and
+ * an identity, and its job is to move numbers between `@fourjs/math` types and
  * Rapier's plain `{ x, y, z }` / `{ x, y, z, w }` records without allocating.
  *
  * ## The mapping, precisely
@@ -33,7 +33,7 @@
  *   widening itself rather than calling `widenToVector3`, only to avoid a
  *   `Vector3` round trip on a path that already has an `out` record to fill.
  *
- * Everything dimension-*aware* is delegated to `@four/physics`'s own
+ * Everything dimension-*aware* is delegated to `@fourjs/physics`'s own
  * `resolveRotation` / `resolveAngularVelocity`, exactly as in 2D, so the adapter
  * cannot drift from the engine's rule for either dimension.
  *
@@ -57,20 +57,20 @@
  * shape constructors trap into wasm.
  */
 
-import { FourError } from "@four/core";
-import type { Matrix3, Quaternion, Vector3 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import type { Matrix3, Quaternion, Vector3 } from "@fourjs/math";
 import {
   ALL_COLLISION_GROUPS,
   resolveAngularVelocity,
   resolveRotation,
-} from "@four/physics";
+} from "@fourjs/physics";
 import type {
   AngularVelocityInput,
   BodyType,
   CollisionShape,
   RotationInput,
   Vector3Input,
-} from "@four/physics";
+} from "@fourjs/physics";
 
 import { RAPIER_3D } from "./init.js";
 import type {
@@ -83,7 +83,7 @@ import type {
 /**
  * §89 has no physics-input code and `PHYSICS_SOLVER_FAILED` means the solver
  * failed, which is a different event; bad input to this adapter is the same
- * general invalid-input code `@four/physics` uses for descriptors.
+ * general invalid-input code `@fourjs/physics` uses for descriptors.
  */
 const CONVERSION_ERROR_CODE = "INVALID_APPLICATION_STATE";
 
@@ -301,7 +301,7 @@ export function toPrincipalInertia3d(
  * `geometry/interaction_groups.d.ts`: two filters `a` and `b` interact when
  * `((a >> 16) & b) !== 0 && ((b >> 16) & a) !== 0` — the high 16 bits are the
  * *membership* groups and the low 16 the *filter* mask. That is the same mutual
- * rule `passesQueryFilter` documents in `@four/physics`, so contact filtering
+ * rule `passesQueryFilter` documents in `@fourjs/physics`, so contact filtering
  * and query filtering agree by construction.
  *
  * Values above bit 15 cannot be represented and are **rejected**;
@@ -485,7 +485,7 @@ function pointCloud(
  *
  * The 3D counterpart of the 2D adapter's `cos`/`sin` pair, and the one piece of
  * real quaternion arithmetic this adapter does: `v' = v + 2w(q × v) + 2q × (q ×
- * v)`, written as the usual two-cross-product form. `@four/math`'s `Quaternion`
+ * v)`, written as the usual two-cross-product form. `@fourjs/math`'s `Quaternion`
  * has no rotate-a-vector method to borrow, and building one here keeps the
  * adapter's per-contact path free of `Vector3` temporaries.
  *

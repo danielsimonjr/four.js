@@ -4,13 +4,13 @@
  * WGSL/bind-group-layout pair that RFC 0001 will one day target.
  *
  * They are exported from `src/index.ts` for exactly this reason — the same
- * argument `@four/render-webgl` makes for exporting `GL`, `UnlitProgram` and
+ * argument `@fourjs/render-webgl` makes for exporting `GL`, `UnlitProgram` and
  * `GeometryCache`: a seam a test can reach is a seam a failure can be localised
  * to.
  */
 
-import { Texture } from "@four/render";
-import { resetDevWarnings } from "@four/core";
+import { Texture } from "@fourjs/render";
+import { resetDevWarnings } from "@fourjs/core";
 import { describe, expect, it, vi } from "vitest";
 
 import { createRecordingGpu } from "../../../tests/integration/helpers/recording-gpu.js";
@@ -637,7 +637,7 @@ describe("mipLevelCount and textureByteLength", () => {
     expect(textureByteLength(8, 2, true)).toBe(64 + 16 + 8 + 4);
   });
 
-  it("agrees with `@four/render`'s own accounting (§84 backend parity)", () => {
+  it("agrees with `@fourjs/render`'s own accounting (§84 backend parity)", () => {
     // Independent computations, asserted equal — the parity §84 needs for
     // `textureMemory` to mean one thing across backends where formats match.
     for (const [width, height, mipmaps] of [

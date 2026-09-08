@@ -1,4 +1,4 @@
-import { Vector3, constructionCount, resetConstructionCount } from "@four/math";
+import { Vector3, constructionCount, resetConstructionCount } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

@@ -9,8 +9,8 @@
  * below assert that nothing is printed at all.
  */
 
-import { Vector2, Vector3 } from "@four/math";
-import { Group } from "@four/scene";
+import { Vector2, Vector3 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BodyType, CollisionShape } from "../src/index.js";

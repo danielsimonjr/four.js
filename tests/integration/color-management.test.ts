@@ -4,10 +4,10 @@
  *
  * §60a is a policy, not a feature: it says where colours are decoded, what
  * space shading happens in, and where the result is encoded. Every one of those
- * sentences spans packages — `@four/math` owns the transfer functions and the
- * CSS grammar, `@four/materials` and `@four/scene` hold authored colours,
- * `@four/render` carries the resource metadata and the output-transform pass,
- * and `@four/render-webgl` is the only place any of it becomes GL. No unit test
+ * sentences spans packages — `@fourjs/math` owns the transfer functions and the
+ * CSS grammar, `@fourjs/materials` and `@fourjs/scene` hold authored colours,
+ * `@fourjs/render` carries the resource metadata and the output-transform pass,
+ * and `@fourjs/render-webgl` is the only place any of it becomes GL. No unit test
  * inside one package can check the agreement, which is what this file is for.
  *
  * Four claims:
@@ -29,7 +29,7 @@
  *    `addPass` rather than discovered on screen.
  */
 
-import { planeGeometry } from "@four/geometry";
+import { planeGeometry } from "@fourjs/geometry";
 import {
   parseColor,
   parseColorRGB,
@@ -38,8 +38,8 @@ import {
   srgbToLinearRGBA,
   type ColorRGB,
   type ColorRGBA,
-} from "@four/math";
-import { UnlitMaterial } from "@four/materials";
+} from "@fourjs/math";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   COPY_EFFECT,
   OUTPUT_TRANSFORM_EFFECT,
@@ -47,8 +47,8 @@ import {
   RenderTarget,
   Renderable,
   Texture,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   DirectionalLight,
   OrthographicCamera,
@@ -56,7 +56,7 @@ import {
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -170,7 +170,7 @@ describe("R-15 — the authored-colour path (§60a: strings denote sRGB)", () =>
     test.renderer.render(test.scene, test.views);
 
     // Rounded to `f32` because that is what a `uniform4fv` upload carries; the
-    // decode itself is exact in doubles (`@four/math`'s unit tests pin it).
+    // decode itself is exact in doubles (`@fourjs/math`'s unit tests pin it).
     const expected = [
       Math.fround(srgbToLinear(0x80 / 255)),
       0,
@@ -190,8 +190,8 @@ describe("R-15 — the authored-colour path (§60a: strings denote sRGB)", () =>
   });
 
   it("decodes a light colour the same way, into §68's three-tuple", () => {
-    // `DirectionalLight.color` is `@four/math`'s `ColorRGB` since R-15 — one
-    // declaration, re-exported by `@four/scene` — so the same two functions
+    // `DirectionalLight.color` is `@fourjs/math`'s `ColorRGB` since R-15 — one
+    // declaration, re-exported by `@fourjs/scene` — so the same two functions
     // serve a light and a material with no adapter between the packages.
     const light = new DirectionalLight();
     const authored: ColorRGB = parseColorRGB("rgb(255 128 0)");

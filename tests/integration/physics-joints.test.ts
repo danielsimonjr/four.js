@@ -49,7 +49,7 @@
  *
  * The break path itself is then exercised on `ScriptedJointAdapter`
  * (`helpers/joint-scenarios.ts`), a local double with scripted reactions: the
- * packet's option (a). `@four/physics` already covers the *world's* break
+ * packet's option (a). `@fourjs/physics` already covers the *world's* break
  * monitor against its own `FakeJointSolverAdapter`
  * (`packages/physics/tests/world-joints.test.ts`), but that fake is
  * test-internal to that package and unreachable from here, and those tests call
@@ -60,15 +60,15 @@
  * the survivors keep simulating.
  */
 
-import { FourError } from "@four/core";
-import { solverJointStatistics } from "@four/diagnostics";
-import { Vector3 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import { solverJointStatistics } from "@fourjs/diagnostics";
+import { Vector3 } from "@fourjs/math";
 import {
   FixedJoint,
   HingeJoint,
   SphericalJoint,
   supportsSolverJointAccess,
-} from "@four/physics";
+} from "@fourjs/physics";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -146,9 +146,9 @@ for (const kit of DIMENSION_KITS) {
       // Tests typecheck gate (2026-08-21): `world.adapter` is a
       // `PhysicsWorldAdapter` (`PhysicsSolverAdapter & SolverBodyAccess`), and
       // the joint seam is deliberately *separate* — so the adapter has to be
-      // narrowed before `@four/diagnostics`' structurally-declared
+      // narrowed before `@fourjs/diagnostics`' structurally-declared
       // `DebugJointAccess` can be satisfied. `supportsSolverJointAccess` is the
-      // guard `@four/physics` exports for exactly this, and it strengthens the
+      // guard `@fourjs/physics` exports for exactly this, and it strengthens the
       // assertion: a Rapier adapter that stopped implementing the seam now
       // fails here instead of type-erroring nowhere.
       const jointAccess = world.adapter;

@@ -6,9 +6,9 @@
  * a specific picture; an unregistered backend skips, never substitutes).
  */
 
-import { planeGeometry } from "@four/geometry";
-import { NodeMaterial, UnlitMaterial, type ShaderGraph } from "@four/materials";
-import { Scene, resolveWorldTransforms } from "@four/scene";
+import { planeGeometry } from "@fourjs/geometry";
+import { NodeMaterial, UnlitMaterial, type ShaderGraph } from "@fourjs/materials";
+import { Scene, resolveWorldTransforms } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

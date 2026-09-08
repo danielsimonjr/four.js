@@ -9,8 +9,8 @@
  * directional light's shadow map, a `DEPTH_COMPONENT24` attachment, a
  * depth-only caster pass, and a 3x3 percentage-closer filter in both shaded
  * pipelines. No unit test inside one package can check that agreement:
- * `@four/scene` owns the light and the volume, `@four/render` owns the
- * collection and the item flags, `@four/render-webgl` is the only place any of
+ * `@fourjs/scene` owns the light and the volume, `@fourjs/render` owns the
+ * collection and the item flags, `@fourjs/render-webgl` is the only place any of
  * it becomes GL, and `four` owns the §79 document.
  *
  * Five claims:
@@ -32,14 +32,14 @@
  *    and a document written before this build still loads.
  */
 
-import { boxGeometry, planeGeometry } from "@four/geometry";
-import { Matrix4, Vector3 } from "@four/math";
+import { boxGeometry, planeGeometry } from "@fourjs/geometry";
+import { Matrix4, Vector3 } from "@fourjs/math";
 import {
   LitMaterial,
   SpriteMaterial,
   StandardMaterial,
   UnlitMaterial,
-} from "@four/materials";
+} from "@fourjs/materials";
 import {
   RenderTarget,
   Renderable,
@@ -47,8 +47,8 @@ import {
   Texture,
   collectSceneLights,
   createSceneLights,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   DirectionalLight,
   DirectionalLightShadow,
@@ -57,15 +57,15 @@ import {
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import {
   decodeSceneDocument,
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
   type SceneDocument,
-} from "@four/serialization";
-import { registerSceneNodeTypes } from "four";
+} from "@fourjs/serialization";
+import { registerSceneNodeTypes } from "fourJS";
 import { describe, expect, it } from "vitest";
 
 import {

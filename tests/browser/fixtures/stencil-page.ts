@@ -37,20 +37,20 @@
  * stencil buffer exists, is cleared, and is tested is entirely the driver's.
  */
 
-import { StencilState, UnlitMaterial } from "@four/materials";
+import { StencilState, UnlitMaterial } from "@fourjs/materials";
 import {
   Rectangle,
   createRenderStatistics,
   resetRenderStatistics,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   type Viewport,
   resolveWorldTransforms,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /** Canvas size the spec creates and this file reads back. */
 const WIDTH = 320;

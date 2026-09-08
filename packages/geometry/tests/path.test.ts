@@ -29,7 +29,7 @@
  * has read, and half of this module's contract is what it says no to.
  */
 
-import { Matrix3 } from "@four/math";
+import { Matrix3 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

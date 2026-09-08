@@ -21,7 +21,7 @@
  * - **Vitest** loads it through Vite, as it loads any `.ts` under `tests/`.
  * - **Plain `node`** loads it directly: this repository pins Node ≥ 20 and runs
  *   on Node 22.22 (`process.features.typescript === "strip"`), where
- *   type-stripping is on by default, and bare `@four/*` specifiers resolve from
+ *   type-stripping is on by default, and bare `@fourjs/*` specifiers resolve from
  *   this file's directory up to the workspace `node_modules` symlinks into each
  *   package's built `dist`.
  *
@@ -64,15 +64,15 @@
  * | insertion-order traversal (§33) | `Scene.traverse`, depth-first, insertion order |
  */
 
-import { createChecksum } from "@four/diagnostics";
-import { Vector3 } from "@four/math";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Vector3 } from "@fourjs/math";
 import {
   PRIORITY_KINEMATICS,
   type FixedUpdateContext,
   type SimulationSystem,
-} from "@four/motion";
-import { Group, type Node } from "@four/scene";
-import { Application } from "four";
+} from "@fourjs/motion";
+import { Group, type Node } from "@fourjs/scene";
+import { Application } from "fourJS";
 
 /** Seed of every RNG stream below: the ASCII bytes of `"FOUR"`. */
 export const SCENARIO_SEED = 0x464f5552;

@@ -6,7 +6,7 @@
  * The claim the fake-device suite cannot make: that
  * `PARTICLE_INTEGRATOR_SHADER_SOURCE` satisfies a real WGSL front end and
  * that the kernel *computes* — one semi-implicit Euler step lands the exact
- * f32 values `@four/particles`' closed form predicts (`v += g·dt`, then
+ * f32 values `@fourjs/particles`' closed form predicts (`v += g·dt`, then
  * `p += v·dt`), the read-only params binding validates against
  * `var<storage, read>`, and the `count` guard leaves the lane past it
  * untouched. Exact equality, deliberately: the chosen inputs are all exact
@@ -29,7 +29,7 @@ import {
   COMPUTE_ENTRY_POINT,
   PARTICLE_INTEGRATOR_SHADER_SOURCE,
   particleIntegratorWorkgroups,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */

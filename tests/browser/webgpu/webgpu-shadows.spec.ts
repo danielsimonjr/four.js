@@ -22,7 +22,7 @@
  *    ratios, never goldens (§92; R-1 plan §5).
  *
  * Mechanics follow the sibling specs' recorded decisions verbatim: the WGSL
- * is **imported** from `@four/render-webgpu`, never retyped; the page program
+ * is **imported** from `@fourjs/render-webgpu`, never retyped; the page program
  * is a string because this repository pins no WebGPU typings; the page is
  * *served* (an opaque origin loses `navigator.gpu`); the spec **skips** when
  * `requestAdapter()` resolves `null`.
@@ -42,7 +42,7 @@ import {
   STANDARD_UNIFORM_BYTES,
   litShaderSource,
   standardShaderSource,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */

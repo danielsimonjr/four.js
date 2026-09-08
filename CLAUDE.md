@@ -77,7 +77,7 @@ participate. Key cross-cutting designs to understand before implementing anythin
   kinematics moves objects directly, dynamics derives motion from forces — the engine
   supports all of these with controlled blending (§19: animation pose → kinematic
   modification → physics solve → interpolated render pose).
-- **Pluggable physics solvers (§37):** the stable `@four/physics` API sits above a
+- **Pluggable physics solvers (§37):** the stable `@fourjs/physics` API sits above a
   `PhysicsSolverAdapter` interface; solver packages (`physics-rapier`, `physics-box2d`)
   implement it and declare capability differences.
 - **Determinism (§33–34):** tiered (`none` → `cross-platform`); initial target is
@@ -89,7 +89,7 @@ participate. Key cross-cutting designs to understand before implementing anythin
 ## Package layout
 
 `packages/` follows the monorepo tree in Part VIII, §98 (Proposed Monorepo). All
-packages are `@four/`-scoped; `packages/four` is the umbrella package. Rough layering:
+packages are `@fourjs/`-scoped; `packages/fourJS` is the umbrella package. Rough layering:
 
 - Foundation: `core`, `math`
 - Scene/time: `scene`, `motion`, `animation`

@@ -2,8 +2,8 @@
  * `ParticleSystem` (§39 step 5, §36, plan WP-9.4) — the fixed-step driver.
  *
  * What this file can and cannot pin, stated up front because the boundary is
- * unusual: the §3.1 dependency matrix keeps `@four/particles` from ever seeing
- * `@four/motion`'s `SimulationSystem`, `FixedUpdateContext` or `PRIORITY_FORCES`
+ * unusual: the §3.1 dependency matrix keeps `@fourjs/particles` from ever seeing
+ * `@fourjs/motion`'s `SimulationSystem`, `FixedUpdateContext` or `PRIORITY_FORCES`
  * (see `src/particle-system.ts`). So this suite pins
  *
  * - the **shape** §39 requires, member by member, and the numeric value of
@@ -26,7 +26,7 @@
  * same claim as "the simulation advanced correctly".
  */
 
-import { constructionCount, resetConstructionCount } from "@four/math";
+import { constructionCount, resetConstructionCount } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import { ParticleEmitter } from "../src/emitter.js";
@@ -146,7 +146,7 @@ describe("ParticleSystem: the §39 shape and its priority", () => {
   });
 
   it("pins PRIORITY_PARTICLES at §39 step 5 (force generation)", () => {
-    // The value `@four/motion` publishes as `PRIORITY_FORCES`. Restated rather
+    // The value `@fourjs/motion` publishes as `PRIORITY_FORCES`. Restated rather
     // than imported (§3.1); the cross-package equality is asserted in
     // tests/determinism/phase9-particles.test.ts.
     expect(PRIORITY_PARTICLES).toBe(500);

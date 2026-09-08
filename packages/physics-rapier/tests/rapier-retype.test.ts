@@ -6,10 +6,10 @@
  * really can swap a live body between §22's models without losing it, so this
  * file measures exactly that against `@dimforge/rapier2d-compat` and
  * `@dimforge/rapier3d-compat` 0.19.3 rather than against a double. What
- * `@four/physics` builds on top — the mass rule, the pipeline re-routing, the
+ * `@fourjs/physics` builds on top — the mass rule, the pipeline re-routing, the
  * inheritance arithmetic — is proved over the structural double in
- * `@four/physics`'s `world-transitions.test.ts`; a `PhysicsWorld` cannot be
- * built here, because it needs `@four/scene` and this package does not depend
+ * `@fourjs/physics`'s `world-transitions.test.ts`; a `PhysicsWorld` cannot be
+ * built here, because it needs `@fourjs/scene` and this package does not depend
  * on it.
  *
  * ## What was verified about Rapier itself (2026-08-02, 0.19.3, both builds)
@@ -30,9 +30,9 @@
  * carry a `1e-6` absolute tolerance.
  */
 
-import { FourError } from "@four/core";
-import { Quaternion, Vector2, Vector3 } from "@four/math";
-import type { BodyType, PhysicsBodyHandle } from "@four/physics";
+import { FourError } from "@fourjs/core";
+import { Quaternion, Vector2, Vector3 } from "@fourjs/math";
+import type { BodyType, PhysicsBodyHandle } from "@fourjs/physics";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { initializeRapier2d, initializeRapier3d } from "../src/init.js";

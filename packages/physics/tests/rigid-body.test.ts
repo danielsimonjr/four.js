@@ -1,4 +1,4 @@
-import { ComponentRegistry, isFourError } from "@four/core";
+import { ComponentRegistry, isFourError } from "@fourjs/core";
 import {
   Matrix3,
   Quaternion,
@@ -6,11 +6,11 @@ import {
   Vector3,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
-import { Group } from "@four/scene";
+} from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { describe, expect, it, vi } from "vitest";
 
-import { MotionComponent } from "@four/motion";
+import { MotionComponent } from "@fourjs/motion";
 
 import { Collider } from "../src/collider.js";
 import type { RigidBodyDescriptor } from "../src/descriptors.js";

@@ -5,7 +5,7 @@
  *
  * 1. **The shipped behaviour** — the buffer's exact float layout, its growth
  *    policy, its zero-allocation promise (via `constructionCount()` from
- *    `@four/math`, which counts every math-object construction), and each
+ *    `@fourjs/math`, which counts every math-object construction), and each
  *    provider's exact segment output against scripted fakes.
  * 2. **The seam shapes** — `MirroredSolverBodyAccess` and
  *    `MirroredSolverJointAccess` below are transcribed from
@@ -25,7 +25,7 @@ import {
   Vector3,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
+} from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

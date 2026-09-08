@@ -1,8 +1,8 @@
 /**
  * R-23 — §50's shape nodes reaching a real backend (2026-08-09).
  *
- * The shape family lives in `@four/render` and the geometry it is made of
- * lives in `@four/geometry`; what makes the packet worth having is a claim
+ * The shape family lives in `@fourjs/render` and the geometry it is made of
+ * lives in `@fourjs/geometry`; what makes the packet worth having is a claim
  * about three packages agreeing, and no unit test inside any one of them can
  * check it:
  *
@@ -31,7 +31,7 @@
  * gate.
  */
 
-import { UnlitMaterial } from "@four/materials";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   Circle,
   PathShape,
@@ -42,16 +42,16 @@ import {
   buildRenderList,
   type RenderItem,
   type Shape2D,
-} from "@four/render";
-import { Path } from "@four/geometry";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { Path } from "@fourjs/geometry";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

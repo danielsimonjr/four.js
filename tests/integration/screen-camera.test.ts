@@ -33,10 +33,10 @@
  * argues that at length).
  */
 
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
-import { Renderable } from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
+import { Renderable } from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
@@ -47,8 +47,8 @@ import {
   resetLayers,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/scene";
+import { Application } from "fourJS/application";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {

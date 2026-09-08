@@ -1,7 +1,7 @@
-export const PACKAGE_NAME = "@four/materials";
+export const PACKAGE_NAME = "@fourjs/materials";
 
 // §81's materials / shader-node token (RFC 0002): declared here;
-// `@four/four`'s `plugins.ts` re-exports the same object.
+// `@fourjs/four`'s `plugins.ts` re-exports the same object.
 export { SHADER_OPERATORS } from "./capabilities.js";
 export type { ShaderOperatorFactory } from "./shader-operators.js";
 export { ShaderOperatorRegistry } from "./shader-operators.js";

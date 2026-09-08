@@ -1,6 +1,6 @@
-import { ComponentRegistry, isFourError } from "@four/core";
-import { Vector2, Vector3 } from "@four/math";
-import { Group, Transform } from "@four/scene";
+import { ComponentRegistry, isFourError } from "@fourjs/core";
+import { Vector2, Vector3 } from "@fourjs/math";
+import { Group, Transform } from "@fourjs/scene";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ColliderOptions, ColliderTriggerEvent } from "../src/collider.js";

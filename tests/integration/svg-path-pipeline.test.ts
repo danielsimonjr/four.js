@@ -41,8 +41,8 @@ import {
   polygonGeometry2D,
   triangulatePolygon,
   type Point2D,
-} from "@four/geometry";
-import { Matrix3 } from "@four/math";
+} from "@fourjs/geometry";
+import { Matrix3 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 /** The tolerance every shape here is flattened at, in world units. */

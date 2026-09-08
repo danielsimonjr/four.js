@@ -7,10 +7,10 @@
  * the bodies stay in it. Rapier 3D, `same-runtime` tier.
  */
 
-import { Vector3 } from "@four/math";
-import { Collider, PhysicsWorld, RigidBody } from "@four/physics";
-import { Rapier3dAdapter } from "@four/physics-rapier";
-import { Group } from "@four/scene";
+import { Vector3 } from "@fourjs/math";
+import { Collider, PhysicsWorld, RigidBody } from "@fourjs/physics";
+import { Rapier3dAdapter } from "@fourjs/physics-rapier";
+import { Group } from "@fourjs/scene";
 
 /** §45 `fixedTimeStep`, in seconds. */
 export const FIXED_TIME_STEP = 1 / 60;

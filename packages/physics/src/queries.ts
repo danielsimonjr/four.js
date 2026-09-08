@@ -46,16 +46,16 @@
  *
  * ## No `Ray` type
  *
- * §30 writes `world.raycast(ray, options)`, but neither `@four/math` nor
- * `@four/scene` defines a ray, and inventing one in the physics package would
+ * §30 writes `world.raycast(ray, options)`, but neither `@fourjs/math` nor
+ * `@fourjs/scene` defines a ray, and inventing one in the physics package would
  * plant a type that picking (§72) and scene queries (§46) would each want to
  * own. {@link RaycastQuery} therefore carries the origin and direction inline,
  * alongside the options — one record instead of two arguments (decision,
- * WP-5.1). A `Ray` in `@four/math` can be adopted later without changing this
+ * WP-5.1). A `Ray` in `@fourjs/math` can be adopted later without changing this
  * shape.
  */
 
-import type { Vector3 } from "@four/math";
+import type { Vector3 } from "@fourjs/math";
 
 import type { CollisionShape } from "./shapes.js";
 import type {

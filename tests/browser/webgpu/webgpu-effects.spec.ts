@@ -34,7 +34,7 @@
  * SwiftShader is not a GPU).
  */
 
-import { effectShaderSource } from "@four/render-webgpu";
+import { effectShaderSource } from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */
@@ -236,7 +236,7 @@ async function inPage<T>(
   return await page.evaluate(`(${PAGE_SCRIPT})(${JSON.stringify(options)})`);
 }
 
-/** The CPU half of §60a's encode — `@four/math`'s `linearToSrgb`, restated. */
+/** The CPU half of §60a's encode — `@fourjs/math`'s `linearToSrgb`, restated. */
 function linearToSrgb(value: number): number {
   return value <= 0.0031308
     ? value * 12.92

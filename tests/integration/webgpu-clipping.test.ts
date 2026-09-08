@@ -2,8 +2,8 @@
  * §67 clipping on the WebGPU backend (WP-R1.3) — the R-23 grammar, re-spoken
  * in pass commands and pipeline state instead of GL calls.
  *
- * `clipping.test.ts` proves the composition (`@four/scene`'s flag,
- * `@four/render`'s allocator and mask emission) against the WebGL backend;
+ * `clipping.test.ts` proves the composition (`@fourjs/scene`'s flag,
+ * `@fourjs/render`'s allocator and mask emission) against the WebGL backend;
  * this file proves the *second application* of the same records, which is what
  * makes the clip API a design rather than a GL feature. The claims restated:
  *
@@ -28,18 +28,18 @@
  *    real frame path.
  */
 
-import { resetDevWarnings } from "@four/core";
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
-import { MAX_CLIP_PLANES, Renderable } from "@four/render";
-import { WebgpuRenderer, createWgpuBatching } from "@four/render-webgpu";
+import { resetDevWarnings } from "@fourjs/core";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
+import { MAX_CLIP_PLANES, Renderable } from "@fourjs/render";
+import { WebgpuRenderer, createWgpuBatching } from "@fourjs/render-webgpu";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

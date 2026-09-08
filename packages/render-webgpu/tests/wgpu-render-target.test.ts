@@ -6,21 +6,21 @@
  *
  * Driven by the recording device double for the reasons
  * `webgpu-renderer.test.ts` gives at length; the scene objects are typed
- * doubles for its reason too (`@four/scene` is outside this package's frozen
+ * doubles for its reason too (`@fourjs/scene` is outside this package's frozen
  * §3.1 row). `RenderTarget` itself is the real class — it lives in
- * `@four/render`, which is a dependency, and the GL twin's cache tests made
+ * `@fourjs/render`, which is a dependency, and the GL twin's cache tests made
  * the same choice for the same recorded reason.
  */
 
-import { resetDevWarnings } from "@four/core";
-import { Matrix4 } from "@four/math";
+import { resetDevWarnings } from "@fourjs/core";
+import { Matrix4 } from "@fourjs/math";
 import {
   Renderable,
   RenderTarget,
   type RenderItem,
   type Renderer,
   type UnlitRenderItem,
-} from "@four/render";
+} from "@fourjs/render";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

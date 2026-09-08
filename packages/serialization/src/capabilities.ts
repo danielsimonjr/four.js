@@ -4,7 +4,7 @@
  *
  * RFC 0002 §2 spells it this way: *each token is exported from the package
  * that owns its registry*. The tokens first shipped together in
- * `@four/four`'s `plugins.ts` — a recorded, reversible spelling difference —
+ * `@fourjs/four`'s `plugins.ts` — a recorded, reversible spelling difference —
  * and moved home once the owning packages were free; the umbrella still
  * re-exports the very same objects, so every existing import keeps working
  * and a token's identity (its `name` string) never changed.
@@ -13,7 +13,7 @@
  * names `defineCapability` and nothing else: a token is `{ name, revocable }`
  * — a key a *host* may choose to provide a value for — and holding or
  * declaring one confers no ability to install a plugin or to acquire a
- * capability. The host machinery — `@four/core`'s installer, host class, and
+ * capability. The host machinery — `@fourjs/core`'s installer, host class, and
  * install-time context, none of which this comment may even name — remains
  * banned from this package (`tests/integration/plugin-boundary.test.ts`):
  * nothing a document names can become a plugin, exactly as before.
@@ -24,7 +24,7 @@
  * nothing references leaves the bundle entirely.
  */
 
-import { defineCapability } from "@four/core";
+import { defineCapability } from "@fourjs/core";
 
 import type { SceneMigrationRegistry } from "./migration.js";
 import type { ComponentSerializerRegistry } from "./serializer.js";

@@ -11,8 +11,8 @@
  * underneath it is **deterministic**, in the four forms WP-1.14, WP-2.7, WP-4.8,
  * WP-5.8 and WP-6.6 established:
  *
- * 1. **Headless.** The scenario imports `@four/animation`, `@four/physics`,
- *    `@four/physics-rapier`, `@four/math`, `@four/scene`, `@four/diagnostics`
+ * 1. **Headless.** The scenario imports `@fourjs/animation`, `@fourjs/physics`,
+ *    `@fourjs/physics-rapier`, `@fourjs/math`, `@fourjs/scene`, `@fourjs/diagnostics`
  *    and `four/application` — no renderer package, no canvas, no DOM. As in
  *    WP-4.8, WP-5.8 and WP-6.6 the application comes from the
  *    `four/application` subpath, so "nothing renderer-shaped is loaded" is a

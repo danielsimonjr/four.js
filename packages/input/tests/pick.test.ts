@@ -1,11 +1,11 @@
-import { Vector3, constructionCount, resetConstructionCount } from "@four/math";
+import { Vector3, constructionCount, resetConstructionCount } from "@fourjs/math";
 import {
   Camera,
   Group,
   OrthographicCamera,
   PerspectiveCamera,
   resolveWorldTransform,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

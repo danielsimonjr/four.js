@@ -1,5 +1,5 @@
 /**
- * `@four/assets` — the asset system (§76–78).
+ * `@fourjs/assets` — the asset system (§76–78).
  *
  * Phase 11 (WP-11.2) ships the MVP tier: a deduplicating, reference-counted
  * {@link AssetManager} over an injectable `fetch`, plus text, JSON, binary, and
@@ -29,9 +29,9 @@
  * hot reload (`watch`). The rules are in `asset-manager.ts`'s module comment.
  */
 
-export const PACKAGE_NAME = "@four/assets";
+export const PACKAGE_NAME = "@fourjs/assets";
 
-// §81's asset-format token (RFC 0002): declared here; `@four/four`'s
+// §81's asset-format token (RFC 0002): declared here; `@fourjs/four`'s
 // `plugins.ts` re-exports the same object.
 export { ASSET_LOADERS } from "./capabilities.js";
 export type { RegisteredAssetLoader } from "./loader-registry.js";

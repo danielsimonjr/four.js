@@ -1,4 +1,4 @@
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import {
   Quaternion,
   Vector2,
@@ -6,7 +6,7 @@ import {
   Vector4,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
+} from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -435,7 +435,7 @@ describe("AnimationTrack cubic interpolation", () => {
   it("degenerates to a straight line with only two keys", () => {
     // Both tangents are the same one-sided secant, so the Hermite basis
     // collapses to p(u) = start + (end - start)·u — matching the two-waypoint
-    // case of @four/motion's Catmull-Rom trajectory.
+    // case of @fourjs/motion's Catmull-Rom trajectory.
     const cubic = scalarTrack([0, 2], [0, 4], "cubic");
     const linear = scalarTrack([0, 2], [0, 4], "linear");
 

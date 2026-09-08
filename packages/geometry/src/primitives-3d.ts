@@ -5,7 +5,7 @@
  *
  * §53 names eleven 3D primitives. `primitives.ts` shipped two of them with the
  * §120 MVP renderer; this module is the other nine, and it closes the gap the
- * §53 note in that file's header had been carrying since Phase 3: `@four/physics`
+ * §53 note in that file's header had been carrying since Phase 3: `@fourjs/physics`
  * ships sphere, capsule, cylinder, and height-field *colliders*, so every
  * physics scene had to draw a box where a round body was, and §119's motor
  * model — cylinders and tori — was unbuildable.
@@ -36,7 +36,7 @@
  * the revolution or sweep angle and wraps at the duplicated seam column, `v`
  * advances along the shape's axis with `v = 0` at the `-Y` (or path-start) end.
  * That matches §7a's Y-up and the bottom-row-first texel order
- * `@four/render`'s `TextureSource` documents, so a texture painted for a
+ * `@fourjs/render`'s `TextureSource` documents, so a texture painted for a
  * cylinder is not upside down on a capsule.
  *
  * ## Validation (§85)
@@ -104,7 +104,7 @@ export interface CapsuleGeometryOptions {
    * Length of the **cylindrical section only**, so the total extent along Y is
    * `height + 2 · radius`. Defaults to 1.
    *
-   * That is the same measurement `@four/physics`' capsule collider takes (§24),
+   * That is the same measurement `@fourjs/physics`' capsule collider takes (§24),
    * which is the whole point: a capsule body and the capsule drawn for it are
    * built from the same two numbers and cannot disagree.
    */
@@ -369,7 +369,7 @@ function taperedGeometry(
  *
  * The axis is +Y rather than +Z because §7a's world is Y-up in 2D and 3D alike:
  * an upright cylinder is the common case (a pillar, a shaft, a rotor), and one
- * that has to lie down is rotated by its node. `@four/physics`' cylinder
+ * that has to lie down is rotated by its node. `@fourjs/physics`' cylinder
  * collider (§24) takes the same radius and height about the same axis.
  *
  * `capped: false` omits both discs and leaves an open tube — cheaper, and what
@@ -1085,7 +1085,7 @@ export function tubeGeometry(options: TubeGeometryOptions): BufferGeometry {
  * });
  * ```
  *
- * XZ with Y up is the orientation `@four/physics`' height-field collider (§24)
+ * XZ with Y up is the orientation `@fourjs/physics`' height-field collider (§24)
  * uses, and it is the one terrain, a machined surface, or a scalar field over a
  * plan view arrives in. The field is centred on the origin: `x` spans
  * `[-width/2, width/2]` and `z` spans `[-depth/2, depth/2]`, whatever the

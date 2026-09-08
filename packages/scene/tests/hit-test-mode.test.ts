@@ -2,9 +2,9 @@
  * §71's authoring surface at the scene tier (A-11, adopted RFC 0005 Q3,
  * 2026-08-29): `Node.hitTestMode` is a plain field, defaulting `null`.
  *
- * Everything the mode *does* lives above this package — `@four/input`'s
+ * Everything the mode *does* lives above this package — `@fourjs/input`'s
  * `pick()` dispatches on it, the candidate data each strategy needs rides the
- * `Pickable` — so this file pins only what `@four/scene` promises: the field
+ * `Pickable` — so this file pins only what `@fourjs/scene` promises: the field
  * exists on every node, defaults `null` (§71's "the engine should select the
  * cheapest valid method"), holds what it is assigned, and gates the node
  * rather than the subtree. A plain field like `visible`, `layers` and `clip`,

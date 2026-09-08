@@ -5,8 +5,8 @@
  * stepped without a renderer."* This file is the proof, in the three forms the
  * plan's §8 verification stack demands:
  *
- * 1. **Headless.** The scenario imports `four`, `@four/scene`, `@four/motion`,
- *    `@four/math`, and `@four/diagnostics` — no renderer package, no canvas, no
+ * 1. **Headless.** The scenario imports `four`, `@fourjs/scene`, `@fourjs/motion`,
+ *    `@fourjs/math`, and `@fourjs/diagnostics` — no renderer package, no canvas, no
  *    DOM. It runs under plain `node` with no environment at all (test 3), which
  *    is stronger evidence than any assertion could be.
  * 2. **Deterministic in-process.** Two independent runs in one process produce

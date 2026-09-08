@@ -31,15 +31,15 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, test, afterEach } from "vitest";
 
-import type { NodeMaterial } from "@four/materials";
+import type { NodeMaterial } from "@fourjs/materials";
 import {
   Rectangle,
   clearRegisteredShapePaints,
   registerShapePaints,
   type StrokeStyle,
   type RadialGradientPaint,
-} from "@four/render";
-import { emitShaderGraphGlsl } from "@four/render-webgl";
+} from "@fourjs/render";
+import { emitShaderGraphGlsl } from "@fourjs/render-webgl";
 
 const GOLDEN_URL = new URL("./golden/shape-paint-glsl.json", import.meta.url);
 

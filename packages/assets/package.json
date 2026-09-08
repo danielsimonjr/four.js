@@ -1,5 +1,5 @@
 {
-  "name": "@four/assets",
+  "name": "@fourjs/assets",
   "version": "0.0.1",
   "type": "module",
   "license": "MIT",
@@ -13,6 +13,6 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@four/core": "workspace:*"
+    "@fourjs/core": "workspace:*"
   }
 }

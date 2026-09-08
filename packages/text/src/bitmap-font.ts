@@ -22,7 +22,7 @@
  * ## Why the pixels live in source (decision, WP-3a.4)
  *
  * There is no DOM here, no `<canvas>`, no `document.fonts`, and no file read.
- * `@four/text` depends on `core`, `math`, and `geometry` only (plan §3.1), it is
+ * `@fourjs/text` depends on `core`, `math`, and `geometry` only (plan §3.1), it is
  * imported by headless tests and by Node, and §33 forbids anything whose result
  * varies by environment. A canvas rasterizer fails all three: it needs a
  * browser, it renders differently on every platform's font stack, and it makes a

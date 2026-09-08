@@ -4,8 +4,8 @@
  * ## Read this before using anything below
  *
  * Declaring a {@link UnitSystem} **does not change what the engine computes**.
- * There is no unit mode. Nothing in `@four/scene`, `@four/motion`,
- * `@four/physics`, or any renderer reads a `UnitSystem`, and no engine
+ * There is no unit mode. Nothing in `@fourjs/scene`, `@fourjs/motion`,
+ * `@fourjs/physics`, or any renderer reads a `UnitSystem`, and no engine
  * signature anywhere takes one. Internally and at every API boundary fourJS is
  * and stays:
  *
@@ -74,9 +74,9 @@
  *
  * - **No `PhysicsWorldOptions.units` and no `ApplicationOptions.units`.** §45's
  *   option record does not list one, so adding it would be inventing API. §101
- *   assigns *"unit application in simulation"* to `@four/physics` (reading
+ *   assigns *"unit application in simulation"* to `@fourjs/physics` (reading
  *   `scale.lengthToMeters` for the §41 precision envelope, for instance); that
- *   is a `@four/physics` packet and is staged, not shipped here (2026-08-07).
+ *   is a `@fourjs/physics` packet and is staged, not shipped here (2026-08-07).
  * - **No text parsing.** `parseAngle("90°")` needs a locale, a symbol table,
  *   and a failure policy; the numeric authoring direction
  *   ({@link angleFromDisplay}) is the part §40 actually asks for. Staged
@@ -476,7 +476,7 @@ export function massFromDisplay(displayed: number, units: UnitSystem): number {
  * The SI value of a world length, independent of the display selector.
  *
  * This is the §40 `scale` factor applied on its own — what §101's *"unit
- * application in simulation"* will read when `@four/physics` checks §41's
+ * application in simulation"* will read when `@fourjs/physics` checks §41's
  * 1e5-length-unit precision envelope in SI terms, and what an engineering
  * readout wants when it must report metres regardless of what the inspector is
  * currently showing.

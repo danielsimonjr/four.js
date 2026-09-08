@@ -11,9 +11,9 @@
  * the byte-identity anchor.
  */
 
-import { resetDevWarnings } from "@four/core";
-import { planeGeometry } from "@four/geometry";
-import { SpriteMaterial, UnlitMaterial } from "@four/materials";
+import { resetDevWarnings } from "@fourjs/core";
+import { planeGeometry } from "@fourjs/geometry";
+import { SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
 import {
   ALL_LAYERS,
   DEFAULT_LAYER_MASK,
@@ -26,7 +26,7 @@ import {
   layerMask,
   resetLayers,
   resolveWorldTransforms,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

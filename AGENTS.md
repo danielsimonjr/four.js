@@ -61,7 +61,7 @@ author's decision (2026-07-28); `docs/ERRATA.md` is now a correction log:
   citing the PDF, say so explicitly ("PDF §49, second range").
 - **E-3 (resolved):** the PDF's Solver Packages section contradicted the monorepo tree by
   naming `physics-matter` and `physics-cannon`. The tree won: §102 (Solver Packages) now
-  lists only `@four/physics-rapier` and `@four/physics-box2d`. The scaffold contains
+  lists only `@fourjs/physics-rapier` and `@fourjs/physics-box2d`. The scaffold contains
   `physics-rapier`, `physics-box2d`, and `physics-soft` only — **do not add `physics-matter`
   or `physics-cannon` directories** without a further spec amendment.
 
@@ -261,7 +261,7 @@ physically. Render everywhere."*
   import/export. Path model (§51): moveTo/lineTo/quadratic/cubic/arc/close plus flatten,
   simplify, offset, length, point/tangent/normal evaluation, closest point, union/intersect/
   subtract/xor; fill rules nonzero and even-odd.
-- **Tessellation** (§52) is an isolated, replaceable **module of `@four/geometry`** with a
+- **Tessellation** (§52) is an isolated, replaceable **module of `@fourjs/geometry`** with a
   stable interface (concave polygons, holes, adaptive subdivision, stroke expansion, AA
   fringe, incremental rebuild).
 - Geometry (§53): `Geometry2D` (path/fill/stroke) and `Geometry3D` (buffer/indexed/
@@ -293,7 +293,7 @@ physically. Render everywhere."*
   "custom"`; engine picks the cheapest valid method.
 - Input (§72): DOM-mirroring capture → target → bubble phases; pointer capture across mixed
   2D/3D.
-- Retained-mode UI (§73–75): `@four/ui` controls are scene nodes; layout modes absolute/
+- Retained-mode UI (§73–75): `@fourjs/ui` controls are scene nodes; layout modes absolute/
   stack/flex/grid/anchor/constraints; **accessibility via a hidden DOM mirror** (roles,
   labels, keyboard nav, focus, reduced motion, high contrast).
 - Assets (§76–78): declarative `app.assets.load({...})`; dedup, caching, refcounting,
@@ -398,7 +398,7 @@ where practical, maintainer approval).
 
 ## 7. Package map (`packages/`)
 
-All packages are `@four/`-scoped. The scaffold matches §98 (Proposed Monorepo) exactly —
+All packages are `@fourjs/`-scoped. The scaffold matches §98 (Proposed Monorepo) exactly —
 24 packages plus the top-level dirs `examples/`, `benchmarks/`, `docs/`, `tests/`, `tools/`,
 `website/`.
 
@@ -423,7 +423,7 @@ All packages are `@four/`-scoped. The scaffold matches §98 (Proposed Monorepo) 
 | `ui` | Retained-mode UI controls, layout, accessibility mirror |
 | `serialization` | `.four.json` / `.four` formats, migration |
 | `diagnostics` | Stats, debug overlays, validation warnings |
-| `four` | Umbrella package (the `import * as Four from "four"` surface); hosts the §45 `Application` composition root (rev 1.4) |
+| `four` | Umbrella package (the `import * as Four from "fourJS"` surface); hosts the §45 `Application` composition root (rev 1.4) |
 
 Dependency direction to preserve: `math`/`core` at the bottom; `scene`, `motion`, `animation`
 above them; `physics` defines the API that `physics-*` adapters implement; `render` defines
@@ -457,7 +457,7 @@ concrete backend; `four` aggregates everything.
 8. **Honor single-authority transforms**: any system writing to a transform must go through
    the transform-authority model; conflicts warn in development.
 9. **Keep the stable-API/adapter split**: application code (and examples/tests) targets
-   `@four/physics` and `@four/render` interfaces, never a specific solver or backend, except
+   `@fourjs/physics` and `@fourjs/render` interfaces, never a specific solver or backend, except
    inside adapter/backend packages themselves.
 10. **Units are explicit** (§40): default meter/kilogram/second/radian, but never hard-code
     the assumption that 1 unit = 1 meter into APIs.

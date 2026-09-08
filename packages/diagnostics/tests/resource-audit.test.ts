@@ -14,7 +14,7 @@ import {
   auditResourceLeaks,
   type LiveResourceCounts,
 } from "../src/resource-audit.js";
-import { resetDevWarnings } from "@four/core";
+import { resetDevWarnings } from "@fourjs/core";
 
 /** A reading with every counter at zero; cases override what they care about. */
 function counts(

@@ -2,14 +2,14 @@
  * §83's "excessive per-frame allocations" development warning (A-4/A-5,
  * 2026-09-06).
  *
- * `@four/math`'s {@link @four/math!constructionCount | constructionCount} is
+ * `@fourjs/math`'s {@link @fourjs/math!constructionCount | constructionCount} is
  * the instrument benchmarks use to prove zero steady-state allocation (§7b).
  * This module turns two readings of that counter into a one-time warning —
  * the same opt-in, caller-driven shape as {@link auditResourceLeaks}:
  *
  * ```ts
- * import { constructionCount, resetConstructionCount } from "@four/math";
- * import { auditFrameAllocations } from "@four/diagnostics";
+ * import { constructionCount, resetConstructionCount } from "@fourjs/math";
+ * import { auditFrameAllocations } from "@fourjs/diagnostics";
  *
  * resetConstructionCount();
  * warmUp();
@@ -22,7 +22,7 @@
  * {@link NO_FRAME_ALLOCATIONS} without touching the arguments.
  */
 
-import { DEV, devWarnOnce } from "@four/core";
+import { DEV, devWarnOnce } from "@fourjs/core";
 
 /** What grew across the audited span. */
 export interface FrameAllocationReport {
@@ -45,7 +45,7 @@ export interface AuditFrameAllocationsOptions {
    */
   readonly label?: string;
   /**
-   * How many {@link @four/math!constructionCount | constructionCount}
+   * How many {@link @fourjs/math!constructionCount | constructionCount}
    * constructions are allowed before warning. Defaults to `0` — steady-state
    * engine code should allocate none (§7b).
    */
@@ -70,7 +70,7 @@ function grew(before: number, after: number): number {
 }
 
 /**
- * Compares two {@link @four/math!constructionCount | constructionCount}
+ * Compares two {@link @fourjs/math!constructionCount | constructionCount}
  * readings and reports — and by default warns once — when the span allocated
  * more math objects than the threshold allows.
  *
@@ -91,7 +91,7 @@ export function auditFrameAllocations(
 
   const label = options.label ?? "this frame";
   const message =
-    `§83: ${String(constructed)} @four/math object(s) were constructed during ` +
+    `§83: ${String(constructed)} @fourjs/math object(s) were constructed during ` +
     `"${label}" (threshold ${String(threshold)}); steady-state per-frame code ` +
     "should reuse out-parameters and pooled buffers (§7b).";
 

@@ -1,5 +1,5 @@
 /**
- * `@four/text` — bitmap text at §56's MVP tier.
+ * `@fourjs/text` — bitmap text at §56's MVP tier.
  *
  * Three pieces, each usable on its own:
  *
@@ -14,8 +14,8 @@
  *
  * ```ts
  * const atlas = buildGlyphAtlas();
- * const texture = new Texture(atlas);                 // @four/render
- * const material = new SpriteMaterial({ texture });   // @four/materials
+ * const texture = new Texture(atlas);                 // @fourjs/render
+ * const material = new SpriteMaterial({ texture });   // @fourjs/materials
  * for (const quad of layoutText("Motor 42", atlas, { size: 0.25 }).quads) {
  *   // one textured rectangle, baseline-left origin, +Y up
  * }
@@ -25,7 +25,7 @@
  * `math`, and `geometry` (plan §3.1, frozen) — not `render`, not `materials`,
  * not `scene` — so it cannot construct a `Texture`, a material, or a `Text`
  * node, and it does not try. The atlas is emitted in exactly the shape
- * `@four/render`'s `TextureSource` accepts, and the layout in the shape a quad
+ * `@fourjs/render`'s `TextureSource` accepts, and the layout in the shape a quad
  * builder wants; the package that owns nodes assembles the two. See
  * `glyph-atlas.ts` for why that seam is structural rather than an import.
  *
@@ -35,7 +35,7 @@
  * package is still what computes where the glyphs go.
  */
 
-export const PACKAGE_NAME = "@four/text";
+export const PACKAGE_NAME = "@fourjs/text";
 
 export {
   BUILTIN_FONT,

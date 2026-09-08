@@ -17,7 +17,7 @@
  *    including for a document carrying binary that is nowhere near ASCII.
  */
 
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import {

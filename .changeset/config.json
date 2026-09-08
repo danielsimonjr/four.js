@@ -8,17 +8,17 @@
   "fixed": [],
   "linked": [
     [
-      "@four/render",
-      "@four/render-webgl",
-      "@four/render-webgpu",
-      "@four/render-canvas",
-      "@four/render-svg"
+      "@fourjs/render",
+      "@fourjs/render-webgl",
+      "@fourjs/render-webgpu",
+      "@fourjs/render-canvas",
+      "@fourjs/render-svg"
     ],
     [
-      "@four/physics",
-      "@four/physics-rapier",
-      "@four/physics-box2d",
-      "@four/physics-soft"
+      "@fourjs/physics",
+      "@fourjs/physics-rapier",
+      "@fourjs/physics-box2d",
+      "@fourjs/physics-soft"
     ]
   ],
   "ignore": []

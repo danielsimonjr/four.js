@@ -11,13 +11,13 @@
  *
  * §79 says components "serialize under registered type names; plugins register
  * theirs (§81)", and the dependency matrix (plan §3.1) makes that the only
- * possible design: `@four/serialization` may depend on `core`, `math`, and
+ * possible design: `@fourjs/serialization` may depend on `core`, `math`, and
  * `scene` only, so it can never name `RigidBody`, an animation component, or an
  * application's own. Each package (or the application wiring them together)
  * registers a serializer for the components it owns, keyed by the component
  * class's `static readonly typeName` — the §6a registry key, which §79 makes the
  * serialization name too. This package ships the serializers for the components
- * it *can* see: `PoseTarget` (§19, §42), which lives in `@four/scene`.
+ * it *can* see: `PoseTarget` (§19, §42), which lives in `@fourjs/scene`.
  *
  * ## The writer walks the node, the registry fixes the order (2026-08-06, A-15)
  *
@@ -59,17 +59,17 @@
  *
  * §79 requires that "node and resource ids are stable: they serialize with the
  * scene, and deserialization restores them (the engine assigns ids only to newly
- * created objects)". `Node.id` is `readonly` and assigned from `@four/scene`'s
+ * created objects)". `Node.id` is `readonly` and assigned from `@fourjs/scene`'s
  * monotonic counter at construction. That counter now knows about restored ids
- * (2026-08-06, A-17): `@four/scene` exports `restoreNodeId`, which reserves the
+ * (2026-08-06, A-17): `@fourjs/scene` exports `restoreNodeId`, which reserves the
  * id against the counter as it writes it, and `NodeOptions.id` does the same at
  * construction time — so a node built *after* a load can no longer be handed an
  * id a loaded node already holds. {@link instantiateScene} additionally refuses
  * a document that names one id twice, since reserving cannot help there.
  */
 
-import { FourError, type Component, type ComponentType } from "@four/core";
-import type { Quaternion, Vector3 } from "@four/math";
+import { FourError, type Component, type ComponentType } from "@fourjs/core";
+import type { Quaternion, Vector3 } from "@fourjs/math";
 import {
   Group,
   Node,
@@ -77,7 +77,7 @@ import {
   Scene,
   restoreNodeId,
   type Transform,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 import {
   SCENE_FORMAT_VERSION,
@@ -167,9 +167,9 @@ export type UnknownComponentPolicy = "throw" | "skip";
  * The `typeName` of a component instance, read through its constructor (§6a,
  * plan D2).
  *
- * Transcribed from `@four/core`'s own private helper rather than imported: the
+ * Transcribed from `@fourjs/core`'s own private helper rather than imported: the
  * function is not part of that package's public surface, and the alternative —
- * widening `@four/core`'s exports so one caller can read a static field it can
+ * widening `@fourjs/core`'s exports so one caller can read a static field it can
  * already reach — is a larger change than four lines. Returns `undefined` for a
  * component class that omits `typeName`, which §6a's registry rejects at attach
  * time, so it can only be seen here on a component attached through some other
@@ -665,7 +665,7 @@ function createNode(
     return custom;
   }
   // The id goes in through the constructor (§79, 2026-08-06 A-17), which also
-  // reserves it against `@four/scene`'s counter. A `nodeFactory` cannot be made
+  // reserves it against `@fourjs/scene`'s counter. A `nodeFactory` cannot be made
   // to do that — it constructs the node itself — so that path restores the id
   // afterwards through `restoreNodeId`, which reserves it too.
   const id = document.id === undefined ? {} : { id: document.id };

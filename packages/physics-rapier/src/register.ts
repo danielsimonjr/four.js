@@ -1,13 +1,13 @@
 /**
  * This package's opt-in to §37's solver registry (PH-19).
  *
- * `@four/physics` holds the registry and knows no solver; this module is the
+ * `@fourjs/physics` holds the registry and knows no solver; this module is the
  * one place that names both, and it lives here — below the stable API, above
  * nothing — because that is the only direction the frozen §3.1 matrix allows
  * (`physics-rapier` already depends on `physics`; no edge is added).
  *
  * ```ts
- * import { registerRapierSolver } from "@four/physics-rapier";
+ * import { registerRapierSolver } from "@fourjs/physics-rapier";
  *
  * registerRapierSolver();
  * const world = new PhysicsWorld({ dimension: "3d", solver: "auto" });
@@ -31,10 +31,10 @@
  *
  * ## Why this is a function call and not an import side effect
  *
- * `@four/physics-rapier` declares `"sideEffects": false`, so a bundler may
+ * `@fourjs/physics-rapier` declares `"sideEffects": false`, so a bundler may
  * delete an import whose bindings are unused; a side-effect registration
  * module would be dropped and `solver: "auto"` would then fail at runtime with
- * "nothing is registered". `@four/render`'s `renderer-registry.ts` carries the
+ * "nothing is registered". `@fourjs/render`'s `renderer-registry.ts` carries the
  * full argument — this is the same decision, taken once for both tiers.
  *
  * The module is separate from the adapters for the mirror-image reason: a
@@ -47,7 +47,7 @@ import {
   type PhysicsWorldAdapter,
   type PhysicsWorldOptions,
   type SolverRegistry,
-} from "@four/physics";
+} from "@fourjs/physics";
 
 import { Rapier2dAdapter } from "./rapier2d-adapter.js";
 import { Rapier3dAdapter } from "./rapier3d-adapter.js";

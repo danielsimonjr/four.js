@@ -1,4 +1,4 @@
-# @four/physics-soft
+# @fourjs/physics-soft
 
 Soft bodies and deformables — **interface reserved; not yet implemented.** Part of [fourJS](../../README.md).
 
@@ -8,4 +8,4 @@ The package exists in the workspace so the §98 monorepo tree stays accurate. Th
 
 Unit tests are colocated in `tests/` per §92.
 
-Workspace name `@four/physics-soft`; publishes as `@danielsimonjr/fourjs-physics-soft`.
+Workspace name `@fourjs/physics-soft`; publishes as `@danielsimonjr/fourjs-physics-soft`.

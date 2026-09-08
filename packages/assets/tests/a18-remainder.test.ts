@@ -4,7 +4,7 @@
  * no real Worker, no websocket, no platform fetch.
  */
 
-import { FourError, isFourError } from "@four/core";
+import { FourError, isFourError } from "@fourjs/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

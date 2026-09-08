@@ -2,7 +2,7 @@
  * `Label` (§73) — a widget whose intrinsic size is its text (§74, §56).
  *
  * ```ts
- * const atlas = buildGlyphAtlas();                        // @four/text
+ * const atlas = buildGlyphAtlas();                        // @fourjs/text
  * const title = new Label({ text: "Motor 42", atlas, size: 18 });
  * title.measure();
  * title.measuredWidth;   // the text's width in layout units
@@ -10,14 +10,14 @@
  *
  * ## Text is measured here and drawn by the skin
  *
- * `@four/text` **is** a dependency of `@four/ui` (plan §3.1), so there is no
+ * `@fourjs/text` **is** a dependency of `@fourjs/ui` (plan §3.1), so there is no
  * excuse for a fake here: a label really lays its string out, with
  * `layoutText`, against a real {@link GlyphAtlas}, and reports the result as its
  * intrinsic size — §74's "intrinsic text/image size", satisfied by arithmetic
  * rather than by a promise.
  *
- * What it cannot do is *draw* it. `@four/text` "produces data, never nodes" for
- * the same dependency-matrix reason `@four/ui` does; turning a quad into a
+ * What it cannot do is *draw* it. `@fourjs/text` "produces data, never nodes" for
+ * the same dependency-matrix reason `@fourjs/ui` does; turning a quad into a
  * textured sprite needs `render` and `materials`, which neither package may
  * import. So {@link Label.textLayout} is public, and a {@link WidgetSkin} turns
  * its quads into whatever the application draws with — exactly the composition
@@ -56,8 +56,8 @@
  * (§56, staged there), so a label's width is its longest line's width.
  */
 
-import type { Vector2 } from "@four/math";
-import { layoutText, type GlyphAtlas, type TextLayout } from "@four/text";
+import type { Vector2 } from "@fourjs/math";
+import { layoutText, type GlyphAtlas, type TextLayout } from "@fourjs/text";
 
 import { UIWidget, type UIWidgetOptions } from "./widget.js";
 
@@ -128,7 +128,7 @@ export class Label extends UIWidget {
   }
 
   /**
-   * The glyph atlas the text is measured against (`@four/text`), or `null`.
+   * The glyph atlas the text is measured against (`@fourjs/text`), or `null`.
    *
    * A label with no atlas measures `0 × 0` and has no {@link Label.textLayout}:
    * a font is data the application loads, and inventing one here would be a

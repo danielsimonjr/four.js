@@ -7,14 +7,14 @@
  *
  * The graphs here are hand-built IR values (`ShaderGraph` is plain JSON), not
  * `NodeMaterialBuilder` output: this package's dependency row is
- * `core, math, render` (§3.1, frozen), so `@four/materials` may not be named
+ * `core, math, render` (§3.1, frozen), so `@fourjs/materials` may not be named
  * even in a test — the builder-driven composition lives in
  * `tests/integration/webgpu-node-materials.test.ts`, and the byte-for-byte
  * emission golden in `tests/determinism/shader-graph-wgsl.test.ts`.
  */
 
-import { resetDevWarnings } from "@four/core";
-import { Matrix4, type Vector3 } from "@four/math";
+import { resetDevWarnings } from "@fourjs/core";
+import { Matrix4, type Vector3 } from "@fourjs/math";
 import {
   Renderable,
   RenderTarget,
@@ -23,7 +23,7 @@ import {
   type Renderer,
   type ShaderGraph,
   type UnlitRenderItem,
-} from "@four/render";
+} from "@fourjs/render";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

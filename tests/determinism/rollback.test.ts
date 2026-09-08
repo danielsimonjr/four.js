@@ -5,7 +5,7 @@
  * §33 lists rollback among the six facilities the engine must support, and
  * until PH-20 it was the one with primitives and no API. The primitives are
  * `PhysicsWorld.createSnapshot`/`restoreSnapshot`; the API is
- * `@four/diagnostics`'s `RollbackBuffer`. What has to be true for it to be
+ * `@fourjs/diagnostics`'s `RollbackBuffer`. What has to be true for it to be
  * worth having is a determinism claim, so it is tested here rather than only in
  * the package: **a run that is rewound to step *n* and re-simulated reproduces
  * the original run's per-step checksums exactly, from step *n* + 1 to the
@@ -30,17 +30,17 @@
  * back.
  */
 
-import { createChecksum, RollbackBuffer } from "@four/diagnostics";
-import { Vector2 } from "@four/math";
-import { SystemRegistry, createTimeState } from "@four/motion";
+import { createChecksum, RollbackBuffer } from "@fourjs/diagnostics";
+import { Vector2 } from "@fourjs/math";
+import { SystemRegistry, createTimeState } from "@fourjs/motion";
 import {
   Collider,
   PhysicsSystem,
   PhysicsWorld,
   RigidBody,
-} from "@four/physics";
-import { Rapier2dAdapter } from "@four/physics-rapier";
-import { Group } from "@four/scene";
+} from "@fourjs/physics";
+import { Rapier2dAdapter } from "@fourjs/physics-rapier";
+import { Group } from "@fourjs/scene";
 import { describe, expect, test } from "vitest";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */

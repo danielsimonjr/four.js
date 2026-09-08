@@ -12,26 +12,26 @@
  * and that a step allocates nothing.
  */
 
-import { isFourError, type FourError } from "@four/core";
+import { isFourError, type FourError } from "@fourjs/core";
 import {
   Quaternion,
   Vector3,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
+} from "@fourjs/math";
 import {
   PRIORITY_ANIMATION_TARGETS,
   SystemRegistry,
   createTimeState,
   type SimulationSystem,
-} from "@four/motion";
+} from "@fourjs/motion";
 import {
   Group,
   PoseBuffer,
   PoseTarget,
   createSnapshotSystem,
   type Node,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BodyType, PhysicsWorldInit } from "../src/index.js";

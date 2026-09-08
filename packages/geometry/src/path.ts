@@ -25,7 +25,7 @@
  * that will need a validating parse, and it can have one.
  *
  * Placement is §98's: *"`geometry`: 2D and 3D geometry, **path model**,
- * tessellation module (§52)"*. `@four/math` owns curves as math; `@four/scene`
+ * tessellation module (§52)"*. `@fourjs/math` owns curves as math; `@fourjs/scene`
  * owns nodes. A `Path` is neither — it is the 2D geometry source `R-23`'s shape
  * nodes, `R-16`'s paints, `R-26`'s SVG bridge and §56's text-on-a-path all read.
  *
@@ -163,7 +163,7 @@
  * module is not the bottleneck it would be easy to assume it is.
  */
 
-import type { Matrix3 } from "@four/math";
+import type { Matrix3 } from "@fourjs/math";
 
 import {
   booleanPolygons,
@@ -1104,7 +1104,7 @@ export class Path {
    * Applies a 2D affine transform to every command (§51 "transform"),
    * returning a new path.
    *
-   * `matrix` is read as `@four/math`'s column-major 3×3 with the translation in
+   * `matrix` is read as `@fourjs/math`'s column-major 3×3 with the translation in
    * its third column: a point maps to `(e0·x + e3·y + e6, e1·x + e4·y + e7)`.
    *
    * ## Points are exact; arcs are the interesting case

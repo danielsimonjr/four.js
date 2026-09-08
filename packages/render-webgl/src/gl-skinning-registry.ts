@@ -14,7 +14,7 @@
  * one `let` and three functions. An application opts in with
  *
  * ```ts
- * import { registerSkinningPipeline } from "@four/render-webgl";
+ * import { registerSkinningPipeline } from "@fourjs/render-webgl";
  * registerSkinningPipeline();
  * ```
  *
@@ -32,8 +32,8 @@
  * is that a value must not become one.
  */
 
-import type { Matrix4 } from "@four/math";
-import type { SceneLights } from "@four/render";
+import type { Matrix4 } from "@fourjs/math";
+import type { SceneLights } from "@fourjs/render";
 
 import type { WebglContext } from "./gl-program.js";
 

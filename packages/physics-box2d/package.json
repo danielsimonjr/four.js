@@ -1,5 +1,5 @@
 {
-  "name": "@four/physics-box2d",
+  "name": "@fourjs/physics-box2d",
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
@@ -13,6 +13,6 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@four/physics": "workspace:*"
+    "@fourjs/physics": "workspace:*"
   }
 }

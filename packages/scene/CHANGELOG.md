@@ -1,4 +1,4 @@
-# @four/scene
+# @fourjs/scene
 
 ## 0.0.1
 

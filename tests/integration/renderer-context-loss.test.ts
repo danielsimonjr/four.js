@@ -48,28 +48,28 @@
  * comparison lives in `packages/render-webgl/tests`, whose double copies.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
-import { Vector3 } from "@four/math";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
+import { Vector3 } from "@fourjs/math";
 import {
   CircularTrajectory,
   KinematicController,
   KinematicSystem,
-} from "@four/motion";
+} from "@fourjs/motion";
 import {
   NullRenderer,
   RenderGraph,
   RenderTarget,
   Renderable,
   type Renderer,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
-} from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/scene";
+import { Application } from "fourJS/application";
 import { describe, expect, it } from "vitest";
 
 import { LosableCanvas } from "./helpers/losable-canvas.js";

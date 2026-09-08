@@ -3,8 +3,8 @@
  * 2026-08-07, A-10).
  *
  * §72 lists keyboard events among the input events a node may receive, and
- * until this module landed `@four/input` had **no key source at all** — the
- * single fact that blocked §75's keyboard traversal (`@four/ui`'s `UI_STAGED`
+ * until this module landed `@fourjs/input` had **no key source at all** — the
+ * single fact that blocked §75's keyboard traversal (`@fourjs/ui`'s `UI_STAGED`
  * named it), and that `examples/ui-demo` worked around with a page-level
  * `keydown` handler.
  *
@@ -19,7 +19,7 @@
  *
  * Everything structural about these events is the pointer precedent, unchanged:
  * the listener keys widen `NodeEventMap` by declaration merging (the mechanism
- * `@four/scene` designed and `pointer-events.ts` established), the capture
+ * `@fourjs/scene` designed and `pointer-events.ts` established), the capture
  * phase gets its own `"capture:"`-prefixed keys because §6b's `on(type,
  * listener)` has no phase flag to pass, and the walk itself is the shared
  * {@link dispatchThreePhase}.
@@ -35,7 +35,7 @@
  * So `KeyboardInput` takes a `focusTarget()` resolver instead of a picker, and
  * this module knows nothing about how focus is decided — which is what keeps
  * the §3.1 dependency direction intact (`ui` depends on `input`, never the
- * reverse: `@four/ui` owns focus and hands its answer *in*).
+ * reverse: `@fourjs/ui` owns focus and hands its answer *in*).
  *
  * ## Why the event carries `preventDefault`
  *
@@ -63,7 +63,7 @@
  * distinguish "held" from "pressed again".
  */
 
-import type { Node } from "@four/scene";
+import type { Node } from "@fourjs/scene";
 
 import { SceneInputEvent, dispatchThreePhase } from "./propagation.js";
 
@@ -233,13 +233,13 @@ const CAPTURE_KEYS = {
   keyup: "capture:keyup",
 } as const satisfies Record<SceneKeyEventType, string>;
 
-declare module "@four/scene" {
+declare module "@fourjs/scene" {
   // Key events (§72), merged into the one node event map (§6b) by declaration
   // merging — the same mechanism, and for the same reasons, as the pointer
   // events in `pointer-events.ts`.
   //
   // Deliberately NOT a doc comment: TypeDoc warns when two declarations of one
-  // merged interface both carry one, and `@four/scene`'s declaration is the
+  // merged interface both carry one, and `@fourjs/scene`'s declaration is the
   // documented one.
   interface NodeEventMap {
     /** Key pressed (or auto-repeated). Capture, target, bubble. */

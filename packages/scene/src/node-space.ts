@@ -25,11 +25,11 @@ import {
   type ComponentHost,
   type JsonValue,
   type SpaceMode,
-} from "@four/core";
-import { Vector3 } from "@four/math";
+} from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
 
 /**
- * The structural shape of `@four/serialization`'s `ComponentSerializer<T>` —
+ * The structural shape of `@fourjs/serialization`'s `ComponentSerializer<T>` —
  * declared here rather than imported because the frozen §3.1 matrix has no
  * scene → serialization edge. Same duck-typing move as
  * {@link ./skeleton.js#MORPH_WEIGHTS_SERIALIZER}.

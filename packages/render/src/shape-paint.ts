@@ -19,12 +19,12 @@
  *
  * ## Where it lives, and why (§3.1, §98)
  *
- * §98 files "paints" under `@four/materials`, but the paint *objects* belong
+ * §98 files "paints" under `@fourjs/materials`, but the paint *objects* belong
  * to §50's shape node — R-16's landed decision, restated by §50's own example
  * (`fill`/`stroke` are constructor options of the shape) — and `materials`
  * cannot see `ShapeFill` without inverting the frozen matrix (`render`
  * imports `materials`, never the reverse). So the lowering sits beside the
- * family that owns the paints, in `@four/render`, and consumes the §60
+ * family that owns the paints, in `@fourjs/render`, and consumes the §60
  * builder through the `render → materials` edge that has existed since
  * wave 3. No §3.1 edge moves.
  *
@@ -91,9 +91,9 @@ import {
   type Material,
   type MaterialTexture,
   type ShaderExpression,
-} from "@four/materials";
-import type { ColorRGBA } from "@four/math";
-import type { Point2D } from "@four/geometry";
+} from "@fourjs/materials";
+import type { ColorRGBA } from "@fourjs/math";
+import type { Point2D } from "@fourjs/geometry";
 
 import {
   setShapePaintSupport,
@@ -117,7 +117,7 @@ import {
 
 /**
  * Paints the lowering actually evaluates. Conic is authored and stored, but
- * kept off {@link ResolvedObjectPaint} so `@four/four`'s existing paint
+ * kept off {@link ResolvedObjectPaint} so `@fourjs/four`'s existing paint
  * switch stays total without a serializer edit in this packet.
  */
 type LoweredPaint = ResolvedPaint | ResolvedConicGradientPaint;
@@ -589,8 +589,8 @@ function plan(
  * this lets the author *say*.
  *
  * ```ts
- * import { registerShapePaints } from "@four/render";
- * import { registerNodeMaterialPipeline } from "@four/render-webgl";
+ * import { registerShapePaints } from "@fourjs/render";
+ * import { registerNodeMaterialPipeline } from "@fourjs/render-webgl";
  *
  * registerShapePaints();
  * registerNodeMaterialPipeline();

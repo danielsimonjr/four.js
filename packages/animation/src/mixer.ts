@@ -79,10 +79,10 @@
  * built once per mixer, and every track writes through its own scratch.
  */
 
-import { FourError } from "@four/core";
-import { Quaternion, type Vector3 } from "@four/math";
-import { Node, warnAuthorityConflict } from "@four/scene";
-import type { TransformAuthority } from "@four/scene";
+import { FourError } from "@fourjs/core";
+import { Quaternion, type Vector3 } from "@fourjs/math";
+import { Node, warnAuthorityConflict } from "@fourjs/scene";
+import type { TransformAuthority } from "@fourjs/scene";
 
 import { createBinding, type PropertyBinding } from "./binding.js";
 import type { AnimationClip, AnimationEvent, TrackSampleSink } from "./clip.js";

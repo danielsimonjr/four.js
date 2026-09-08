@@ -20,8 +20,8 @@
  * surface under the same driver.
  */
 
-import { Vector3 } from "@four/math";
-import { UnlitMaterial, SpriteMaterial } from "@four/materials";
+import { Vector3 } from "@fourjs/math";
+import { UnlitMaterial, SpriteMaterial } from "@fourjs/materials";
 import {
   Rectangle,
   Renderable,
@@ -29,16 +29,16 @@ import {
   Texture,
   createRenderStatistics,
   resetRenderStatistics,
-} from "@four/render";
-import { WebglRenderer, createGlBatching } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer, createGlBatching } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   type Viewport,
   resolveWorldTransforms,
-} from "@four/scene";
-import { planeGeometry } from "@four/geometry";
+} from "@fourjs/scene";
+import { planeGeometry } from "@fourjs/geometry";
 
 /** Canvas size the spec creates and this file reads back. */
 const WIDTH = 320;

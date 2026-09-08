@@ -4,7 +4,7 @@
  *
  * RFC 0002 §2 spells it this way: *each token is exported from the package
  * that owns its registry*. The tokens first shipped together in
- * `@four/four`'s `plugins.ts` — a recorded, reversible spelling difference —
+ * `@fourjs/four`'s `plugins.ts` — a recorded, reversible spelling difference —
  * and moved home once the owning packages were free; the umbrella still
  * re-exports the very same object, so every existing import keeps working and
  * the token's identity (its `name` string) never changed.
@@ -15,7 +15,7 @@
  * references leaves the bundle entirely.
  */
 
-import { defineCapability } from "@four/core";
+import { defineCapability } from "@fourjs/core";
 
 import type { SystemRegistry } from "./systems.js";
 
@@ -42,7 +42,7 @@ import type { SystemRegistry } from "./systems.js";
  * await app.initialize();
  * ```
  *
- * (The plugin and context types live in `@four/core`; naming them here would
+ * (The plugin and context types live in `@fourjs/core`; naming them here would
  * trip the §96 boundary test's textual ban, which is blunt on purpose.)
  *
  * Provided by `Application` for every application that configures plugins: the

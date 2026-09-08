@@ -46,7 +46,7 @@
  * `camera.lookAt(target); camera.updateViewMatrix();` yields the classic
  * look-at view matrix. {@link Node.getWorldDirection} reads the aim back.
  * §44's *rigs* live where each one's inputs do: `OrbitRig` and `FollowRig`
- * (follow target and spring arm) in `@four/motion` (R-36), and `TrackballRig`
+ * (follow target and spring arm) in `@fourjs/motion` (R-36), and `TrackballRig`
  * in this package (R-37), because a trackball is defined over a viewport in
  * screen space. Fly, first-person and shake are still staged with recorded
  * reasons (`camera-rigs.ts`); `lookAt` is the primitive they are built on, not
@@ -69,7 +69,7 @@
  * not rewrite `viewMatrix`. A renderer calls it once per view per frame.
  */
 
-import { Matrix4, type DepthRange } from "@four/math";
+import { Matrix4, type DepthRange } from "@fourjs/math";
 
 import { ALL_LAYERS, type LayerMask } from "./layers.js";
 import { Node } from "./node.js";
@@ -267,7 +267,7 @@ export interface PerspectiveCameraOptions {
  * at or beyond π) produce non-finite matrix elements rather than throwing, as
  * `Matrix4.setPerspective` documents. Nothing validates them here either: there
  * is no §89 error code for a configuration mistake yet, and inventing one is a
- * `@four/core` change this packet may not make (decision, WP-3.1 — revisit when
+ * `@fourjs/core` change this packet may not make (decision, WP-3.1 — revisit when
  * the diagnostics phase adds validation).
  */
 export class PerspectiveCamera extends Camera {

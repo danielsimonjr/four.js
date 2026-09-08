@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Quaternion, Vector2, Vector3, Vector4 } from "@four/math";
+import { Quaternion, Vector2, Vector3, Vector4 } from "@fourjs/math";
 
 import { createBinding } from "../src/binding.js";
 import {

@@ -26,13 +26,13 @@ import {
   createGltfLoader,
   type FetchResponse,
   type GltfAsset,
-} from "@four/assets";
+} from "@fourjs/assets";
 import { describe, expect, it } from "vitest";
 
 /**
  * The fixture directory **as a URL**, not as a native path.
  *
- * `resolveUri` in `@four/assets` resolves a glTF's relative URIs against the asset's URL
+ * `resolveUri` in `@fourjs/assets` resolves a glTF's relative URIs against the asset's URL
  * by splitting on "/" -- correct, and deliberate: a glTF URL is always "/"-separated and
  * that package names no `URL` global (§33). Handing it `fileURLToPath(...)` worked only
  * because a POSIX native path is also "/"-separated. On Windows the separator is "\\",

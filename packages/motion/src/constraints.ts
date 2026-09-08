@@ -71,13 +71,13 @@
  * same-runtime tier, like the rest of the engine's floating point.
  */
 
-import type { Component, ComponentHost } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
+import type { Component, ComponentHost } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
 import {
   resolveWorldTransform,
   warnAuthorityConflict,
   type Node,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 import { FollowRig, OrbitRig } from "./camera-rigs.js";
 import { CameraShake } from "./camera-shake.js";

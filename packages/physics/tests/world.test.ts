@@ -1,12 +1,12 @@
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import {Matrix3,
   Quaternion,
   Vector2,
   Vector3,
   constructionCount,
-  resetConstructionCount} from "@four/math";
-import { PoseBuffer, createSnapshotSystem, Group } from "@four/scene";
-import { SystemRegistry, createTimeState } from "@four/motion";
+  resetConstructionCount} from "@fourjs/math";
+import { PoseBuffer, createSnapshotSystem, Group } from "@fourjs/scene";
+import { SystemRegistry, createTimeState } from "@fourjs/motion";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {

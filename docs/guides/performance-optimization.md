@@ -35,16 +35,16 @@ The demo below simulates thousands of particles in two draw calls; scaling
 the numbers up changes fill rate, not call count:
 
 ```ts
-import { Application } from "four/application";
-import { Vector3 } from "four/math";
+import { Application } from "fourJS/application";
+import { Vector3 } from "fourJS/math";
 import {
   ParticleEmitter,
   ParticleRenderable,
   ParticleSystem,
   uniformGravityField,
-} from "four/particles";
-import { WebglRenderer } from "four/render-webgl";
-import { OrthographicCamera, createFullscreenViewport } from "four/scene";
+} from "fourJS/particles";
+import { WebglRenderer } from "fourJS/render-webgl";
+import { OrthographicCamera, createFullscreenViewport } from "fourJS/scene";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#scene");
 if (canvas === null) throw new Error("no canvas");
@@ -149,7 +149,7 @@ export default defineConfig({
 
 **You opt out, not in.** `__FOUR_DEV__` is a global that need not exist. The
 engine reads it as `typeof __FOUR_DEV__ !== "undefined" ? __FOUR_DEV__ : true`,
-in one place (`@four/core`'s `dev.ts`), so a program that never configures a
+in one place (`@fourjs/core`'s `dev.ts`), so a program that never configures a
 bundler — a `<script type="module">`, a Vitest run, `node` — is a development
 build and gets every warning. Define it as `"false"` and the ternary folds to a
 literal at build time, every `if (DEV)` in every package becomes dead code, and
@@ -171,7 +171,7 @@ Rapier's two wasm images, which dwarf half a kilobyte.)
 Three things go, and they are all things only an author reads:
 
 - **§84's statistics wiring.** `app.stats` is `null` in a production build even
-  if you passed `stats: true`, and `@four/diagnostics` leaves the bundle
+  if you passed `stats: true`, and `@fourjs/diagnostics` leaves the bundle
   entirely. The option and the member keep their types in both builds, so
   `app.stats?.drawCalls` compiles and runs either way — it simply answers
   `undefined`. Measure in development.
@@ -196,10 +196,10 @@ without a recorded argument.
 
 ### Writing your own gated code
 
-`@four/core` exports the flag and three helpers:
+`@fourjs/core` exports the flag and three helpers:
 
 ```ts
-import { DEV, devWarn, devWarnOnce, devAssert } from "four/core";
+import { DEV, devWarn, devWarnOnce, devAssert } from "fourJS/core";
 
 if (DEV && node.scale.x === 0) {
   devWarnOnce(
@@ -227,13 +227,13 @@ a function you call around a span you expect to balance — not a watcher, becau
 only you know which span was supposed to end where it began:
 
 ```ts
-import { liveGeometryCount, geometryMemoryBytes } from "four/geometry";
+import { liveGeometryCount, geometryMemoryBytes } from "fourJS/geometry";
 import {
   liveTextureCount,
   liveRenderTargetCount,
   textureMemoryBytes,
-} from "four/render";
-import { auditResourceLeaks } from "four/diagnostics";
+} from "fourJS/render";
+import { auditResourceLeaks } from "fourJS/diagnostics";
 
 const read = () => ({
   geometries: liveGeometryCount(),

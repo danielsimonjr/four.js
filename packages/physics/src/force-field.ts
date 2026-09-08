@@ -3,8 +3,8 @@
  * 2026-08-09) — the engine occupant of §39's step 5, "force generation".
  *
  * ```ts
- * import { ForceFieldSystem } from "@four/physics";
- * import { dragField, radialField } from "@four/particles";
+ * import { ForceFieldSystem } from "@fourjs/physics";
+ * import { dragField, radialField } from "@fourjs/particles";
  *
  * const forces = new ForceFieldSystem({ worlds: [world] });
  * forces.addField(radialField(sunPosition, -6.7e2), "acceleration");
@@ -25,7 +25,7 @@
  * ```
  *
  * Both halves already existed on their own: `RigidBody` has had the six §26
- * methods since Phase 5, and `@four/particles` has had §27's built-in field set
+ * methods since Phase 5, and `@fourjs/particles` has had §27's built-in field set
  * since WP-9.2. Nothing joined them — a field could push a *particle* and not a
  * *body*. {@link ForceFieldSystem} is the join, and it is the whole of this
  * module: sample every registered field at every dynamic body once per fixed
@@ -34,7 +34,7 @@
  * ## Why a system and not a step inside `PhysicsWorld`
  *
  * Because §39 already says where this goes. Step 5 is "force generation" and
- * step 6 is "physics solve"; `@four/motion` publishes them as
+ * step 6 is "physics solve"; `@fourjs/motion` publishes them as
  * `PRIORITY_FORCES` (500) and `PRIORITY_PHYSICS_SOLVE` (600), and
  * `PhysicsSystem` occupies the second. So force generation is a **separate
  * system at the priority §39 gave it**, and three properties follow for free:
@@ -56,13 +56,13 @@
  * ## The cross-package contract: structural, with no new dependency edge
  *
  * {@link ForceField} is §27's interface transcribed member-for-member — the
- * same transcription `@four/particles`' `ParticleForceField` carries, whose own
+ * same transcription `@fourjs/particles`' `ParticleForceField` carries, whose own
  * module note anticipated this packet: *"if a later packet lands a general
  * `ForceField` in another package, the two can be reconciled without a rename
  * churn here. They are structurally identical, so any §27 field satisfies this
  * type without an adapter."* That is the reconciliation, and it is structural:
  * the frozen §3.1 dependency matrix has no `physics → particles` edge and this
- * module adds none. Every built-in field in `@four/particles` —
+ * module adds none. Every built-in field in `@fourjs/particles` —
  * `uniformGravityField`, `radialField`, `vortexField`, `windField`,
  * `dragField`, `turbulenceField`, and `volumeField`'s inclusion wrapper — is
  * assignable to {@link ForceField} with no adapter, no cast, and no import in
@@ -80,7 +80,7 @@
  * §27's own built-in list mixes the two — "uniform gravity" and "radial
  * gravity" are accelerations (m/s²), "wind" and "drag volume" are forces (N) —
  * and the two differ by a factor of the body's mass, which is 1 for a particle
- * and anything at all for a body. `@four/particles` documents its fields as
+ * and anything at all for a body. `@fourjs/particles` documents its fields as
  * accelerations because MVP particles carry no mass channel; handing one of
  * them to a system that assumed newtons would be a silent unit error on exactly
  * the reuse path this module advertises. A required argument makes that error
@@ -109,12 +109,12 @@
  *   is in — `PhysicsWorld.addBody` refuses any other (PH-12).
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 import {
   PRIORITY_FORCES,
   type FixedUpdateContext,
   type SimulationSystem,
-} from "@four/motion";
+} from "@fourjs/motion";
 
 import type { RigidBody } from "./rigid-body.js";
 import type { PhysicsWorld } from "./world.js";
@@ -131,7 +131,7 @@ import type { PhysicsWorld } from "./world.js";
  * };
  * ```
  *
- * Structurally identical to `@four/particles`' `ParticleForceField`, so a field
+ * Structurally identical to `@fourjs/particles`' `ParticleForceField`, so a field
  * written for either pillar works in both (module header). Contract for an
  * implementation, restated from §27 and the particle transcription so that a
  * reader of this package alone has all of it:
@@ -174,7 +174,7 @@ export interface ForceField {
    * **Optional fast path**: the same contribution as {@link ForceField.sample},
    * for `count` bodies at once, **added into** `out` (stride-3 `xyz`).
    *
-   * This is `@four/particles`' `ParticleForceField.sampleAll` transcribed
+   * This is `@fourjs/particles`' `ParticleForceField.sampleAll` transcribed
    * member-for-member so every built-in particle field is a batched
    * {@link ForceField} with no adapter. Contract, restated from that
    * transcription:
@@ -233,7 +233,7 @@ export interface ForceField {
  * - `"acceleration"` — m/s², multiplied by the body's mass before it is
  *   applied, so every body accelerates equally. What §27's uniform and radial
  *   *gravity* entries are naturally authored in, and what every built-in field
- *   in `@four/particles` documents itself as.
+ *   in `@fourjs/particles` documents itself as.
  *
  * There is no default: see the module header for why the choice is a required
  * argument rather than a documented convention.

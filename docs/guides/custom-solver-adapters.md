@@ -1,6 +1,6 @@
 # Custom solver adapters
 
-The stable `@four/physics` API never talks to a physics engine directly: it
+The stable `@fourjs/physics` API never talks to a physics engine directly: it
 talks to an **adapter** (§37). `physics-rapier` ships two of them
 (`Rapier2dAdapter`, `Rapier3dAdapter`); `physics-box2d` is the scaffolded
 second solver. This guide describes the contract a new adapter signs, the
@@ -58,9 +58,9 @@ refused quoting the numbers.
 ## Using an adapter (the consumer side, complete)
 
 ```ts
-import { PhysicsWorld, RigidBody, Collider } from "four/physics";
-import { Rapier2dAdapter } from "four/physics-rapier";
-import { Group } from "four/scene";
+import { PhysicsWorld, RigidBody, Collider } from "fourJS/physics";
+import { Rapier2dAdapter } from "fourJS/physics-rapier";
+import { Group } from "fourJS/scene";
 
 const adapter = new Rapier2dAdapter();
 const world = new PhysicsWorld({ dimension: "2d", adapter });

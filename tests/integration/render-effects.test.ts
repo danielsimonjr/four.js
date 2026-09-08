@@ -2,7 +2,7 @@
  * R-6 — §70's full-screen effects, driving the real WebGL 2 backend
  * (2026-08-07).
  *
- * `EffectRenderPass` lives in `@four/render` and names no GL type; the WebGL 2
+ * `EffectRenderPass` lives in `@fourjs/render` and names no GL type; the WebGL 2
  * backend runs it; `RenderGraph` orders it against the scene passes that
  * produce its input. Those are three packages agreeing, and no unit test
  * inside any one of them can check the agreement — which is what this file is
@@ -29,8 +29,8 @@
  * `render-graph.test.ts` gives at length.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   COPY_EFFECT,
   RenderGraph,
@@ -39,15 +39,15 @@ import {
   createRenderStatistics,
   supportsScreenEffects,
   type EffectRenderPass,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

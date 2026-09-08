@@ -3,7 +3,7 @@
  * headless 2D Rapier scenario, driven through the **shipped** `RigidBody` /
  * `Collider` component serializers.
  *
- * `@four/serialization` may depend on `core`, `math`, and `scene` only (plan
+ * `@fourjs/serialization` may depend on `core`, `math`, and `scene` only (plan
  * §3.1), so it can never name `RigidBody` or `Collider`: §79's answer is a
  * registry each package — or, when the matrix forbids even that, the
  * application wiring them together — registers its own serializers into. P11-1
@@ -11,7 +11,7 @@
  * WP-11.5 until 2026-08-06 this file also held the two **reference
  * serializers** an application was meant to copy out of it.
  *
- * It no longer does. `PH-17` shipped them: `@four/physics` exports
+ * It no longer does. `PH-17` shipped them: `@fourjs/physics` exports
  * `RIGID_BODY_SERIALIZER` and `COLLIDER_SERIALIZER`, and the umbrella package's
  * `registerPhysicsSerializers()` performs the registration — which is what
  * {@link createRoundtripSerializers} now calls. The duplicates that used to
@@ -36,14 +36,14 @@
  *
  * ## What round-trips, and what is world-registration state
  *
- * The authoritative table is `@four/physics`'s `serializers.ts` header. What
+ * The authoritative table is `@fourjs/physics`'s `serializers.ts` header. What
  * matters to *this* suite:
  *
  * | state | round-trips? |
  * | --- | --- |
  * | §22/§23/§31 body state, §19 blend weights | yes |
  * | §23 mass and centre of mass | yes, **only when authored** — see below |
- * | node pose, authority, name, tags, metadata | yes (`@four/scene`'s own serializer) |
+ * | node pose, authority, name, tags, metadata | yes (`@fourjs/scene`'s own serializer) |
  * | §24 shape, offset, sensor flag, groups, mask | yes |
  * | §25 friction / restitution / density | yes, **as authored**; the fallback chain re-resolves on load |
  * | §32 `sleeping` | recorded as diagnostics, never applied — a reloaded body starts awake |
@@ -100,22 +100,22 @@
  * by `Application.step(DT)` with a constant, injected delta.
  */
 
-import { Quaternion, Vector2, Vector3 } from "@four/math";
+import { Quaternion, Vector2, Vector3 } from "@fourjs/math";
 import {
   Collider,
   PhysicsSystem,
   PhysicsWorld,
   RigidBody,
   type CollisionShape,
-} from "@four/physics";
-import { Rapier2dAdapter } from "@four/physics-rapier";
-import { Group, Node } from "@four/scene";
+} from "@fourjs/physics";
+import { Rapier2dAdapter } from "@fourjs/physics-rapier";
+import { Group, Node } from "@fourjs/scene";
 import {
   ComponentSerializerRegistry,
   createDefaultComponentSerializers,
-} from "@four/serialization";
-import { registerPhysicsSerializers } from "four";
-import { Application } from "four/application";
+} from "@fourjs/serialization";
+import { registerPhysicsSerializers } from "fourJS";
+import { Application } from "fourJS/application";
 
 // ---------------------------------------------------------------------------
 // Scenario constants (§7a: seconds and world units, never milliseconds)
@@ -223,7 +223,7 @@ export const BODY_COUNT = 2 + BALLS.length;
 export const SIM_ROOT_NAME = "sim-root";
 
 /**
- * The registry this suite saves and loads with: `@four/serialization`'s own
+ * The registry this suite saves and loads with: `@fourjs/serialization`'s own
  * (`PoseTarget`) plus the two physics components (§79, plan P11-1, PH-17).
  *
  * The **shipped** registration, not a copy of it: `registerPhysicsSerializers`

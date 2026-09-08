@@ -1,4 +1,4 @@
-import { FourError, isFourError } from "@four/core";
+import { FourError, isFourError } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import {

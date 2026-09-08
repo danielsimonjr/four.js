@@ -1,5 +1,5 @@
-import { isFourError } from "@four/core";
-import { Node } from "@four/scene";
+import { isFourError } from "@fourjs/core";
+import { Node } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { AnimationClip } from "../src/clip.js";

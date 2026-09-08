@@ -6,13 +6,13 @@
  * per-step call sequence (`integrate` → `moveSlot`s → `writeSpawn`s), the
  * device mirror of swap-remove compaction, and the CPU/GPU spawn-stream
  * parity that the division-of-labour decision promises (`types.ts`). The
- * device half is `@four/render-webgpu`'s suite; the two pin the structural
+ * device half is `@fourjs/render-webgpu`'s suite; the two pin the structural
  * contract from both sides, since no compiler checks it across the §3.1
  * boundary.
  */
 
-import { isFourError, type FourError } from "@four/core";
-import { Vector3 } from "@four/math";
+import { isFourError, type FourError } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

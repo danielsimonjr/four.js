@@ -62,8 +62,8 @@
  * and neither feeds a number back into the simulation.
  */
 
-import { Frustum, type Matrix4, Vector3 } from "@four/math";
-import { layersMatch, type Viewport } from "@four/scene";
+import { Frustum, type Matrix4, Vector3 } from "@fourjs/math";
+import { layersMatch, type Viewport } from "@fourjs/scene";
 
 import { computeWorldBoundingSphere, type BoundingSphere } from "./bounds.js";
 import {

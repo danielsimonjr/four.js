@@ -21,7 +21,7 @@
  *   §33 checksum has something to hash.
  *
  * It is deliberately **not exported from the package**: it is a test fixture,
- * not a shipped adapter, and `@four/physics` ships no solver (§20).
+ * not a shipped adapter, and `@fourjs/physics` ships no solver (§20).
  *
  * ## Two doubles, on purpose (WP-6.1)
  *
@@ -51,10 +51,10 @@
  * mass refresh has to leave alone.
  */
 
-import { FourError } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
 import { rejectStalePhysicsHandle } from "../src/stale-handle.js";
-import type { Matrix3 } from "@four/math";
+import type { Matrix3 } from "@fourjs/math";
 import type {
   AngularVelocityInput,
   BodyType,

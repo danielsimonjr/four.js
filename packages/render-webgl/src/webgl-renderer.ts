@@ -3,13 +3,13 @@
  *
  * §120 fixes the MVP tier as *"WebGL 2 only, one solver adapter, basic 2D/3D
  * primitives"*, and §62 lists WebGL 2 as backend 2 of 5. {@link WebglRenderer}
- * implements `@four/render`'s `Renderer` for that tier and its later additions:
+ * implements `@fourjs/render`'s `Renderer` for that tier and its later additions:
  * five scene pipelines (unlit, lit, standard, sprite, particles — see the class
  * documentation) plus §70's full-screen effect program, one vertex array per
  * geometry, `"negative-one-to-one"` clip depth (plan D8).
  *
  * The normative clear and viewport semantics live on `Renderer.render`'s
- * documentation in `@four/render`, not here — they are shared by every backend
+ * documentation in `@fourjs/render`, not here — they are shared by every backend
  * so that a test can assert them once. This module implements them; where a
  * sentence there admitted more than one reading, the reading chosen is recorded
  * below on {@link WebglRenderer.render}.
@@ -35,8 +35,8 @@
  * calls checkable.
  */
 
-import { DEV, devWarnOnce, EventEmitter, FourError } from "@four/core";
-import { Frustum, Matrix4, type Rectangle2 } from "@four/math";
+import { DEV, devWarnOnce, EventEmitter, FourError } from "@fourjs/core";
+import { Frustum, Matrix4, type Rectangle2 } from "@fourjs/math";
 import {
   MAX_SKINNING_JOINTS,
   RenderTarget,
@@ -68,10 +68,10 @@ import {
   type RendererEventMap,
   type RendererOptions,
   type ScreenEffectRenderer,
-} from "@four/render";
+} from "@fourjs/render";
 
 // Type-only, and load-bearingly so: naming `GlBatching` as a *value* here would
-// link §65's batcher — and `@four/render`'s planner behind it — into every
+// link §65's batcher — and `@fourjs/render`'s planner behind it — into every
 // bundle that carries this renderer, whether the application batches or not
 // (see `WebglRenderer.batching` and `gl-batch.ts`'s header). The context this
 // backend narrows to (`ParticleGlContext`) already satisfies the batcher's own
@@ -128,9 +128,9 @@ import { TextureCache, type CacheableTexture } from "./gl-texture.js";
 /**
  * The subtree root {@link WebglRenderer.render} draws, and the viewports it
  * draws it into — read off the `Renderer` interface instead of imported from
- * `@four/scene`.
+ * `@fourjs/scene`.
  *
- * `@four/render-webgl` depends on `core`, `math`, and `render` only (plan §3.1,
+ * `@fourjs/render-webgl` depends on `core`, `math`, and `render` only (plan §3.1,
  * frozen). `Parameters<Renderer["render"]>` yields exactly the `Node` and
  * `Viewport` types the interface declares, with no new edge in the dependency
  * matrix and no chance of drifting from the interface being implemented
@@ -143,7 +143,7 @@ type RenderView = Parameters<Renderer["render"]>[1][number];
 
 /**
  * The §43 interpolation record, derived as {@link RenderRoot} is — the pose
- * buffer it carries is `@four/scene`'s, named here only through the interface
+ * buffer it carries is `@fourjs/scene`'s, named here only through the interface
  * this class implements, so the frozen dependency matrix is untouched.
  */
 type RenderInterpolationArgument = NonNullable<
@@ -154,7 +154,7 @@ type RenderInterpolationArgument = NonNullable<
  * The off-screen surface `render` draws into when it is given one (§61, §48;
  * R-4), derived from the interface as {@link RenderRoot} is.
  *
- * `@four/render`'s `RenderTarget` — a *type* import through the interface, so
+ * `@fourjs/render`'s `RenderTarget` — a *type* import through the interface, so
  * this file still names nothing outside the frozen matrix. `gl-render-target.ts`
  * imports the class by name for a reason written out there.
  */
@@ -294,7 +294,7 @@ const REQUIRED_CONTEXT_METHODS = [
  * {@link WebglRenderer.render} builds the list and consumes every item
  * synchronously before returning — no item ever outlives the call that produced
  * it. Two *simultaneously live* lists would need two arrays, which is why
- * `@four/render` keys its pools on the array rather than on a module global.
+ * `@fourjs/render` keys its pools on the array rather than on a module global.
  */
 const renderList: RenderItem[] = [];
 
@@ -368,8 +368,8 @@ const effectUniformScratch = new Float32Array(1);
  * §57's material as this backend reads it, derived from the render item union
  * rather than imported.
  *
- * `@four/render-webgl` depends on `core`, `math`, and `render` only (plan §3.1,
- * frozen), so it may not name `@four/materials`' `Material`. `RenderItem`'s
+ * `@fourjs/render-webgl` depends on `core`, `math`, and `render` only (plan §3.1,
+ * frozen), so it may not name `@fourjs/materials`' `Material`. `RenderItem`'s
  * `material` is that type, so taking it back off the union gives the same
  * contract with no new edge — the technique this file already uses for the
  * scene root and the viewport (decision, WP-3.5).
@@ -422,7 +422,7 @@ const STENCIL_ALL_BITS = 0xff;
  *
  * A record rather than a `switch`, matching `BLEND_FUNCTIONS`: the lookup is
  * one property load, and `StencilState` validates every assignment against
- * these same eight names (`@four/materials`), so the table is total over its
+ * these same eight names (`@fourjs/materials`), so the table is total over its
  * key type and a missing arm is a compile error rather than an `undefined`
  * reaching `stencilFunc` inside a frame.
  */
@@ -583,7 +583,7 @@ function applyBlendState(
   }
   if ((blend || forceMode) && mode !== state.blendMode) {
     // Total over `ItemBlendMode`: §57's `Material.blendMode` validates every
-    // assignment against the same four names (`@four/materials`, F14), and
+    // assignment against the same four names (`@fourjs/materials`, F14), and
     // `applyMaterialState` maps a material that declares none onto `"normal"`.
     const [source, destination] = BLEND_FUNCTIONS[mode];
     gl.blendFunc(source, destination);
@@ -868,7 +868,7 @@ function unlitColorBlends(material: object): boolean {
  * there are two.
  *
  * An ordinary `Texture` is uploaded from its CPU-side texels by
- * {@link TextureCache}. A {@link @four/render!RenderTargetTexture | render-target
+ * {@link TextureCache}. A {@link @fourjs/render!RenderTargetTexture | render-target
  * texture} has none — it *is* a framebuffer's colour attachment — so it resolves
  * through {@link RenderTargetCache} instead, which allocates the framebuffer if
  * this is the first the backend has heard of it. That is what makes sampling a
@@ -1045,7 +1045,7 @@ const WEBGL_STATIC_CAPABILITIES = Object.freeze({
   compressedTextureFormats: Object.freeze([]),
   shaderPrecision: "highp",
   // §54's joint limit (RFC 0003): a declared constant, not a `getParameter`
-  // read — `@four/render`'s `MAX_SKINNING_JOINTS` documents the portability
+  // read — `@fourjs/render`'s `MAX_SKINNING_JOINTS` documents the portability
   // arithmetic, and R-30b's law is why no query happens here. The capability
   // says what this backend *can* do; drawing skinned additionally requires
   // `registerSkinningPipeline()` (see `gl-skinning-registry.ts`).
@@ -1256,7 +1256,7 @@ function applyItemScissor(
  * - **lit** — Lambert diffuse under §68's directional light plus the scene
  *   ambient term, depth-tested and opaque-by-default like unlit. The
  *   frame's lights are collected once per `render` call (`collectSceneLights`,
- *   `@four/render`) — and only for frames whose list actually contains a lit
+ *   `@fourjs/render`) — and only for frames whose list actually contains a lit
  *   or standard item, so unlit scenes never pay the walk;
  * - **standard** — §59's metallic-roughness BRDF (GGX, Smith, Schlick) under
  *   the same one light and the same ambient term, plus the eye position the
@@ -1288,7 +1288,7 @@ function applyItemScissor(
  *
  * Textures are discovered from the render list and cached exactly as geometry
  * is (`gl-texture.ts`), which is why §61's `createTexture` stays deferred — the
- * argument is written out in that module's header and in `@four/render`'s
+ * argument is written out in that module's header and in `@fourjs/render`'s
  * `texture.ts`.
  *
  * ## Render targets (§61, §48; R-4, 2026-08-07)
@@ -1399,7 +1399,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * purely 2D application, and **measured** rather than assumed: 0.75 kB gzip
    * per example bundle (0.42 kB for this pipeline and its two shaders, 0.33 kB
    * for {@link WebglRenderer.renderEffect}), because nothing reachable from a
-   * class method can tree-shake. `@four/render`'s half — `effect-pass.ts` — is
+   * class method can tree-shake. `@fourjs/render`'s half — `effect-pass.ts` — is
    * a separate side-effect-free module and does tree-shake out; grepping the
    * example bundles confirms both halves of that sentence (R-6, 2026-08-07).
    */
@@ -1492,7 +1492,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   /**
    * §84's render counters, or `null` (the default) to count nothing — the
    * optional `Renderer` capability (A-1, 2026-08-07; see
-   * `@four/render`'s `statistics.ts`).
+   * `@fourjs/render`'s `statistics.ts`).
    *
    * This backend accumulates one entry per *submitted* draw call: a draw
    * skipped for a geometry it could not allocate, a texture the application
@@ -1523,7 +1523,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * capability (R-9, 2026-08-09; see `gl-batch.ts`).
    *
    * ```ts
-   * import { createGlBatching } from "@four/render-webgl";
+   * import { createGlBatching } from "@fourjs/render-webgl";
    * renderer.batching = createGlBatching();
    * ```
    *
@@ -1692,7 +1692,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * program, sets the fixed GL state, and wires the context-loss events (§61,
    * §45).
    *
-   * Rejects with a {@link @four/core!FourError | FourError} carrying `RENDERER_INITIALIZATION_FAILED`
+   * Rejects with a {@link @fourjs/core!FourError | FourError} carrying `RENDERER_INITIALIZATION_FAILED`
    * when there is no canvas, when the canvas will not give up a `"webgl2"`
    * context (an older browser, a blocked GPU, a context already taken by
    * another API), or when what it gives back is not a WebGL 2 context; and with
@@ -2142,7 +2142,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         // §64 stages 2–3, per view (R-8, 2026-08-09). The frame's list is built
         // once, above; this derives *this view's* draws from it — §46's layer
         // filter (`view.layerMask`, else the camera's `layers`, §48's fallback
-        // rule) and §87's frustum cull, both in `@four/render` so that every
+        // rule) and §87's frustum cull, both in `@fourjs/render` so that every
         // backend spells them the same way.
         //
         // The filter used to be an inline `item.layers & mask` in the loop
@@ -2667,7 +2667,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                 quadHeight,
               );
             } else {
-              // The reparametrization derived in `@four/render`'s `sprite.ts`:
+              // The reparametrization derived in `@fourjs/render`'s `sprite.ts`:
               // the rectangle the *whole* texture would occupy, given that the
               // quad shows `frame` of it. Collapses to the four values above at
               // `frame = (0, 0, texture.width, texture.height)`. `map` rather
@@ -2968,7 +2968,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * colour attachment over the whole of `pass.target`, or of the drawing
    * buffer, through `pass.effect`.
    *
-   * The normative contract is on `@four/render`'s `Renderer.renderEffect`;
+   * The normative contract is on `@fourjs/render`'s `Renderer.renderEffect`;
    * this is what the WebGL 2 backend does with it, and the two readings that
    * sentence left open.
    *
@@ -3193,7 +3193,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     if (factory === null) {
       throw new FourError(
         LIFECYCLE_ERROR_CODE,
-        "§71: call registerPickingPipeline() from @four/render-webgl " +
+        "§71: call registerPickingPipeline() from @fourjs/render-webgl " +
           "before createPickingService() (§85).",
         { context: { registered: false } },
       );
@@ -3219,7 +3219,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   /**
    * Reads back `target`'s colour attachment — or the `region` rectangle of it
    * — as tightly packed RGBA8 bytes: §61's `readPixels` (landed 2026-08-29,
-   * with `Rectangle2` in `@four/math` — RFC 0005's named prerequisite — after
+   * with `Rectangle2` in `@fourjs/math` — RFC 0005's named prerequisite — after
    * sitting on `gl-render-target.ts`'s staged list since R-4).
    *
    * **A `Promise` over a synchronous read, and that is the §62 contract, not
@@ -3262,7 +3262,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * `UNSUPPORTED_GPU_FEATURE` on a context double without the `readPixels`
    * entry point (presence is the capability, `gl-program.ts`). A malformed
    * region rejects with `validateReadbackRegion`'s `RangeError` (§85,
-   * `@four/render`'s shared check, so both backends refuse with the same
+   * `@fourjs/render`'s shared check, so both backends refuse with the same
    * words).
    *
    * The framebuffer binding is borrowed and restored in a `finally`, exactly
@@ -3607,7 +3607,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
           "§54: this scene contains a skinned mesh but no skinning pipeline " +
             "is registered, so its draws are skipped (a bind pose would be " +
             "a different picture). Call registerSkinningPipeline() from " +
-            "@four/render-webgl" +
+            "@fourjs/render-webgl" +
             " at application setup (RFC 0003).",
         );
       }
@@ -3656,7 +3656,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
           "§60: this scene uses a node material (or §70 graph effect) but no " +
             "node pipeline is registered, so those draws are skipped (flat " +
             "colour would be a different picture). Call " +
-            "registerNodeMaterialPipeline() from @four/render-webgl at " +
+            "registerNodeMaterialPipeline() from @fourjs/render-webgl at " +
             "application setup (RFC 0001).",
         );
       }

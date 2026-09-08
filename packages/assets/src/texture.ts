@@ -19,7 +19,7 @@
  * });
  *
  * const albedo = await assets.load("/textures/crate.png", pngLoader);
- * const texture = new Texture(albedo);   // @four/render, structurally
+ * const texture = new Texture(albedo);   // @fourjs/render, structurally
  * ```
  *
  * ## What this is and is not
@@ -28,15 +28,15 @@
  * disposable result with the engine's row order and colour-space metadata
  * attached, bounded per §96. It is not §77 itself — cube, array and 3D targets,
  * mipmaps, anisotropy, compressed containers, render targets and video textures
- * live in `@four/render`'s `Texture` and are still open there (R-30b). Nothing
+ * live in `@fourjs/render`'s `Texture` and are still open there (R-30b). Nothing
  * here decodes a format either: PNG, JPEG, WebP and AVIF are the platform's
  * business, and the decoder is injected exactly as `createImageLoader`'s is,
  * for the same reason (this package must build and test under plain
  * `lib.es2022` in Node, so it names no `Blob`, no `ImageBitmap`, no canvas).
  *
- * ## Why it does not import `@four/render`
+ * ## Why it does not import `@fourjs/render`
  *
- * `@four/assets` sits below the renderer in §3.1's dependency matrix, and
+ * `@fourjs/assets` sits below the renderer in §3.1's dependency matrix, and
  * §62 allows several backends: an asset package that imported one renderer's
  * `TextureSource` would put the whole render tier in the dependency graph of a
  * headless build that only wanted bytes. So {@link TextureAsset} satisfies
@@ -83,20 +83,20 @@
  * else in this package.
  */
 
-import { FourError, type Disposable } from "@four/core";
+import { FourError, type Disposable } from "@fourjs/core";
 
 import type { AssetLoader, FetchResponse } from "./asset-manager.js";
 
 /**
- * The colour space of a texture's texels — `@four/render`'s `ColorSpace`,
+ * The colour space of a texture's texels — `@fourjs/render`'s `ColorSpace`,
  * spelled structurally (see the module comment).
  */
 export type TextureColorSpace = "srgb" | "linear";
 
-/** Sampling between texel centres; `@four/render`'s `TextureFilter`. */
+/** Sampling between texel centres; `@fourjs/render`'s `TextureFilter`. */
 export type TextureFilterMode = "nearest" | "linear";
 
-/** Addressing outside `[0, 1]`; `@four/render`'s `TextureWrap`. */
+/** Addressing outside `[0, 1]`; `@fourjs/render`'s `TextureWrap`. */
 export type TextureWrapMode = "clamp-to-edge" | "repeat" | "mirrored-repeat";
 
 /**
@@ -184,7 +184,7 @@ export interface TextureLoaderOptions {
 
 /**
  * A decoded texture with an explicit lifetime (§83), shaped as
- * `@four/render`'s `TextureSource` (§61, §77).
+ * `@fourjs/render`'s `TextureSource` (§61, §77).
  *
  * `new Texture(asset)` takes it directly. {@link dispose} drops the texel
  * buffer — the one large allocation a texture asset owns — so releasing the

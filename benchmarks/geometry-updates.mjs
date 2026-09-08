@@ -15,8 +15,8 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { BufferGeometry } from "@four/geometry";
-import { GeometryCache } from "@four/render-webgl";
+import { BufferGeometry } from "@fourjs/geometry";
+import { GeometryCache } from "@fourjs/render-webgl";
 
 import {
   MEASUREMENT_NOTE,

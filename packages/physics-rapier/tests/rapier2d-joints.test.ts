@@ -4,7 +4,7 @@
  *
  * No fake solver, for the same reason `rapier2d-adapter.test.ts` has none: an
  * adapter packet exists to prove the mapping onto a real engine, and a mock
- * would only re-assert this file's own assumptions. `@four/physics`'s
+ * would only re-assert this file's own assumptions. `@fourjs/physics`'s
  * `FakeJointSolverAdapter` is where the *contract* is exercised without a
  * solver.
  *
@@ -41,15 +41,15 @@
  *   below assert that equality rather than trusting this note.
  */
 
-import { FourError } from "@four/core";
-import { Quaternion, Vector2, Vector3 } from "@four/math";
-import { supportsSolverJointAccess } from "@four/physics";
+import { FourError } from "@fourjs/core";
+import { Quaternion, Vector2, Vector3 } from "@fourjs/math";
+import { supportsSolverJointAccess } from "@fourjs/physics";
 import type {
   JointDescriptor,
   PhysicsBodyHandle,
   PhysicsJointHandle,
   PhysicsWorldOptions,
-} from "@four/physics";
+} from "@fourjs/physics";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {

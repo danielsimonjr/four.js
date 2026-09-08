@@ -8,8 +8,8 @@
  * world, create bodies and colliders, advance by a fixed delta, hand back the
  * events, answer queries, snapshot. It deliberately says nothing about reading
  * or writing *one* body, because the transform exchange with the scene graph is
- * `@four/physics`'s business and an adapter is not allowed to know what a scene
- * is (a solver package may not import `@four/scene`).
+ * `@fourjs/physics`'s business and an adapter is not allowed to know what a scene
+ * is (a solver package may not import `@fourjs/scene`).
  *
  * That leaves `PhysicsWorld` needing something it can call per body per step:
  * read the solved pose so it can be written onto a node under `"physics"`
@@ -99,7 +99,7 @@
  * member.
  */
 
-import type { Matrix3, Quaternion, Vector3 } from "@four/math";
+import type { Matrix3, Quaternion, Vector3 } from "@fourjs/math";
 
 import type {
   AngularVelocityInput,

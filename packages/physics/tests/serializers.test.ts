@@ -10,15 +10,15 @@
  *    `RigidBody.massAuthored` exists to prevent);
  * 2. the read side is total for values and strict for tags, per the module
  *    header's rule;
- * 3. the structural declarations still match `@four/serialization`'s
+ * 3. the structural declarations still match `@fourjs/serialization`'s
  *    `ComponentSerializer`. That is the honest cost of duck typing — no compiler
  *    checks the two declarations against each other, so a transcribed mirror is
- *    asserted here, exactly as `@four/motion`'s suite does.
+ *    asserted here, exactly as `@fourjs/motion`'s suite does.
  */
 
-import { isFourError, type JsonValue } from "@four/core";
-import { Matrix3, Quaternion, Vector2, Vector3 } from "@four/math";
-import { Group, Transform, type Node } from "@four/scene";
+import { isFourError, type JsonValue } from "@fourjs/core";
+import { Matrix3, Quaternion, Vector2, Vector3 } from "@fourjs/math";
+import { Group, Transform, type Node } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -37,7 +37,7 @@ import {
 } from "../src/index.js";
 
 /**
- * `@four/serialization`'s `ComponentSerializer<T>`, transcribed member for
+ * `@fourjs/serialization`'s `ComponentSerializer<T>`, transcribed member for
  * member (there is no §3.1 edge from `physics` to `serialization`).
  */
 interface ComponentSerializerMirror<T> {
@@ -835,7 +835,7 @@ describe("SWEPT_CHARACTER_CONTROLLER_SERIALIZER (§12, §30, §79 — PH-11b)", 
     ).toThrow(/"radius"/);
   });
 
-  it("still matches @four/serialization's structural ComponentSerializer", () => {
+  it("still matches @fourjs/serialization's structural ComponentSerializer", () => {
     const mirror: ComponentSerializerMirror<SweptCharacterController> =
       SWEPT_CHARACTER_CONTROLLER_SERIALIZER;
     expect(typeof mirror.serialize).toBe("function");

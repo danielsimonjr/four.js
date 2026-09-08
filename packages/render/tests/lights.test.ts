@@ -1,12 +1,12 @@
-import { resetDevWarnings } from "@four/core";
-import { Matrix4, Vector3 } from "@four/math";
+import { resetDevWarnings } from "@fourjs/core";
+import { Matrix4, Vector3 } from "@fourjs/math";
 import {
   DirectionalLight,
   Group,
   PointLight,
   Scene,
   SpotLight,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

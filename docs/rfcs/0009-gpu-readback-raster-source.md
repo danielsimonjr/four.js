@@ -54,7 +54,7 @@ not make the loop safe; it only makes it a frame late.
 
 ### 1. Snapshot source, not a live GPU surface
 
-Add `GpuReadbackSource` in `@four/render` (beside `raster.ts`). It
+Add `GpuReadbackSource` in `@fourjs/render` (beside `raster.ts`). It
 **implements `RasterSource`**. It does not widen `RasterSource`, does
 not make `readPixels` async, and does not change `CanvasTexture`.
 
@@ -107,7 +107,7 @@ The sentence is RFC 0004 §3 with the producer renamed:
 > fixed step, a §33 checksum, a §34 snapshot, or a replay document.
 
 `tests/integration/raster-display-only.test.ts` already forbids
-simulation packages from importing `@four/render`'s raster module.
+simulation packages from importing `@fourjs/render`'s raster module.
 `GpuReadbackSource` lives in that module (or a sibling imported only
 from it), so the existing allowlist covers it. No new scan.
 
@@ -215,7 +215,7 @@ Particle/compute snapshots are not authorised.
 ## Compatibility analysis
 
 - **Public API (§90).** Additive: `GpuReadbackSource` from
-  `@four/render`. **Minor.** `RasterSource` and `CanvasTexture` are
+  `@fourjs/render`. **Minor.** `RasterSource` and `CanvasTexture` are
   unchanged.
 - **Scene format (§79).** Unmoved. No representation (RFC 0004 §3:
   painted/readback pixels have no key).

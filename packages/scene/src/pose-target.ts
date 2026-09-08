@@ -11,11 +11,11 @@
  * the target with the solver pose and performs the single authoritative
  * transform write.
  *
- * ## Why this lives in `@four/scene` (plan P7-1)
+ * ## Why this lives in `@fourjs/scene` (plan P7-1)
  *
- * Neither `@four/animation` nor `@four/physics` may import the other (plan
+ * Neither `@fourjs/animation` nor `@fourjs/physics` may import the other (plan
  * §3.1), and both need to name the target pose — animation to write it, physics
- * to read it. `@four/scene` is the package they both already depend on, and a
+ * to read it. `@fourjs/scene` is the package they both already depend on, and a
  * target pose is scene data (a pose on a node) rather than solver data, so it
  * is also where it belongs on the merits.
  *
@@ -74,7 +74,7 @@
  *
  * {@link PoseTarget.capturePrevious} is called **once per fixed step, at the
  * top of the step, before that step's animation writes** — by
- * `PhysicsWorld.capturePoseTargets` in `@four/physics` (WP-7.3), which the
+ * `PhysicsWorld.capturePoseTargets` in `@fourjs/physics` (WP-7.3), which the
  * system `createPoseTargetCaptureSystem` runs at §39 step 3's priority minus
  * one notch, the way `createSnapshotSystem` owns `PoseBuffer.capture`.
  * Animation writes targets at §39 step 3 and the solve reads them at step 6, so
@@ -99,8 +99,8 @@
  * keeps the previous/current **target** pose, and feeds directly into it.
  */
 
-import type { Component, ComponentHost } from "@four/core";
-import { Quaternion, Vector3 } from "@four/math";
+import type { Component, ComponentHost } from "@fourjs/core";
+import { Quaternion, Vector3 } from "@fourjs/math";
 
 import type { Transform } from "./transform.js";
 

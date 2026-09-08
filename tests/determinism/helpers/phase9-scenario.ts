@@ -17,14 +17,14 @@
  *
  * Because the wiring is part of what has to be deterministic, and because this
  * file is the **only** place in the repository that can check it at all. The
- * §3.1 dependency matrix keeps `@four/particles` from importing `@four/motion`,
+ * §3.1 dependency matrix keeps `@fourjs/particles` from importing `@fourjs/motion`,
  * so `ParticleSystem` implements §39's `SimulationSystem` *structurally* and
  * restates `PRIORITY_FORCES` as `PRIORITY_PARTICLES` (see
  * `packages/particles/src/particle-system.ts`). Nothing type-checks those two
  * declarations against each other — except here, where both packages are
  * importable: registering the system on a real `SystemRegistry` is the
  * assignability check, and {@link Phase9ScenarioResult.particlePriority} against
- * `@four/motion`'s own constant is the value check.
+ * `@fourjs/motion`'s own constant is the value check.
  *
  * ## What the scenario deliberately exercises
  *
@@ -77,8 +77,8 @@
  * — so the last bits may legally differ between JS engines.
  */
 
-import { createChecksum } from "@four/diagnostics";
-import { PRIORITY_FORCES } from "@four/motion";
+import { createChecksum } from "@fourjs/diagnostics";
+import { PRIORITY_FORCES } from "@fourjs/motion";
 import {
   ParticleEmitter,
   ParticleRenderable,
@@ -87,9 +87,9 @@ import {
   turbulenceField,
   uniformGravityField,
   vortexField,
-} from "@four/particles";
-import { Vector3, Vector4 } from "@four/math";
-import { Application } from "four/application";
+} from "@fourjs/particles";
+import { Vector3, Vector4 } from "@fourjs/math";
+import { Application } from "fourJS/application";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 export const FIXED_TIME_STEP = 1 / 60;
@@ -208,7 +208,7 @@ export interface Phase9ScenarioResult {
   authorityWarningCount: number;
   /** `ParticleSystem.priority` — §39 step 5. */
   particlePriority: number;
-  /** `@four/motion`'s `PRIORITY_FORCES`, for the cross-package equality check. */
+  /** `@fourjs/motion`'s `PRIORITY_FORCES`, for the cross-package equality check. */
   forcesPriority: number;
   /** Systems registered on the application's §39 registry. */
   registeredSystemCount: number;

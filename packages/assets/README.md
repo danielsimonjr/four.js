@@ -1,4 +1,4 @@
-# @four/assets
+# @fourjs/assets
 
 Asset system. Part of [fourJS](../../README.md).
 
@@ -17,7 +17,7 @@ Implements the MVP tier of §76–78 in [`docs/SPECIFICATION.md`](../../docs/SPE
 - **Content hashing (§76)** — `load(url, loader, { hashContent: true })` records a hash readable through `contentHash(url, loader)`; `{ expectedHash }` verifies it and **refuses** a mismatch (`context.reason === "hash-mismatch"`), which is the §96 integrity feature. SHA-256 over `crypto.subtle` by default, overridable through `digest`; `canHashContent` reports whether the runtime has one, and a hash that cannot be computed refuses rather than passes. See `src/content-hash.ts` for the algorithm argument.
 - **The §79 manifest** — `manifestLoader` / `parseAssetManifest` (a manifest is untrusted content too), `loadFromManifest(assets, manifest, key, loader)` resolving logical key → URL → verified bytes, and `manifestUrl` for the matching `release`.
 - **Loaders** — `textLoader`, `jsonLoader`, `binaryLoader`, `createImageLoader` (over an injectable `ImageDecodeLike`), and `createTextureLoader`; `AssetLoader` is the contract a custom loader implements.
-- **`ImageAsset` / `TextureAsset`** — disposal wrappers (§83) around a decoded image and around decoded RGBA8 texels. `TextureAsset` is shaped as `@four/render`'s `TextureSource` **structurally** (no dependency edge; `tests/integration/texture-manifest.test.ts` keeps the two spellings honest), carries §60a/§77 `colorSpace`/`filter`/`wrap`, and flips the codec's top-first rows so row 0 is `v = 0` (§7a).
+- **`ImageAsset` / `TextureAsset`** — disposal wrappers (§83) around a decoded image and around decoded RGBA8 texels. `TextureAsset` is shaped as `@fourjs/render`'s `TextureSource` **structurally** (no dependency edge; `tests/integration/texture-manifest.test.ts` keeps the two spellings honest), carries §60a/§77 `colorSpace`/`filter`/`wrap`, and flips the codec's top-first rows so row 0 is `v = 0` (§7a).
 - **§96 decompression limits** — `createTextureLoader` bounds decoded output (`maximumDecodedBytes`, default 64 MiB = 4096²) _and_ expansion ratio (`maximumExpansionRatio`, default 1000×), post-decode by default and pre-decode when an optional `probe` reads the header.
 
 ## Staged / not yet implemented
@@ -27,4 +27,4 @@ Implements the MVP tier of §76–78 in [`docs/SPECIFICATION.md`](../../docs/SPE
 
 Unit tests are colocated in `tests/` per §92.
 
-Workspace name `@four/assets`; publishes as `@danielsimonjr/fourjs-assets`.
+Workspace name `@fourjs/assets`; publishes as `@danielsimonjr/fourjs-assets`.

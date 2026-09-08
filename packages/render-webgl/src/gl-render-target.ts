@@ -1,6 +1,6 @@
 /**
  * GPU-side render targets for the WebGL 2 backend: one framebuffer object per
- * `@four/render` `RenderTarget`, cached and invalidated by version (§61, §48,
+ * `@fourjs/render` `RenderTarget`, cached and invalidated by version (§61, §48,
  * §63; R-4, 2026-08-07).
  *
  * The third member of the family `gl-geometry.ts` and `gl-texture.ts` started —
@@ -10,7 +10,7 @@
  * all three back the same claim: **GPU residency is a backend cache, not an
  * application concern.** That is also the answer to why §61's
  * `createRenderTarget` stays deferred; the argument is written out on
- * `@four/render`'s `RenderTarget`, on the class it concerns.
+ * `@fourjs/render`'s `RenderTarget`, on the class it concerns.
  *
  * ## What one entry holds
  *
@@ -64,7 +64,7 @@
  *
  * ## Staged (2026-08-07, R-4)
  *
- * The public shape of each of these is on `@four/render`'s `render-target.ts`;
+ * The public shape of each of these is on `@fourjs/render`'s `render-target.ts`;
  * what this module would additionally need is noted here:
  *
  * - ~~**Stencil attachments** (§67)~~ — **landed 2026-08-11 (R-7)**:
@@ -73,7 +73,7 @@
  *   interplay with R-18's samplable depth is an exclusion rather than a
  *   precedence: a framebuffer has one depth attachment, the packed form is a
  *   renderbuffer and the samplable form is a `DEPTH_COMPONENT24` texture, so
- *   `@four/render`'s constructor refuses `{ stencil: true, depthTexture: true }`
+ *   `@fourjs/render`'s constructor refuses `{ stencil: true, depthTexture: true }`
  *   (§85) and this cache never has to choose. `stencil: true` with
  *   `depth: false` is refused there too, because the stencil arrives *inside*
  *   the depth attachment.
@@ -84,14 +84,14 @@
  *   a `MAX_SAMPLES` query. Three entry points and a second framebuffer per
  *   target; deliberately not paid for by the minimal tier.
  * - ~~**`readPixels`**~~ (§61, §92) — **landed 2026-08-29**: `Rectangle2`
- *   arrived in `@four/math` and `WebglRenderer.readPixels(target, region?)`
+ *   arrived in `@fourjs/math` and `WebglRenderer.readPixels(target, region?)`
  *   reads a cached target's framebuffer through the optional `readPixels`
  *   entry point (the stalling form, wrapped in §61's promise shape — the
  *   method's own doc defends the choice against the picking fence path).
  */
 
-import type { RenderTarget } from "@four/render";
-import { warnDisposedInUse } from "@four/render";
+import type { RenderTarget } from "@fourjs/render";
+import { warnDisposedInUse } from "@fourjs/render";
 
 import {
   GL,
@@ -110,7 +110,7 @@ import {
  * geometry or a texture reaches the backend *through a material*, as a
  * structural read contract that more than one class can satisfy, whereas a
  * render target reaches it as the fourth argument of `Renderer.render`, typed
- * as this one class — `@four/render` is already a dependency (plan §3.1), the
+ * as this one class — `@fourjs/render` is already a dependency (plan §3.1), the
  * class carries private state and so cannot be satisfied structurally anyway,
  * and naming it is what lets `render-webgl`'s tests drive this cache with the
  * real thing (decision, R-4).

@@ -86,10 +86,10 @@
  * script is scoped to the one §86 row it can name. Recorded, never gated.
  */
 
-import { Vector3 } from "@four/math";
-import { Collider, PhysicsWorld, RigidBody } from "@four/physics";
-import { Rapier3dAdapter } from "@four/physics-rapier";
-import { Group } from "@four/scene";
+import { Vector3 } from "@fourjs/math";
+import { Collider, PhysicsWorld, RigidBody } from "@fourjs/physics";
+import { Rapier3dAdapter } from "@fourjs/physics-rapier";
+import { Group } from "@fourjs/scene";
 
 import {
   MEASUREMENT_NOTE,
@@ -321,7 +321,7 @@ const record = {
     "§86 (active rigid bodies: 5 000 simple bodies baseline), §20–32, §37, §39, §92; plan §6j P11-4, WP-11.4",
   recordedAt: new Date().toISOString(),
   solver:
-    "rapier3d (@four/physics-rapier Rapier3dAdapter) through @four/physics",
+    "rapier3d (@fourjs/physics-rapier Rapier3dAdapter) through @fourjs/physics",
   dimension: "3d",
   fixedDeltaTimeSeconds: round(FIXED_DELTA_TIME, 9),
   fixedStepBudgetMs: round(FIXED_STEP_BUDGET_MS, 4),

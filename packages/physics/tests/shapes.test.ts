@@ -1,5 +1,5 @@
-import { isFourError } from "@four/core";
-import { Vector2, Vector3 } from "@four/math";
+import { isFourError } from "@fourjs/core";
+import { Vector2, Vector3 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import type { CollisionShape } from "../src/shapes.js";

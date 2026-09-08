@@ -154,7 +154,7 @@ can be replaced without changing the scene API." No such package exists in the �
 the scaffold (per ERRATA E-3 discipline) must match §98.
 
 **Proposal:** either amend §52 to "an isolated *module* with a stable interface inside
-`@four/geometry`" (recommended — avoids growing the package count for the MVP), or amend §98
+`@fourjs/geometry`" (recommended — avoids growing the package count for the MVP), or amend §98
 to add `packages/tessellate/`. Either way the two sections must agree, same class of defect as
 E-3.
 
@@ -247,7 +247,7 @@ Only §13's `Trajectory` shows `out?` parameters. Everything else returns/accept
 no stated convention, while §83 warns diagnostics should flag "excessive per-frame
 allocations". Whether `Vector3` is mutable, whether operations are in-place, chainable, or
 allocating, and whether hot APIs take `out` parameters determines every signature in
-`@four/math` — Phase 1 code.
+`@fourjs/math` — Phase 1 code.
 
 **Proposal:** add a convention subsection to Part I or §91: mutable math types; instance
 methods mutate in place and return `this`; static/`*.clone()` variants allocate; all sampling
@@ -371,7 +371,7 @@ sRGB-native with documented divergence; CSS-style color strings (used throughout
 audio section, no package in §98, no non-goal in §5.
 
 **Proposal:** pick one: (a) add "audio engine" to §5 non-goals with a note that the plugin
-system (§81) is the extension point, or (b) reserve `@four/audio` in §98 with a stub
+system (§81) is the extension point, or (b) reserve `@fourjs/audio` in §98 with a stub
 responsibilities section. Recommended: (a) for 1.0 — matches the E-3 discipline of keeping
 §98 authoritative over the scaffold.
 
@@ -400,7 +400,7 @@ it); note `TimeState.realTime` precision over multi-day sessions.
 
 ### R-25 — Tree-shaking vs the umbrella package; bundle budgets
 
-§91 requires tree-shakable modules, but every example does `import * as Four from "four"`
+§91 requires tree-shakable modules, but every example does `import * as Four from "fourJS"`
 (§97, §114) through the umbrella package — the pattern most hostile to dead-code elimination,
 and the one users will copy. Separately, §86 sets runtime targets but the spec sets no payload
 targets, which for a web framework is a primary adoption criterion.
@@ -424,8 +424,8 @@ don't silently fail on unconfigured hosts.
 ### R-27 — Package responsibility coverage (§98–§102)
 
 Part VIII gives responsibility lists for only 3 of 24 packages (motion, animation, physics)
-plus the solver packages. Notably homeless: camera rigs/controls (§44, §47 — `@four/scene`?
-`@four/input`? a future `@four/controls`?), tessellation (R-7), units (§101 puts "units" in
+plus the solver packages. Notably homeless: camera rigs/controls (§44, §47 — `@fourjs/scene`?
+`@fourjs/input`? a future `@fourjs/controls`?), tessellation (R-7), units (§101 puts "units" in
 physics, but §40 is engine-wide). **Proposal:** add one-line responsibility entries for the
 remaining packages (the scaffold's per-package READMEs already exist and could be the source),
 and assign camera rigs and units explicitly.

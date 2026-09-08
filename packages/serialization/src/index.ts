@@ -1,5 +1,5 @@
 /**
- * `@four/serialization` — the §79 scene document and its §80 migrations.
+ * `@fourjs/serialization` — the §79 scene document and its §80 migrations.
  *
  * Three modules: `format.ts` is the document (types, canonical validation, JSON
  * text), `serializer.ts` turns a live scene graph into one and back through a
@@ -15,10 +15,10 @@
  * ```
  */
 
-export const PACKAGE_NAME = "@four/serialization";
+export const PACKAGE_NAME = "@fourjs/serialization";
 
 // §81's serialization-side capability tokens (RFC 0002), declared by the
-// package that owns the §79/§80 registries; `@four/four`'s `plugins.ts`
+// package that owns the §79/§80 registries; `@fourjs/four`'s `plugins.ts`
 // re-exports the same objects, so both import paths hand out one identity.
 // Declaring a token does not reach the §96 plugin host — `capabilities.ts`
 // states the boundary argument.

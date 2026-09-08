@@ -3,10 +3,10 @@
  *
  * The registry is module-level state, so every case that inspects allocation
  * starts from {@link resetLayers} — the same discipline `resetDevWarnings`
- * imposes on `@four/core`'s warning tests.
+ * imposes on `@fourjs/core`'s warning tests.
  */
 
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {

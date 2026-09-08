@@ -6,31 +6,31 @@
  * rates", and §64 stage 6 says the way to get there is batching: one draw for
  * the whole system, not one per particle. This module is the backend-independent
  * half of that — the data a batched particle draw needs, written down once so
- * `@four/particles` can produce it and every backend can consume it.
+ * `@fourjs/particles` can produce it and every backend can consume it.
  *
  * ## Why this is a *structural* contract and not a base class
  *
  * The obvious shape is `class ParticleRenderable extends Renderable` in
- * `@four/particles` (§49 lists `ParticleSystem` in the renderable family). It
+ * `@fourjs/particles` (§49 lists `ParticleSystem` in the renderable family). It
  * cannot be written, and the reason is a hard constraint rather than a
  * preference: the frozen §3.1 dependency matrix gives `particles` exactly
  * `core`, `math`, `scene`, and gives `render` exactly `core`, `math`, `scene`,
  * `geometry`, `materials`. Neither package may import the other — they are in
  * the same dispatch wave — so
  *
- * - `@four/particles` cannot `extends Renderable`, cannot name `RenderItem`,
+ * - `@fourjs/particles` cannot `extends Renderable`, cannot name `RenderItem`,
  *   and cannot construct a `BufferGeometry` or a material; and
- * - `@four/render` cannot name `ParticleEmitter` or `ParticlePool`.
+ * - `@fourjs/render` cannot name `ParticleEmitter` or `ParticlePool`.
  *
- * What is left is a **duck-typed contract**: `@four/render` declares
+ * What is left is a **duck-typed contract**: `@fourjs/render` declares
  * {@link ParticleDrawable}, `buildRenderList` recognises any node carrying the
- * {@link ParticleDrawable.isParticleDrawable} brand, and `@four/particles`
- * implements the shape without importing it. `@four/particles`'s
+ * {@link ParticleDrawable.isParticleDrawable} brand, and `@fourjs/particles`
+ * implements the shape without importing it. `@fourjs/particles`'s
  * `ParticleRenderable` re-declares the members with a comment pointing here.
  *
  * The honest cost, stated plainly: **nothing type-checks the two declarations
  * against each other.** A change to this interface will not fail
- * `@four/particles`'s build; it will fail its *tests*, which assert the shape
+ * `@fourjs/particles`'s build; it will fail its *tests*, which assert the shape
  * member by member, and the backend's, which assert the items. Both suites pin
  * the same field names and the same interleaved layout. If a later revision of
  * the matrix lets particles depend on render, `ParticleRenderable` re-parents
@@ -41,7 +41,7 @@
  *
  * A particle's *drawn* state is its world-space centre, its **current** size and
  * its **current** colour — the §36 over-lifetime ramps already evaluated. The
- * pool stores ramp *endpoints* plus age (see `@four/particles`'s `pool.ts`), so
+ * pool stores ramp *endpoints* plus age (see `@fourjs/particles`'s `pool.ts`), so
  * something has to evaluate `start + (end − start) · normalizedAge` before the
  * GPU sees it. That happens **once per frame on the CPU, into an array the node
  * owns and reuses**, because:
@@ -80,7 +80,7 @@
  * ## What a backend owes this item
  *
  * - **One draw call.** The reference implementation
- *   (`@four/render-webgl`) draws `count` instances of {@link particleQuadGeometry}
+ *   (`@fourjs/render-webgl`) draws `count` instances of {@link particleQuadGeometry}
  *   with `drawArraysInstanced`.
  * - **Alpha blending.** Particles are transparent by nature — the §36 colour
  *   ramp's whole point is fading out — so the particle pass runs with blending
@@ -106,8 +106,8 @@
  * WP-9.3).
  */
 
-import { BufferGeometry } from "@four/geometry";
-import type { Vector3 } from "@four/math";
+import { BufferGeometry } from "@fourjs/geometry";
+import type { Vector3 } from "@fourjs/math";
 
 /**
  * Floats per particle in {@link ParticleDrawable.particleInstances} — the
@@ -136,7 +136,7 @@ export const PARTICLE_SOFTNESS_OFFSET = 9;
 /**
  * Floats per trail ribbon vertex — position `xyz` plus straight-alpha `rgba`.
  *
- * Duplicated in `@four/particles`' `trail.ts` for the same reason as
+ * Duplicated in `@fourjs/particles`' `trail.ts` for the same reason as
  * {@link PARTICLE_INSTANCE_FLOATS}.
  */
 export const TRAIL_VERTEX_FLOATS = 7;
@@ -155,7 +155,7 @@ export const TRAIL_COLOR_OFFSET = 3;
  * turned into exactly one `ParticleRenderItem`.
  *
  * ```ts
- * // in @four/particles, with no import from @four/render:
+ * // in @fourjs/particles, with no import from @fourjs/render:
  * class ParticleRenderable extends Node {
  *   readonly isParticleDrawable = true;
  *   renderLayer = 0;
@@ -248,7 +248,7 @@ export interface ParticleDrawable {
 
   /**
    * Optional live-particle AABB in the node's **local** space (R-8 follow-up
-   * b). `@four/particles`' `ParticleRenderable` already publishes this;
+   * b). `@fourjs/particles`' `ParticleRenderable` already publishes this;
    * `buildRenderList` probes it structurally, converts the box to a world
    * sphere, and sets `frustumCulled` so §87 can hide an emitter whose
    * particles are all off screen. Absent or `false` keeps the item
@@ -296,7 +296,7 @@ export function isParticleDrawable(value: unknown): value is ParticleDrawable {
  * nothing next to the instance stream, and `drawArraysInstanced` avoids putting
  * an element buffer into every particle vertex array.
  *
- * Created on first use rather than at module load, so importing `@four/render`
+ * Created on first use rather than at module load, so importing `@fourjs/render`
  * does not consume a geometry id or allocate a buffer for an application with no
  * particles. Never disposed: it is process-wide shared state, and disposing it
  * would empty the quad under every particle system at once (§83 — the creator

@@ -5,7 +5,7 @@
  * file is short by construction. What it pins is the part a later edit could
  * quietly get wrong: that the union is §8's own six members in §8's own order,
  * and that {@link isSimulationSpaceMode} answers **§8's sentence** rather than
- * "what `@four/physics` happens to accept today" — the two are deliberately
+ * "what `@fourjs/physics` happens to accept today" — the two are deliberately
  * different for `"local-plane"`, and a packet that implements §21's mapping
  * must be able to tell them apart.
  *

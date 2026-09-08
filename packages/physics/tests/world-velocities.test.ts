@@ -2,11 +2,11 @@
  * PH-1 live velocity writes — §42-style who-wins.
  */
 
-import { Vector3 } from "@four/math";
-import { Group } from "@four/scene";
+import { Vector3 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import { Collider } from "../src/collider.js";
 import { PhysicsWorld } from "../src/world.js";
 import { RigidBody } from "../src/rigid-body.js";

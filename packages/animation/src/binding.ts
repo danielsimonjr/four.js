@@ -34,7 +34,7 @@
  *
  * ```ts
  * // A morph-weight track: a number track into one element of the
- * // MorphWeights component's array (§54; @four/scene).
+ * // MorphWeights component's array (§54; @fourjs/scene).
  * createBinding(morphWeights, "weights.2");
  * // A skeletal-joint track: ordinary vector3/quaternion tracks into a bone
  * // reached through Skeleton.bones — insertion order is the ABI (§33).
@@ -57,7 +57,7 @@
  * one property, deliberately with no policy of its own.
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import { detectAdapter, numberAdapter, type ValueAdapter } from "./values.js";
 

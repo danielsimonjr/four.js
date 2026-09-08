@@ -17,7 +17,7 @@ import type { Vector3 } from "./vector3.js";
  * half-spaces that bound what a camera can see. This class is that test and
  * nothing else. It builds no index, holds no scene, and caches nothing, so it
  * is equally the leaf of a future BVH walk and the whole of the linear scan
- * `@four/render`'s per-view list does today.
+ * `@fourjs/render`'s per-view list does today.
  *
  * ## Why a sphere is the only volume it accepts
  *
@@ -31,7 +31,7 @@ import type { Vector3 } from "./vector3.js";
  * one a box test would have kept: **a false keep costs a draw, a false reject
  * costs a missing object**, and only one of those is a bug.
  *
- * `@four/render`'s `computeWorldBoundingSphere` is the producer; it derives the
+ * `@fourjs/render`'s `computeWorldBoundingSphere` is the producer; it derives the
  * sphere from §53's cached local AABB.
  *
  * ## Storage
@@ -57,7 +57,7 @@ import type { Vector3 } from "./vector3.js";
  *
  * ## Validation (§85, §61)
  *
- * Nothing here throws — `@four/math` validates nothing (the rule
+ * Nothing here throws — `@fourjs/math` validates nothing (the rule
  * `Matrix4.setPerspective` states), and this class is read inside a frame,
  * where §61 forbids throwing outright. Instead **every degenerate input fails
  * towards drawing**: a plane whose normal has no length (a singular or

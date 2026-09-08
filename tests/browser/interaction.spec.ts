@@ -21,7 +21,7 @@
  * the pixel a human aims at is the object the ray finds — the composition of
  * the CSS rectangle, the DPR, the NDC convention, the Y flip, the projection,
  * and the camera's world matrix. A single sign error anywhere in that chain
- * still passes every unit test in `@four/input` and puts the click in the wrong
+ * still passes every unit test in `@fourjs/input` and puts the click in the wrong
  * quadrant, which is exactly the defect this file exists to catch.
  *
  * ## What is measured

@@ -82,8 +82,8 @@ import {
   FourError,
   type Component,
   type ComponentHost,
-} from "@four/core";
-import { Node, Transform } from "@four/scene";
+} from "@fourjs/core";
+import { Node, Transform } from "@fourjs/scene";
 
 import type { ColliderDescriptor } from "./descriptors.js";
 import type { CollisionEvent, TriggerEvent } from "./events.js";
@@ -302,7 +302,7 @@ export class Collider
    * and why the ancestor walk is what lets one body carry several colliders.
    *
    * The walk needs a scene graph, so it runs only when the host is a
-   * `@four/scene` `Node`; a bare `ComponentRegistry` host resolves against
+   * `@fourjs/scene` `Node`; a bare `ComponentRegistry` host resolves against
    * itself alone.
    */
   get body(): RigidBody | undefined {

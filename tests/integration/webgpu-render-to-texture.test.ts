@@ -20,22 +20,22 @@
  *    result.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   COPY_EFFECT,
   RenderGraph,
   RenderTarget,
   Renderable,
   supportsScreenEffects,
-} from "@four/render";
-import { WebgpuRenderer } from "@four/render-webgpu";
+} from "@fourjs/render";
+import { WebgpuRenderer } from "@fourjs/render-webgpu";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

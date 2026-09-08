@@ -1,5 +1,5 @@
 {
-  "name": "@four/physics-rapier",
+  "name": "@fourjs/physics-rapier",
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
@@ -15,8 +15,8 @@
   "dependencies": {
     "@dimforge/rapier2d-compat": "0.20.0",
     "@dimforge/rapier3d-compat": "0.20.0",
-    "@four/core": "workspace:*",
-    "@four/math": "workspace:*",
-    "@four/physics": "workspace:*"
+    "@fourjs/core": "workspace:*",
+    "@fourjs/math": "workspace:*",
+    "@fourjs/physics": "workspace:*"
   }
 }

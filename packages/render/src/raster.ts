@@ -25,7 +25,7 @@
  *
  * In the discipline of `TextureSource`, `FetchLike`, `PointerSurface`, and
  * `SurfaceObserver`: the engine names a shape, the host supplies a value, and
- * the browser adapter is a few lines in the application. `@four/render`
+ * the browser adapter is a few lines in the application. `@fourjs/render`
  * compiles with no `lib.dom`, so a seam naming `HTMLCanvasElement` would not
  * even compile (RFC 0004, alternative F). The adapter the discipline promises:
  *
@@ -104,9 +104,9 @@
  * by the most churn-heavy allocation an application makes).
  */
 
-import { FourError, type Disposable } from "@four/core";
-import type { MaterialTexture } from "@four/materials";
-import type { ColorSpace } from "@four/math";
+import { FourError, type Disposable } from "@fourjs/core";
+import type { MaterialTexture } from "@fourjs/materials";
+import type { ColorSpace } from "@fourjs/math";
 
 import { validateColorSpace } from "./render-target.js";
 import {
@@ -296,7 +296,7 @@ function flipRows(
  * ## No backend changes, none
  *
  * A backend's texture cache keys on {@link CanvasTexture.id} and validates on
- * {@link CanvasTexture.version} (`@four/render-webgl`'s `TextureCache`); a
+ * {@link CanvasTexture.version} (`@fourjs/render-webgl`'s `TextureCache`); a
  * `CanvasTexture` satisfies both and uploads through the path that already
  * exists — R-4's `MaterialTexture` seam paying off a second time, and the
  * strongest single argument for this shape (RFC 0004 §2a). No new duck-typed

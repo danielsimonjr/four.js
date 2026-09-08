@@ -1,1 +1,1 @@
-export const PACKAGE_NAME = "@four/physics-soft";
+export const PACKAGE_NAME = "@fourjs/physics-soft";

@@ -1,21 +1,21 @@
 /**
  * The read surface of a texture as a **material** and a rendering backend see
- * it (§77) — implemented by `@four/render`'s `Texture`.
+ * it (§77) — implemented by `@fourjs/render`'s `Texture`.
  *
  * ## Why the contract is declared here (decision, WP-3a.3, widened by R-19)
  *
- * The concrete `Texture` class lives in `@four/render`, because a texture is a
- * renderer resource (§61, §77) and `@four/render` is where the renderer
+ * The concrete `Texture` class lives in `@fourjs/render`, because a texture is a
+ * renderer resource (§61, §77) and `@fourjs/render` is where the renderer
  * interface lives. But the dependency matrix (plan §3.1, frozen) puts
  * `materials` *below* `render` — `render` depends on `materials`, never the
  * other way round — so this package cannot import that class.
  *
- * So the **contract** is declared here and `@four/render`'s `Texture` declares
+ * So the **contract** is declared here and `@fourjs/render`'s `Texture` declares
  * `implements SpriteTexture`: the compiler checks the two agree, the dependency
  * edge stays pointing the one legal way, and a caller writes
  * `new SpriteMaterial({ texture })` or `new UnlitMaterial({ map })` with a real
  * `Texture` and never sees the seam. It is the same technique
- * `@four/render-webgl` uses for the GL context it does not own, one layer down.
+ * `@fourjs/render-webgl` uses for the GL context it does not own, one layer down.
  *
  * It lives in a module of its own since R-19 (2026-08-07), when
  * `UnlitMaterial.map` and `LitMaterial.map` made it the *family's* texture
@@ -38,11 +38,11 @@
  * geometry and material.
  */
 
-import type { ColorSpace } from "@four/math";
+import type { ColorSpace } from "@fourjs/math";
 
 /**
  * How a texture is sampled between texel centres (§77's "filter modes"; R-30,
- * 2026-08-13) — the read side of `@four/render`'s `TextureFilter`.
+ * 2026-08-13) — the read side of `@fourjs/render`'s `TextureFilter`.
  *
  * Two values because a texture with one mip level has no choice to make between
  * levels: §77's remaining filter modes (`*_MIPMAP_*`) name exactly that choice.
@@ -69,7 +69,7 @@ export type MaterialTextureFilter = "nearest" | "linear";
  *
  * A mip-choosing value is only meaningful on a texture that *has* a mip chain:
  * GL leaves a texture with one level and a `*_MIPMAP_*` min filter **incomplete**
- * — it samples as opaque black — which is why `@four/render`'s `Texture` refuses
+ * — it samples as opaque black — which is why `@fourjs/render`'s `Texture` refuses
  * the combination (§85) rather than letting a scene go silently black.
  *
  * There is deliberately **no** `magFilter`: magnification cannot use mip levels
@@ -87,7 +87,7 @@ export type MaterialTextureMinFilter =
 
 /**
  * How a texture is addressed outside `[0, 1]` (§77's "wrap modes"; R-30,
- * 2026-08-13) — the read side of `@four/render`'s `TextureWrap`.
+ * 2026-08-13) — the read side of `@fourjs/render`'s `TextureWrap`.
  *
  * One value for both axes: a per-axis split is meaningful, but nothing in the
  * engine authors anisotropic addressing today and a field with no reader is a
@@ -130,7 +130,7 @@ export interface MaterialTexture {
    * **Row 0 is `v = 0`**, i.e. the bottom row in the Y-up convention of §7a and
    * in GL's default unpack orientation. A source whose first row is the *top*
    * one (an `ImageBitmap`, a decoded PNG) is flipped by whoever adapts it, not
-   * here — see `@four/render`'s `TextureSource` for the note on where those
+   * here — see `@fourjs/render`'s `TextureSource` for the note on where those
    * sources land.
    */
   readonly data: Uint8Array | null;

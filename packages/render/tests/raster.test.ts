@@ -9,8 +9,8 @@
  * tracking that is the tier's whole upload-efficiency claim.
  */
 
-import { isFourError } from "@four/core";
-import { UnlitMaterial } from "@four/materials";
+import { isFourError } from "@fourjs/core";
+import { UnlitMaterial } from "@fourjs/materials";
 import { describe, expect, it } from "vitest";
 
 import { CanvasTexture, type RasterSource } from "../src/raster.js";

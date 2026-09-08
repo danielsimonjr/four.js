@@ -29,8 +29,8 @@
  * bind pose, invisible in the transcript.
  */
 
-import { Path, planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { Path, planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   Circle,
   Mesh,
@@ -43,13 +43,13 @@ import {
   type RenderItem,
   type Shape2D,
   type SolidPaint,
-} from "@four/render";
+} from "@fourjs/render";
 import {
   WebglRenderer,
   clearRegisteredSkinningPipeline,
   registerSkinningPipeline,
-} from "@four/render-webgl";
-import { WebgpuRenderer } from "@four/render-webgpu";
+} from "@fourjs/render-webgl";
+import { WebgpuRenderer } from "@fourjs/render-webgpu";
 import {
   Bone,
   OrthographicCamera,
@@ -58,7 +58,7 @@ import {
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { RecordingCanvas, createRecordingGl } from "./helpers/recording-gl.js";

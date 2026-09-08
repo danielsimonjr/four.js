@@ -3,7 +3,7 @@ import {
   isFourError,
   resetDevWarnings,
   type Disposable,
-} from "@four/core";
+} from "@fourjs/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

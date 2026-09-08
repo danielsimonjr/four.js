@@ -63,7 +63,7 @@
  * the quad is a rectangle in the XY plane, so `uv = (position.xy - min) / size`
  * maps its corners onto `(0,0)…(1,1)` exactly, and `min`/`size` are the
  * geometry's own local bounds (`computeBounds()`, cached against the version).
- * The backend uploads them as one `vec4` per draw; see `@four/render-webgl`'s
+ * The backend uploads them as one `vec4` per draw; see `@fourjs/render-webgl`'s
  * `SpriteProgram`.
  *
  * `BufferGeometry.uvs` exists as of R-19 (2026-08-07), and this module then
@@ -130,7 +130,7 @@
  *   thing hands out — `atlas.get("coin")` returns a {@link SpriteFrame} — and
  *   an atlas is a §77 texture-metadata container (a parsed `.json` sidecar,
  *   a packer's output) rather than a scene-graph feature. It belongs with
- *   `@four/assets`, next to the loader that would parse it, and it needs
+ *   `@fourjs/assets`, next to the loader that would parse it, and it needs
  *   nothing from this class that is not already public. Consecutive sprites
  *   that already share one texture are grouped by
  *   {@link groupSpritesByTexture} — that is §65's atlas-*grouping* helper,
@@ -150,10 +150,10 @@
  * documented as a limitation on the backend.
  */
 
-import type { Disposable } from "@four/core";
-import { BufferGeometry } from "@four/geometry";
-import { Vector2 } from "@four/math";
-import type { SpriteMaterial } from "@four/materials";
+import type { Disposable } from "@fourjs/core";
+import { BufferGeometry } from "@fourjs/geometry";
+import { Vector2 } from "@fourjs/math";
+import type { SpriteMaterial } from "@fourjs/materials";
 
 import { Renderable, type RenderableOptions } from "./renderable.js";
 
@@ -189,7 +189,7 @@ import { Renderable, type RenderableOptions } from "./renderable.js";
  * sheet, most packer sidecars) flips with `y = textureHeight - top - height`
  * where it adapts them, which is the same place it already flips the texels.
  *
- * A producer that has **normalized** uv instead — `@four/text`'s `TextQuad`
+ * A producer that has **normalized** uv instead — `@fourjs/text`'s `TextQuad`
  * carries `u0/v0/u1/v1` — multiplies: `x = u0 · texture.width`,
  * `width = (u1 - u0) · texture.width`, and the same in Y.
  *
@@ -318,7 +318,7 @@ const QUAD_VERTEX_COUNT = 4;
  */
 const QUAD_INDICES = new Uint16Array([0, 1, 2, 0, 2, 3]);
 
-/** Validates one extent (§85), mirroring `@four/geometry`'s builders. */
+/** Validates one extent (§85), mirroring `@fourjs/geometry`'s builders. */
 function requirePositive(name: string, value: number): number {
   if (!Number.isFinite(value) || value <= 0) {
     throw new RangeError(
@@ -581,7 +581,7 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
    *
    * Assigning a *different* texture to the material afterwards — or a different
    * material to the sprite — is therefore not re-checked, because neither
-   * setter is this class's: `Material.texture` belongs to `@four/materials`,
+   * setter is this class's: `Material.texture` belongs to `@fourjs/materials`,
    * which cannot know its sprites, and `Renderable.material` is a plain field
    * on the base. A frame left over from a larger texture then resolves to uv
    * beyond `1`, which samples per the texture's wrap mode — clamp-to-edge is

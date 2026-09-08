@@ -2,9 +2,9 @@
  * R-29 — §55's `frame` sub-rectangle, end to end across `render` and
  * `render-webgl` (2026-08-08).
  *
- * A frame is one fact spread over two packages and a shader: `@four/render`'s
- * `Sprite` owns and validates it, `@four/render`'s render list snapshots it
- * onto the draw, and `@four/render-webgl` resolves it into the `quad` uniform
+ * A frame is one fact spread over two packages and a shader: `@fourjs/render`'s
+ * `Sprite` owns and validates it, `@fourjs/render`'s render list snapshots it
+ * onto the draw, and `@fourjs/render-webgl` resolves it into the `quad` uniform
  * the vertex stage already had. No unit test inside either package can check
  * that agreement, which is what this file is for.
  *
@@ -36,8 +36,8 @@
  *    GPU texture instead of one per cell.
  *
  * 3. **§85 refuses, it does not clamp.** A frame outside its texture throws at
- *    the write, against the real `@four/render` `Texture` satisfying
- *    `@four/materials`' contract — the seam a unit test with a hand-written
+ *    the write, against the real `@fourjs/render` `Texture` satisfying
+ *    `@fourjs/materials`' contract — the seam a unit test with a hand-written
  *    double cannot exercise.
  *
  * 4. **A frame changes no geometry.** Stepping a sprite through an atlas
@@ -51,22 +51,22 @@
  * `render-graph.test.ts` gives at length.
  */
 
-import { SpriteMaterial } from "@four/materials";
+import { SpriteMaterial } from "@fourjs/materials";
 import {
   Sprite,
   Texture,
   buildRenderList,
   isSpriteItem,
   type RenderItem,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

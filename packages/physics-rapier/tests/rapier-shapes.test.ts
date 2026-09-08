@@ -16,12 +16,12 @@
  * with the same tolerance the adapter suites use for resting contacts.
  */
 
-import { Quaternion, Vector2, Vector3 } from "@four/math";
+import { Quaternion, Vector2, Vector3 } from "@fourjs/math";
 import type {
   CollisionShape,
   PhysicsBodyHandle,
   Vector3Input,
-} from "@four/physics";
+} from "@fourjs/physics";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { initializeRapier2d, initializeRapier3d } from "../src/init.js";

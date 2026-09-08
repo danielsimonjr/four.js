@@ -13,7 +13,7 @@
  * entirely.
  */
 
-import { defineCapability } from "@four/core";
+import { defineCapability } from "@fourjs/core";
 
 import type { ShaderOperatorRegistry } from "./shader-operators.js";
 

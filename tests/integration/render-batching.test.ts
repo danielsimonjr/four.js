@@ -1,7 +1,7 @@
 /**
  * §65 batching across the packages that have to agree about it (R-9,
- * 2026-08-09) — `@four/scene` builds the graph, `@four/render` plans the runs,
- * `@four/render-webgl` issues the draws.
+ * 2026-08-09) — `@fourjs/scene` builds the graph, `@fourjs/render` plans the runs,
+ * `@fourjs/render-webgl` issues the draws.
  *
  * Three claims live only in the composition, which is why they are here rather
  * than in either package's unit suite:
@@ -20,9 +20,9 @@
  *    scene by planning it twice.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { Matrix4 } from "@four/math";
-import { SpriteMaterial, UnlitMaterial } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { Matrix4 } from "@fourjs/math";
+import { SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
 import {
   RenderBatcher,
   Renderable,
@@ -33,15 +33,15 @@ import {
   groupRenderListByPipeline,
   resetRenderStatistics,
   type RenderItem,
-} from "@four/render";
-import { WebglRenderer, createGlBatching } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer, createGlBatching } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

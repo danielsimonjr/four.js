@@ -25,9 +25,9 @@
  *    solver-call sequence, byte for byte.
  */
 
-import { isFourError } from "@four/core";
-import { Vector3 } from "@four/math";
-import { Group } from "@four/scene";
+import { isFourError } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { describe, expect, it, vi } from "vitest";
 
 import type { CollisionEvent, PhysicsWorldInit } from "../src/index.js";

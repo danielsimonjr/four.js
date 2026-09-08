@@ -9,7 +9,7 @@
  * *drawing* strategies — **sprite batching and compatible shape batching** — as
  * a backend-independent planner: it turns a run of {@link RenderItem}s into one
  * interleaved vertex stream plus one index stream, and a backend uploads and
- * draws them. `@four/render-webgl`'s `gl-batch.ts` is the first consumer;
+ * draws them. `@fourjs/render-webgl`'s `gl-batch.ts` is the first consumer;
  * nothing here names GL, so a second backend reuses the planner unchanged.
  *
  * ```ts
@@ -95,14 +95,14 @@
  * the call, never retain.
  */
 
-import type { BufferGeometry } from "@four/geometry";
+import type { BufferGeometry } from "@fourjs/geometry";
 import type {
   MaterialTexture,
   SpriteMaterial,
   UnlitMaterial,
-} from "@four/materials";
-import type { ColorRGBA } from "@four/math";
-import { ALL_LAYERS, type LayerMask } from "@four/scene";
+} from "@fourjs/materials";
+import type { ColorRGBA } from "@fourjs/math";
+import { ALL_LAYERS, type LayerMask } from "@fourjs/scene";
 
 import type { RenderItemClip } from "./clip.js";
 import { scissorsEqual, type ScissorRect } from "./scissor.js";
@@ -414,7 +414,7 @@ function isBatchable(item: RenderItem): item is BatchableItem {
  * The rectangle in **local** space that a sprite item's whole texture maps onto
  * — `(x, y, width, height)` written into `out`.
  *
- * This is the `quad` uniform `@four/render-webgl`'s sprite pipeline uploads,
+ * This is the `quad` uniform `@fourjs/render-webgl`'s sprite pipeline uploads,
  * derived here instead so a batched sprite can carry the same mapping *per
  * vertex*: `uv = (position.xy − quad.xy) / quad.zw`. With no frame the
  * rectangle is the geometry's own local bounds; with one it is the (larger,

@@ -115,9 +115,9 @@
  * pretending the simulation is something it is not.
  *
  * Semi-implicit rather than explicit Euler because it is the engine's default
- * (`@four/motion`'s `DEFAULT_INTEGRATOR`) and does not pump energy into orbiting
+ * (`@fourjs/motion`'s `DEFAULT_INTEGRATOR`) and does not pump energy into orbiting
  * particles under a radial field. It is **inlined here** rather than delegated to
- * `@four/motion`'s `semiImplicitEuler`: §3.1 gives particles no motion
+ * `@fourjs/motion`'s `semiImplicitEuler`: §3.1 gives particles no motion
  * dependency, and the inline form works on `Float32Array` lanes without boxing
  * each particle into an `IntegratorState`.
  *
@@ -177,8 +177,8 @@
  * engine does.
  */
 
-import { FourError } from "@four/core";
-import { Vector3, Vector4 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import { Vector3, Vector4 } from "@fourjs/math";
 
 import { ParticlePool } from "./pool.js";
 import { SeededRandom } from "./random.js";

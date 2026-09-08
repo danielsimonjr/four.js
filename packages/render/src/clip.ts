@@ -3,7 +3,7 @@
  * §57 stencil records (R-23, 2026-08-21).
  *
  * ```ts
- * panel.clip = true;          // @four/scene: this node's shape clips its subtree
+ * panel.clip = true;          // @fourjs/scene: this node's shape clips its subtree
  * buildRenderList(scene, list);
  * // list[0] is the panel's *mask* draw; every descendant item carries the
  * // stencil test that keeps it inside.
@@ -75,8 +75,8 @@
  * exactly what it resolved to before, and not one GL call is added or moved.
  */
 
-import { DEV, devWarn } from "@four/core";
-import type { StencilFunc, StencilOp } from "@four/materials";
+import { DEV, devWarn } from "@fourjs/core";
+import type { StencilFunc, StencilOp } from "@fourjs/materials";
 
 /**
  * How many clips one frame can carry: eight, because every stencil buffer
@@ -96,7 +96,7 @@ export const MAX_CLIP_PLANES = 8;
  * A stencil configuration as a **render item** carries it — structurally
  * identical to §57's `StencilState`, and deliberately not that class.
  *
- * `@four/materials`' `StencilState` is nominal (private fields) precisely so
+ * `@fourjs/materials`' `StencilState` is nominal (private fields) precisely so
  * that `material.ts` can import it type-only and a bundle that never masks does
  * not carry it (R-7, measured at 0.62 kB gzip). Constructing one here would
  * undo that for every bundle that carries a render list — i.e. all of them — so

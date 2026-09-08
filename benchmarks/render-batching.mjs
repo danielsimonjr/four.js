@@ -12,7 +12,7 @@
  *
  * Both rows are a *rate*: N sprites, or N shapes, at 60 FPS. A frame of that
  * costs two things — **preparing the draws** and **issuing them**. This script
- * measures the first half only, which is exactly what `@four/render` does per
+ * measures the first half only, which is exactly what `@fourjs/render` does per
  * frame and is pure CPU work:
  *
  * ```text
@@ -61,15 +61,15 @@
  * Recorded, never gated — see `benchmarks/README.md`.
  */
 
-import { SpriteMaterial, UnlitMaterial } from "@four/materials";
+import { SpriteMaterial, UnlitMaterial } from "@fourjs/materials";
 import {
   RenderBatcher,
   Rectangle,
   Sprite,
   Texture,
   buildRenderList,
-} from "@four/render";
-import { Scene, resolveWorldTransforms } from "@four/scene";
+} from "@fourjs/render";
+import { Scene, resolveWorldTransforms } from "@fourjs/scene";
 
 import {
   MEASUREMENT_NOTE,

@@ -4,8 +4,8 @@
  * §113's exit is that *a physics defect can be captured, replayed, and inspected
  * frame by frame*, and plan §6i makes that concrete as four claims. This file
  * discharges all four end to end against **real Rapier**, through the public API
- * (`four/application`, `@four/physics`, `@four/physics-rapier`,
- * `@four/diagnostics`) and with no renderer anywhere in the import graph:
+ * (`four/application`, `@fourjs/physics`, `@fourjs/physics-rapier`,
+ * `@fourjs/diagnostics`) and with no renderer anywhere in the import graph:
  *
  * 1. **Record.** A scripted 240-step 2D scenario is captured into a §34
  *    document — initial snapshot, seed, fixed delta, inputs by step, per-frame
@@ -47,7 +47,7 @@ import {
   encodeReplayRecording,
   type ReplayRecording,
   type ReplayStepEvent,
-} from "@four/diagnostics";
+} from "@fourjs/diagnostics";
 import { beforeAll, describe, expect, test } from "vitest";
 
 import {

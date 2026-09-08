@@ -8,7 +8,7 @@
  * `devWarnOnce`. The throw is the behaviour; the message is diagnostics.
  */
 
-import { FourError, type FourErrorCode } from "@four/core";
+import { FourError, type FourErrorCode } from "@fourjs/core";
 
 const warnedStaleHandles = new Set<string>();
 

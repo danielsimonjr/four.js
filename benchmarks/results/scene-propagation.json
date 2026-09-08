@@ -3,7 +3,7 @@
   "benchmark": "scene-propagation",
   "specification": "§7 (world-transform resolution), §7b, §92 (CPU time); plan §6j P11-4, WP-11.4",
   "recordedAt": "2026-08-08T14:47:32.684Z",
-  "entryPoint": "resolveWorldTransforms(root, out) from @four/scene",
+  "entryPoint": "resolveWorldTransforms(root, out) from @fourjs/scene",
   "passKinds": {
     "full": "the root is marked dirty before every pass, so every node is recomputed (asserted: recomputed === visited === nodeCount)",
     "sparse": "64 leaves are marked dirty before every pass (asserted: recomputed === 64)",

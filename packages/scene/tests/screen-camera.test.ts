@@ -9,8 +9,8 @@
  * the same way twice.
  */
 
-import { FourError } from "@four/core";
-import { Vector3 } from "@four/math";
+import { FourError } from "@fourjs/core";
+import { Vector3 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

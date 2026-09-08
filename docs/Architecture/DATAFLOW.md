@@ -50,13 +50,13 @@ One frame of a fully composed application moves data through the layers like thi
 └────────────────────┘  └──────────────────────┘  └────────────────────┘
 ```
 
-Alongside the frame loop, three event-shaped flows run at their own rates: pointer input (hardware rate, `@four/input`), physics events (once per fixed step, after the solve), and serialization/replay (on demand).
+Alongside the frame loop, three event-shaped flows run at their own rates: pointer input (hardware rate, `@fourjs/input`), physics events (once per fixed step, after the solve), and serialization/replay (on demand).
 
 ---
 
 ## The §10 Frame Loop
 
-**Sources**: `packages/four/src/application.ts`, `packages/motion/src/scheduler.ts`, `packages/motion/src/systems.ts`, `packages/scene/src/world-transforms.ts`, `packages/scene/src/interpolation.ts`, `packages/render/src/render-list.ts`, `packages/render-webgl/src/webgl-renderer.ts`.
+**Sources**: `packages/fourJS/src/application.ts`, `packages/motion/src/scheduler.ts`, `packages/motion/src/systems.ts`, `packages/scene/src/world-transforms.ts`, `packages/scene/src/interpolation.ts`, `packages/render/src/render-list.ts`, `packages/render-webgl/src/webgl-renderer.ts`.
 
 `Application.step(elapsedSeconds)` is one frame. The host — a rAF driver, a test, or the replay player — chooses the cadence; nothing in the engine reads a wall clock.
 
@@ -283,7 +283,7 @@ platform pointer event  { clientX, clientY, pointerId }
 └───────────────────────────┘  └─────────────────────────────────────┘
 ```
 
-Each dispatch allocates one `ScenePointerEvent` and one path array — deliberate (events outlive their dispatch when listeners store them; pointer rates are human rates); the picking and drag math underneath uses `out` parameters per plan D7. `pointercancel` (2026-08-06) and keyboard (2026-08-07: `KeyboardInput` routes `keydown`/`keyup` through the same three-phase path, targeted at `@four/ui`'s focused widget via an injected resolver) are handled; wheel, gamepad, and XR are not yet (recorded in `packages/input/README.md`).
+Each dispatch allocates one `ScenePointerEvent` and one path array — deliberate (events outlive their dispatch when listeners store them; pointer rates are human rates); the picking and drag math underneath uses `out` parameters per plan D7. `pointercancel` (2026-08-06) and keyboard (2026-08-07: `KeyboardInput` routes `keydown`/`keyup` through the same three-phase path, targeted at `@fourjs/ui`'s focused widget via an injected resolver) are handled; wheel, gamepad, and XR are not yet (recorded in `packages/input/README.md`).
 
 ---
 

@@ -21,9 +21,9 @@ classes" and omitted `LitMaterial` until 2026-08-05, and "three" until
 (RFC 0001, 2026-08-28) had landed:
 
 ```ts
-import { SpriteMaterial, UnlitMaterial } from "four/materials";
-import { Renderable, Sprite, Texture } from "four/render";
-import { planeGeometry } from "four/geometry";
+import { SpriteMaterial, UnlitMaterial } from "fourJS/materials";
+import { Renderable, Sprite, Texture } from "fourJS/render";
+import { planeGeometry } from "fourJS/geometry";
 
 // Flat colour, straight (non-premultiplied) RGBA in 0..1 (§60a, §66):
 const slab = new Renderable(
@@ -107,7 +107,7 @@ There is no retained display list to manage. Each frame the renderer walks
 the scene into a sorted **render list**:
 
 ```ts
-import { buildInterpolatedRenderList, buildRenderList } from "four/render";
+import { buildInterpolatedRenderList, buildRenderList } from "fourJS/render";
 
 const list = buildRenderList(scene, []); // live transforms
 buildInterpolatedRenderList(scene, poses, alpha, list); // §43 render poses
@@ -138,7 +138,7 @@ becomes exactly one instanced draw whatever its count.
 
 `Renderer` (§61) is the backend-independent interface; `NullRenderer` is the
 headless implementation the determinism suites use. A backend registers
-itself into `@four/render`'s §62 registry only when the application calls
+itself into `@fourjs/render`'s §62 registry only when the application calls
 its `register*Renderer()` — `four/application` itself imports no backend at
 runtime, which is what keeps headless bundles free of GL (R-2/A-8).
 
@@ -149,7 +149,7 @@ runtime, which is what keeps headless bundles free of GL (R-2/A-8).
 | §57–§59 | unified material model, PBR        | **§57 base complete** (seven members; `stencil` joined 2026-08-11, R-7) under five shipped classes, §59's metallic-roughness `StandardMaterial` among them (R-13; `normalMap`/`occlusionMap` staged). `PhysicalMaterial` and §59's physical extensions are not implemented; `ShaderMaterial` is permanently unshipped (rev 1.11). This row said "not implemented" beyond three classes until 2026-08-29                                                                                                                                                            |
 | §60     | shader & node-material system      | **shipped** (RFC 0001, 2026-08-28): the `ShaderGraph` IR + `analyzeShaderGraph`, `NodeMaterialBuilder`, and `NodeMaterial`; the GLSL emitter registers via `registerNodeMaterialPipeline()` and the WGSL emitter via `registerWebgpuNodeMaterialPipeline()` (WP-R1.9, 2026-08-29). Unlit at this tier (sequenced R-14 → R-17 → R-13) — see [custom shaders](custom-shaders.md). This row said "not implemented" until 2026-08-29                                                                                                                                   |
 | §62     | backends                           | WebGL 2 shipped; **`render-webgpu` shipped — the R-1 plan is complete** (WP-R1.1–R1.9, 2026-08-21…29), behind `registerWebgpuRenderer()`, with two honest absences (RFC 0003's skinned pipelines, §71 picking); `render-canvas` and `render-svg` remain reserved stubs. This row called `render-webgpu` "scaffold-only" until 2026-08-29 — stale since WP-R1.1 landed 2026-08-21                                                                                                                                                                                   |
-| §63     | render graph                       | **shipped at the linear-pass tier 2026-08-07** (`RenderGraph` in `@four/render`: named passes over R-4's target seam, declared `inputs` + discovered sampled-target validation, enable/disable, per-pass viewports, textual `describe()`). Transient targets, resource lifetimes, and barriers are staged with dated reasons in the module header. This row said "not implemented; the fixed pipeline is list → sort → draw" until 2026-08-07; the fixed pipeline is still what one pass runs                                                                      |
+| §63     | render graph                       | **shipped at the linear-pass tier 2026-08-07** (`RenderGraph` in `@fourjs/render`: named passes over R-4's target seam, declared `inputs` + discovered sampled-target validation, enable/disable, per-pass viewports, textual `describe()`). Transient targets, resource lifetimes, and barriers are staged with dated reasons in the module header. This row said "not implemented; the fixed pipeline is list → sort → draw" until 2026-08-07; the fixed pipeline is still what one pass runs                                                                      |
 | §65     | batching                           | particles are instanced (one draw per system); **sprite and compatible-shape batching shipped opt-in** (R-9, 2026-08-09): `renderer.batching = createGlBatching()` (or `createWgpuBatching()`, WP-R1.3) merges consecutive draws sharing a pipeline (`unlit`/`sprite`) and a material instance into one draw — without the opt-in it stays one draw call per sprite. Instanced meshes for the shaded pipelines are staged (`batch.ts`). This row said "nothing else is batched" until 2026-08-29                                                                   |
 | §68–§70 | lighting, shadows, post-processing | lighting: directional + ambient (2026-08-04) **plus up to eight punctual point/spot lights** (R-17, 2026-08-09; hemisphere/area/IBL/layers staged, `lights.ts`). Shadows (§69): **one tier shipped** — the directional light's depth-only shadow map with 3×3 PCF, on both GPU backends (R-18, 2026-08-09). Post-processing (§70): **shipped as `RenderGraph` effect passes** — copy, colour grade, the §60a sRGB output transform (R-6/R-15), and §60 graph effects (RFC 0001). This row said shadows and post-processing were "not implemented" until 2026-08-29 |
 

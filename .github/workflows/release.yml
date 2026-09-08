@@ -9,7 +9,7 @@ name: Release
 # workflow still succeeds and simply maintains the version PR. Adding the secret
 # is the owner's decision (§94 0.1) and is the one action that turns this on.
 #
-# The published names are not the workspace names — `four` and `@four/*` become
+# The published names are not the workspace names — `four` and `@fourjs/*` become
 # `@danielsimonjr/fourjs` and `@danielsimonjr/fourjs-*` (spec §98 rev 1.6).
 # `tools/apply-publish-names.mjs` applies that mapping into a staging directory
 # outside the checkout and the publish runs from there, so a failed or cancelled

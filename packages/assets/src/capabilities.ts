@@ -3,8 +3,8 @@
  *
  * RFC 0002 §2 spells it this way: *each token is exported from the package
  * that owns its registry*. The umbrella re-exports the very same object, so
- * `import { ASSET_LOADERS } from "four"` and
- * `import { ASSET_LOADERS } from "@four/assets"` compare `===`.
+ * `import { ASSET_LOADERS } from "fourJS"` and
+ * `import { ASSET_LOADERS } from "@fourjs/assets"` compare `===`.
  *
  * **Declaring a token is not reaching the §96 host.** This module names
  * `defineCapability` and nothing else: a token is `{ name, revocable }` — a
@@ -15,7 +15,7 @@
  * entirely.
  */
 
-import { defineCapability } from "@four/core";
+import { defineCapability } from "@fourjs/core";
 
 import type { AssetLoaderRegistry } from "./loader-registry.js";
 

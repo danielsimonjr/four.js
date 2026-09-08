@@ -1,7 +1,7 @@
 /**
  * Unit tests for render-target byte accounting (§83, §84; A-5 follow-up).
  *
- * The helpers quote what `@four/render-webgl`'s `gl-render-target.ts` allocates
+ * The helpers quote what `@fourjs/render-webgl`'s `gl-render-target.ts` allocates
  * so {@link RenderTarget.byteLength} stays aligned with §67's
  * `DEPTH24_STENCIL8`, R-18's samplable depth, and the staged float formats.
  */

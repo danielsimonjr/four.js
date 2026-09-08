@@ -5,9 +5,9 @@
  * §67 asks for six clipping mechanisms; this packet lands the one the other
  * five are built on — a **stencil test** a material can declare, a buffer for
  * it to read and write, and the composition that turns the two into a mask.
- * No unit test inside one package can check that agreement: `@four/materials`
- * owns `StencilState` and its refusals, `@four/render` owns the surface that
- * carries the buffer, and `@four/render-webgl` is the only place any of it
+ * No unit test inside one package can check that agreement: `@fourjs/materials`
+ * owns `StencilState` and its refusals, `@fourjs/render` owns the surface that
+ * carries the buffer, and `@fourjs/render-webgl` is the only place any of it
  * becomes GL.
  *
  * Four claims:
@@ -35,17 +35,17 @@
  * real driver — is `tests/browser/stencil.spec.ts`, on ANGLE/SwiftShader.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { StencilState, UnlitMaterial } from "@four/materials";
-import { RenderTarget, Renderable } from "@four/render";
-import { GL, WebglRenderer } from "@four/render-webgl";
+import { planeGeometry } from "@fourjs/geometry";
+import { StencilState, UnlitMaterial } from "@fourjs/materials";
+import { RenderTarget, Renderable } from "@fourjs/render";
+import { GL, WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -476,7 +476,7 @@ describe("R-7 — refused, not resolved (§85)", () => {
     // `StencilState` is nominal — its fields are private — so an object
     // literal is not assignable to `Material.stencil` and the constructor
     // above is the only way in. That is the F14 rule met by the type system
-    // rather than by an accessor, and it is what lets `@four/materials` import
+    // rather than by an accessor, and it is what lets `@fourjs/materials` import
     // the class type-only so a scene that never masks does not carry it.
     const material = new UnlitMaterial();
     expect(material.stencil).toBeUndefined();

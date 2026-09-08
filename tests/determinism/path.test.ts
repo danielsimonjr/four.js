@@ -7,8 +7,8 @@
  * same points" is what all of that assumes, and this file is the gate on it, in
  * the four forms the phase suites established:
  *
- * 1. **Headless and dependency-free.** The scenario imports `@four/geometry`,
- *    `@four/core` and `@four/diagnostics` — no renderer, no application, no
+ * 1. **Headless and dependency-free.** The scenario imports `@fourjs/geometry`,
+ *    `@fourjs/core` and `@fourjs/diagnostics` — no renderer, no application, no
  *    canvas, no DOM. A path is a pure value; there is no clock to inject.
  * 2. **Deterministic in-process.** Two independent runs produce identical
  *    per-path digests and identical records.

@@ -4,8 +4,8 @@
  * §96 opens *"asset loaders and scene deserializers shall treat external
  * content as untrusted"* and lists seven requirements. Two of them —
  * **input-size limits** and the bounds half of **bounds checking** — apply
- * identically to both persistence surfaces in the engine: `@four/serialization`'s
- * §79 scene document and `@four/diagnostics`' §34 replay recording. Neither
+ * identically to both persistence surfaces in the engine: `@fourjs/serialization`'s
+ * §79 scene document and `@fourjs/diagnostics`' §34 replay recording. Neither
  * package may depend on the other (the §3.1 matrix puts them side by side with
  * no edge), and both already read their shared JSON vocabulary from here, so
  * this module is where one definition of "how much text, how deep" can live.

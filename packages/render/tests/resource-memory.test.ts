@@ -6,7 +6,7 @@ import {
   resetDevWarnings,
   resetLeakRegistry,
   trackedDisposableId,
-} from "@four/core";
+} from "@fourjs/core";
 
 import { CanvasTexture } from "../src/raster.js";
 import { RenderTarget } from "../src/render-target.js";

@@ -90,8 +90,8 @@
  *    target is reported as sampling an `"unwritten"` surface.
  */
 
-import { FourError } from "@four/core";
-import type { Node, Viewport } from "@four/scene";
+import { FourError } from "@fourjs/core";
+import type { Node, Viewport } from "@fourjs/scene";
 
 import {
   supportsScreenEffects,
@@ -110,7 +110,7 @@ import type { RenderInterpolation, Renderer } from "./renderer.js";
  * an effect pass on a backend that has no `renderEffect` are all "the
  * application asked for a graph that cannot exist". The dedicated code lets a
  * host tell a graph authoring mistake from a lifecycle one without parsing
- * the message; §89's union lives in `@four/core` (`errors.ts`) and this is
+ * the message; §89's union lives in `@fourjs/core` (`errors.ts`) and this is
  * the packet that named the gap.
  */
 const GRAPH_ERROR_CODE = "INVALID_RENDER_GRAPH";
@@ -445,7 +445,7 @@ export class RenderGraph {
    * Appends a pass under `name` (§63's `graph.addPass(name, pass, options)`)
    * and returns the graph, so calls chain.
    *
-   * Throws a {@link @four/core!FourError | FourError} carrying
+   * Throws a {@link @fourjs/core!FourError | FourError} carrying
    * `INVALID_APPLICATION_STATE` when `name` is empty, when it is already taken,
    * or when an entry of `options.inputs` names a pass this graph does not have.
    * The last of those is what makes the graph acyclic by construction: an input
@@ -516,7 +516,7 @@ export class RenderGraph {
   /**
    * Removes the pass added under `name` and returns whether there was one.
    *
-   * Refused with a {@link @four/core!FourError | FourError} while another pass
+   * Refused with a {@link @fourjs/core!FourError | FourError} while another pass
    * declares it as an input: silently dropping a producer would leave its
    * consumers sampling a surface nothing writes, and the graph knows that now
    * rather than at {@link RenderGraph.validate} time. Drop the consumers first,
@@ -552,7 +552,7 @@ export class RenderGraph {
    * sampling whatever its target last held, which {@link RenderGraph.validate}
    * reports as `"unwritten"`.
    *
-   * Throws a {@link @four/core!FourError | FourError} when the graph has no
+   * Throws a {@link @fourjs/core!FourError | FourError} when the graph has no
    * pass under `name`, rather than doing nothing: a typo that silently fails to
    * disable a pass costs a frame's worth of work per frame, invisibly.
    */
@@ -592,7 +592,7 @@ export class RenderGraph {
    *
    * An effect pass met by a renderer that does not implement
    * {@link ScreenEffectRenderer} throws a
-   * {@link @four/core!FourError | FourError} carrying
+   * {@link @fourjs/core!FourError | FourError} carrying
    * `INVALID_APPLICATION_STATE`. That is a deliberate exception to "a frame
    * never throws": the mismatch is a *permanent* property of the backend the
    * application selected (§62 selects one at the edge, once), not the

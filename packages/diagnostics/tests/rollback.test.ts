@@ -2,14 +2,14 @@
  * PH-20 (2026-08-21): §33's sixth item, rollback, gets an API.
  *
  * The target here is a counting double rather than a `PhysicsWorld` — this
- * package may not import `@four/physics` (§3.1), and the buffer's contract is
+ * package may not import `@fourjs/physics` (§3.1), and the buffer's contract is
  * over `createSnapshot`/`restoreSnapshot` and nothing else. The real-solver
  * claim (rewind + re-simulate reproduces the original checksums exactly) is
  * `tests/determinism/rollback.test.ts`, which is the only place allowed to see
  * both packages.
  */
 
-import { isFourError } from "@four/core";
+import { isFourError } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import type { ReplaySnapshot, RollbackTarget } from "../src/index.js";

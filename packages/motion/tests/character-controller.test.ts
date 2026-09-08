@@ -7,8 +7,8 @@
  * its components, and the §79 serializers.
  */
 
-import { Vector3 } from "@four/math";
-import { Group } from "@four/scene";
+import { Vector3 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {

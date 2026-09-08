@@ -1,4 +1,4 @@
-import { Matrix4, Quaternion, Vector3 } from "@four/math";
+import { Matrix4, Quaternion, Vector3 } from "@fourjs/math";
 
 /**
  * Local/world transform of a scene node (§7).

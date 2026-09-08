@@ -17,17 +17,17 @@ What follows is only what is specific to this repository.
 
 ## Published names are not workspace names
 
-The workspace calls its packages `four` and `@four/*`. npm publishes them as `@danielsimonjr/fourjs`
+The workspace calls its packages `four` and `@fourjs/*`. npm publishes them as `@danielsimonjr/fourjs`
 and `@danielsimonjr/fourjs-<name>` (owner decision 2026-07-29, spec §98 revision 1.6). Changesets
-works entirely in **workspace** names: a changeset file names `@four/scene`, not
+works entirely in **workspace** names: a changeset file names `@fourjs/scene`, not
 `@danielsimonjr/fourjs-scene`. The rename is applied last, mechanically, by
 `tools/apply-publish-names.mjs`, which stages a renamed copy of the workspace and never edits the
 checkout. Do not rename anything by hand in a changeset.
 
 ## `linked`, and why the two families are grouped
 
-`@four/render` is the §62 renderer interface and `render-webgl` / `render-webgpu` / `render-canvas` /
-`render-svg` are backends implementing it; `@four/physics` is the §37 stable solver API and
+`@fourjs/render` is the §62 renderer interface and `render-webgl` / `render-webgpu` / `render-canvas` /
+`render-svg` are backends implementing it; `@fourjs/physics` is the §37 stable solver API and
 `physics-rapier` / `physics-box2d` / `physics-soft` are adapters behind it. Within each family the
 interface and its implementations only make sense at matching versions — a consumer reading a
 capability table needs to know which interface revision an adapter was built against — so each family
@@ -36,12 +36,12 @@ deliberately not `fixed`, which would force every member into every release whet
 
 ## `ignore` is empty, and that is not an oversight
 
-The intent was to `ignore` the five reserved stubs (`@four/physics-box2d`, `@four/physics-soft`,
-`@four/render-webgpu`, `@four/render-canvas`, `@four/render-svg`) so they never publish. Changesets
+The intent was to `ignore` the five reserved stubs (`@fourjs/physics-box2d`, `@fourjs/physics-soft`,
+`@fourjs/render-webgpu`, `@fourjs/render-canvas`, `@fourjs/render-svg`) so they never publish. Changesets
 rejects that configuration, and it is right to:
 
 ```
-The package "four" depends on the skipped package "@four/physics-box2d",
+The package "four" depends on the skipped package "@fourjs/physics-box2d",
 but "four" is not being skipped. Please add "four" to the `ignore` option.
 ```
 

@@ -54,7 +54,7 @@
  * fresh pass.
  */
 
-import type { RenderItem, RenderItemStencil } from "@four/render";
+import type { RenderItem, RenderItemStencil } from "@fourjs/render";
 
 import type { GpuRenderPassEncoder } from "./webgpu-device.js";
 import type { WgpuStencilDescriptor } from "./wgpu-pipeline-cache.js";

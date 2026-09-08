@@ -36,19 +36,19 @@
  * - **`normalMap` needs tangents.** A tangent-space normal map is meaningless
  *   without a per-vertex tangent frame, and §53's tangent attribute was
  *   deliberately left out by R-19 (2026-08-07) when `uvs` and `colors` landed —
- *   see `@four/geometry`'s `BufferGeometry`. Shipping the field without the
+ *   see `@fourjs/geometry`'s `BufferGeometry`. Shipping the field without the
  *   attribute would put a texture in the public API that every geometry in the
  *   engine silently ignores. This packet does **not** pretend it shipped PBR
  *   normal mapping.
  * - **`occlusionMap` and `emissiveMap` need more than a second unit.** The
- *   unit allocator (`@four/render-webgl`'s `gl-program.ts`, named since
+ *   unit allocator (`@fourjs/render-webgl`'s `gl-program.ts`, named since
  *   WP-3a.3) now reserves unit 2 for the packed metallic-roughness map glTF
  *   actually authors. Occlusion still needs an AO multiply the BRDF does not
  *   evaluate, and emissive still needs a third colour texture; both stay
  *   warned-inert on the glTF loader until those terms exist.
  *
  * **WebGPU staging (2026-09-06).** {@link StandardMaterial.metalRoughnessMap}
- * is a real field on every backend, but `@four/render-webgpu`'s standard
+ * is a real field on every backend, but `@fourjs/render-webgpu`'s standard
  * family still shades from the scalar factors alone — see `wgpu-standard.ts`.
  * Do not read a WebGPU standard draw as sampling this map.
  *
@@ -61,9 +61,9 @@
  * (Trowbridge-Reitz) normal distribution, a height-correlated Smith visibility
  * term, and a Schlick Fresnel over `F0 = mix(0.04, baseColor, metalness)` —
  * evaluated against the **one** directional light and the scene ambient term
- * §68's MVP tier collects (`@four/render`'s `lights.ts`). One light is not a
+ * §68's MVP tier collects (`@fourjs/render`'s `lights.ts`). One light is not a
  * limitation of this material: multi-light needs §68's uniform arrays or its
- * clustered path, staged where `@four/scene`'s `light.ts` records it. A
+ * clustered path, staged where `@fourjs/scene`'s `light.ts` records it. A
  * Lambert-versus-GGX difference under one light is still the difference between
  * a plastic and a metal, which is what §59 is for.
  *
@@ -79,12 +79,12 @@
  * **Superseded 2026-08-08 by R-15.** This block used to read "no colour space
  * attached … tagging a space here would pin half of R-15's design by accident",
  * and that deferral is now resolved rather than still open: §60a's working-space
- * policy is written down (`@four/math`'s `color.ts` module header), and it says
+ * policy is written down (`@fourjs/math`'s `color.ts` module header), and it says
  * these numbers **are linear-light**. Nothing about the values changed — the
  * BRDF multiplied them as linear before the policy existed and multiplies them
  * as linear now — but the space is no longer *untagged*: it is named, and the
  * one thing it was waiting for, an encode on the way out, exists as
- * `@four/render`'s `OutputTransformEffect`.
+ * `@fourjs/render`'s `OutputTransformEffect`.
  *
  * What is unchanged, and stays: no per-material colour-space field. §60a puts
  * its metadata on *resources* — textures (§77) and render targets (§63) — and a
@@ -102,7 +102,7 @@
  * *final render-graph pass*, not a per-material step.
  *
  * Tone mapping (§68) is still staged — it is the other half of §60a's output
- * transform and needs the HDR float targets R-4 staged; `@four/render`'s
+ * transform and needs the HDR float targets R-4 staged; `@fourjs/render`'s
  * `effect-pass.ts` carries the reason.
  *
  * ## Putting one on a node (§49)
@@ -110,7 +110,7 @@
  * `new Renderable(geometry, new StandardMaterial())` infers
  * `Renderable<StandardMaterial>` and needs nothing said. A variable *annotated*
  * as a bare `Renderable` is a different thing: that type parameter defaults to
- * `@four/render`'s `SurfaceMaterial`, deliberately still `UnlitMaterial |
+ * `@fourjs/render`'s `SurfaceMaterial`, deliberately still `UnlitMaterial |
  * LitMaterial`, and §59's member is not in it. Widening that union would take
  * `color` and `setColor` off every ordinary renderable's material — the exact
  * argument `renderable.ts` records for keeping `SpriteMaterial` out of it, and
@@ -128,7 +128,7 @@
  *
  * ```ts
  * const baseColor: ColorRGBA = [0, 0, 0, 1];
- * srgbToLinearRGBA(parseColor("#a0a0a0"), baseColor);   // @four/math
+ * srgbToLinearRGBA(parseColor("#a0a0a0"), baseColor);   // @fourjs/math
  * new StandardMaterial({ baseColor });                  // §59's example, today
  * ```
  *
@@ -141,20 +141,20 @@
  * conversion one line (recorded 2026-08-08).
  */
 
-import type { ColorRGB, ColorRGBA } from "@four/math";
+import type { ColorRGB, ColorRGBA } from "@fourjs/math";
 
 import { Material, type MaterialOptions } from "./material.js";
 import type { MaterialTexture } from "./texture.js";
 
 /**
- * Straight RGB, each component nominally in 0…1 — `@four/math`'s
+ * Straight RGB, each component nominally in 0…1 — `@fourjs/math`'s
  * {@link ColorRGB}, re-exported beside `UnlitMaterial`'s `ColorRGBA` (hoisted
  * 2026-08-08 by R-15's colour packet).
  *
  * The type {@link StandardMaterial.emissive} carries, and the type §68's light
  * colours carry: the colours with no opacity of their own.
  */
-export type { ColorRGB } from "@four/math";
+export type { ColorRGB } from "@fourjs/math";
 
 /**
  * Construction arguments of {@link StandardMaterial} — §59's own parameters,
@@ -257,7 +257,7 @@ function requireFiniteScalar(name: string, value: number): number {
  * supply the light: with no directional light it shades from the ambient term
  * alone, and a geometry without a `normals` attribute has no surface to shade
  * against and falls back to that same ambient term (see
- * `@four/render-webgl`'s standard fragment stage).
+ * `@fourjs/render-webgl`'s standard fragment stage).
  *
  * `StandardMaterial` sits **above** `LitMaterial` in §57's family, not
  * beside it: the lit tier is one Lambert lobe times a colour, this one is a
@@ -309,11 +309,11 @@ export class StandardMaterial extends Material {
    * white, waiting for the tone mapping §60a stages. The array instance is
    * `readonly` for the same reason {@link StandardMaterial.baseColor}'s is.
    *
-   * The type is {@link ColorRGB} — `@four/math`'s alias, hoisted there
+   * The type is {@link ColorRGB} — `@fourjs/math`'s alias, hoisted there
    * 2026-08-08 by R-15's colour packet exactly as this note asked (the tuple was
    * written out inline until then, because a second own-definition of the name
-   * is what the duplicate-symbol gate exists to refuse and `@four/scene`'s copy
-   * was unreachable across the frozen §3.1 matrix). `@four/scene`'s `ColorRGB`
+   * is what the duplicate-symbol gate exists to refuse and `@fourjs/scene`'s copy
+   * was unreachable across the frozen §3.1 matrix). `@fourjs/scene`'s `ColorRGB`
    * is now the same declaration, re-exported.
    */
   readonly emissive: ColorRGB;

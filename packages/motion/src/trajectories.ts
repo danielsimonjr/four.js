@@ -66,7 +66,7 @@
  * cancellation) and gives roughly 1e-8 absolute error on the first derivative.
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 
 /**
  * A position, velocity, and acceleration sampled from a path (§13).

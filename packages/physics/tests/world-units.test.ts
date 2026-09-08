@@ -3,8 +3,8 @@
  * solver and back out. Omitted units is today's identity path.
  */
 
-import { Vector2 } from "@four/math";
-import { Group } from "@four/scene";
+import { Vector2 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { Collider } from "../src/collider.js";

@@ -1,6 +1,6 @@
 /**
- * §65 batching for the WebGPU backend — the GPU half of `@four/render`'s
- * {@link RenderBatcher}, and the twin of `@four/render-webgl`'s `gl-batch.ts`
+ * §65 batching for the WebGPU backend — the GPU half of `@fourjs/render`'s
+ * {@link RenderBatcher}, and the twin of `@fourjs/render-webgl`'s `gl-batch.ts`
  * (WP-R1.3).
  *
  * The planner is untouched and unshared-code: `batch.ts` decides which
@@ -77,7 +77,7 @@ import {
   type RenderBatch,
   type RenderBatchOptions,
   type RenderItem,
-} from "@four/render";
+} from "@fourjs/render";
 
 import {
   GPU_BUFFER_USAGE,

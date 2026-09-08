@@ -4,14 +4,14 @@
  *
  * `ConstraintSystem` is the first producing system §42's `"constraint"`
  * authority has ever had, and the claims that no unit test inside
- * `@four/motion` can make are about what happens *between* packages:
+ * `@fourjs/motion` can make are about what happens *between* packages:
  *
  * 1. **The refusal is the one §42 describes.** A node owned by `"physics"`
  *    carrying a targeted rig is refused every step, warned about **once**, in a
  *    message naming both the writer and the owner — and the instant the
  *    application grants the authority, the very next step writes, with no
- *    second warning. That is `@four/scene`'s `warnAuthorityConflict` and
- *    `@four/motion`'s system agreeing about a rule neither of them owns alone.
+ *    second warning. That is `@fourjs/scene`'s `warnAuthorityConflict` and
+ *    `@fourjs/motion`'s system agreeing about a rule neither of them owns alone.
  * 2. **§44's path-animated camera is two nodes, and works.** §42 allows exactly
  *    one owner per transform, so a camera that flies a §13 trajectory *and*
  *    aims at a subject cannot be one node: it is a path-driven parent under
@@ -28,7 +28,7 @@
  *    by hand.
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 import {
   CircularTrajectory,
   ConstraintSystem,
@@ -42,16 +42,16 @@ import {
   PRIORITY_PHYSICS_SOLVE,
   SystemRegistry,
   createTimeState,
-} from "@four/motion";
+} from "@fourjs/motion";
 import {
   Collider,
   PhysicsSystem,
   PhysicsWorld,
   RigidBody,
-} from "@four/physics";
-import { Rapier3dAdapter } from "@four/physics-rapier";
-import { Group, PerspectiveCamera, Scene } from "@four/scene";
-import * as four from "four";
+} from "@fourjs/physics";
+import { Rapier3dAdapter } from "@fourjs/physics-rapier";
+import { Group, PerspectiveCamera, Scene } from "@fourjs/scene";
+import * as four from "fourJS";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const DT = 1 / 60;

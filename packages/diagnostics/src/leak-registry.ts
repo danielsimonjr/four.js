@@ -1,8 +1,8 @@
 /**
- * Re-export of `@four/core`'s §83 FinalizationRegistry leak bookkeeping.
+ * Re-export of `@fourjs/core`'s §83 FinalizationRegistry leak bookkeeping.
  *
- * The implementation moved to core so `@four/geometry`, `@four/render`, and
- * `@four/materials` can register at construction without importing this
+ * The implementation moved to core so `@fourjs/geometry`, `@fourjs/render`, and
+ * `@fourjs/materials` can register at construction without importing this
  * package (dependency matrix). This file keeps the previous public path.
  */
 
@@ -13,4 +13,4 @@ export {
   resetLeakRegistry,
   trackDisposable,
   trackedDisposableId,
-} from "@four/core";
+} from "@fourjs/core";

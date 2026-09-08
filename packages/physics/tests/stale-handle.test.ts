@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { isFourError, resetDevWarnings } from "@four/core";
+import { isFourError, resetDevWarnings } from "@fourjs/core";
 
 import {
   rejectStalePhysicsHandle,

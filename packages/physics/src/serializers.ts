@@ -3,7 +3,7 @@
  * `Collider` (§24) — closing the `PH-17` remainder (2026-08-06).
  *
  * §6a says components "serialize under registered type names (§79)", and §79's
- * registry is `@four/serialization`'s — which may depend on `core`, `math`, and
+ * registry is `@fourjs/serialization`'s — which may depend on `core`, `math`, and
  * `scene` only (plan §3.1) and so can never name `RigidBody` or `Collider`.
  * Until this module landed, the only working pair lived in a **test helper**
  * (`tests/integration/helpers/roundtrip-scenarios.ts`, WP-11.5) and every
@@ -13,8 +13,8 @@
  *
  * ## Why the type is declared elsewhere and imported
  *
- * Nothing below imports `@four/serialization`. {@link ComponentSerializerShape}
- * — `@four/motion`'s structural transcription of `ComponentSerializer` — is
+ * Nothing below imports `@fourjs/serialization`. {@link ComponentSerializerShape}
+ * — `@fourjs/motion`'s structural transcription of `ComponentSerializer` — is
  * imported instead, over the `physics → motion` edge the §3.1 matrix already
  * grants this package. So `registry.register(RigidBody, RIGID_BODY_SERIALIZER)`
  * type-checks with no cast and **no new edge**, exactly as
@@ -22,7 +22,7 @@
  * repository rather than two that can drift apart from each other as well as
  * from the original.
  *
- * The honest cost is the same one `@four/motion`'s header states: **nothing
+ * The honest cost is the same one `@fourjs/motion`'s header states: **nothing
  * type-checks the transcription against `ComponentSerializer` itself.** A change
  * to that interface will not fail this package's build; it will fail
  * `tests/serializers.test.ts`, which asserts assignability against a transcribed
@@ -92,7 +92,7 @@
  *
  * ## How strict the reader is, and where the line falls
  *
- * `@four/motion`'s reader is deliberately **total**: a missing field restores
+ * `@fourjs/motion`'s reader is deliberately **total**: a missing field restores
  * its documented default rather than refusing the scene. That is right for a
  * number whose absence has a meaning — a missing damping rate *is* zero damping.
  * It is wrong for a **tag**, because there is no defensible default for one: a
@@ -101,7 +101,7 @@
  * guessed at all. So the rule here is:
  *
  * - **numbers, vectors, booleans, and the quaternion** — absent or malformed
- *   restores the §23/§24/§25 default, exactly as `@four/motion` does;
+ *   restores the §23/§24/§25 default, exactly as `@fourjs/motion` does;
  * - **`type`, `ccdMode`, and `shape.type`** — absent or unrecognized throws a
  *   `FourError` naming the field and the section, because loading half a
  *   simulation is worse than not loading it;
@@ -127,13 +127,13 @@ import {
   FourError,
   type JsonValue,
   type SpaceMode,
-} from "@four/core";
-import { Matrix3, Quaternion, Vector2, Vector3 } from "@four/math";
+} from "@fourjs/core";
+import { Matrix3, Quaternion, Vector2, Vector3 } from "@fourjs/math";
 import {
   DEFAULT_CHARACTER_GRAVITY,
   type ComponentSerializerShape,
-} from "@four/motion";
-import { Transform } from "@four/scene";
+} from "@fourjs/motion";
+import { Transform } from "@fourjs/scene";
 
 import { Collider, type ColliderOptions } from "./collider.js";
 import type { RigidBodyDescriptor } from "./descriptors.js";
@@ -631,7 +631,7 @@ export interface RigidBodyDocument {
  * The §79 serializer for {@link RigidBody} (§23, §26, §31, PH-17).
  *
  * ```ts
- * import { Collider, RigidBody, RIGID_BODY_SERIALIZER, COLLIDER_SERIALIZER } from "@four/physics";
+ * import { Collider, RigidBody, RIGID_BODY_SERIALIZER, COLLIDER_SERIALIZER } from "@fourjs/physics";
  *
  * const registry = createDefaultComponentSerializers()
  *   .register(RigidBody, RIGID_BODY_SERIALIZER)
@@ -913,7 +913,7 @@ export const COLLIDER_SERIALIZER: ComponentSerializerShape<Collider> = {
  * import {
  *   SweptCharacterController,
  *   SWEPT_CHARACTER_CONTROLLER_SERIALIZER,
- * } from "@four/physics";
+ * } from "@fourjs/physics";
  *
  * registry.register(
  *   SweptCharacterController,
@@ -943,7 +943,7 @@ export const COLLIDER_SERIALIZER: ComponentSerializerShape<Collider> = {
  * | `groundBody` | **no** — it is *derived*: the next step's probe recomputes it, and a saved reference to another node's component is precisely what the rig serializers drop |
  * | `skippedSteps`, `slideCount`, `stepUpCount`, `budgetExhaustedSteps` | **no** — diagnostics of a run |
  *
- * Reading follows this module's own rule rather than `@four/motion`'s total
+ * Reading follows this module's own rule rather than `@fourjs/motion`'s total
  * one for the two fields that have no defensible default: `radius` and
  * `halfHeight` are *required* constructor parameters (§24 refuses a capsule
  * without them), so a document missing them throws naming the field rather than

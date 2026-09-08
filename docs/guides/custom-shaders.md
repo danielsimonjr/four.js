@@ -35,9 +35,9 @@ graph and wraps it in a `NodeMaterial`, which is an ordinary §57 material —
 hand it to a `Renderable` like any other:
 
 ```ts
-import { planeGeometry } from "four/geometry";
-import { NodeMaterialBuilder } from "four/materials";
-import { Renderable, Texture } from "four/render";
+import { planeGeometry } from "fourJS/geometry";
+import { NodeMaterialBuilder } from "fourJS/materials";
+import { Renderable, Texture } from "fourJS/render";
 
 const texture = new Texture({ width: 4, height: 4, data: rgbaBytes });
 
@@ -79,11 +79,11 @@ by default — an application opts in with one call per backend, the same seam
 as `registerWebglRenderer()` and the §37 solver registry:
 
 ```ts
-import { Application } from "four/application";
+import { Application } from "fourJS/application";
 import {
   registerNodeMaterialPipeline,
   registerWebglRenderer,
-} from "four/render-webgl";
+} from "fourJS/render-webgl";
 
 registerWebglRenderer(); // §62 registry: "auto" can now pick WebGL 2
 registerNodeMaterialPipeline(); // §60: links the GLSL emitter + program cache
@@ -156,8 +156,8 @@ the `"source"` sampler is the pass's input, and uniform values live on the
 pass:
 
 ```ts
-import { ShaderGraphBuilder } from "four/materials";
-import { RenderGraph, RenderTarget } from "four/render";
+import { ShaderGraphBuilder } from "fourJS/materials";
+import { RenderGraph, RenderTarget } from "fourJS/render";
 
 const sceneColor = new RenderTarget({ width: 512, height: 512 });
 

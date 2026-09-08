@@ -28,12 +28,12 @@
  * }
  * ```
  *
- * and it lives in `@four/motion`, which the frozen §3.1 dependency matrix does
- * **not** give `@four/particles` (this package gets `core`, `math`, `scene`, and
+ * and it lives in `@fourjs/motion`, which the frozen §3.1 dependency matrix does
+ * **not** give `@fourjs/particles` (this package gets `core`, `math`, `scene`, and
  * nothing else; `motion` sits in the same dispatch wave, so an edge to it is not
  * merely undeclared but ordering-illegal). This class therefore implements the
  * shape without naming it — exactly the arrangement `ParticleRenderable` uses
- * for `@four/render`'s `ParticleDrawable`, for the same reason, with the same
+ * for `@fourjs/render`'s `ParticleDrawable`, for the same reason, with the same
  * honest cost:
  *
  * > **Nothing type-checks the two declarations against each other.** A change to
@@ -41,7 +41,7 @@
  * > `tests/determinism/phase9-particles.test.ts`, which registers a
  * > `ParticleSystem` on a real `Application`'s registry — the one place in the
  * > repository that can see both packages — and which additionally asserts
- * > {@link PRIORITY_PARTICLES} against `@four/motion`'s own constant.
+ * > {@link PRIORITY_PARTICLES} against `@fourjs/motion`'s own constant.
  *
  * {@link ParticleFixedUpdateContext} below is the *narrowest* view of §39's
  * `FixedUpdateContext` that this system actually reads: `time.fixedDeltaTime`
@@ -54,7 +54,7 @@
  * §39's step 5 is **force generation**, and a particle step is, precisely, §27
  * force fields sampled and integrated: gravity, drag, wind, vortex, turbulence
  * (`fields.ts`). So {@link PRIORITY_PARTICLES} is `500` — numerically identical
- * to `@four/motion`'s `PRIORITY_FORCES`, restated here because the matrix
+ * to `@fourjs/motion`'s `PRIORITY_FORCES`, restated here because the matrix
  * forbids importing it.
  *
  * What that buys, stated precisely rather than generously:
@@ -87,7 +87,7 @@
  *
  * The GPU-facing half of a particle system is
  * `ParticleRenderable.updateParticleInstances()`, and it is **not called here**.
- * `@four/render`'s `buildRenderList` calls it itself, from `collect()`, once per
+ * `@fourjs/render`'s `buildRenderList` calls it itself, from `collect()`, once per
  * list build — read `render-list.ts`: the branch that recognises a
  * `ParticleDrawable` calls `node.updateParticleInstances()` immediately before
  * filling the item that points at the array. That is a *render*-frame cadence,
@@ -119,7 +119,7 @@
 /**
  * Execution order key for particle simulation: §39 step 5, *force generation*.
  *
- * **A deliberate duplicate** of `@four/motion`'s `PRIORITY_FORCES`, which is the
+ * **A deliberate duplicate** of `@fourjs/motion`'s `PRIORITY_FORCES`, which is the
  * normative definition. The §3.1 matrix forbids importing it (see the module
  * header); the value is restated here, exported so an application can order
  * against it without hard-coding `500`, and cross-checked against the original
@@ -131,7 +131,7 @@ export const PRIORITY_PARTICLES = 500;
 /**
  * The part of §9's `TimeState` a particle step reads.
  *
- * Structural, and deliberately narrow: `@four/motion`'s `ReadonlyTimeState`
+ * Structural, and deliberately narrow: `@fourjs/motion`'s `ReadonlyTimeState`
  * carries eleven fields and this system reads two. Any `ReadonlyTimeState`
  * satisfies it.
  */

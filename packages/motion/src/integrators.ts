@@ -72,7 +72,7 @@
  *   guarantee.
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 
 /**
  * The §38 integrator names, verbatim. Keys of {@link INTEGRATORS}.

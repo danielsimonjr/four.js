@@ -5,8 +5,8 @@
  * `pointer.test.ts` does for pointers.
  */
 
-import { FourError } from "@four/core";
-import { Group, type Node } from "@four/scene";
+import { FourError } from "@fourjs/core";
+import { Group, type Node } from "@fourjs/scene";
 import { describe, expect, it, vi } from "vitest";
 
 import {

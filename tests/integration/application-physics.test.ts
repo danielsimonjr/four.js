@@ -1,7 +1,7 @@
 /**
  * A-6 — §45's `physics` option, against a real solver (2026-08-08).
  *
- * `packages/four/tests/application.test.ts` proves the composition root's
+ * `packages/fourJS/tests/application.test.ts` proves the composition root's
  * *contract* with a world using a double: construct or accept, initialize once,
  * step then dispatch per fixed step, count bodies after the frame, dispose only
  * what it built. What no unit test in `four` can prove is that the contract is
@@ -22,20 +22,20 @@
  *    awake count, both taken from an application that really is simulating.
  *
  * Everything goes through the public API — `four/application`,
- * `@four/physics`, `@four/physics-rapier` — and no clock and no `Math.random`
+ * `@fourjs/physics`, `@fourjs/physics-rapier` — and no clock and no `Math.random`
  * drives anything (§33): frames are `app.step(DT)` with a constant delta.
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 import {
   Collider,
   PhysicsSystem,
   PhysicsWorld,
   RigidBody,
-} from "@four/physics";
-import { Rapier3dAdapter } from "@four/physics-rapier";
-import { Group } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/physics";
+import { Rapier3dAdapter } from "@fourjs/physics-rapier";
+import { Group } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 import { describe, expect, it } from "vitest";
 
 /** One fixed step in seconds (§7a, §10; Appendix A's 1/60). */

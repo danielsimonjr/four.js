@@ -3,8 +3,8 @@ import {
   Vector3,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
-import { Group, type TransformAuthority } from "@four/scene";
+} from "@fourjs/math";
+import { Group, type TransformAuthority } from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

@@ -18,16 +18,16 @@
  *
  * ## Why the scene objects are doubles too
  *
- * `@four/render-webgpu`'s dependencies are `core`, `math`, and `render` (plan
+ * `@fourjs/render-webgpu`'s dependencies are `core`, `math`, and `render` (plan
  * §3.1, frozen). Cameras, `BufferGeometry` and `UnlitMaterial` live in
- * `@four/scene`, `@four/geometry` and `@four/materials`, so importing them here
+ * `@fourjs/scene`, `@fourjs/geometry` and `@fourjs/materials`, so importing them here
  * — even in a test — would be a phantom dependency outside the matrix. They are
  * therefore typed doubles derived from the very types the renderer consumes,
  * exactly as `packages/render-webgl/tests/webgl-renderer.test.ts` does.
  */
 
-import { isFourError, type FourError } from "@four/core";
-import { Matrix4, type Vector3 } from "@four/math";
+import { isFourError, type FourError } from "@fourjs/core";
+import { Matrix4, type Vector3 } from "@fourjs/math";
 import {
   PARTICLE_INSTANCE_FLOATS,
   Renderable,
@@ -36,7 +36,7 @@ import {
   type RenderItem,
   type Renderer,
   type UnlitRenderItem,
-} from "@four/render";
+} from "@fourjs/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -3349,8 +3349,8 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
 // Particles (§36, §64 stage 6, WP-R1.8).
 //
 // The emitting node is a double for the GL suite's recorded reason:
-// `@four/particles`' `ParticleRenderable` is outside this package's dependency
-// matrix — and, by design, outside `@four/render`'s too. What `buildRenderList`
+// `@fourjs/particles`' `ParticleRenderable` is outside this package's dependency
+// matrix — and, by design, outside `@fourjs/render`'s too. What `buildRenderList`
 // recognises is the *structural* `ParticleDrawable` contract, so a double
 // implementing that contract is not a shortcut here: it is the contract,
 // exercised exactly as the real class is (the real class runs in
@@ -3773,7 +3773,7 @@ describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
 // GPU particle simulations (§36 `simulation: "gpu"`, R-31 wiring, 2026-08-29).
 //
 // The emitter side and the WgpuParticleSimulation verbs have their own suites
-// (`@four/particles`' gpu-simulation.test.ts; wgpu-particle-simulation.test.ts
+// (`@fourjs/particles`' gpu-simulation.test.ts; wgpu-particle-simulation.test.ts
 // here); what this block pins is the *renderer's* half of the join — the
 // registry `createParticleSimulation` keeps by system id, and the draw arm
 // re-sourcing the position stream through the `|gi:y` pipeline variant.

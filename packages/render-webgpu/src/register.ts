@@ -2,16 +2,16 @@
  * This backend's opt-in to §62's renderer registry (R-2, A-8, WP-R1.1).
  *
  * ```ts
- * import { registerWebgpuRenderer } from "@four/render-webgpu";
+ * import { registerWebgpuRenderer } from "@fourjs/render-webgpu";
  *
  * registerWebgpuRenderer();
  * const app = new Application({ renderer: "auto", canvas });
  * ```
  *
- * A verbatim structural copy of `@four/render-webgl`'s `register.ts`, including
+ * A verbatim structural copy of `@fourjs/render-webgl`'s `register.ts`, including
  * the reason it is a **function call and never an import side effect**: this
  * package declares `"sideEffects": false`, so a bundler is entitled to delete an
- * import whose bindings are unused, and `import "@four/render-webgpu/register"`
+ * import whose bindings are unused, and `import "@fourjs/render-webgpu/register"`
  * is exactly that. A call expression is a use the bundler can see.
  *
  * ## Calling this changes which backend an application uses
@@ -54,7 +54,7 @@ import {
   registerRenderer,
   type RendererOptions,
   type RendererRegistry,
-} from "@four/render";
+} from "@fourjs/render";
 
 import { hostGpu } from "./webgpu-renderer.js";
 import { WebgpuRenderer } from "./webgpu-renderer.js";

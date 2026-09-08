@@ -3,11 +3,11 @@
  *
  * The measurements are checked against the built-in 6 × 12 face's own metrics
  * (`cellWidth = 6`, `lineHeight = 12`, `ascent = 8`), so a change in either
- * `@four/text` or this package's arithmetic shows up here rather than in a
+ * `@fourjs/text` or this package's arithmetic shows up here rather than in a
  * screenshot.
  */
 
-import { buildGlyphAtlas } from "@four/text";
+import { buildGlyphAtlas } from "@fourjs/text";
 import { describe, expect, it } from "vitest";
 
 import { Label } from "../src/label.js";

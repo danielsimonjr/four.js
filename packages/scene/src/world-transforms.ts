@@ -66,7 +66,7 @@
  * wraps in any realistic session.
  */
 
-import type { Matrix4 } from "@four/math";
+import type { Matrix4 } from "@fourjs/math";
 
 import type { Node } from "./node.js";
 import type { Transform } from "./transform.js";

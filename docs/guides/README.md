@@ -95,9 +95,9 @@ for (until 2026-08-29 it lived only in `raster.ts`'s module header):
 - Imports use the umbrella package's subpaths, exactly as the examples do:
 
   ```ts
-  import { Application } from "four/application";
-  import { Group, OrthographicCamera } from "four/scene";
-  import { Vector3 } from "four/math";
+  import { Application } from "fourJS/application";
+  import { Group, OrthographicCamera } from "fourJS/scene";
+  import { Vector3 } from "fourJS/math";
   ```
 
 Section references like "§42" mean `docs/SPECIFICATION.md` numbering. Every
@@ -115,7 +115,7 @@ under `/examples/<name>/` on Pages; browser gates live in `tests/browser/`.
 | Surface | Where to look |
 | ------- | ------------- |
 | WebGL 2 | `examples/first-2d-scene`, `examples/first-3d-scene` (every Pages demo) |
-| WebGPU | shipped backend; no Pages demo calls `registerWebgpuRenderer()` (the flagship registers WebGL only). `tests/integration/backend-selection.test.ts` and `@four/render-webgpu` |
+| WebGPU | shipped backend; no Pages demo calls `registerWebgpuRenderer()` (the flagship registers WebGL only). `tests/integration/backend-selection.test.ts` and `@fourjs/render-webgpu` |
 | Tweens / clips / timelines | `examples/first-2d-scene` / `examples/first-animated-scene`; `tests/browser/animation.spec.ts` |
 | glTF | no example site; `tests/browser/gltf.spec.ts` loads the committed fixture through the real loader |
 | UI | `examples/ui-demo`; `tests/browser/ui.spec.ts` |

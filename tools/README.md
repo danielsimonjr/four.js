@@ -32,8 +32,8 @@ ESLint, Prettier, TypeDoc, Vite, Changesets (choices recorded in `MEMORY.md`).
   and renderer-backend blocks of `docs/COMPATIBILITY.md` between their generated-block
   markers from **live** capability declarations (imports each built `dist/`, constructs
   the adapter or renderer, reads `capabilities`; probes
-  `SolverBodyAccess`/`SolverJointAccess` structurally against `@four/physics`'s emitted
-  declarations; parses `RendererCapabilities` members from `@four/render`'s emitted
+  `SolverBodyAccess`/`SolverJointAccess` structurally against `@fourjs/physics`'s emitted
+  declarations; parses `RendererCapabilities` members from `@fourjs/render`'s emitted
   `renderer.d.ts`). Requires a built tree. Adding an adapter or renderer package adds a
   column with no tool edit.
 
@@ -61,7 +61,7 @@ ESLint, Prettier, TypeDoc, Vite, Changesets (choices recorded in `MEMORY.md`).
   ```
 
 - `apply-publish-names.mjs` — §98 publish-name mapping (added 2026-08-07, gap A-25).
-  Rewrites `@four/x` → `@danielsimonjr/fourjs-x` (and `four` → `@danielsimonjr/fourjs`)
+  Rewrites `@fourjs/x` → `@danielsimonjr/fourjs-x` (and `four` → `@danielsimonjr/fourjs`)
   into a **staging copy**, never in place: package manifests, `workspace:*` ranges
   (resolved the way the workspace protocol publishes), and quoted workspace specifiers in emitted `.js`/`.d.ts`
   (tsc writes workspace names straight through, so manifests alone would publish 24

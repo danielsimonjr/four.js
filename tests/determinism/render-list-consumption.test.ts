@@ -43,8 +43,8 @@
  *   matrix is read out of the frame's uniform upload at that offset.
  */
 
-import { boxGeometry, planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { boxGeometry, planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   NullRenderer,
   RenderBatcher,
@@ -52,17 +52,17 @@ import {
   buildRenderList,
   buildViewRenderList,
   type RenderItem,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
-import { WebgpuRenderer } from "@four/render-webgpu";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
+import { WebgpuRenderer } from "@fourjs/render-webgpu";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
-import { Frustum } from "@four/math";
+} from "@fourjs/scene";
+import { Frustum } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -170,7 +170,7 @@ function buildViews(): Viewport[] {
   ];
 }
 
-/** The reference: what `@four/render` says every backend must consume. */
+/** The reference: what `@fourjs/render` says every backend must consume. */
 function referenceDraws(
   scene: Scene,
   views: readonly Viewport[],
@@ -352,7 +352,7 @@ describe("render-list consumption is backend-independent (§33, §61)", () => {
   it("gives the shared planner the same batch plan whichever backend asks", () => {
     const scene = buildScene();
     const views = buildViews();
-    // `RenderBatcher` is a pure planner in `@four/render`; a backend's batch
+    // `RenderBatcher` is a pure planner in `@fourjs/render`; a backend's batch
     // module is only the uploader. So the plan is a function of the list, and
     // the list is what the test above proves is shared.
     expect(referenceBatchPlan(scene, views)).toEqual(

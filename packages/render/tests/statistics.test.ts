@@ -4,7 +4,7 @@
  *
  * The record is three numbers; what is worth pinning is the *contract* around
  * it — accumulate-never-clear, presence-is-the-capability, and the structural
- * agreement with `@four/diagnostics`, which transcribes this shape because the
+ * agreement with `@fourjs/diagnostics`, which transcribes this shape because the
  * frozen §3.1 matrix forbids it the import.
  */
 
@@ -89,9 +89,9 @@ describe("NullRenderer statistics", () => {
   });
 });
 
-describe("the @four/diagnostics transcription", () => {
+describe("the @fourjs/diagnostics transcription", () => {
   it("is satisfied by this package's record (structural agreement)", () => {
-    // `RenderStatisticsLike` in `@four/diagnostics/src/stats.ts`, transcribed
+    // `RenderStatisticsLike` in `@fourjs/diagnostics/src/stats.ts`, transcribed
     // here because that package may not import this one and this one may not
     // import it (§3.1, frozen). Assigning the real type to the transcription is
     // what turns "they look the same" into a compile error when they stop

@@ -6,13 +6,13 @@
  * built-in one and emits no `"opaque"` issue.
  */
 
-import { planeGeometry } from "@four/geometry";
+import { planeGeometry } from "@fourjs/geometry";
 import {
   NodeMaterial,
   ShaderGraphBuilder,
   type ShaderGraph,
-} from "@four/materials";
-import { Scene, resolveWorldTransforms } from "@four/scene";
+} from "@fourjs/materials";
+import { Scene, resolveWorldTransforms } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

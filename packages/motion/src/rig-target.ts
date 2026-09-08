@@ -64,8 +64,8 @@
  * synchronous, non-re-entrant, and fully write the scratch before reading it.
  */
 
-import { Matrix4, Vector3 } from "@four/math";
-import { resolveWorldTransform, type Node } from "@four/scene";
+import { Matrix4, Vector3 } from "@fourjs/math";
+import { resolveWorldTransform, type Node } from "@fourjs/scene";
 
 /**
  * What a rig tracks: a fixed world-space point, or a node whose world position

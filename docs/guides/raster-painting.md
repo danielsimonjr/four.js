@@ -10,7 +10,7 @@ buffer, a version, a size rule, and a place to put it**. There is no
 application, and an engine-defined drawing API is RFC 0004's rejected
 alternative C.
 
-Nor is this §62's Canvas 2D _backend_ (`@four/render-canvas`, an unchanged
+Nor is this §62's Canvas 2D _backend_ (`@fourjs/render-canvas`, an unchanged
 reserved stub). A backend draws the scene into a host canvas; this seam reads
 arbitrary pixels out of one. The two share a host surface and nothing else.
 
@@ -26,7 +26,7 @@ Two types carry the whole tier, both in `four/render`:
 
 ## The browser adapter
 
-The seam is structural and DOM-free — `@four/render` compiles with no
+The seam is structural and DOM-free — `@fourjs/render` compiles with no
 `lib.dom`, so it cannot name `HTMLCanvasElement` (RFC 0004, alternative F). In
 the discipline of `TextureSource`, `FetchLike`, `PointerSurface` and
 `SurfaceObserver`, the engine names a shape, the host supplies a value, and
@@ -34,7 +34,7 @@ the browser adapter is a few lines in the application. This is the recipe,
 reproduced from `packages/render/src/raster.ts`'s module header:
 
 ```ts
-import { CanvasTexture, type RasterSource } from "four/render";
+import { CanvasTexture, type RasterSource } from "fourJS/render";
 
 const canvas = new OffscreenCanvas(256, 256);
 const ctx = canvas.getContext("2d")!;

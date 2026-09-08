@@ -9,7 +9,7 @@
  * §112 closes Phase 9 on *"≥100,000 simple particles simulated and rendered at
  * interactive rates on suitable hardware"*. Plan §6h reads that honestly for
  * this environment and splits it in two: the **renderer** must draw a system in
- * one draw call (`@four/render-webgl`'s instanced particle path, WP-9.3), and
+ * one draw call (`@fourjs/render-webgl`'s instanced particle path, WP-9.3), and
  * the **CPU simulation** must step 100 000 particles inside a fixed-step budget
  * *measured and documented in a benchmark* — recorded numbers, deliberately not
  * gated on wall time in CI. This file is that benchmark. It was the first real
@@ -95,13 +95,13 @@
  * fields the file carries.
  */
 
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 import {
   ParticleEmitter,
   dragField,
   uniformGravityField,
   vortexField,
-} from "@four/particles";
+} from "@fourjs/particles";
 
 import {
   hostRecord,
@@ -320,7 +320,7 @@ const record = {
   perFieldMedianMsPerStep: round(perFieldMs, 4),
   ...host,
   hostCaveat:
-    "CI container, no GPU, shared host; run-to-run spread is large. CPU simulation only: no GL context, no upload, no draw. The rendering half of §112 is the single instanced draw call of @four/render-webgl, shown in examples/particles-demo.",
+    "CI container, no GPU, shared host; run-to-run spread is large. CPU simulation only: no GL context, no upload, no draw. The rendering half of §112 is the single instanced draw call of @fourjs/render-webgl, shown in examples/particles-demo.",
 };
 
 const resultsPath = writeResult("particles-100k", record);

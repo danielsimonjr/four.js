@@ -50,7 +50,7 @@ The codebase is organized into the following modules:
 - **packages/assets**: 9 files
 - **packages/core**: 14 files
 - **packages/diagnostics**: 12 files
-- **packages/four**: 35 files
+- **packages/fourJS**: 35 files
 - **packages/geometry**: 12 files
 - **packages/input**: 8 files
 - **packages/materials**: 14 files
@@ -78,30 +78,30 @@ The codebase is organized into the following modules:
 
 | Package | Depends On | Files (Active) | Files (Dormant) |
 |---------|------------|----------------|-----------------|
-| `@four/animation` (`packages/animation/`) | `@four/motion`, `@four/core`, `@four/scene`, `@four/math` | 14 | 0 |
-| `@four/assets` (`packages/assets/`) | `@four/core` | 9 | 0 |
-| `@four/core` (`packages/core/`) | (none) | 14 | 0 |
-| `@four/diagnostics` (`packages/diagnostics/`) | `@four/core`, `@four/math` | 12 | 1 |
-| `four` (`packages/four/`) | `@four/animation`, `@four/core`, `@four/diagnostics`, `@four/geometry`, `@four/motion`, `@four/math`, `@four/assets`, `@four/physics`, `@four/scene`, `@four/render`, `@four/materials`, `@four/input`, `@four/particles`, `@four/physics-box2d`, `@four/physics-rapier`, `@four/physics-soft`, `@four/serialization`, `@four/ui`, `@four/render-canvas`, `@four/render-svg`, `@four/render-webgl`, `@four/render-webgpu`, `@four/text` | 35 | 0 |
-| `@four/geometry` (`packages/geometry/`) | `@four/math`, `@four/core` | 12 | 0 |
-| `@four/input` (`packages/input/`) | `@four/core`, `@four/math`, `@four/scene` | 8 | 0 |
-| `@four/materials` (`packages/materials/`) | `@four/core`, `@four/math` | 14 | 0 |
-| `@four/math` (`packages/math/`) | (none) | 11 | 0 |
-| `@four/motion` (`packages/motion/`) | `@four/core`, `@four/math`, `@four/scene` | 22 | 0 |
-| `@four/particles` (`packages/particles/`) | `@four/core`, `@four/math`, `@four/scene` | 9 | 0 |
-| `@four/physics` (`packages/physics/`) | `@four/core`, `@four/math`, `@four/scene`, `@four/motion` | 25 | 0 |
-| `@four/physics-box2d` (`packages/physics-box2d/`) | (none) | 1 | 0 |
-| `@four/physics-rapier` (`packages/physics-rapier/`) | `@four/physics`, `@four/core`, `@four/math` | 8 | 0 |
-| `@four/physics-soft` (`packages/physics-soft/`) | (none) | 1 | 0 |
-| `@four/render` (`packages/render/`) | `@four/geometry`, `@four/materials`, `@four/math`, `@four/scene`, `@four/core` | 30 | 0 |
-| `@four/render-canvas` (`packages/render-canvas/`) | (none) | 1 | 0 |
-| `@four/render-svg` (`packages/render-svg/`) | (none) | 1 | 0 |
-| `@four/render-webgl` (`packages/render-webgl/`) | `@four/math`, `@four/render`, `@four/core` | 19 | 0 |
-| `@four/render-webgpu` (`packages/render-webgpu/`) | `@four/render`, `@four/core`, `@four/math`, `@four/scene` | 25 | 0 |
-| `@four/scene` (`packages/scene/`) | `@four/math`, `@four/core` | 17 | 0 |
-| `@four/serialization` (`packages/serialization/`) | `@four/core`, `@four/scene`, `@four/math` | 5 | 0 |
-| `@four/text` (`packages/text/`) | (none) | 4 | 0 |
-| `@four/ui` (`packages/ui/`) | `@four/core`, `@four/scene`, `@four/input`, `@four/math`, `@four/text` | 16 | 0 |
+| `@fourjs/animation` (`packages/animation/`) | `@fourjs/motion`, `@fourjs/core`, `@fourjs/scene`, `@fourjs/math` | 14 | 0 |
+| `@fourjs/assets` (`packages/assets/`) | `@fourjs/core` | 9 | 0 |
+| `@fourjs/core` (`packages/core/`) | (none) | 14 | 0 |
+| `@fourjs/diagnostics` (`packages/diagnostics/`) | `@fourjs/core`, `@fourjs/math` | 12 | 1 |
+| `four` (`packages/fourJS/`) | `@fourjs/animation`, `@fourjs/core`, `@fourjs/diagnostics`, `@fourjs/geometry`, `@fourjs/motion`, `@fourjs/math`, `@fourjs/assets`, `@fourjs/physics`, `@fourjs/scene`, `@fourjs/render`, `@fourjs/materials`, `@fourjs/input`, `@fourjs/particles`, `@fourjs/physics-box2d`, `@fourjs/physics-rapier`, `@fourjs/physics-soft`, `@fourjs/serialization`, `@fourjs/ui`, `@fourjs/render-canvas`, `@fourjs/render-svg`, `@fourjs/render-webgl`, `@fourjs/render-webgpu`, `@fourjs/text` | 35 | 0 |
+| `@fourjs/geometry` (`packages/geometry/`) | `@fourjs/math`, `@fourjs/core` | 12 | 0 |
+| `@fourjs/input` (`packages/input/`) | `@fourjs/core`, `@fourjs/math`, `@fourjs/scene` | 8 | 0 |
+| `@fourjs/materials` (`packages/materials/`) | `@fourjs/core`, `@fourjs/math` | 14 | 0 |
+| `@fourjs/math` (`packages/math/`) | (none) | 11 | 0 |
+| `@fourjs/motion` (`packages/motion/`) | `@fourjs/core`, `@fourjs/math`, `@fourjs/scene` | 22 | 0 |
+| `@fourjs/particles` (`packages/particles/`) | `@fourjs/core`, `@fourjs/math`, `@fourjs/scene` | 9 | 0 |
+| `@fourjs/physics` (`packages/physics/`) | `@fourjs/core`, `@fourjs/math`, `@fourjs/scene`, `@fourjs/motion` | 25 | 0 |
+| `@fourjs/physics-box2d` (`packages/physics-box2d/`) | (none) | 1 | 0 |
+| `@fourjs/physics-rapier` (`packages/physics-rapier/`) | `@fourjs/physics`, `@fourjs/core`, `@fourjs/math` | 8 | 0 |
+| `@fourjs/physics-soft` (`packages/physics-soft/`) | (none) | 1 | 0 |
+| `@fourjs/render` (`packages/render/`) | `@fourjs/geometry`, `@fourjs/materials`, `@fourjs/math`, `@fourjs/scene`, `@fourjs/core` | 30 | 0 |
+| `@fourjs/render-canvas` (`packages/render-canvas/`) | (none) | 1 | 0 |
+| `@fourjs/render-svg` (`packages/render-svg/`) | (none) | 1 | 0 |
+| `@fourjs/render-webgl` (`packages/render-webgl/`) | `@fourjs/math`, `@fourjs/render`, `@fourjs/core` | 19 | 0 |
+| `@fourjs/render-webgpu` (`packages/render-webgpu/`) | `@fourjs/render`, `@fourjs/core`, `@fourjs/math`, `@fourjs/scene` | 25 | 0 |
+| `@fourjs/scene` (`packages/scene/`) | `@fourjs/math`, `@fourjs/core` | 17 | 0 |
+| `@fourjs/serialization` (`packages/serialization/`) | `@fourjs/core`, `@fourjs/scene`, `@fourjs/math` | 5 | 0 |
+| `@fourjs/text` (`packages/text/`) | (none) | 4 | 0 |
+| `@fourjs/ui` (`packages/ui/`) | `@fourjs/core`, `@fourjs/scene`, `@fourjs/input`, `@fourjs/math`, `@fourjs/text` | 16 | 0 |
 
 ### Package Dependency Diagram
 
@@ -111,7 +111,7 @@ graph LR
     P1[packages/assets]
     P2[packages/core]
     P3[packages/diagnostics]
-    P4[packages/four]
+    P4[packages/fourJS]
     P5[packages/geometry]
     P6[packages/input]
     P7[packages/materials]
@@ -216,7 +216,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/motion` | `PRIORITY_ANIMATION_TARGETS, FixedUpdateContext, SimulationSystem` |
+| `@fourjs/motion` | `PRIORITY_ANIMATION_TARGETS, FixedUpdateContext, SimulationSystem` |
 
 **Exports:**
 - Classes: `AnimationSystem`
@@ -230,7 +230,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -262,7 +262,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -281,9 +281,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/scene` | `Node, warnAuthorityConflict` |
-| `@four/scene` | `TransformAuthority` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/scene` | `Node, warnAuthorityConflict` |
+| `@fourjs/scene` | `TransformAuthority` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -313,7 +313,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Exports:**
 - Types: `EasingFunction`, `EasingName`
@@ -322,7 +322,7 @@ graph LR
 
 ---
 
-### `packages/animation/src/index.ts` - `@four/animation` — the public surface of the animation pillar (Part III).
+### `packages/animation/src/index.ts` - `@fourjs/animation` — the public surface of the animation pillar (Part III).
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -365,9 +365,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/scene` | `Node, warnAuthorityConflict` |
-| `@four/scene` | `TransformAuthority` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/scene` | `Node, warnAuthorityConflict` |
+| `@fourjs/scene` | `TransformAuthority` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -389,10 +389,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Quaternion, Vector3` |
-| `@four/scene` | `Node, warnAuthorityConflict` |
-| `@four/scene` | `TransformAuthority` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Quaternion, Vector3` |
+| `@fourjs/scene` | `Node, warnAuthorityConflict` |
+| `@fourjs/scene` | `TransformAuthority` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -415,7 +415,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -434,8 +434,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Vector2, Vector3, Vector4` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Vector2, Vector3, Vector4` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -454,10 +454,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Quaternion, Vector2, Vector3, Vector4` |
-| `@four/scene` | `Node, warnAuthorityConflict` |
-| `@four/scene` | `TransformAuthority` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Quaternion, Vector2, Vector3, Vector4` |
+| `@fourjs/scene` | `Node, warnAuthorityConflict` |
+| `@fourjs/scene` | `TransformAuthority` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -479,8 +479,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Quaternion, Vector2, Vector3, Vector4, ColorRGBA` |
-| `@four/math` | `ColorRGBA` |
+| `@fourjs/math` | `Quaternion, Vector2, Vector3, Vector4, ColorRGBA` |
+| `@fourjs/math` | `ColorRGBA` |
 
 **Exports:**
 - Interfaces: `ValueAdapter`
@@ -496,7 +496,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -518,7 +518,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, FourError, devWarnOnce, disposeAll, isFourError, Disposable` |
+| `@fourjs/core` | `DEV, FourError, devWarnOnce, disposeAll, isFourError, Disposable` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -538,7 +538,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `defineCapability` |
+| `@fourjs/core` | `defineCapability` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -564,7 +564,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, cloneJsonValue, devWarnOnce, isFourError, parseUntrustedJson, Disposable, JsonValue` |
+| `@fourjs/core` | `FourError, cloneJsonValue, devWarnOnce, isFourError, parseUntrustedJson, Disposable, JsonValue` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -581,7 +581,7 @@ graph LR
 
 ---
 
-### `packages/assets/src/index.ts` - `@four/assets` — the asset system (§76–78).
+### `packages/assets/src/index.ts` - `@fourjs/assets` — the asset system (§76–78).
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -613,7 +613,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -647,7 +647,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -668,7 +668,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, Disposable` |
+| `@fourjs/core` | `FourError, Disposable` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -873,7 +873,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, devWarnOnce` |
+| `@fourjs/core` | `DEV, devWarnOnce` |
 
 **Exports:**
 - Interfaces: `FrameAllocationReport`, `AuditFrameAllocationsOptions`
@@ -895,7 +895,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Quaternion, Vector3` |
+| `@fourjs/math` | `Quaternion, Vector3` |
 
 **Exports:**
 - Classes: `DebugDrawBuffer`
@@ -939,12 +939,12 @@ graph LR
 
 ---
 
-### `packages/diagnostics/src/leak-registry.ts` - Re-export of `@four/core`'s §83 FinalizationRegistry leak bookkeeping.
+### `packages/diagnostics/src/leak-registry.ts` - Re-export of `@fourjs/core`'s §83 FinalizationRegistry leak bookkeeping.
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `auditFinalizedLeaks, disposeTracked, reportFinalized, resetLeakRegistry, trackDisposable, trackedDisposableId` |
+| `@fourjs/core` | `auditFinalizedLeaks, disposeTracked, reportFinalized, resetLeakRegistry, trackDisposable, trackedDisposableId` |
 
 **Exports:**
 - Re-exports: `auditFinalizedLeaks`, `disposeTracked`, `reportFinalized`, `resetLeakRegistry`, `trackDisposable`, `trackedDisposableId`
@@ -956,7 +956,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -974,10 +974,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, cloneJsonValue, parseUntrustedJson, JsonValue, UntrustedJsonLimits` |
-| `@four/core` | `cloneJsonValue` |
-| `@four/core` | `JsonValue` |
-| `@four/core` | `UntrustedJsonLimits` |
+| `@fourjs/core` | `FourError, cloneJsonValue, parseUntrustedJson, JsonValue, UntrustedJsonLimits` |
+| `@fourjs/core` | `cloneJsonValue` |
+| `@fourjs/core` | `JsonValue` |
+| `@fourjs/core` | `UntrustedJsonLimits` |
 
 **Exports:**
 - Interfaces: `ReplayInputRecord`, `ReplayFrameRecord`, `ReplaySnapshotRecord`, `ReplayAdapterIdentity`, `ReplayRecording`
@@ -992,7 +992,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1013,7 +1013,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, devWarnOnce` |
+| `@fourjs/core` | `DEV, devWarnOnce` |
 
 **Exports:**
 - Interfaces: `LiveResourceCounts`, `ResourceLeakReport`, `AuditResourceLeaksOptions`
@@ -1027,7 +1027,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1059,7 +1059,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, devAssert, devWarnOnce` |
+| `@fourjs/core` | `DEV, devAssert, devWarnOnce` |
 
 **Exports:**
 - Interfaces: `ValidationCheckOptions`, `ValidationCatalogueOptions`, `ValidationNodeLike`, `ValidationTransformLike`
@@ -1072,33 +1072,33 @@ graph LR
 
 ## Packages/four Dependencies
 
-### `packages/four/src/animation.ts` - animation module
+### `packages/fourJS/src/animation.ts` - animation module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/animation` | `*` |
+| `@fourjs/animation` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/animation`
+- Re-exports: `* from @fourjs/animation`
 
 ---
 
-### `packages/four/src/application.ts` - The `Application` composition root (§45, plan D4).
+### `packages/fourJS/src/application.ts` - The `Application` composition root (§45, plan D4).
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, EventEmitter, FourError, bindCapability, devWarnOnce, installPlugins, FourPlugin, PluginCapabilityBinding, PluginContext` |
-| `@four/diagnostics` | `auditFrameAllocations, createFrameStats, monotonicNowSeconds, recordRenderStatistics, recordResourceMemory, recordSolverStatistics, resetFrameStats, solverStatistics, FrameStats, SolverStatistics` |
-| `@four/geometry` | `geometryMemoryBytes` |
-| `@four/motion` | `DEFAULT_FIXED_DELTA_TIME, DEFAULT_MAXIMUM_SUB_STEPS, PRIORITY_PHYSICS_SOLVE, Scheduler, SystemRegistry, Detach, ReadonlyTimeState, SimulationSystem` |
-| `@four/math` | `constructionCount, DepthRange` |
-| `@four/assets` | `AssetManager` |
-| `@four/physics` | `PhysicsWorld` |
-| `@four/scene` | `PerspectiveCamera, PoseBuffer, Scene, createSnapshotSystem, resolveWorldTransforms, Camera, SurfaceSizedCamera, Viewport, WorldTransformStats` |
-| `@four/render` | `RenderStatistics, Renderer, RendererCapabilityDeclaration, RendererCapabilityShortfall, RendererFallbackReport, RendererRegistry, RendererSelection` |
-| `@four/render` | `resolveRenderer, textureMemoryBytes` |
+| `@fourjs/core` | `DEV, EventEmitter, FourError, bindCapability, devWarnOnce, installPlugins, FourPlugin, PluginCapabilityBinding, PluginContext` |
+| `@fourjs/diagnostics` | `auditFrameAllocations, createFrameStats, monotonicNowSeconds, recordRenderStatistics, recordResourceMemory, recordSolverStatistics, resetFrameStats, solverStatistics, FrameStats, SolverStatistics` |
+| `@fourjs/geometry` | `geometryMemoryBytes` |
+| `@fourjs/motion` | `DEFAULT_FIXED_DELTA_TIME, DEFAULT_MAXIMUM_SUB_STEPS, PRIORITY_PHYSICS_SOLVE, Scheduler, SystemRegistry, Detach, ReadonlyTimeState, SimulationSystem` |
+| `@fourjs/math` | `constructionCount, DepthRange` |
+| `@fourjs/assets` | `AssetManager` |
+| `@fourjs/physics` | `PhysicsWorld` |
+| `@fourjs/scene` | `PerspectiveCamera, PoseBuffer, Scene, createSnapshotSystem, resolveWorldTransforms, Camera, SurfaceSizedCamera, Viewport, WorldTransformStats` |
+| `@fourjs/render` | `RenderStatistics, Renderer, RendererCapabilityDeclaration, RendererCapabilityShortfall, RendererFallbackReport, RendererRegistry, RendererSelection` |
+| `@fourjs/render` | `resolveRenderer, textureMemoryBytes` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1112,24 +1112,24 @@ graph LR
 
 ---
 
-### `packages/four/src/assets.ts` - assets module
+### `packages/fourJS/src/assets.ts` - assets module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/assets` | `*` |
+| `@fourjs/assets` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/assets`
+- Re-exports: `* from @fourjs/assets`
 
 ---
 
-### `packages/four/src/capabilities.ts` - The umbrella's own §81 capability token (RFC 0002).
+### `packages/fourJS/src/capabilities.ts` - The umbrella's own §81 capability token (RFC 0002).
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `defineCapability` |
+| `@fourjs/core` | `defineCapability` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1141,12 +1141,12 @@ graph LR
 
 ---
 
-### `packages/four/src/compute-pass.ts` - §82's `Four.ComputePass` — the named-map sugar over `@four/render`'s
+### `packages/fourJS/src/compute-pass.ts` - §82's `Four.ComputePass` — the named-map sugar over `@fourjs/render`'s
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `ComputeBinding, ComputeBuffer, ComputePassDescriptor` |
+| `@fourjs/render` | `ComputeBinding, ComputeBuffer, ComputePassDescriptor` |
 
 **Exports:**
 - Classes: `ComputePass`
@@ -1155,36 +1155,36 @@ graph LR
 
 ---
 
-### `packages/four/src/core.ts` - core module
+### `packages/fourJS/src/core.ts` - core module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `*` |
+| `@fourjs/core` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/core`
+- Re-exports: `* from @fourjs/core`
 
 ---
 
-### `packages/four/src/diagnostics.ts` - diagnostics module
+### `packages/fourJS/src/diagnostics.ts` - diagnostics module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/diagnostics` | `*` |
+| `@fourjs/diagnostics` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/diagnostics`
+- Re-exports: `* from @fourjs/diagnostics`
 
 ---
 
-### `packages/four/src/editor-tools.ts` - The §81 editor-tool registry — a named map of tool factories the **host**
+### `packages/fourJS/src/editor-tools.ts` - The §81 editor-tool registry — a named map of tool factories the **host**
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Exports:**
 - Classes: `EditorToolRegistry`
@@ -1192,31 +1192,31 @@ graph LR
 
 ---
 
-### `packages/four/src/geometry.ts` - geometry module
+### `packages/fourJS/src/geometry.ts` - geometry module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/geometry` | `*` |
+| `@fourjs/geometry` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/geometry`
+- Re-exports: `* from @fourjs/geometry`
 
 ---
 
-### `packages/four/src/gltf.ts` - §78 glTF assembly — `instantiateGltf` (A-19's closing packet, 2026-08-29).
+### `packages/fourJS/src/gltf.ts` - §78 glTF assembly — `instantiateGltf` (A-19's closing packet, 2026-08-29).
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/assets` | `GltfAsset` |
-| `@four/animation` | `AnimationClip, AnimationTrack, quaternionAdapter, vector3Adapter, AnimationTrackLike` |
-| `@four/core` | `FourError, devWarnOnce` |
-| `@four/geometry` | `BufferGeometry` |
-| `@four/materials` | `StandardMaterial` |
-| `@four/math` | `Matrix4, Quaternion, Vector3` |
-| `@four/render` | `Mesh, Texture` |
-| `@four/scene` | `Bone, Group, Skeleton, Node` |
+| `@fourjs/assets` | `GltfAsset` |
+| `@fourjs/animation` | `AnimationClip, AnimationTrack, quaternionAdapter, vector3Adapter, AnimationTrackLike` |
+| `@fourjs/core` | `FourError, devWarnOnce` |
+| `@fourjs/geometry` | `BufferGeometry` |
+| `@fourjs/materials` | `StandardMaterial` |
+| `@fourjs/math` | `Matrix4, Quaternion, Vector3` |
+| `@fourjs/render` | `Mesh, Texture` |
+| `@fourjs/scene` | `Bone, Group, Skeleton, Node` |
 
 **Exports:**
 - Interfaces: `GltfInstance`
@@ -1224,7 +1224,7 @@ graph LR
 
 ---
 
-### `packages/four/src/index.ts` - The umbrella package (§98): one namespace per workspace package, plus the
+### `packages/fourJS/src/index.ts` - The umbrella package (§98): one namespace per workspace package, plus the
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1252,40 +1252,40 @@ graph LR
 
 ---
 
-### `packages/four/src/input.ts` - input module
+### `packages/fourJS/src/input.ts` - input module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/input` | `*` |
+| `@fourjs/input` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/input`
+- Re-exports: `* from @fourjs/input`
 
 ---
 
-### `packages/four/src/live-resource-counts.ts` - Aggregates §83 live-resource counts for `auditResourceLeaks`.
+### `packages/fourJS/src/live-resource-counts.ts` - Aggregates §83 live-resource counts for `auditResourceLeaks`.
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/diagnostics` | `LiveResourceCounts` |
-| `@four/geometry` | `geometryMemoryBytes, liveGeometryCount` |
-| `@four/materials` | `liveMaterialCount` |
-| `@four/physics` | `liveSolverBodyCount, liveSolverColliderCount, liveSolverHandleCount, liveSolverJointCount` |
-| `@four/render` | `liveRenderTargetCount, liveTextureCount, textureMemoryBytes` |
+| `@fourjs/diagnostics` | `LiveResourceCounts` |
+| `@fourjs/geometry` | `geometryMemoryBytes, liveGeometryCount` |
+| `@fourjs/materials` | `liveMaterialCount` |
+| `@fourjs/physics` | `liveSolverBodyCount, liveSolverColliderCount, liveSolverHandleCount, liveSolverJointCount` |
+| `@fourjs/render` | `liveRenderTargetCount, liveTextureCount, textureMemoryBytes` |
 
 **Exports:**
 - Functions: `readLiveResourceCounts`
 
 ---
 
-### `packages/four/src/manifest-catalog.ts` - Preload a §79 manifest into a synchronous {@link SceneResourceCatalog}
+### `packages/fourJS/src/manifest-catalog.ts` - Preload a §79 manifest into a synchronous {@link SceneResourceCatalog}
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/assets` | `loadFromManifest, AssetLoader, AssetManager, AssetManifest, ManifestLoadOptions` |
+| `@fourjs/assets` | `loadFromManifest, AssetLoader, AssetManager, AssetManifest, ManifestLoadOptions` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1298,128 +1298,128 @@ graph LR
 
 ---
 
-### `packages/four/src/materials.ts` - materials module
+### `packages/fourJS/src/materials.ts` - materials module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/materials` | `*` |
+| `@fourjs/materials` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/materials`
+- Re-exports: `* from @fourjs/materials`
 
 ---
 
-### `packages/four/src/math.ts` - math module
+### `packages/fourJS/src/math.ts` - math module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `*` |
+| `@fourjs/math` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/math`
+- Re-exports: `* from @fourjs/math`
 
 ---
 
-### `packages/four/src/motion.ts` - motion module
+### `packages/fourJS/src/motion.ts` - motion module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/motion` | `*` |
+| `@fourjs/motion` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/motion`
+- Re-exports: `* from @fourjs/motion`
 
 ---
 
-### `packages/four/src/particles.ts` - particles module
+### `packages/fourJS/src/particles.ts` - particles module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/particles` | `*` |
+| `@fourjs/particles` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/particles`
+- Re-exports: `* from @fourjs/particles`
 
 ---
 
-### `packages/four/src/physics-box2d.ts` - physics-box2d module
+### `packages/fourJS/src/physics-box2d.ts` - physics-box2d module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/physics-box2d` | `*` |
+| `@fourjs/physics-box2d` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/physics-box2d`
+- Re-exports: `* from @fourjs/physics-box2d`
 
 ---
 
-### `packages/four/src/physics-rapier.ts` - physics-rapier module
+### `packages/fourJS/src/physics-rapier.ts` - physics-rapier module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/physics-rapier` | `*` |
+| `@fourjs/physics-rapier` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/physics-rapier`
+- Re-exports: `* from @fourjs/physics-rapier`
 
 ---
 
-### `packages/four/src/physics-soft.ts` - physics-soft module
+### `packages/fourJS/src/physics-soft.ts` - physics-soft module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/physics-soft` | `*` |
+| `@fourjs/physics-soft` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/physics-soft`
+- Re-exports: `* from @fourjs/physics-soft`
 
 ---
 
-### `packages/four/src/physics.ts` - physics module
+### `packages/fourJS/src/physics.ts` - physics module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/physics` | `*` |
+| `@fourjs/physics` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/physics`
+- Re-exports: `* from @fourjs/physics`
 
 ---
 
-### `packages/four/src/pick-provider.ts` - The four-line adapter RFC 0005 §2 promised (§71, §45; 2026-08-28): a
+### `packages/fourJS/src/pick-provider.ts` - The four-line adapter RFC 0005 §2 promised (§71, §45; 2026-08-28): a
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/input` | `PickProvider` |
-| `@four/render` | `PickingService` |
-| `@four/scene` | `Viewport` |
+| `@fourjs/input` | `PickProvider` |
+| `@fourjs/render` | `PickingService` |
+| `@fourjs/scene` | `Viewport` |
 
 **Exports:**
 - Functions: `createPickProvider`
 
 ---
 
-### `packages/four/src/plugins.ts` - The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`) —
+### `packages/fourJS/src/plugins.ts` - The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`) —
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/assets` | `ASSET_LOADERS` |
-| `@four/materials` | `SHADER_OPERATORS` |
-| `@four/motion` | `SIMULATION_SYSTEMS` |
-| `@four/physics` | `SOLVER_REGISTRY` |
-| `@four/render` | `COMPUTE_WORKLOADS, RENDERER_REGISTRY, RENDER_GRAPH` |
-| `@four/serialization` | `COMPONENT_SERIALIZERS, SCENE_MIGRATIONS` |
-| `@four/ui` | `UI_CONTROLS` |
+| `@fourjs/assets` | `ASSET_LOADERS` |
+| `@fourjs/materials` | `SHADER_OPERATORS` |
+| `@fourjs/motion` | `SIMULATION_SYSTEMS` |
+| `@fourjs/physics` | `SOLVER_REGISTRY` |
+| `@fourjs/render` | `COMPUTE_WORKLOADS, RENDERER_REGISTRY, RENDER_GRAPH` |
+| `@fourjs/serialization` | `COMPONENT_SERIALIZERS, SCENE_MIGRATIONS` |
+| `@fourjs/ui` | `UI_CONTROLS` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1433,82 +1433,82 @@ graph LR
 
 ---
 
-### `packages/four/src/render-canvas.ts` - render-canvas module
+### `packages/fourJS/src/render-canvas.ts` - render-canvas module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render-canvas` | `*` |
+| `@fourjs/render-canvas` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/render-canvas`
+- Re-exports: `* from @fourjs/render-canvas`
 
 ---
 
-### `packages/four/src/render-svg.ts` - render-svg module
+### `packages/fourJS/src/render-svg.ts` - render-svg module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render-svg` | `*` |
+| `@fourjs/render-svg` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/render-svg`
+- Re-exports: `* from @fourjs/render-svg`
 
 ---
 
-### `packages/four/src/render-webgl.ts` - render-webgl module
+### `packages/fourJS/src/render-webgl.ts` - render-webgl module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render-webgl` | `*` |
+| `@fourjs/render-webgl` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/render-webgl`
+- Re-exports: `* from @fourjs/render-webgl`
 
 ---
 
-### `packages/four/src/render-webgpu.ts` - render-webgpu module
+### `packages/fourJS/src/render-webgpu.ts` - render-webgpu module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render-webgpu` | `*` |
+| `@fourjs/render-webgpu` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/render-webgpu`
+- Re-exports: `* from @fourjs/render-webgpu`
 
 ---
 
-### `packages/four/src/render.ts` - render module
+### `packages/fourJS/src/render.ts` - render module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `*` |
+| `@fourjs/render` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/render`
+- Re-exports: `* from @fourjs/render`
 
 ---
 
-### `packages/four/src/scene-serializers.ts` - §79 node types and component serializers for the classes the engine itself
+### `packages/fourJS/src/scene-serializers.ts` - §79 node types and component serializers for the classes the engine itself
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, JsonValue` |
-| `@four/geometry` | `Path, BufferGeometry, Point2D` |
-| `@four/materials` | `Material, MaterialTexture, SpriteMaterial, UnlitMaterial` |
-| `@four/motion` | `CAMERA_SHAKE_SERIALIZER, CHARACTER_CONTROLLER_SERIALIZER, CameraShake, CharacterController, FIRST_PERSON_LOOK_SERIALIZER, FOLLOW_RIG_SERIALIZER, FirstPersonLook, FollowRig, KINEMATIC_CONTROLLER_SERIALIZER, KinematicController, LOOK_AT_CONSTRAINT_SERIALIZER, LookAtConstraint, MOTION_COMPONENT_SERIALIZER, MotionComponent, ORBIT_RIG_SERIALIZER, OrbitRig` |
-| `@four/physics` | `COLLIDER_SERIALIZER, Collider, RIGID_BODY_SERIALIZER, RigidBody, SWEPT_CHARACTER_CONTROLLER_SERIALIZER, SweptCharacterController` |
-| `@four/render` | `Arc, Circle, Ellipse, Line, Mesh, PathShape, Polygon, Polyline, Rectangle, RegularPolygon, Renderable, Ring, Sector, Shape2D, Sprite, Star, resolveShapePaintSupport, restoreMeshSkeleton` |
-| `@four/render` | `GradientStop, Paint, ResolvedPaint, ResolvedShapeFill, ResolvedStrokeStyle, ScissorRect` |
-| `@four/scene` | `Bone, DirectionalLight, MORPH_WEIGHTS_SERIALIZER, MorphWeights, NODE_SPACE_SERIALIZER, NodeSpace, OrthographicCamera, PerspectiveCamera, PointLight, SCREEN_ORIGINS, SCREEN_UNITS, ScreenCamera, SpotLight, restoreNodeId, HitTestMode, Node` |
-| `@four/serialization` | `ComponentSerializerRegistry, createDefaultComponentSerializers, InstantiateSceneOptions, SceneNodeDocument, SerializeSceneOptions` |
-| `@four/text` | `GlyphAtlas, TextAlign` |
-| `@four/ui` | `Button, CanvasViewWidget, Checkbox, ImageWidget, Label, Panel, ProgressIndicator, RadioButton, Slider, Toggle, UIWidget, CheckableWidget, UIWidgetOptions, WidgetAccessibility` |
+| `@fourjs/core` | `FourError, JsonValue` |
+| `@fourjs/geometry` | `Path, BufferGeometry, Point2D` |
+| `@fourjs/materials` | `Material, MaterialTexture, SpriteMaterial, UnlitMaterial` |
+| `@fourjs/motion` | `CAMERA_SHAKE_SERIALIZER, CHARACTER_CONTROLLER_SERIALIZER, CameraShake, CharacterController, FIRST_PERSON_LOOK_SERIALIZER, FOLLOW_RIG_SERIALIZER, FirstPersonLook, FollowRig, KINEMATIC_CONTROLLER_SERIALIZER, KinematicController, LOOK_AT_CONSTRAINT_SERIALIZER, LookAtConstraint, MOTION_COMPONENT_SERIALIZER, MotionComponent, ORBIT_RIG_SERIALIZER, OrbitRig` |
+| `@fourjs/physics` | `COLLIDER_SERIALIZER, Collider, RIGID_BODY_SERIALIZER, RigidBody, SWEPT_CHARACTER_CONTROLLER_SERIALIZER, SweptCharacterController` |
+| `@fourjs/render` | `Arc, Circle, Ellipse, Line, Mesh, PathShape, Polygon, Polyline, Rectangle, RegularPolygon, Renderable, Ring, Sector, Shape2D, Sprite, Star, resolveShapePaintSupport, restoreMeshSkeleton` |
+| `@fourjs/render` | `GradientStop, Paint, ResolvedPaint, ResolvedShapeFill, ResolvedStrokeStyle, ScissorRect` |
+| `@fourjs/scene` | `Bone, DirectionalLight, MORPH_WEIGHTS_SERIALIZER, MorphWeights, NODE_SPACE_SERIALIZER, NodeSpace, OrthographicCamera, PerspectiveCamera, PointLight, SCREEN_ORIGINS, SCREEN_UNITS, ScreenCamera, SpotLight, restoreNodeId, HitTestMode, Node` |
+| `@fourjs/serialization` | `ComponentSerializerRegistry, createDefaultComponentSerializers, InstantiateSceneOptions, SceneNodeDocument, SerializeSceneOptions` |
+| `@fourjs/text` | `GlyphAtlas, TextAlign` |
+| `@fourjs/ui` | `Button, CanvasViewWidget, Checkbox, ImageWidget, Label, Panel, ProgressIndicator, RadioButton, Slider, Toggle, UIWidget, CheckableWidget, UIWidgetOptions, WidgetAccessibility` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1523,40 +1523,40 @@ graph LR
 
 ---
 
-### `packages/four/src/scene.ts` - scene module
+### `packages/fourJS/src/scene.ts` - scene module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/scene` | `*` |
+| `@fourjs/scene` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/scene`
+- Re-exports: `* from @fourjs/scene`
 
 ---
 
-### `packages/four/src/serialization.ts` - serialization module
+### `packages/fourJS/src/serialization.ts` - serialization module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/serialization` | `*` |
+| `@fourjs/serialization` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/serialization`
+- Re-exports: `* from @fourjs/serialization`
 
 ---
 
-### `packages/four/src/text-node.ts` - `Text` (§49, §56) — a string, a font atlas and a material become **one** draw
+### `packages/fourJS/src/text-node.ts` - `Text` (§49, §56) — a string, a font atlas and a material become **one** draw
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/geometry` | `BufferGeometry` |
-| `@four/materials` | `UnlitMaterial` |
-| `@four/render` | `Renderable, RenderableOptions` |
-| `@four/text` | `layoutText, GlyphAtlas, TextAlign, TextLayout` |
-| `@four/core` | `Disposable` |
+| `@fourjs/geometry` | `BufferGeometry` |
+| `@fourjs/materials` | `UnlitMaterial` |
+| `@fourjs/render` | `Renderable, RenderableOptions` |
+| `@fourjs/text` | `layoutText, GlyphAtlas, TextAlign, TextLayout` |
+| `@fourjs/core` | `Disposable` |
 
 **Exports:**
 - Classes: `Text`
@@ -1564,27 +1564,27 @@ graph LR
 
 ---
 
-### `packages/four/src/text.ts` - text module
+### `packages/fourJS/src/text.ts` - text module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/text` | `*` |
+| `@fourjs/text` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/text`
+- Re-exports: `* from @fourjs/text`
 
 ---
 
-### `packages/four/src/ui.ts` - ui module
+### `packages/fourJS/src/ui.ts` - ui module
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/ui` | `*` |
+| `@fourjs/ui` | `*` |
 
 **Exports:**
-- Re-exports: `* from @four/ui`
+- Re-exports: `* from @fourjs/ui`
 
 ---
 
@@ -1597,7 +1597,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
+| `@fourjs/math` | `Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1617,8 +1617,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
-| `@four/math` | `Vector3` |
+| `@fourjs/core` | `Disposable` |
+| `@fourjs/math` | `Vector3` |
 
 **Exports:**
 - Interfaces: `BoundingVolume`, `MutableBoundingVolume`
@@ -1674,7 +1674,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix3` |
+| `@fourjs/math` | `Matrix3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1737,7 +1737,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, disposeTracked, trackDisposable` |
+| `@fourjs/core` | `DEV, disposeTracked, trackDisposable` |
 
 **Exports:**
 - Functions: `noteGeometry`, `geometryMemoryBytes`, `liveGeometryCount`, `trackGeometryDisposable`, `releaseGeometryDisposable`
@@ -1749,8 +1749,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Matrix3` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Matrix3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1770,7 +1770,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1809,9 +1809,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Unsubscribe` |
-| `@four/math` | `Vector3, DepthRange` |
-| `@four/scene` | `resolveWorldTransform, Camera, Node` |
+| `@fourjs/core` | `Unsubscribe` |
+| `@fourjs/math` | `Vector3, DepthRange` |
+| `@fourjs/scene` | `resolveWorldTransform, Camera, Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1827,7 +1827,7 @@ graph LR
 
 ---
 
-### `packages/input/src/index.ts` - Package entry point for @four/input (re-exports 38 symbols)
+### `packages/input/src/index.ts` - Package entry point for @fourjs/input (re-exports 38 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1857,7 +1857,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/scene` | `Node` |
+| `@fourjs/scene` | `Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1877,8 +1877,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/scene` | `Node` |
-| `@four/core` | `DEV, FourError` |
+| `@fourjs/scene` | `Node` |
+| `@fourjs/core` | `DEV, FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1898,9 +1898,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Matrix4, Vector3, DepthRange` |
-| `@four/scene` | `resolveWorldTransform, Camera, Node` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Matrix4, Vector3, DepthRange` |
+| `@fourjs/scene` | `resolveWorldTransform, Camera, Node` |
 
 **Exports:**
 - Interfaces: `PickProvider`, `PickableAlphaMask`, `PickableTriangles`, `Pickable`, `PickHit`
@@ -1913,8 +1913,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
-| `@four/scene` | `Node` |
+| `@fourjs/math` | `Vector3` |
+| `@fourjs/scene` | `Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1937,8 +1937,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3, DepthRange` |
-| `@four/scene` | `Camera, Node` |
+| `@fourjs/math` | `Vector3, DepthRange` |
+| `@fourjs/scene` | `Camera, Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1959,7 +1959,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/scene` | `Node, NodeEventMap` |
+| `@fourjs/scene` | `Node, NodeEventMap` |
 
 **Exports:**
 - Functions: `buildPropagationPath`, `dispatchThreePhase`
@@ -1975,7 +1975,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `defineCapability` |
+| `@fourjs/core` | `defineCapability` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2042,7 +2042,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
+| `@fourjs/core` | `Disposable` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2091,7 +2091,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, disposeTracked, trackDisposable` |
+| `@fourjs/core` | `DEV, disposeTracked, trackDisposable` |
 
 **Exports:**
 - Functions: `noteMaterial`, `liveMaterialCount`, `trackMaterialDisposable`, `releaseMaterialDisposable`
@@ -2113,7 +2113,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2147,8 +2147,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `ColorRGB, ColorRGBA` |
-| `@four/math` | `ColorRGB` |
+| `@fourjs/math` | `ColorRGB, ColorRGBA` |
+| `@fourjs/math` | `ColorRGB` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2178,7 +2178,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `ColorSpace` |
+| `@fourjs/math` | `ColorSpace` |
 
 **Exports:**
 - Interfaces: `MaterialTexture`
@@ -2191,8 +2191,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `ColorRGBA` |
-| `@four/math` | `ColorRGBA` |
+| `@fourjs/math` | `ColorRGBA` |
+| `@fourjs/math` | `ColorRGBA` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2239,7 +2239,7 @@ graph LR
 
 ---
 
-### `packages/math/src/index.ts` - Package entry point for @four/math (re-exports 22 symbols)
+### `packages/math/src/index.ts` - Package entry point for @fourjs/math (re-exports 22 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2361,9 +2361,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Component, ComponentHost` |
-| `@four/math` | `Vector3` |
-| `@four/scene` | `resolveWorldTransform, Node` |
+| `@fourjs/core` | `Component, ComponentHost` |
+| `@fourjs/math` | `Vector3` |
+| `@fourjs/scene` | `resolveWorldTransform, Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2384,9 +2384,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Component, ComponentHost` |
-| `@four/math` | `Quaternion, Vector3` |
-| `@four/scene` | `Node` |
+| `@fourjs/core` | `Component, ComponentHost` |
+| `@fourjs/math` | `Quaternion, Vector3` |
+| `@fourjs/scene` | `Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2405,7 +2405,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `defineCapability` |
+| `@fourjs/core` | `defineCapability` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2422,8 +2422,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Component, ComponentHost` |
-| `@four/scene` | `Transform` |
+| `@fourjs/core` | `Component, ComponentHost` |
+| `@fourjs/scene` | `Transform` |
 
 **Exports:**
 - Classes: `CharacterController`, `FirstPersonLook`
@@ -2447,9 +2447,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Component, ComponentHost` |
-| `@four/math` | `Quaternion, Vector3` |
-| `@four/scene` | `resolveWorldTransform, warnAuthorityConflict, Node` |
+| `@fourjs/core` | `Component, ComponentHost` |
+| `@fourjs/math` | `Quaternion, Vector3` |
+| `@fourjs/scene` | `resolveWorldTransform, warnAuthorityConflict, Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2470,8 +2470,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
-| `@four/scene` | `resolveWorldTransform, Node` |
+| `@fourjs/math` | `Vector3` |
+| `@fourjs/scene` | `resolveWorldTransform, Node` |
 
 **Exports:**
 - Interfaces: `TwoBoneIKSolution`, `JointLimit`, `IKSolveOptions`, `IKSolveResult`
@@ -2537,7 +2537,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
+| `@fourjs/math` | `Vector3` |
 
 **Exports:**
 - Types: `Integrator`, `IntegratorState`, `AccelerationFn`, `IntegratorFn`
@@ -2550,9 +2550,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Component, ComponentHost` |
-| `@four/math` | `Quaternion, Vector3` |
-| `@four/scene` | `warnAuthorityConflict, Node, Transform` |
+| `@fourjs/core` | `Component, ComponentHost` |
+| `@fourjs/math` | `Quaternion, Vector3` |
+| `@fourjs/scene` | `warnAuthorityConflict, Node, Transform` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2573,9 +2573,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Component, ComponentHost` |
-| `@four/math` | `Quaternion, Vector3` |
-| `@four/scene` | `warnAuthorityConflict, Node` |
+| `@fourjs/core` | `Component, ComponentHost` |
+| `@fourjs/math` | `Quaternion, Vector3` |
+| `@fourjs/scene` | `warnAuthorityConflict, Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2603,7 +2603,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
+| `@fourjs/math` | `Vector3` |
 
 **Exports:**
 - Interfaces: `InterceptTimeOptions`
@@ -2611,12 +2611,12 @@ graph LR
 
 ---
 
-### `packages/motion/src/random.ts` - `SeededRandom`'s original home (WP-8.2), now a re-export of `@four/core`.
+### `packages/motion/src/random.ts` - `SeededRandom`'s original home (WP-8.2), now a re-export of `@fourjs/core`.
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `SeededRandom` |
+| `@fourjs/core` | `SeededRandom` |
 
 **Exports:**
 - Re-exports: `SeededRandom`
@@ -2628,8 +2628,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix4, Vector3` |
-| `@four/scene` | `resolveWorldTransform, Node` |
+| `@fourjs/math` | `Matrix4, Vector3` |
+| `@fourjs/scene` | `resolveWorldTransform, Node` |
 
 **Exports:**
 - Types: `RigTarget`
@@ -2656,8 +2656,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `JsonValue` |
-| `@four/math` | `Vector3` |
+| `@fourjs/core` | `JsonValue` |
+| `@fourjs/math` | `Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2690,7 +2690,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
+| `@fourjs/math` | `Vector3` |
 
 **Exports:**
 - Classes: `SpringDamper`
@@ -2704,7 +2704,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
+| `@fourjs/math` | `Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2740,7 +2740,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
+| `@fourjs/math` | `Vector3` |
 
 **Exports:**
 - Classes: `LinearTrajectory`, `ParabolicTrajectory`, `BallisticTrajectory`, `CircularTrajectory`, `EllipticalTrajectory`, `CubicBezierTrajectory`, `CatmullRomTrajectory`, `DampedSpringTrajectory`, `ParametricTrajectory`
@@ -2758,8 +2758,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Vector3, Vector4` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Vector3, Vector4` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2782,9 +2782,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEFAULT_GRAVITY_Y` |
-| `@four/math` | `Vector3` |
-| `@four/core` | `DEFAULT_GRAVITY_Y` |
+| `@fourjs/core` | `DEFAULT_GRAVITY_Y` |
+| `@fourjs/math` | `Vector3` |
+| `@fourjs/core` | `DEFAULT_GRAVITY_Y` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2832,8 +2832,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3, Vector4` |
-| `@four/scene` | `Node` |
+| `@fourjs/math` | `Vector3, Vector4` |
+| `@fourjs/scene` | `Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2863,19 +2863,19 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3, Vector4` |
+| `@fourjs/math` | `Vector3, Vector4` |
 
 **Exports:**
 - Classes: `ParticlePool`
 
 ---
 
-### `packages/particles/src/random.ts` - `SeededRandom` for particles — a re-export of `@four/core`.
+### `packages/particles/src/random.ts` - `SeededRandom` for particles — a re-export of `@fourjs/core`.
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `SeededRandom` |
+| `@fourjs/core` | `SeededRandom` |
 
 **Exports:**
 - Re-exports: `SeededRandom`
@@ -2897,7 +2897,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
+| `@fourjs/math` | `Vector3` |
 
 **Exports:**
 - Interfaces: `ParticleForceField`, `ParticleGpuRadialField`, `ParticleGpuIntegrateExtras`, `ParticleGpuSimulation`, `ParticleRange`, `ParticleLifetimeStop`, `ParticleLifetimeRamp`, `ParticleColor`, `ParticleBurst`
@@ -2915,7 +2915,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
+| `@fourjs/core` | `Disposable` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2937,7 +2937,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix3, Quaternion, Vector3` |
+| `@fourjs/math` | `Matrix3, Quaternion, Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2955,7 +2955,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `defineCapability` |
+| `@fourjs/core` | `defineCapability` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2972,8 +2972,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `EventEmitter, FourError, Component, ComponentHost` |
-| `@four/scene` | `Node, Transform` |
+| `@fourjs/core` | `EventEmitter, FourError, Component, ComponentHost` |
+| `@fourjs/scene` | `Node, Transform` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3001,11 +3001,11 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEFAULT_GRAVITY_Y, FourError, SpaceMode` |
-| `@four/math` | `Quaternion, Vector3` |
-| `@four/math` | `Matrix3` |
-| `@four/scene` | `Transform` |
-| `@four/core` | `DEFAULT_GRAVITY_Y` |
+| `@fourjs/core` | `DEFAULT_GRAVITY_Y, FourError, SpaceMode` |
+| `@fourjs/math` | `Quaternion, Vector3` |
+| `@fourjs/math` | `Matrix3` |
+| `@fourjs/scene` | `Transform` |
+| `@fourjs/core` | `DEFAULT_GRAVITY_Y` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3030,7 +3030,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
+| `@fourjs/math` | `Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3048,8 +3048,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
-| `@four/motion` | `PRIORITY_FORCES, FixedUpdateContext, SimulationSystem` |
+| `@fourjs/math` | `Vector3` |
+| `@fourjs/motion` | `PRIORITY_FORCES, FixedUpdateContext, SimulationSystem` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3064,7 +3064,7 @@ graph LR
 
 ---
 
-### `packages/physics/src/index.ts` - `@four/physics` — the stable, solver-independent physics API (§101, Part IV).
+### `packages/physics/src/index.ts` - `@fourjs/physics` — the stable, solver-independent physics API (§101, Part IV).
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3125,8 +3125,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `EventEmitter, FourError` |
-| `@four/math` | `Quaternion, Vector3` |
+| `@fourjs/core` | `EventEmitter, FourError` |
+| `@fourjs/math` | `Quaternion, Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3153,8 +3153,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Quaternion, Vector3` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Quaternion, Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3173,7 +3173,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3193,8 +3193,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/motion` | `PRIORITY_EVENT_DISPATCH, SimulationSystem` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/motion` | `PRIORITY_EVENT_DISPATCH, SimulationSystem` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3213,8 +3213,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/motion` | `PRIORITY_PHYSICS_SOLVE, FixedUpdateContext, SimulationSystem` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/motion` | `PRIORITY_PHYSICS_SOLVE, FixedUpdateContext, SimulationSystem` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3232,7 +3232,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector3` |
+| `@fourjs/math` | `Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3260,8 +3260,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEFAULT_SPACE_MODE, EventEmitter, FourError, Component, ComponentHost, SpaceMode` |
-| `@four/math` | `Matrix3, Quaternion, Vector3` |
+| `@fourjs/core` | `DEFAULT_SPACE_MODE, EventEmitter, FourError, Component, ComponentHost, SpaceMode` |
+| `@fourjs/math` | `Matrix3, Quaternion, Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3287,10 +3287,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `SPACE_MODES, FourError, JsonValue, SpaceMode` |
-| `@four/math` | `Matrix3, Quaternion, Vector2, Vector3` |
-| `@four/motion` | `DEFAULT_CHARACTER_GRAVITY, ComponentSerializerShape` |
-| `@four/scene` | `Transform` |
+| `@fourjs/core` | `SPACE_MODES, FourError, JsonValue, SpaceMode` |
+| `@fourjs/math` | `Matrix3, Quaternion, Vector2, Vector3` |
+| `@fourjs/motion` | `DEFAULT_CHARACTER_GRAVITY, ComponentSerializerShape` |
+| `@fourjs/scene` | `Transform` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3317,8 +3317,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Vector2, Vector3` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Vector2, Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3338,7 +3338,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3362,7 +3362,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, FourErrorCode` |
+| `@fourjs/core` | `FourError, FourErrorCode` |
 
 **Exports:**
 - Types: `StalePhysicsHandleKind`
@@ -3375,10 +3375,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Component, ComponentHost` |
-| `@four/math` | `Vector3` |
-| `@four/motion` | `CharacterController, PRIORITY_KINEMATICS, FixedUpdateContext, SimulationSystem` |
-| `@four/scene` | `warnAuthorityConflict, Node` |
+| `@fourjs/core` | `Component, ComponentHost` |
+| `@fourjs/math` | `Vector3` |
+| `@fourjs/motion` | `CharacterController, PRIORITY_KINEMATICS, FixedUpdateContext, SimulationSystem` |
+| `@fourjs/scene` | `warnAuthorityConflict, Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3401,7 +3401,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Quaternion, Vector2, Vector3` |
+| `@fourjs/math` | `Quaternion, Vector2, Vector3` |
 
 **Exports:**
 - Interfaces: `SleepingConfig`, `PhysicsBodyHandle`, `PhysicsColliderHandle`, `PhysicsJointHandle`
@@ -3415,8 +3415,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Matrix3` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Matrix3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3445,10 +3445,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEFAULT_SPACE_MODE, FourError, isSimulationSpaceMode` |
-| `@four/math` | `Quaternion, Vector2, Vector3` |
-| `@four/motion` | `PRIORITY_ANIMATION_TARGETS, SimulationSystem` |
-| `@four/scene` | `PoseTarget, warnAuthorityConflict, Node, PoseBuffer, TransformAuthority` |
+| `@fourjs/core` | `DEFAULT_SPACE_MODE, FourError, isSimulationSpaceMode` |
+| `@fourjs/math` | `Quaternion, Vector2, Vector3` |
+| `@fourjs/motion` | `PRIORITY_ANIMATION_TARGETS, SimulationSystem` |
+| `@fourjs/scene` | `PoseTarget, warnAuthorityConflict, Node, PoseBuffer, TransformAuthority` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3507,8 +3507,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/physics` | `DEFAULT_ENABLED_CCD_MODE` |
-| `@four/physics` | `CCDMode, RigidBodyDescriptor` |
+| `@fourjs/physics` | `DEFAULT_ENABLED_CCD_MODE` |
+| `@fourjs/physics` | `CCDMode, RigidBodyDescriptor` |
 
 **Exports:**
 - Functions: `resolveCcdMode`
@@ -3520,10 +3520,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Quaternion, Vector3` |
-| `@four/physics` | `ALL_COLLISION_GROUPS, resolveAngularVelocity, resolveRotation` |
-| `@four/physics` | `AngularVelocityInput, BodyType, CollisionShape, RotationInput, Vector3Input` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Quaternion, Vector3` |
+| `@fourjs/physics` | `ALL_COLLISION_GROUPS, resolveAngularVelocity, resolveRotation` |
+| `@fourjs/physics` | `AngularVelocityInput, BodyType, CollisionShape, RotationInput, Vector3Input` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3542,10 +3542,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Matrix3, Quaternion, Vector3` |
-| `@four/physics` | `ALL_COLLISION_GROUPS, resolveAngularVelocity, resolveRotation` |
-| `@four/physics` | `AngularVelocityInput, BodyType, CollisionShape, RotationInput, Vector3Input` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Matrix3, Quaternion, Vector3` |
+| `@fourjs/physics` | `ALL_COLLISION_GROUPS, resolveAngularVelocity, resolveRotation` |
+| `@fourjs/physics` | `AngularVelocityInput, BodyType, CollisionShape, RotationInput, Vector3Input` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3560,7 +3560,7 @@ graph LR
 
 ---
 
-### `packages/physics-rapier/src/index.ts` - `@four/physics-rapier` — the Rapier solver adapters (§37, §102, §108).
+### `packages/physics-rapier/src/index.ts` - `@fourjs/physics-rapier` — the Rapier solver adapters (§37, §102, §108).
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3628,11 +3628,11 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Quaternion, Vector3` |
-| `@four/math` | `Matrix3` |
-| `@four/physics` | `ALL_COLLISION_GROUPS, DEFAULT_FRICTION, DEFAULT_RESTITUTION, DETERMINISM_LEVELS, passesQueryFilter, resolveDensity, resolveGravity, resolveQueryOptions, resolveSleepingConfig, sortHitsByDistance, validateColliderDescriptor, validateJointDescriptor, validatePhysicsWorldOptions, validateQueryShape, validateRigidBodyDescriptor, rejectStalePhysicsHandle` |
-| `@four/physics` | `AngularVelocityInput, BodyType, CCDMode, ColliderDescriptor, ContactPoint, JointDescriptor, ShippedJointType, SolverBodyTuningAccess, SolverJointAccess, SolverJointMotor, OverlapHit, OverlapQuery, PhysicsBodyHandle, PhysicsCapabilities, PhysicsColliderHandle, PhysicsDimension, PhysicsEvent, PhysicsJointHandle, PhysicsSolverAdapter, PhysicsWorldOptions, PointHit, PointQuery, QueryCandidate, RaycastHit, RaycastQuery, ResolvedQueryOptions, RigidBodyDescriptor, RotationInput, ShapeCastHit, ShapeCastQuery, SleepingConfig, Vector3Input` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Quaternion, Vector3` |
+| `@fourjs/math` | `Matrix3` |
+| `@fourjs/physics` | `ALL_COLLISION_GROUPS, DEFAULT_FRICTION, DEFAULT_RESTITUTION, DETERMINISM_LEVELS, passesQueryFilter, resolveDensity, resolveGravity, resolveQueryOptions, resolveSleepingConfig, sortHitsByDistance, validateColliderDescriptor, validateJointDescriptor, validatePhysicsWorldOptions, validateQueryShape, validateRigidBodyDescriptor, rejectStalePhysicsHandle` |
+| `@fourjs/physics` | `AngularVelocityInput, BodyType, CCDMode, ColliderDescriptor, ContactPoint, JointDescriptor, ShippedJointType, SolverBodyTuningAccess, SolverJointAccess, SolverJointMotor, OverlapHit, OverlapQuery, PhysicsBodyHandle, PhysicsCapabilities, PhysicsColliderHandle, PhysicsDimension, PhysicsEvent, PhysicsJointHandle, PhysicsSolverAdapter, PhysicsWorldOptions, PointHit, PointQuery, QueryCandidate, RaycastHit, RaycastQuery, ResolvedQueryOptions, RigidBodyDescriptor, RotationInput, ShapeCastHit, ShapeCastQuery, SleepingConfig, Vector3Input` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3654,11 +3654,11 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Quaternion, Vector3` |
-| `@four/math` | `Matrix3` |
-| `@four/physics` | `ALL_COLLISION_GROUPS, DEFAULT_FRICTION, DEFAULT_RESTITUTION, DETERMINISM_LEVELS, passesQueryFilter, resolveDensity, resolveGravity, resolveQueryOptions, resolveSleepingConfig, sortHitsByDistance, validateColliderDescriptor, validateJointDescriptor, validatePhysicsWorldOptions, validateQueryShape, validateRigidBodyDescriptor, rejectStalePhysicsHandle` |
-| `@four/physics` | `AngularVelocityInput, BodyType, CCDMode, ColliderDescriptor, ContactPoint, JointDescriptor, OverlapHit, OverlapQuery, PhysicsBodyHandle, PhysicsCapabilities, PhysicsColliderHandle, PhysicsDimension, PhysicsEvent, PhysicsJointHandle, PhysicsSolverAdapter, PhysicsWorldOptions, PointHit, PointQuery, QueryCandidate, RaycastHit, RaycastQuery, ResolvedQueryOptions, RigidBodyDescriptor, RotationInput, ShapeCastHit, ShapeCastQuery, ShippedJointType, SleepingConfig, SolverBodyTuningAccess, SolverJointAccess, SolverJointMotor, Vector3Input` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Quaternion, Vector3` |
+| `@fourjs/math` | `Matrix3` |
+| `@fourjs/physics` | `ALL_COLLISION_GROUPS, DEFAULT_FRICTION, DEFAULT_RESTITUTION, DETERMINISM_LEVELS, passesQueryFilter, resolveDensity, resolveGravity, resolveQueryOptions, resolveSleepingConfig, sortHitsByDistance, validateColliderDescriptor, validateJointDescriptor, validatePhysicsWorldOptions, validateQueryShape, validateRigidBodyDescriptor, rejectStalePhysicsHandle` |
+| `@fourjs/physics` | `AngularVelocityInput, BodyType, CCDMode, ColliderDescriptor, ContactPoint, JointDescriptor, OverlapHit, OverlapQuery, PhysicsBodyHandle, PhysicsCapabilities, PhysicsColliderHandle, PhysicsDimension, PhysicsEvent, PhysicsJointHandle, PhysicsSolverAdapter, PhysicsWorldOptions, PointHit, PointQuery, QueryCandidate, RaycastHit, RaycastQuery, ResolvedQueryOptions, RigidBodyDescriptor, RotationInput, ShapeCastHit, ShapeCastQuery, ShippedJointType, SleepingConfig, SolverBodyTuningAccess, SolverJointAccess, SolverJointMotor, Vector3Input` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3679,7 +3679,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/physics` | `registerSolver, PhysicsWorldAdapter, PhysicsWorldOptions, SolverRegistry` |
+| `@fourjs/physics` | `registerSolver, PhysicsWorldAdapter, PhysicsWorldOptions, SolverRegistry` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3712,10 +3712,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/geometry` | `BufferGeometry` |
-| `@four/materials` | `MaterialTexture, SpriteMaterial, UnlitMaterial` |
-| `@four/math` | `ColorRGBA` |
-| `@four/scene` | `ALL_LAYERS, LayerMask` |
+| `@fourjs/geometry` | `BufferGeometry` |
+| `@fourjs/materials` | `MaterialTexture, SpriteMaterial, UnlitMaterial` |
+| `@fourjs/math` | `ColorRGBA` |
+| `@fourjs/scene` | `ALL_LAYERS, LayerMask` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3738,8 +3738,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/geometry` | `BufferGeometry` |
-| `@four/math` | `Matrix4, Vector3` |
+| `@fourjs/geometry` | `BufferGeometry` |
+| `@fourjs/math` | `Matrix4, Vector3` |
 
 **Exports:**
 - Interfaces: `BoundingSphere`
@@ -3752,7 +3752,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `defineCapability` |
+| `@fourjs/core` | `defineCapability` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3771,8 +3771,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, devWarn` |
-| `@four/materials` | `StencilFunc, StencilOp` |
+| `@fourjs/core` | `DEV, devWarn` |
+| `@fourjs/materials` | `StencilFunc, StencilOp` |
 
 **Exports:**
 - Classes: `ClipPlaneAllocator`
@@ -3786,7 +3786,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3814,7 +3814,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/materials` | `SHADER_VALUE_COMPONENTS, analyzeShaderGraph, ShaderGraph` |
+| `@fourjs/materials` | `SHADER_VALUE_COMPONENTS, analyzeShaderGraph, ShaderGraph` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3835,8 +3835,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/materials` | `MAX_SHADER_GRAPH_NODES, MAX_SHADER_GRAPH_TEXTURES, SHADER_ATTRIBUTE_TYPES, SHADER_VALUE_COMPONENTS, analyzeShaderGraph, forEachShaderNodeReference` |
-| `@four/materials` | `ShaderAttributeName, ShaderBinaryOp, ShaderDomain, ShaderGraph, ShaderGraphAnalysis, ShaderNode, ShaderNodeId, ShaderReflection, ShaderTextureReflection, ShaderUnaryOp, ShaderUniformReflection, ShaderValueType` |
+| `@fourjs/materials` | `MAX_SHADER_GRAPH_NODES, MAX_SHADER_GRAPH_TEXTURES, SHADER_ATTRIBUTE_TYPES, SHADER_VALUE_COMPONENTS, analyzeShaderGraph, forEachShaderNodeReference` |
+| `@fourjs/materials` | `ShaderAttributeName, ShaderBinaryOp, ShaderDomain, ShaderGraph, ShaderGraphAnalysis, ShaderNode, ShaderNodeId, ShaderReflection, ShaderTextureReflection, ShaderUnaryOp, ShaderUniformReflection, ShaderValueType` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3906,9 +3906,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, devWarnOnce` |
-| `@four/math` | `Matrix4, Vector3` |
-| `@four/scene` | `Node` |
+| `@fourjs/core` | `DEV, devWarnOnce` |
+| `@fourjs/math` | `Matrix4, Vector3` |
+| `@fourjs/scene` | `Node` |
 
 **Exports:**
 - Interfaces: `DirectionalLightSource`, `DirectionalShadowSource`, `PunctualLightSourceBase`, `PointLightSource`, `SpotLightSource`, `AmbientLightSource`, `SceneLights`
@@ -3923,9 +3923,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/materials` | `Material` |
-| `@four/scene` | `Bone, MorphWeights, Skeleton, Node` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/materials` | `Material` |
+| `@fourjs/scene` | `Bone, MorphWeights, Skeleton, Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3944,8 +3944,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/geometry` | `BufferGeometry` |
-| `@four/math` | `Vector3` |
+| `@fourjs/geometry` | `BufferGeometry` |
+| `@fourjs/math` | `Vector3` |
 
 **Exports:**
 - Interfaces: `ParticleDrawable`
@@ -3959,9 +3959,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `Matrix4` |
-| `@four/scene` | `Node, Viewport` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `Matrix4` |
+| `@fourjs/scene` | `Node, Viewport` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3981,9 +3981,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, Disposable` |
-| `@four/materials` | `MaterialTexture` |
-| `@four/math` | `ColorSpace` |
+| `@fourjs/core` | `FourError, Disposable` |
+| `@fourjs/materials` | `MaterialTexture` |
+| `@fourjs/math` | `ColorSpace` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4003,7 +4003,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Rectangle2` |
+| `@fourjs/math` | `Rectangle2` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4021,8 +4021,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/scene` | `Node, Viewport` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/scene` | `Node, Viewport` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4044,11 +4044,11 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, devWarnOnce` |
-| `@four/geometry` | `BufferGeometry` |
-| `@four/math` | `Matrix4, Quaternion, Vector3` |
-| `@four/materials` | `LitMaterial, Material, NodeMaterial, SpriteMaterial, StandardMaterial, UnlitMaterial` |
-| `@four/scene` | `ALL_LAYERS, DEFAULT_LAYER_MASK, assertLayerMask, isLayerMask, layersMatch, LayerMask, Node, PoseBuffer, Skeleton, Viewport` |
+| `@fourjs/core` | `DEV, devWarnOnce` |
+| `@fourjs/geometry` | `BufferGeometry` |
+| `@fourjs/math` | `Matrix4, Quaternion, Vector3` |
+| `@fourjs/materials` | `LitMaterial, Material, NodeMaterial, SpriteMaterial, StandardMaterial, UnlitMaterial` |
+| `@fourjs/scene` | `ALL_LAYERS, DEFAULT_LAYER_MASK, assertLayerMask, isLayerMask, layersMatch, LayerMask, Node, PoseBuffer, Skeleton, Viewport` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4085,9 +4085,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
-| `@four/materials` | `MaterialTexture` |
-| `@four/math` | `ColorSpace` |
+| `@fourjs/core` | `Disposable` |
+| `@fourjs/materials` | `MaterialTexture` |
+| `@fourjs/math` | `ColorSpace` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4108,9 +4108,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/geometry` | `BufferGeometry` |
-| `@four/materials` | `LitMaterial, Material, UnlitMaterial` |
-| `@four/scene` | `Node` |
+| `@fourjs/geometry` | `BufferGeometry` |
+| `@fourjs/materials` | `LitMaterial, Material, UnlitMaterial` |
+| `@fourjs/scene` | `Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4129,7 +4129,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4150,10 +4150,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
-| `@four/core` | `EventEmitter, FourError` |
-| `@four/math` | `Rectangle2` |
-| `@four/scene` | `Node, PoseBuffer, Viewport` |
+| `@fourjs/core` | `Disposable` |
+| `@fourjs/core` | `EventEmitter, FourError` |
+| `@fourjs/math` | `Rectangle2` |
+| `@fourjs/scene` | `Node, PoseBuffer, Viewport` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4176,7 +4176,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, disposeTracked, trackDisposable` |
+| `@fourjs/core` | `DEV, disposeTracked, trackDisposable` |
 
 **Exports:**
 - Functions: `noteTexture`, `noteRenderTarget`, `textureMemoryBytes`, `liveTextureCount`, `liveRenderTargetCount`, `trackRenderDisposable`, `releaseRenderDisposable`
@@ -4188,7 +4188,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, devWarnOnce` |
+| `@fourjs/core` | `DEV, devWarnOnce` |
 
 **Exports:**
 - Types: `DisposedResourceKind`
@@ -4209,9 +4209,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/materials` | `NodeMaterialBuilder, Material, MaterialTexture, ShaderExpression` |
-| `@four/math` | `ColorRGBA` |
-| `@four/geometry` | `Point2D` |
+| `@fourjs/materials` | `NodeMaterialBuilder, Material, MaterialTexture, ShaderExpression` |
+| `@fourjs/math` | `ColorRGBA` |
+| `@fourjs/geometry` | `Point2D` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4228,10 +4228,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
-| `@four/geometry` | `BufferGeometry, DEFAULT_FLATTEN_TOLERANCE, expandStroke, Path, triangulatePolygon, GeometryIndexArray, PathFillRings, Point2D, StrokeAlignment, StrokeLineCap, StrokeLineJoin, StrokeMesh` |
-| `@four/materials` | `Material, MaterialTexture` |
-| `@four/math` | `ColorRGBA` |
+| `@fourjs/core` | `Disposable` |
+| `@fourjs/geometry` | `BufferGeometry, DEFAULT_FLATTEN_TOLERANCE, expandStroke, Path, triangulatePolygon, GeometryIndexArray, PathFillRings, Point2D, StrokeAlignment, StrokeLineCap, StrokeLineJoin, StrokeMesh` |
+| `@fourjs/materials` | `Material, MaterialTexture` |
+| `@fourjs/math` | `ColorRGBA` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4251,10 +4251,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
-| `@four/geometry` | `BufferGeometry` |
-| `@four/math` | `Vector2` |
-| `@four/materials` | `SpriteMaterial` |
+| `@fourjs/core` | `Disposable` |
+| `@fourjs/geometry` | `BufferGeometry` |
+| `@fourjs/math` | `Vector2` |
+| `@fourjs/materials` | `SpriteMaterial` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4281,9 +4281,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, Disposable` |
-| `@four/materials` | `MaterialTextureFilter, MaterialTextureMinFilter, MaterialTextureWrap, SpriteTexture` |
-| `@four/math` | `ColorSpace` |
+| `@fourjs/core` | `FourError, Disposable` |
+| `@fourjs/materials` | `MaterialTextureFilter, MaterialTextureMinFilter, MaterialTextureWrap, SpriteTexture` |
+| `@fourjs/math` | `ColorSpace` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4303,8 +4303,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Frustum, Matrix4, Vector3` |
-| `@four/scene` | `layersMatch, Viewport` |
+| `@fourjs/math` | `Frustum, Matrix4, Vector3` |
+| `@fourjs/scene` | `layersMatch, Viewport` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4344,13 +4344,13 @@ graph LR
 
 ## Packages/render webgl Dependencies
 
-### `packages/render-webgl/src/gl-batch.ts` - §65 batching for the WebGL 2 backend — the GPU half of `@four/render`'s
+### `packages/render-webgl/src/gl-batch.ts` - §65 batching for the WebGL 2 backend — the GPU half of `@fourjs/render`'s
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix4` |
-| `@four/render` | `RenderBatcher, RenderBatch, RenderBatchOptions, RenderItem` |
+| `@fourjs/math` | `Matrix4` |
+| `@fourjs/render` | `RenderBatcher, RenderBatch, RenderBatchOptions, RenderItem` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4369,7 +4369,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
+| `@fourjs/core` | `Disposable` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4387,8 +4387,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `RenderItem` |
-| `@four/render` | `warnDisposedInUse` |
+| `@fourjs/render` | `RenderItem` |
+| `@fourjs/render` | `warnDisposedInUse` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4421,9 +4421,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, devWarnOnce, Disposable` |
-| `@four/math` | `Matrix4` |
-| `@four/render` | `analyzeShaderGraph, ShaderAttributeName, ShaderDomain, ShaderGraph, ShaderGraphAnalysis, ShaderNode, ShaderUniformReflection, ShaderValueType` |
+| `@fourjs/core` | `DEV, devWarnOnce, Disposable` |
+| `@fourjs/math` | `Matrix4` |
+| `@fourjs/render` | `analyzeShaderGraph, ShaderAttributeName, ShaderDomain, ShaderGraph, ShaderGraphAnalysis, ShaderNode, ShaderUniformReflection, ShaderValueType` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4443,9 +4443,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
-| `@four/math` | `Matrix4` |
-| `@four/render` | `PARTICLE_COLOR_OFFSET, PARTICLE_INSTANCE_FLOATS, PARTICLE_POSITION_OFFSET, PARTICLE_ROTATION_OFFSET, PARTICLE_SIZE_OFFSET, PARTICLE_SOFTNESS_OFFSET, PARTICLE_WIDE_INSTANCE_FLOATS, TRAIL_COLOR_OFFSET, TRAIL_POSITION_OFFSET, TRAIL_VERTEX_FLOATS, ParticleRenderItem` |
+| `@fourjs/core` | `Disposable` |
+| `@fourjs/math` | `Matrix4` |
+| `@fourjs/render` | `PARTICLE_COLOR_OFFSET, PARTICLE_INSTANCE_FLOATS, PARTICLE_POSITION_OFFSET, PARTICLE_ROTATION_OFFSET, PARTICLE_SIZE_OFFSET, PARTICLE_SOFTNESS_OFFSET, PARTICLE_WIDE_INSTANCE_FLOATS, TRAIL_COLOR_OFFSET, TRAIL_POSITION_OFFSET, TRAIL_VERTEX_FLOATS, ParticleRenderItem` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4465,7 +4465,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `PickingService` |
+| `@fourjs/render` | `PickingService` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4485,9 +4485,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, FourError, devWarnOnce` |
-| `@four/math` | `Frustum, Matrix4` |
-| `@four/render` | `RenderTarget, assertEncodableCandidateCount, buildRenderList, buildViewRenderList, collectPickCandidates, decodePickId, encodePickId, PickRequest, PickResult, PickingService, RenderItem, RenderItemClip, RenderItemStencil` |
+| `@fourjs/core` | `DEV, FourError, devWarnOnce` |
+| `@fourjs/math` | `Frustum, Matrix4` |
+| `@fourjs/render` | `RenderTarget, assertEncodableCandidateCount, buildRenderList, buildViewRenderList, collectPickCandidates, decodePickId, encodePickId, PickRequest, PickResult, PickingService, RenderItem, RenderItemClip, RenderItemStencil` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4509,9 +4509,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, Disposable` |
-| `@four/math` | `Matrix4, Vector3` |
-| `@four/render` | `MAX_PUNCTUAL_LIGHTS, SceneLights` |
+| `@fourjs/core` | `FourError, Disposable` |
+| `@fourjs/math` | `Matrix4, Vector3` |
+| `@fourjs/render` | `MAX_PUNCTUAL_LIGHTS, SceneLights` |
 
 **Exports:**
 - Classes: `PunctualLightUniforms`, `ShadowUniforms`, `UnlitProgram`, `SpriteProgram`, `LitProgram`
@@ -4527,8 +4527,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `RenderTarget` |
-| `@four/render` | `warnDisposedInUse` |
+| `@fourjs/render` | `RenderTarget` |
+| `@fourjs/render` | `warnDisposedInUse` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4547,8 +4547,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
-| `@four/math` | `Matrix4` |
+| `@fourjs/core` | `Disposable` |
+| `@fourjs/math` | `Matrix4` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4565,8 +4565,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix4` |
-| `@four/render` | `SceneLights` |
+| `@fourjs/math` | `Matrix4` |
+| `@fourjs/render` | `SceneLights` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4584,9 +4584,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
-| `@four/math` | `Matrix4` |
-| `@four/render` | `MAX_SKINNING_JOINTS, SceneLights` |
+| `@fourjs/core` | `Disposable` |
+| `@fourjs/math` | `Matrix4` |
+| `@fourjs/render` | `MAX_SKINNING_JOINTS, SceneLights` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4605,9 +4605,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
-| `@four/math` | `Matrix4, Vector3` |
-| `@four/render` | `SceneLights` |
+| `@fourjs/core` | `Disposable` |
+| `@fourjs/math` | `Matrix4, Vector3` |
+| `@fourjs/render` | `SceneLights` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4624,8 +4624,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `SpriteRenderItem` |
-| `@four/render` | `warnDisposedInUse` |
+| `@fourjs/render` | `SpriteRenderItem` |
+| `@fourjs/render` | `warnDisposedInUse` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4639,7 +4639,7 @@ graph LR
 
 ---
 
-### `packages/render-webgl/src/index.ts` - `@four/render-webgl` — the WebGL 2 backend (§62 backend 2, §120's MVP tier).
+### `packages/render-webgl/src/index.ts` - `@fourjs/render-webgl` — the WebGL 2 backend (§62 backend 2, §120's MVP tier).
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4686,8 +4686,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix4` |
-| `@four/render` | `NodeRenderItem, ShaderGraph` |
+| `@fourjs/math` | `Matrix4` |
+| `@fourjs/render` | `NodeRenderItem, ShaderGraph` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4707,7 +4707,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `registerRenderer, RendererOptions, RendererRegistry` |
+| `@fourjs/render` | `registerRenderer, RendererOptions, RendererRegistry` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4724,9 +4724,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, devWarnOnce, EventEmitter, FourError` |
-| `@four/math` | `Frustum, Matrix4, Rectangle2` |
-| `@four/render` | `MAX_SKINNING_JOINTS, RenderTarget, buildInterpolatedRenderList, buildRenderList, buildViewRenderList, collectSceneLights, createSceneLights, isLitItem, isNodeItem, isParticlesItem, isRenderTargetTexture, isSkinnedLitItem, isSkinnedUnlitItem, isSpriteItem, isStandardItem, intersectScissor, validateReadbackRegion, COLOR_GRADE_DEFAULTS, EffectRenderPass, GraphEffect, PickingService, RenderItem, RenderItemKind, RenderStatistics, Renderer, RendererCapabilities, ScissorRect, RendererEventMap, RendererOptions, ScreenEffectRenderer` |
+| `@fourjs/core` | `DEV, devWarnOnce, EventEmitter, FourError` |
+| `@fourjs/math` | `Frustum, Matrix4, Rectangle2` |
+| `@fourjs/render` | `MAX_SKINNING_JOINTS, RenderTarget, buildInterpolatedRenderList, buildRenderList, buildViewRenderList, collectSceneLights, createSceneLights, isLitItem, isNodeItem, isParticlesItem, isRenderTargetTexture, isSkinnedLitItem, isSkinnedUnlitItem, isSpriteItem, isStandardItem, intersectScissor, validateReadbackRegion, COLOR_GRADE_DEFAULTS, EffectRenderPass, GraphEffect, PickingService, RenderItem, RenderItemKind, RenderStatistics, Renderer, RendererCapabilities, ScissorRect, RendererEventMap, RendererOptions, ScreenEffectRenderer` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4755,7 +4755,7 @@ graph LR
 
 ## Packages/render webgpu Dependencies
 
-### `packages/render-webgpu/src/index.ts` - `@four/render-webgpu` — the WebGPU backend (§62 backend 1).
+### `packages/render-webgpu/src/index.ts` - `@fourjs/render-webgpu` — the WebGPU backend (§62 backend 1).
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4809,7 +4809,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `registerRenderer, RendererOptions, RendererRegistry` |
+| `@fourjs/render` | `registerRenderer, RendererOptions, RendererRegistry` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4836,10 +4836,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, EventEmitter, FourError, devWarnOnce` |
-| `@four/math` | `Frustum, Matrix4, Rectangle2` |
-| `@four/render` | `COLOR_GRADE_DEFAULTS, RenderTarget, buildInterpolatedRenderList, buildRenderList, buildViewRenderList, collectSceneLights, createSceneLights, isRenderTargetTexture, intersectScissor, validateReadbackRegion, EffectRenderPass, RenderBatch, RenderInterpolation, RenderItem, RenderStatistics, Renderer, RendererCapabilities, RendererEventMap, RendererOptions, ScissorRect` |
-| `@four/scene` | `Node, Viewport` |
+| `@fourjs/core` | `DEV, EventEmitter, FourError, devWarnOnce` |
+| `@fourjs/math` | `Frustum, Matrix4, Rectangle2` |
+| `@fourjs/render` | `COLOR_GRADE_DEFAULTS, RenderTarget, buildInterpolatedRenderList, buildRenderList, buildViewRenderList, collectSceneLights, createSceneLights, isRenderTargetTexture, intersectScissor, validateReadbackRegion, EffectRenderPass, RenderBatch, RenderInterpolation, RenderItem, RenderStatistics, Renderer, RendererCapabilities, RendererEventMap, RendererOptions, ScissorRect` |
+| `@fourjs/scene` | `Node, Viewport` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4871,12 +4871,12 @@ graph LR
 
 ---
 
-### `packages/render-webgpu/src/wgpu-batch.ts` - §65 batching for the WebGPU backend — the GPU half of `@four/render`'s
+### `packages/render-webgpu/src/wgpu-batch.ts` - §65 batching for the WebGPU backend — the GPU half of `@fourjs/render`'s
 
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `RenderBatcher, RenderBatch, RenderBatchOptions, RenderItem` |
+| `@fourjs/render` | `RenderBatcher, RenderBatch, RenderBatchOptions, RenderItem` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4909,8 +4909,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/render` | `COMPUTE_ENTRY_POINT, ComputeBinding, ComputeBindingAccess, ComputeBuffer, ComputePassDescriptor` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/render` | `COMPUTE_ENTRY_POINT, ComputeBinding, ComputeBindingAccess, ComputeBuffer, ComputePassDescriptor` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4946,8 +4946,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `RenderItem` |
-| `@four/render` | `warnDisposedInUse` |
+| `@fourjs/render` | `RenderItem` |
+| `@fourjs/render` | `warnDisposedInUse` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4978,7 +4978,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `MAX_PUNCTUAL_LIGHTS, SceneLights` |
+| `@fourjs/render` | `MAX_PUNCTUAL_LIGHTS, SceneLights` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5014,8 +5014,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, devWarnOnce, Disposable` |
-| `@four/render` | `SHADER_VALUE_COMPONENTS, analyzeShaderGraph, isRenderTargetTexture, GraphEffect, NodeRenderItem, RenderItem, RenderStatistics, ShaderAttributeName, ShaderDomain, ShaderGraph, ShaderGraphAnalysis, ShaderNode, ShaderUniformReflection, ShaderValueType` |
+| `@fourjs/core` | `DEV, devWarnOnce, Disposable` |
+| `@fourjs/render` | `SHADER_VALUE_COMPONENTS, analyzeShaderGraph, isRenderTargetTexture, GraphEffect, NodeRenderItem, RenderItem, RenderStatistics, ShaderAttributeName, ShaderDomain, ShaderGraph, ShaderGraphAnalysis, ShaderNode, ShaderUniformReflection, ShaderValueType` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5042,8 +5042,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix4` |
-| `@four/render` | `GraphEffect, NodeRenderItem, RenderItem, RenderStatistics` |
+| `@fourjs/math` | `Matrix4` |
+| `@fourjs/render` | `GraphEffect, NodeRenderItem, RenderItem, RenderStatistics` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5065,7 +5065,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5085,7 +5085,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `PARTICLE_COLOR_OFFSET, PARTICLE_INSTANCE_FLOATS, PARTICLE_POSITION_OFFSET, PARTICLE_ROTATION_OFFSET, PARTICLE_SIZE_OFFSET, PARTICLE_SOFTNESS_OFFSET, PARTICLE_WIDE_INSTANCE_FLOATS, ParticleRenderItem` |
+| `@fourjs/render` | `PARTICLE_COLOR_OFFSET, PARTICLE_INSTANCE_FLOATS, PARTICLE_POSITION_OFFSET, PARTICLE_ROTATION_OFFSET, PARTICLE_SIZE_OFFSET, PARTICLE_SOFTNESS_OFFSET, PARTICLE_WIDE_INSTANCE_FLOATS, ParticleRenderItem` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5106,7 +5106,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `RenderItemStencil` |
+| `@fourjs/render` | `RenderItemStencil` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5134,7 +5134,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Rectangle2` |
+| `@fourjs/math` | `Rectangle2` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5152,8 +5152,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `RenderTarget` |
-| `@four/render` | `warnDisposedInUse` |
+| `@fourjs/render` | `RenderTarget` |
+| `@fourjs/render` | `warnDisposedInUse` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5175,7 +5175,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `SceneLights` |
+| `@fourjs/render` | `SceneLights` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5228,7 +5228,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `RenderItem, RenderItemStencil` |
+| `@fourjs/render` | `RenderItem, RenderItemStencil` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5248,8 +5248,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/render` | `RenderItem` |
-| `@four/render` | `warnDisposedInUse` |
+| `@fourjs/render` | `RenderItem` |
+| `@fourjs/render` | `warnDisposedInUse` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5300,7 +5300,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix4, DepthRange` |
+| `@fourjs/math` | `Matrix4, DepthRange` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5327,7 +5327,7 @@ graph LR
 
 ---
 
-### `packages/scene/src/index.ts` - Package entry point for @four/scene (re-exports 84 symbols)
+### `packages/scene/src/index.ts` - Package entry point for @fourjs/scene (re-exports 84 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5372,7 +5372,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Quaternion, Vector3` |
+| `@fourjs/math` | `Quaternion, Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5392,7 +5392,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Exports:**
 - Interfaces: `LayeredNode`
@@ -5407,8 +5407,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix4, parseColorRGB, srgbToLinearRGB, ColorRGB, Vector3` |
-| `@four/math` | `ColorRGB` |
+| `@fourjs/math` | `Matrix4, parseColorRGB, srgbToLinearRGB, ColorRGB, Vector3` |
+| `@fourjs/math` | `ColorRGB` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5429,8 +5429,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEFAULT_SPACE_MODE, SPACE_MODES, Component, ComponentHost, JsonValue, SpaceMode` |
-| `@four/math` | `Vector3` |
+| `@fourjs/core` | `DEFAULT_SPACE_MODE, SPACE_MODES, Component, ComponentHost, JsonValue, SpaceMode` |
+| `@fourjs/math` | `Vector3` |
 
 **Exports:**
 - Classes: `NodeSpace`
@@ -5444,8 +5444,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `ComponentRegistry, EventEmitter, FourError, Component, ComponentHost, ComponentType` |
-| `@four/math` | `Quaternion, Vector3` |
+| `@fourjs/core` | `ComponentRegistry, EventEmitter, FourError, Component, ComponentHost, ComponentType` |
+| `@fourjs/math` | `Quaternion, Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5467,8 +5467,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Component, ComponentHost` |
-| `@four/math` | `Quaternion, Vector3` |
+| `@fourjs/core` | `Component, ComponentHost` |
+| `@fourjs/math` | `Quaternion, Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5485,7 +5485,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Component, ComponentType` |
+| `@fourjs/core` | `Component, ComponentType` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5503,8 +5503,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-| `@four/math` | `DepthRange` |
+| `@fourjs/core` | `FourError` |
+| `@fourjs/math` | `DepthRange` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5524,8 +5524,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, Component, ComponentHost, JsonValue` |
-| `@four/math` | `Matrix4` |
+| `@fourjs/core` | `FourError, Component, ComponentHost, JsonValue` |
+| `@fourjs/math` | `Matrix4` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5545,7 +5545,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Quaternion, Vector3` |
+| `@fourjs/math` | `Quaternion, Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5566,7 +5566,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix4, Quaternion, Vector3` |
+| `@fourjs/math` | `Matrix4, Quaternion, Vector3` |
 
 **Exports:**
 - Classes: `Transform`
@@ -5592,7 +5592,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix4` |
+| `@fourjs/math` | `Matrix4` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5615,7 +5615,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `defineCapability` |
+| `@fourjs/core` | `defineCapability` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5633,11 +5633,11 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, cloneJsonValue, parseUntrustedJson, JsonValue, UntrustedJsonLimits` |
-| `@four/scene` | `DEFAULT_TRANSFORM_AUTHORITY, TRANSFORM_AUTHORITIES, TransformAuthority` |
-| `@four/core` | `cloneJsonValue` |
-| `@four/core` | `JsonValue` |
-| `@four/core` | `UntrustedJsonLimits` |
+| `@fourjs/core` | `FourError, cloneJsonValue, parseUntrustedJson, JsonValue, UntrustedJsonLimits` |
+| `@fourjs/scene` | `DEFAULT_TRANSFORM_AUTHORITY, TRANSFORM_AUTHORITIES, TransformAuthority` |
+| `@fourjs/core` | `cloneJsonValue` |
+| `@fourjs/core` | `JsonValue` |
+| `@fourjs/core` | `UntrustedJsonLimits` |
 
 **Exports:**
 - Interfaces: `Vector3Document`, `QuaternionDocument`, `TransformDocument`, `ComponentDocument`, `SceneNodeDocument`, `SceneDocument`
@@ -5648,7 +5648,7 @@ graph LR
 
 ---
 
-### `packages/serialization/src/index.ts` - `@four/serialization` — the §79 scene document and its §80 migrations.
+### `packages/serialization/src/index.ts` - `@fourjs/serialization` — the §79 scene document and its §80 migrations.
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5672,7 +5672,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5692,9 +5692,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, Component, ComponentType` |
-| `@four/math` | `Quaternion, Vector3` |
-| `@four/scene` | `Group, Node, PoseTarget, Scene, restoreNodeId, Transform` |
+| `@fourjs/core` | `FourError, Component, ComponentType` |
+| `@fourjs/math` | `Quaternion, Vector3` |
+| `@fourjs/scene` | `Group, Node, PoseTarget, Scene, restoreNodeId, Transform` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5737,7 +5737,7 @@ graph LR
 
 ---
 
-### `packages/text/src/index.ts` - `@four/text` — bitmap text at §56's MVP tier.
+### `packages/text/src/index.ts` - `@fourjs/text` — bitmap text at §56's MVP tier.
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5778,8 +5778,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable, Unsubscribe` |
-| `@four/scene` | `Node` |
+| `@fourjs/core` | `Disposable, Unsubscribe` |
+| `@fourjs/scene` | `Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5803,7 +5803,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/input` | `ScenePointerEvent, SceneKeyEvent` |
+| `@fourjs/input` | `ScenePointerEvent, SceneKeyEvent` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5836,7 +5836,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `defineCapability` |
+| `@fourjs/core` | `defineCapability` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5867,7 +5867,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@fourjs/core` | `FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5885,7 +5885,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector2` |
+| `@fourjs/math` | `Vector2` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5899,7 +5899,7 @@ graph LR
 
 ---
 
-### `packages/ui/src/index.ts` - `@four/ui` — retained-mode UI at §113a's MVP tier (§73–§75).
+### `packages/ui/src/index.ts` - `@fourjs/ui` — retained-mode UI at §113a's MVP tier (§73–§75).
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5943,9 +5943,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Unsubscribe` |
-| `@four/input` | `SceneKeyEvent` |
-| `@four/scene` | `Node` |
+| `@fourjs/core` | `Unsubscribe` |
+| `@fourjs/input` | `SceneKeyEvent` |
+| `@fourjs/scene` | `Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5963,8 +5963,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector2` |
-| `@four/text` | `layoutText, GlyphAtlas, TextLayout` |
+| `@fourjs/math` | `Vector2` |
+| `@fourjs/text` | `layoutText, GlyphAtlas, TextLayout` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -5989,7 +5989,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Vector2` |
+| `@fourjs/math` | `Vector2` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -6022,8 +6022,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/input` | `SceneKeyEvent` |
-| `@four/scene` | `Node` |
+| `@fourjs/input` | `SceneKeyEvent` |
+| `@fourjs/scene` | `Node` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -6042,9 +6042,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/input` | `ScenePointerEvent, SceneKeyEvent` |
-| `@four/math` | `Matrix4, Vector3` |
-| `@four/scene` | `resolveWorldTransform` |
+| `@fourjs/input` | `ScenePointerEvent, SceneKeyEvent` |
+| `@fourjs/math` | `Matrix4, Vector3` |
+| `@fourjs/scene` | `resolveWorldTransform` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -6064,10 +6064,10 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable, Unsubscribe` |
-| `@four/input` | `Pickable, ScenePointerEvent` |
-| `@four/math` | `Vector2, Vector3` |
-| `@four/scene` | `Node, warnAuthorityConflict, NodeOptions` |
+| `@fourjs/core` | `Disposable, Unsubscribe` |
+| `@fourjs/input` | `Pickable, ScenePointerEvent` |
+| `@fourjs/math` | `Vector2, Vector3` |
+| `@fourjs/scene` | `Node, warnAuthorityConflict, NodeOptions` |
 
 **Exports:**
 - Classes: `Insets`
@@ -6113,7 +6113,7 @@ graph LR
 | `packages/math/src/index` | 10 files | 0 files |
 | `packages/render/src/render-list` | 6 files | 4 files |
 | `packages/render/src/render-target` | 2 files | 8 files |
-| `packages/four/src/index` | 9 files | 0 files |
+| `packages/fourJS/src/index` | 9 files | 0 files |
 | `packages/geometry/src/index` | 9 files | 0 files |
 | `packages/motion/src/serializers` | 8 files | 1 file |
 | `packages/physics/src/serializers` | 8 files | 1 file |

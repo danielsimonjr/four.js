@@ -2,7 +2,7 @@
  * §21 local-plane basis and mapping, independent of a solver.
  */
 
-import { Quaternion, Vector3 } from "@four/math";
+import { Quaternion, Vector3 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

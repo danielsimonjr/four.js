@@ -78,7 +78,7 @@
  * pose, since nothing else moves a body between steps) as "previous". A second
  * capture from inside the physics step would shift the pair twice per step and
  * flatten interpolation to a constant, which is the artefact §43 exists to
- * remove. See `@four/scene`'s `interpolation.ts`, which states the same
+ * remove. See `@fourjs/scene`'s `interpolation.ts`, which states the same
  * arrangement from the buffer's side.
  *
  * An application that drives a world without the snapshot system gets no
@@ -136,19 +136,19 @@ import {
   DEFAULT_SPACE_MODE,
   FourError,
   isSimulationSpaceMode,
-} from "@four/core";
-import { Quaternion, Vector2, Vector3 } from "@four/math";
+} from "@fourjs/core";
+import { Quaternion, Vector2, Vector3 } from "@fourjs/math";
 import {
   PRIORITY_ANIMATION_TARGETS,
   type SimulationSystem,
-} from "@four/motion";
+} from "@fourjs/motion";
 import {
   PoseTarget,
   warnAuthorityConflict,
   type Node,
   type PoseBuffer,
   type TransformAuthority,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 import type {
   PhysicsSolverAdapter,
@@ -362,7 +362,7 @@ export interface PhysicsWorldInit extends PhysicsWorldOptions {
 
   /**
    * §20's `solver: "auto"` — or one §102 solver by name — resolved through
-   * `@four/physics`'s solver registry (PH-19, 2026-08-07).
+   * `@fourjs/physics`'s solver registry (PH-19, 2026-08-07).
    *
    * The alternative to {@link PhysicsWorldInit.adapter}, and the reason it took
    * this long: resolving a name means *something* has to map it to a class, and
@@ -372,7 +372,7 @@ export interface PhysicsWorldInit extends PhysicsWorldOptions {
    * this option resolves against whatever the application actually imported:
    *
    * ```ts
-   * import { registerRapierSolver } from "@four/physics-rapier";
+   * import { registerRapierSolver } from "@fourjs/physics-rapier";
    *
    * registerRapierSolver();
    * const world = new PhysicsWorld({ dimension: "3d", solver: "auto" });
@@ -401,8 +401,8 @@ export interface PhysicsWorldInit extends PhysicsWorldOptions {
    * (`"unsupported"`, `"dimension"`, `"determinism"`).
    *
    * The solver-side twin of §62's fallback diagnostics event, delivered as a
-   * callback for the same reason: the frozen §3.1 matrix gives `@four/physics`
-   * no `@four/diagnostics` edge, so the report is handed to the application to
+   * callback for the same reason: the frozen §3.1 matrix gives `@fourjs/physics`
+   * no `@fourjs/diagnostics` edge, so the report is handed to the application to
    * route. Unread for an instance or a named solver.
    */
   onSolverReject?: (report: SolverRejectionReport) => void;
@@ -632,7 +632,7 @@ interface JointRegistration {
 /**
  * Quantizes one value to §33's 1e-6 grid, normalizing `-0` to `+0` first.
  *
- * Identical to `@four/diagnostics`'s D6 hasher, which `@four/physics` may not
+ * Identical to `@fourjs/diagnostics`'s D6 hasher, which `@fourjs/physics` may not
  * import (the frozen dependency matrix gives this package core, math, scene, and
  * motion only). The two implementations must agree byte for byte; see
  * {@link PhysicsWorld.checksum}.
@@ -2462,8 +2462,8 @@ export class PhysicsWorld {
    * §33 says "each existing body".
    *
    * The algorithm is D6's, byte for byte identical to
-   * `@four/diagnostics`'s `hashFloats`; it is re-implemented here because the
-   * frozen dependency matrix gives `@four/physics` core, math, scene, and motion
+   * `@fourjs/diagnostics`'s `hashFloats`; it is re-implemented here because the
+   * frozen dependency matrix gives `@fourjs/physics` core, math, scene, and motion
    * only. `tests/world.test.ts` pins the digest of a known world so the two
    * cannot drift apart silently.
    *
@@ -3017,7 +3017,7 @@ export class PhysicsWorld {
    *   through that basis (§21). The default plane is world XY, so a `"2d"`
    *   world that never names a plane gets an identity map.
    *
-   * `@four/core`'s `isSimulationSpaceMode` still answers §8's question — world
+   * `@fourjs/core`'s `isSimulationSpaceMode` still answers §8's question — world
    * and local-plane pass, presentation frames fail.
    */
   #requireSimulationSpace(node: Node, body: RigidBody): void {
@@ -3782,7 +3782,7 @@ export class PhysicsWorld {
    *
    * The transform is written **only for a dynamic body and only under
    * `"physics"` authority**: §42 gives a transform exactly one owner, and the
-   * enforcement is the one `@four/scene` documents — the non-owner's write is
+   * enforcement is the one `@fourjs/scene` documents — the non-owner's write is
    * refused and reported once per node per writer, so the owner keeps the
    * transform. The solved pose goes straight into the node's own
    * `position`/`rotation`, which fires plan D3's change hooks and advances

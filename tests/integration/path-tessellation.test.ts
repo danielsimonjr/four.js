@@ -39,7 +39,7 @@ import {
   polygonGeometry2D,
   triangulatePolygon,
   type Point2D,
-} from "@four/geometry";
+} from "@fourjs/geometry";
 import { describe, expect, it } from "vitest";
 
 /** The tolerance every shape here is flattened at, in world units. */

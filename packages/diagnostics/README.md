@@ -1,4 +1,4 @@
-# @four/diagnostics
+# @fourjs/diagnostics
 
 Diagnostics, determinism checksums, replay, and debug-draw data. Part of [fourJS](../../README.md).
 
@@ -19,4 +19,4 @@ Read the exported `DEBUG_DRAW_STAGED` list for dated, per-item reasons: joint-an
 
 Unit tests are colocated in `tests/` per §92.
 
-Workspace name `@four/diagnostics`; publishes as `@danielsimonjr/fourjs-diagnostics`.
+Workspace name `@fourjs/diagnostics`; publishes as `@danielsimonjr/fourjs-diagnostics`.

@@ -89,7 +89,7 @@
  *
  * ## Clip depth (§3.3.8 of the R-1 plan)
  *
- * WebGPU's NDC depth is `[0, 1]`; `@four/math`'s projections are written to
+ * WebGPU's NDC depth is `[0, 1]`; `@fourjs/math`'s projections are written to
  * WebGL's `[-1, 1]`. `Camera.updateProjectionMatrix` accepts `"zero-to-one"`
  * and would produce a native matrix — and this backend deliberately does not
  * call it. A renderer that rewrote an application-owned camera's projection
@@ -101,8 +101,8 @@
  * it.
  */
 
-import { DEV, EventEmitter, FourError, devWarnOnce } from "@four/core";
-import { Frustum, Matrix4, type Rectangle2 } from "@four/math";
+import { DEV, EventEmitter, FourError, devWarnOnce } from "@fourjs/core";
+import { Frustum, Matrix4, type Rectangle2 } from "@fourjs/math";
 import {
   COLOR_GRADE_DEFAULTS,
   RenderTarget,
@@ -124,8 +124,8 @@ import {
   type RendererEventMap,
   type RendererOptions,
   type ScissorRect,
-} from "@four/render";
-import type { Node, Viewport } from "@four/scene";
+} from "@fourjs/render";
+import type { Node, Viewport } from "@fourjs/scene";
 
 import {
   GPU_BUFFER_USAGE,
@@ -823,7 +823,7 @@ export class WebgpuRenderer implements Renderer {
    * that never calls `createWgpuBatching` never links it.
    *
    * ```ts
-   * import { createWgpuBatching } from "@four/render-webgpu";
+   * import { createWgpuBatching } from "@fourjs/render-webgpu";
    * renderer.batching = createWgpuBatching();
    * ```
    */
@@ -2056,7 +2056,7 @@ export class WebgpuRenderer implements Renderer {
   /**
    * Draws one §70 full-screen effect (WP-R1.6) — `pass.source`'s colour
    * attachment over the whole of `pass.target`, or of the swap chain, through
-   * `pass.effect`. The normative contract is on `@four/render`'s
+   * `pass.effect`. The normative contract is on `@fourjs/render`'s
    * `Renderer.renderEffect`; the GL backend's method documents the shared
    * readings and this one differs in exactly two ways, both structural:
    *
@@ -2249,7 +2249,7 @@ export class WebgpuRenderer implements Renderer {
    * Reads back `target`'s colour attachment — or the `region` rectangle of it
    * — as tightly packed RGBA8 bytes: §61's `readPixels` (WP-R1.6 shipped the
    * whole-target form; the region form arrived 2026-08-29 with `Rectangle2`
-   * in `@four/math`, RFC 0005's named prerequisite, cleared).
+   * in `@fourjs/math`, RFC 0005's named prerequisite, cleared).
    *
    * **Asynchronous, honestly and permanently.** WebGPU has no synchronous
    * readback — `copyTextureToBuffer` + `mapAsync` is the only path (probe-
@@ -2273,7 +2273,7 @@ export class WebgpuRenderer implements Renderer {
    * `UNSUPPORTED_GPU_FEATURE` on a device double without the readback entry
    * points (their presence is the capability — `webgpu-device.ts`). A
    * malformed region — fractional, empty, or hanging off the target — rejects
-   * with `validateReadbackRegion`'s `RangeError` (§85, `@four/render`'s
+   * with `validateReadbackRegion`'s `RangeError` (§85, `@fourjs/render`'s
    * shared check, so both backends refuse with the same words).
    */
   async readPixels(
@@ -2370,7 +2370,7 @@ export class WebgpuRenderer implements Renderer {
    * `@group(0)` in array order, and submits the dispatch.
    *
    * **This is `Renderer.compute?()`** — the R-1 plan's Q3 promotion,
-   * executed 2026-08-29: the descriptor now lives in `@four/render`
+   * executed 2026-08-29: the descriptor now lives in `@fourjs/render`
    * (`compute.ts` there owns the story) and this method implements the
    * optional interface member. Presence is the capability, the
    * `statistics`/`renderEffect` pattern: WebGL 2 has no compute and never
@@ -2538,7 +2538,7 @@ export class WebgpuRenderer implements Renderer {
             "node pipeline is registered on the WebGPU backend, so those " +
             "draws are skipped (flat colour would be a different picture). " +
             "Call registerWebgpuNodeMaterialPipeline() from " +
-            "@four/render-webgpu" +
+            "@fourjs/render-webgpu" +
             " at application setup (RFC 0001).",
         );
       }
@@ -3641,7 +3641,7 @@ export class WebgpuRenderer implements Renderer {
       // §36 GPU particle simulations (R-31 wiring): their residency died
       // with the device and there is no WebGPU restore, so the joins drop —
       // a GPU-simulated system's state does not survive device loss (the
-      // §34 posture; `@four/particles`' types.ts owns it). The application
+      // §34 posture; `@fourjs/particles`' types.ts owns it). The application
       // still owes each simulation's `dispose()`, now a defined no-op
       // device-side.
       this.#particleSimulations.clear();

@@ -3,9 +3,9 @@ import {
   Quaternion,
   resetConstructionCount,
   Vector3,
-} from "@four/math";
+} from "@fourjs/math";
 // Test-only import (WP-2.6 decision, reported to the orchestrator): §39's
-// `SystemRegistry` and the §10 `Scheduler` live in `@four/motion`, whose
+// `SystemRegistry` and the §10 `Scheduler` live in `@fourjs/motion`, whose
 // dependency edge runs motion → scene (plan §3.1). `src/interpolation.ts`
 // therefore imports nothing from motion — it restates the system shape
 // structurally — and this file imports motion **only** to prove that the
@@ -18,7 +18,7 @@ import {
   Scheduler,
   SystemRegistry,
   type SimulationSystem,
-} from "@four/motion";
+} from "@fourjs/motion";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -375,7 +375,7 @@ describe("PoseBuffer.computeRenderPose", () => {
 });
 
 describe("createSnapshotSystem", () => {
-  it("runs in the §39 snapshot slot, which is @four/motion's PRIORITY_SNAPSHOT", () => {
+  it("runs in the §39 snapshot slot, which is @fourjs/motion's PRIORITY_SNAPSHOT", () => {
     expect(POSE_SNAPSHOT_PRIORITY).toBe(PRIORITY_SNAPSHOT);
     const system = createSnapshotSystem(new PoseBuffer());
     expect(system.priority).toBe(PRIORITY_SNAPSHOT);

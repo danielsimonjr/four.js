@@ -24,7 +24,7 @@
  *
  * ## Why a hand-written context type instead of `WebGL2RenderingContext`
  *
- * `WebGL2RenderingContext` is a `lib.dom` type. `@four/render` already refuses
+ * `WebGL2RenderingContext` is a `lib.dom` type. `@fourjs/render` already refuses
  * to name DOM types (its `RendererOptions.canvas` is `unknown` for exactly this
  * reason), and this package keeps the same discipline one level down: nothing
  * here needs `lib.dom`, so nothing here pulls it in, and the package
@@ -48,9 +48,9 @@
  * double small enough to be read in one sitting.
  */
 
-import { FourError, type Disposable } from "@four/core";
-import type { Matrix4, Vector3 } from "@four/math";
-import { MAX_PUNCTUAL_LIGHTS, type SceneLights } from "@four/render";
+import { FourError, type Disposable } from "@fourjs/core";
+import type { Matrix4, Vector3 } from "@fourjs/math";
+import { MAX_PUNCTUAL_LIGHTS, type SceneLights } from "@fourjs/render";
 
 /**
  * The WebGL 2 / OpenGL ES 3.0 enumerants this package uses, by their normative
@@ -662,7 +662,7 @@ export const COLOR_ATTRIBUTE_LOCATION = 3;
  * Vertex attribute slot the optional joint-index stream is bound to (§53,
  * §54; RFC 0003, 2026-08-28) — fixed by `layout(location = 4)` in the skinned
  * vertex stages (`gl-skinning.ts`), continuing R-19's numbering, and a public
- * layout commitment: `@four/geometry`'s `BufferGeometry.joints` documents it,
+ * layout commitment: `@fourjs/geometry`'s `BufferGeometry.joints` documents it,
  * and glTF's second influence set (`JOINTS_1`/`WEIGHTS_1`) is the named
  * extension point at the next two locations.
  *
@@ -830,13 +830,13 @@ void main() {
  * is an affine reparametrization of the map above, so it is reached by
  * uploading a different `quad` — the (larger, offset) rectangle the whole
  * texture would occupy — and changing nothing else. `webgl-renderer.ts` derives
- * it; `@four/render`'s `sprite.ts` carries the algebra. The consequences that
+ * it; `@fourjs/render`'s `sprite.ts` carries the algebra. The consequences that
  * matter here: no second uniform, no second attribute, no new GL call, and a
  * frameless sprite's transcript byte-identical because it is the same code
  * path with the same values.
  *
  * `v = 0` is the quad's **bottom** edge, matching §7a's Y-up world and the
- * bottom-row-first texel order `@four/render`'s `TextureSource` documents; no
+ * bottom-row-first texel order `@fourjs/render`'s `TextureSource` documents; no
  * flip is needed anywhere in this backend, and §55 frames are measured from the
  * bottom-left texel for the same reason.
  */
@@ -899,7 +899,7 @@ void main() {
  *
  * `punctualCount` is a *uniform*, not a `#define`, so one linked program shades
  * a scene with any number of lamps from zero to
- * {@link @four/render!MAX_PUNCTUAL_LIGHTS} — the uniform-switch argument
+ * {@link @fourjs/render!MAX_PUNCTUAL_LIGHTS} — the uniform-switch argument
  * `useMap` records, one size up. That it is an `int` uniform is also the whole
  * byte-identity story: GL initializes it to `0`, so a program whose scene has
  * no punctual light never uploads it, the loop below never runs, and the frame
@@ -917,7 +917,7 @@ void main() {
  * Inverse-square because a point emitter obeys it; the range window and the
  * cone ramp are `KHR_lights_punctual`'s, so a loaded glTF light transfers
  * without reinterpretation. `punctualParams[i].z` is the precomputed
- * `1 / max(cos inner − cos outer, 1e-6)` — see `@four/render`'s `lights.ts`,
+ * `1 / max(cos inner − cos outer, 1e-6)` — see `@fourjs/render`'s `lights.ts`,
  * which packs it.
  *
  * The `max(d², 1e-8)` is the same placement rule R-13 fixed for `roughness`:
@@ -1000,7 +1000,7 @@ const PUNCTUAL_UNIFORM_NAMES = [
  *
  * When the count *is* non-zero the whole array is uploaded, dead tail included,
  * rather than a live sub-range: `uniform3fv` over the record's own
- * `Float32Array` copies nothing on the way (the reason `@four/render` packs
+ * `Float32Array` copies nothing on the way (the reason `@fourjs/render` packs
  * those arrays as typed arrays), and a sub-range upload would need the
  * `srcOffset`/`srcLength` overloads this backend's hand-written GL surface
  * deliberately does not carry.
@@ -1252,7 +1252,7 @@ export class ShadowUniforms {
     gl.uniform1f(this.#locations[3], lights.shadowBias);
     gl.uniform1f(this.#locations[4], lights.shadowNormalBias);
     // `1 / mapSize`, computed once per frame here rather than once per fragment
-    // in the tap loop. `mapSize` is a positive integer — `@four/scene` refuses
+    // in the tap loop. `mapSize` is a positive integer — `@fourjs/scene` refuses
     // anything else — and `hasShadow` is only true for a light carrying a valid
     // record, so this cannot divide by zero on the path that reaches it.
     gl.uniform1f(this.#locations[5], 1 / lights.shadowMapSize);
@@ -1286,7 +1286,7 @@ export class ShadowUniforms {
  * the plain 3×3 would bend normals off their surfaces. GLSL ES 3.00 has
  * `inverse()` and `transpose()` built in, so the matrix is derived in the
  * shader per vertex rather than uploaded per draw; staged with a dated note
- * (2026-08-04): when `@four/math`'s `Matrix3` grows a normal-matrix utility,
+ * (2026-08-04): when `@fourjs/math`'s `Matrix3` grows a normal-matrix utility,
  * hoisting this to a per-draw uniform saves the per-vertex inversion. MVP
  * vertex counts make the difference unmeasurable, and the shader route needs
  * no new upload path or math surface today.
@@ -1351,7 +1351,7 @@ void main() {
  * ## The shadow (R-18, 2026-08-09)
  *
  * §69's shadow attenuates the **directional** term only — the light set has no
- * shadow maps at this tier ({@link SHADOW_GLSL}, `@four/scene`'s
+ * shadow maps at this tier ({@link SHADOW_GLSL}, `@fourjs/scene`'s
  * `DirectionalLightShadow`) — and it does so as a multiplication *into* the
  * pre-existing product, in source order:
  *
@@ -1645,7 +1645,7 @@ export class UnlitProgram implements Disposable {
   /**
    * Compiles and links the unlit program on `gl`.
    *
-   * Throws a {@link @four/core!FourError | FourError} carrying `SHADER_COMPILATION_FAILED` (§89) with
+   * Throws a {@link @fourjs/core!FourError | FourError} carrying `SHADER_COMPILATION_FAILED` (§89) with
    * the driver's info log in `context.log` when any stage fails to compile,
    * when linking fails, when GL refuses to allocate an object, or when a
    * uniform this backend wrote is missing from the linked program. Shader
@@ -1995,9 +1995,9 @@ export class SpriteProgram implements Disposable {
  * programs. Light uniforms are per *frame* state uploaded per viewport (they
  * live in the program object, exactly like the view-projection): the scene
  * ambient term, one directional light, and up to
- * {@link @four/render!MAX_PUNCTUAL_LIGHTS} point and spot lights (R-17,
+ * {@link @fourjs/render!MAX_PUNCTUAL_LIGHTS} point and spot lights (R-17,
  * 2026-08-09). Shadows (§69), tone mapping (§60a), and §68's remaining light
- * types are staged where `@four/scene`'s `light.ts` records.
+ * types are staged where `@fourjs/scene`'s `light.ts` records.
  *
  * Owns its GL objects and nothing else; the renderer re-creates it on context
  * restore exactly as it re-creates the unlit one (§61).

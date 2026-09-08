@@ -1,9 +1,9 @@
 /**
  * fourJS — the §73–§75 retained-mode UI, composed into a rendered scene
- * (post-plan backlog: the WP-11.5 packet-intent shortfall — "@four/ui has
+ * (post-plan backlog: the WP-11.5 packet-intent shortfall — "@fourjs/ui has
  * node-level §72 coverage only; no example app imports it").
  *
- * The smallest program in which `@four/ui` does everything it claims to own,
+ * The smallest program in which `@fourjs/ui` does everything it claims to own,
  * on a real WebGL 2 surface, with the application supplying exactly what the
  * package may not:
  *
@@ -12,7 +12,7 @@
  *   §74's flex modes (a column of rows, gaps and padding in layout units). The
  *   buttons' hover/press/focus state machines and the `click → uiactivate`
  *   synthesis are the package's (§72); nothing here re-derives a gesture.
- * - **The application owns the pixels.** `@four/ui`'s frozen dependency matrix
+ * - **The application owns the pixels.** `@fourjs/ui`'s frozen dependency matrix
  *   gives it no `render`, `materials`, or `geometry`, so widgets cannot draw
  *   themselves. Every visible surface below — panel background, button faces,
  *   the focus ring, the glyphs of every label — is supplied through the
@@ -27,10 +27,10 @@
  * - **Keyboard navigation is the engine's, end to end (§75).** The application
  *   supplies a key *surface* (`window`) and nothing else: `KeyboardInput`
  *   normalizes the platform's events and routes them to the focused node, and
- *   `@four/ui` decides what they mean — Tab and Shift-Tab walk the focus
+ *   `@fourjs/ui` decides what they mean — Tab and Shift-Tab walk the focus
  *   through `installKeyboardTraversal`, Enter and Space activate the focused
  *   `Button`. Until 2026-08-07 this page carried a hand-written `keydown`
- *   handler doing both, because `@four/input` had no key source at all (the
+ *   handler doing both, because `@fourjs/input` had no key source at all (the
  *   `UI_STAGED` entry that A-10 closed); the handler is gone, and every
  *   listener downstream still cannot tell a key from a click apart from the
  *   event's `source` field ("pointer" vs "keyboard").
@@ -69,7 +69,7 @@
  *
  * ## Text, and what it costs (§49, §56)
  *
- * Labels *measure* their text through `@four/text` (a real `@four/ui`
+ * Labels *measure* their text through `@fourjs/text` (a real `@fourjs/ui`
  * dependency); drawing it is the skin's job, and {@link labelSkin} does it with
  * **one `Text` node per label** over one shared atlas texture and one shared
  * material — three nodes and three draw calls for the whole page.
@@ -82,14 +82,14 @@
  * the backlog item it was the evidence for — is gone.
  */
 
-import { Application } from "four/application";
-import { planeGeometry } from "four/geometry";
-import { KeyboardInput, PointerInput, type Pickable } from "four/input";
-import { UnlitMaterial } from "four/materials";
-import { Renderable, Texture } from "four/render";
-import { WebglRenderer } from "four/render-webgl";
-import { OrthographicCamera, createFullscreenViewport } from "four/scene";
-import { buildGlyphAtlas } from "four/text";
+import { Application } from "fourJS/application";
+import { planeGeometry } from "fourJS/geometry";
+import { KeyboardInput, PointerInput, type Pickable } from "fourJS/input";
+import { UnlitMaterial } from "fourJS/materials";
+import { Renderable, Texture } from "fourJS/render";
+import { WebglRenderer } from "fourJS/render-webgl";
+import { OrthographicCamera, createFullscreenViewport } from "fourJS/scene";
+import { buildGlyphAtlas } from "fourJS/text";
 import {
   Button,
   Label,
@@ -100,8 +100,8 @@ import {
   keyboardFocusTarget,
   type WidgetActivationSource,
   type WidgetSkin,
-} from "four/ui";
-import { Text } from "four";
+} from "fourJS/ui";
+import { Text } from "fourJS";
 
 // --- surface ---------------------------------------------------------------
 
@@ -346,7 +346,7 @@ function buttonSkin(): WidgetSkin {
 /**
  * A label's glyphs — **one `Text` node per label** (§49, §56).
  *
- * `Label` measures its text (that is `@four/ui`'s half of the §56 split); this
+ * `Label` measures its text (that is `@fourjs/ui`'s half of the §56 split); this
  * skin draws it, by handing the same three numbers to a `Text` node and letting
  * it own the quads. The node sits at `(0, −textBaselineTop)` because a `Text`'s
  * origin is the first line's baseline at its left edge while the widget's origin
@@ -583,7 +583,7 @@ new PointerInput(canvas, {
  * surface because a DOM element receives key events only while it holds the
  * DOM's focus — and this scene's focus model is §75's, not the DOM's.
  *
- * `keyboardFocusTarget(uiRoot)` is the seam `@four/input` needs and may not
+ * `keyboardFocusTarget(uiRoot)` is the seam `@fourjs/input` needs and may not
  * import: it answers the focused widget, or the UI root when nothing is
  * focused yet, so the very first Tab is deliverable. `installKeyboardTraversal`
  * then owns Tab and Shift-Tab, and each `Button` owns its own Enter and Space

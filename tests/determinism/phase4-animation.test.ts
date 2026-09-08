@@ -6,8 +6,8 @@
  * `packages/animation/tests/` are the "unit tested" half. This file is the
  * "deterministic" half, in the four forms WP-1.14 and WP-2.7 established:
  *
- * 1. **Headless.** The scenario imports `@four/animation`, `@four/motion`,
- *    `@four/scene`, `@four/math`, `@four/diagnostics` and `four/application` —
+ * 1. **Headless.** The scenario imports `@fourjs/animation`, `@fourjs/motion`,
+ *    `@fourjs/scene`, `@fourjs/math`, `@fourjs/diagnostics` and `four/application` —
  *    no renderer package, no canvas, no DOM. Unlike Phase 2's scenario, which
  *    reaches `Application` through `four`'s root barrel (and whose test files
  *    that fact as a follow-up, because the barrel namespace-exports every

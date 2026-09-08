@@ -31,9 +31,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 test("publishName maps the umbrella and the scoped packages, and only those", () => {
   assert.equal(publishName("four"), "@danielsimonjr/fourjs");
-  assert.equal(publishName("@four/core"), "@danielsimonjr/fourjs-core");
+  assert.equal(publishName("@fourjs/core"), "@danielsimonjr/fourjs-core");
   assert.equal(
-    publishName("@four/physics-rapier"),
+    publishName("@fourjs/physics-rapier"),
     "@danielsimonjr/fourjs-physics-rapier",
   );
   assert.equal(publishName("@dimforge/rapier2d-compat"), null);
@@ -52,17 +52,17 @@ test("resolveWorkspaceRange reproduces workspace publish-time substitution", () 
 // --- manifest rewrite ------------------------------------------------------
 
 const FIXTURE = {
-  name: "@four/render-webgl",
+  name: "@fourjs/render-webgl",
   version: "0.1.0",
   exports: { ".": { types: "./dist/index.d.ts", import: "./dist/index.js" } },
   files: ["dist"],
-  dependencies: { "@four/core": "workspace:*", "gl-matrix": "^3.4.3" },
+  dependencies: { "@fourjs/core": "workspace:*", "gl-matrix": "^3.4.3" },
   devDependencies: { four: "workspace:^", vitest: "3.2.7" },
 };
 
 test("rewriteManifest renames keys, resolves workspace ranges, and leaves the rest alone", () => {
   const versions = new Map([
-    ["@four/core", "0.1.0"],
+    ["@fourjs/core", "0.1.0"],
     ["four", "0.1.0"],
   ]);
   const out = rewriteManifest(FIXTURE, versions);
@@ -79,11 +79,11 @@ test("rewriteManifest renames keys, resolves workspace ranges, and leaves the re
   assert.deepEqual(out.files, FIXTURE.files);
   assert.equal(out.version, "0.1.0");
   assert.deepEqual(Object.keys(out), Object.keys(FIXTURE)); // key order preserved
-  assert.equal(FIXTURE.name, "@four/render-webgl"); // source untouched
+  assert.equal(FIXTURE.name, "@fourjs/render-webgl"); // source untouched
 });
 
 test("checkRewrite rejects a lost export, a missed rename, and an unresolved range", () => {
-  const versions = new Map([["@four/core", "0.1.0"]]);
+  const versions = new Map([["@fourjs/core", "0.1.0"]]);
   const good = rewriteManifest(FIXTURE, versions);
   assert.deepEqual(checkRewrite(FIXTURE, good), []);
 
@@ -92,7 +92,7 @@ test("checkRewrite rejects a lost export, a missed rename, and an unresolved ran
 
   const missedRename = {
     ...good,
-    dependencies: { "@four/core": "workspace:*" },
+    dependencies: { "@fourjs/core": "workspace:*" },
   };
   const problems = checkRewrite(FIXTURE, missedRename);
   assert.ok(
@@ -112,11 +112,11 @@ test("checkRewrite rejects a lost export, a missed rename, and an unresolved ran
 
 test("rewriteCode renames quoted workspace names in emitted code", () => {
   const source = [
-    'import { Node } from "@four/scene";',
-    'export * from "@four/math";',
-    'const mod = await import("four");',
-    'export const PACKAGE_NAME = "@four/core";',
-    ' * import { Application } from "four";',
+    'import { Node } from "@fourjs/scene";',
+    'export * from "@fourjs/math";',
+    'const mod = await import("fourJS");',
+    'export const PACKAGE_NAME = "@fourjs/core";',
+    ' * import { Application } from "fourJS";',
   ].join("\n");
   const { text, count } = rewriteCode(source);
   assert.equal(count, 5);
@@ -130,7 +130,7 @@ test("rewriteCode leaves the English word `four` and unquoted prose alone", () =
   const source = [
     'const label = "four";',
     'assert.equal(count, "four");',
-    " * `@four/animation` — the public surface of the animation pillar.",
+    " * `@fourjs/animation` — the public surface of the animation pillar.",
   ].join("\n");
   const { text, count } = rewriteCode(source);
   assert.equal(count, 0);
@@ -166,12 +166,12 @@ test("every workspace package maps to a published name and checks clean", () => 
   }
 });
 
-test("no @four/ string survives in any rewritten package.json", () => {
+test("no @fourjs/ string survives in any rewritten package.json", () => {
   for (const pkg of packages) {
     const json = JSON.stringify(rewriteManifest(pkg.manifest, versions));
     assert.ok(
-      !json.includes("@four/"),
-      `${pkg.relDir} still carries an @four/ name`,
+      !json.includes("@fourjs/"),
+      `${pkg.relDir} still carries an @fourjs/ name`,
     );
     assert.ok(
       !json.includes('"four"'),

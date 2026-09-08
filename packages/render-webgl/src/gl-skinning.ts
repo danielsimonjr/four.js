@@ -29,7 +29,7 @@
  * ## The palette, and the declared joint limit
  *
  * The palette is `uniform mat4 jointMatrices[MAX_SKINNING_JOINTS]` — 48
- * joints, `@four/render`'s declared constant, sized to fit WebGL 2's
+ * joints, `@fourjs/render`'s declared constant, sized to fit WebGL 2's
  * guaranteed-minimum vertex uniform budget (see `MAX_SKINNING_JOINTS` for the
  * arithmetic). A rig over the limit was already refused **at setup** by
  * `Mesh.skeleton` (§89 `UNSUPPORTED_GPU_FEATURE`), so the upload here can
@@ -50,9 +50,9 @@
  * skinned bounds, no engine API returning skinned positions.
  */
 
-import type { Disposable } from "@four/core";
-import type { Matrix4 } from "@four/math";
-import { MAX_SKINNING_JOINTS, type SceneLights } from "@four/render";
+import type { Disposable } from "@fourjs/core";
+import type { Matrix4 } from "@fourjs/math";
+import { MAX_SKINNING_JOINTS, type SceneLights } from "@fourjs/render";
 
 import {
   FRAGMENT_SHADER_SOURCE,
@@ -542,7 +542,7 @@ class SkinnedProgramPair implements SkinnedPrograms {
  * Opts this process's `WebglRenderer`s into GPU skinning (§54, §62; RFC 0003).
  *
  * ```ts
- * import { registerSkinningPipeline } from "@four/render-webgl";
+ * import { registerSkinningPipeline } from "@fourjs/render-webgl";
  * registerSkinningPipeline();          // once, at application setup
  * ```
  *

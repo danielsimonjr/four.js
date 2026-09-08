@@ -5,7 +5,7 @@
  *
  * ## What one pass draws
  *
- * `@four/render`'s `PickingService` contract, executed: the service owns an
+ * `@fourjs/render`'s `PickingService` contract, executed: the service owns an
  * offscreen `RenderTarget` sized to the drawing buffer, builds the **same
  * render list the frame builds** (`buildRenderList` → `buildViewRenderList`
  * with the view's own frustum, in the same §66 order — order *is* the picture
@@ -23,7 +23,7 @@
  *
  * - **blending is ignored** — a transparent surface writes its id over its
  *   full geometry; per-texel alpha accuracy is §71's `"pixel"` strategy, the
- *   CPU tier `@four/input`'s `PickableAlphaMask` ships (RFC 0005
+ *   CPU tier `@fourjs/input`'s `PickableAlphaMask` ships (RFC 0005
  *   alternative D, adopted);
  * - **`material.stencil` (R-7's hand-composed tier) is not applied** — the
  *   id target carries stencil bits only for §67 clips, and a hand-composed
@@ -59,8 +59,8 @@
  * too (asserted in `tests/integration/pixel-picking.test.ts`).
  */
 
-import { DEV, FourError, devWarnOnce } from "@four/core";
-import { Frustum, Matrix4 } from "@four/math";
+import { DEV, FourError, devWarnOnce } from "@fourjs/core";
+import { Frustum, Matrix4 } from "@fourjs/math";
 import {
   RenderTarget,
   assertEncodableCandidateCount,
@@ -75,7 +75,7 @@ import {
   type RenderItem,
   type RenderItemClip,
   type RenderItemStencil,
-} from "@four/render";
+} from "@fourjs/render";
 
 import type { GeometryCache } from "./gl-geometry.js";
 import {
@@ -95,7 +95,7 @@ import type { RenderTargetRecord } from "./gl-render-target.js";
 
 /**
  * The subtree root an update draws and the viewport it draws it into — read
- * off the `PickingService` interface rather than imported from `@four/scene`:
+ * off the `PickingService` interface rather than imported from `@fourjs/scene`:
  * this package depends on `core`, `math`, and `render` only (plan §3.1,
  * frozen), and `Parameters<…>` yields exactly the `Node` and `Viewport` types
  * the interface declares — `webgl-renderer.ts`'s `RenderRoot` move.
@@ -377,7 +377,7 @@ function nextPoll(): Promise<void> {
 const LIFECYCLE_ERROR_CODE = "INVALID_APPLICATION_STATE";
 
 /**
- * `@four/render`'s `PickingService`, executed on the WebGL 2 backend — see
+ * `@fourjs/render`'s `PickingService`, executed on the WebGL 2 backend — see
  * the module header for the pass, the interface for the contract. Built by
  * `WebglRenderer.createPickingService()` once {@link registerPickingPipeline}
  * has run; one service per call, each with its own id buffer.
@@ -1032,7 +1032,7 @@ export class WebglPickingService implements PickingService {
  * (RFC 0005).
  *
  * ```ts
- * import { registerPickingPipeline } from "@four/render-webgl";
+ * import { registerPickingPipeline } from "@fourjs/render-webgl";
  * registerPickingPipeline();           // once, at application setup
  * const picking = renderer.createPickingService();
  * ```

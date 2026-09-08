@@ -60,11 +60,11 @@ import {
   type AnimationTrackLike,
   type AnimationTransition,
   type ColorRGBA,
-} from "@four/animation";
-import { createChecksum } from "@four/diagnostics";
-import { Vector3 } from "@four/math";
-import { Group, type Node } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/animation";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Vector3 } from "@fourjs/math";
+import { Group, type Node } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 export const FIXED_TIME_STEP = 1 / 60;

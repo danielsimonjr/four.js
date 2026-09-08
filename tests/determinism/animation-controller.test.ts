@@ -8,8 +8,8 @@
  * about the machine's history, not about a time axis. This file proves it in the
  * three forms the determinism gate uses:
  *
- * 1. **Headless.** The scenario imports `@four/animation`, `@four/scene`,
- *    `@four/math`, `@four/diagnostics` and `four/application` — no renderer
+ * 1. **Headless.** The scenario imports `@fourjs/animation`, `@fourjs/scene`,
+ *    `@fourjs/math`, `@fourjs/diagnostics` and `four/application` — no renderer
  *    package, no canvas, no DOM.
  * 2. **Deterministic in-process.** Two independent runs in one process produce
  *    byte-identical per-step digests and identical state-change records.

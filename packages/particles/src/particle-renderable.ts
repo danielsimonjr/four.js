@@ -18,22 +18,22 @@
  * §49 lists `ParticleSystem` among the `Renderable` subclasses, and that is
  * where this class belongs. It **cannot extend `Renderable`**, and the reason is
  * a hard constraint rather than a preference: the frozen §3.1 dependency matrix
- * gives `@four/particles` exactly `core`, `math`, and `scene`. `Renderable`,
+ * gives `@fourjs/particles` exactly `core`, `math`, and `scene`. `Renderable`,
  * `RenderItem`, `BufferGeometry`, and every material live in packages this one
  * may not import — the matrix is a plan ground rule ("never add or reverse an
  * edge"), and `particles` and `render` sit in the *same* dispatch wave, so an
  * edge between them is not merely undeclared but ordering-illegal.
  *
- * So this class extends `@four/scene`'s `Node` and implements
- * `@four/render`'s **structural** `ParticleDrawable` contract — the brand, the
+ * So this class extends `@fourjs/scene`'s `Node` and implements
+ * `@fourjs/render`'s **structural** `ParticleDrawable` contract — the brand, the
  * two sort keys, the count, the instance array, and the repack method. Read
- * `@four/render`'s `src/particles.ts` for the contract, the interleaved layout,
+ * `@fourjs/render`'s `src/particles.ts` for the contract, the interleaved layout,
  * the blending policy, and the §43 statement; this file implements them and does
  * not restate the arguments.
  *
  * **Nothing type-checks the two declarations against each other** (neither
  * package can see the other). `tests/particle-renderable.test.ts` pins the shape
- * member by member, and `@four/render-webgl`'s suite pins the layout from the
+ * member by member, and `@fourjs/render-webgl`'s suite pins the layout from the
  * other side. When a later revision lets particles depend on render, this class
  * re-parents onto `Renderable`, `implements ParticleDrawable` becomes literal,
  * and nothing else changes. (Decision, WP-9.3 — reported to the orchestrator.)
@@ -68,8 +68,8 @@
  * against the pool's own accessors rather than against a re-derivation.
  */
 
-import { Vector3, Vector4 } from "@four/math";
-import { Node } from "@four/scene";
+import { Vector3, Vector4 } from "@fourjs/math";
+import { Node } from "@fourjs/scene";
 
 import type { ParticleEmitter } from "./emitter.js";
 import type { ParticleTexture } from "./types.js";
@@ -82,7 +82,7 @@ import {
  * Floats per particle in {@link ParticleRenderable.particleInstances}: centre
  * (3) + current size (1) + current straight-alpha RGBA (4).
  *
- * **A deliberate duplicate** of `@four/render`'s `PARTICLE_INSTANCE_FLOATS`,
+ * **A deliberate duplicate** of `@fourjs/render`'s `PARTICLE_INSTANCE_FLOATS`,
  * which is the normative definition. The dependency matrix forbids importing it
  * (see the module header), so the value is restated here, exported so a caller
  * can size or slice the array without guessing, and pinned by the tests on both
@@ -111,7 +111,7 @@ export const PARTICLE_ROTATION_OFFSET = 8;
 /** Offset of the per-particle softness in the wide stream. */
 export const PARTICLE_SOFTNESS_OFFSET = 9;
 
-/** Floats per trail ribbon vertex — duplicate of `@four/render`'s `TRAIL_VERTEX_FLOATS`. */
+/** Floats per trail ribbon vertex — duplicate of `@fourjs/render`'s `TRAIL_VERTEX_FLOATS`. */
 export const PARTICLE_TRAIL_VERTEX_FLOATS = TRAIL_VERTEX_FLOATS;
 
 /** Components per particle in `ParticlePool.positions` / `velocities`. */
@@ -158,7 +158,7 @@ export interface ParticleRenderableOptions {
  */
 export class ParticleRenderable extends Node {
   /**
-   * The `@four/render` `ParticleDrawable` brand. `readonly` and a literal, so
+   * The `@fourjs/render` `ParticleDrawable` brand. `readonly` and a literal, so
    * the property's type is `true` and the structural contract is satisfied
    * exactly; see the module header for why this is a brand and not a base
    * class.
@@ -260,7 +260,7 @@ export class ParticleRenderable extends Node {
 
   /**
    * Stride of {@link particleInstances} — `8` by default, `10` when the
-   * emitter opted into R-32 appearance. Duplicated on `@four/render`'s
+   * emitter opted into R-32 appearance. Duplicated on `@fourjs/render`'s
    * `ParticleDrawable.particleInstanceFloats`.
    */
   get particleInstanceFloats(): number {
@@ -298,7 +298,7 @@ export class ParticleRenderable extends Node {
    * updates {@link particleCount} (§36's ramps evaluated, per the module
    * header).
    *
-   * Called by `@four/render`'s `buildRenderList` once per build; calling it by
+   * Called by `@fourjs/render`'s `buildRenderList` once per build; calling it by
    * hand is harmless and idempotent between simulation steps. One pass over the
    * live particles, `O(count)`, no allocation, no branch per channel.
    *

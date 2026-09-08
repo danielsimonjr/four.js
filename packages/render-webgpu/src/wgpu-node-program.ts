@@ -1,16 +1,16 @@
 /**
  * The node-material pipeline for WebGPU (§60, §62; RFC 0001 — WP-R1.9): a
- * WGSL emitter over `@four/materials`' shader-graph IR, and the per-renderer
+ * WGSL emitter over `@fourjs/materials`' shader-graph IR, and the per-renderer
  * pipeline store — reached only through
  * {@link registerWebgpuNodeMaterialPipeline}. The twin of
- * `@four/render-webgl`'s `gl-node-program.ts`; where the two backends can
+ * `@fourjs/render-webgl`'s `gl-node-program.ts`; where the two backends can
  * agree they do, and every place they cannot is named here.
  *
  * ## No user shader source, at any tier
  *
  * Nothing here accepts WGSL text from outside this repository. The emitter's
  * input is the closed-operator graph (`ShaderGraph`, read through the types
- * `@four/render` re-exposes — the frozen §3.1 row is untouched), its output
+ * `@fourjs/render` re-exposes — the frozen §3.1 row is untouched), its output
  * is a pure, deterministic function of that graph (§33: nodes are visited in
  * **array order**, dead-node elimination is the only transform), and the same
  * closed operators emit the same arithmetic the GLSL emitter emits — WGSL's
@@ -94,7 +94,7 @@
  *   rasterise (garbage, but rasterised) is refused as absence.
  */
 
-import { DEV, devWarnOnce, type Disposable } from "@four/core";
+import { DEV, devWarnOnce, type Disposable } from "@fourjs/core";
 import {
   SHADER_VALUE_COMPONENTS,
   analyzeShaderGraph,
@@ -110,7 +110,7 @@ import {
   type ShaderNode,
   type ShaderUniformReflection,
   type ShaderValueType,
-} from "@four/render";
+} from "@fourjs/render";
 
 import {
   GPU_BUFFER_USAGE,
@@ -1610,7 +1610,7 @@ function countNodeDraw(
  * `"graph"` effects (RFC 0001; WP-R1.9).
  *
  * ```ts
- * import { registerWebgpuNodeMaterialPipeline } from "@four/render-webgpu";
+ * import { registerWebgpuNodeMaterialPipeline } from "@fourjs/render-webgpu";
  * registerWebgpuNodeMaterialPipeline();   // once, at application setup
  * ```
  *

@@ -2,8 +2,8 @@
  * R-13 — §59's `StandardMaterial` and the metallic-roughness pipeline, driving
  * the real WebGL 2 backend (2026-08-08).
  *
- * `StandardMaterial` lives in `@four/materials` and names no GL type;
- * `@four/render`'s render list turns it into a `"standard"` item; the WebGL 2
+ * `StandardMaterial` lives in `@fourjs/materials` and names no GL type;
+ * `@fourjs/render`'s render list turns it into a `"standard"` item; the WebGL 2
  * backend draws it through `StandardProgram`. Those are three packages
  * agreeing, and no unit test inside any one of them can check the agreement —
  * which is what this file is for. Four claims:
@@ -33,13 +33,13 @@
  * `render-graph.test.ts` gives at length.
  */
 
-import { BufferGeometry, boxGeometry, planeGeometry } from "@four/geometry";
+import { BufferGeometry, boxGeometry, planeGeometry } from "@fourjs/geometry";
 import {
   LitMaterial,
   SpriteMaterial,
   StandardMaterial,
   UnlitMaterial,
-} from "@four/materials";
+} from "@fourjs/materials";
 import {
   Renderable,
   Sprite,
@@ -47,8 +47,8 @@ import {
   buildRenderList,
   isStandardItem,
   type RenderItem,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   DirectionalLight,
   OrthographicCamera,
@@ -56,7 +56,7 @@ import {
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

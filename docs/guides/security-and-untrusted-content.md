@@ -24,7 +24,7 @@ because the feature it would guard does not exist yet.
 | cancellation and timeouts for expensive decoders | **met**    | `AssetManagerOptions.timeoutSeconds` bounds a whole load, transport and decode together; `load(url, loader, { signal })` cancels one caller's load, and `AssetManagerOptions.abortController` extends both to the request itself (`canAbortTransport` reports whether a manager has it)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | documented content-security-policy behavior      | **met**    | this guide's "CSP posture" section, enforced by `tests/integration/security-csp.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | decompression limits                             | **absent** | no compressed path exists (no gzip, no Draco, no Basis) — there is nothing yet to bound                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| safe shader/plugin boundaries                    | **met**    | the plugin half (2026-08-28, `A-3`/RFC 0002): a plugin is a **value** the application installs — `PluginHost.add` and `ApplicationOptions.plugins` accept no URL, no module specifier, and no name from a document, and `tests/integration/plugin-boundary.test.ts` fails if any deserializing package reaches the host. It is a boundary, **not a sandbox** — see "Plugins run with your authority". The shader half (2026-08-28, `R-14`/RFC 0001, spec revision 1.11): **shading is a graph of closed operators, never source text** — §60's shipped surface (`ShaderGraph`/`NodeMaterial`/`NodeMaterialBuilder`, `@four/materials`) accepts no GLSL or WGSL anywhere, a graph is plain JSON whose every operator is a member of a closed union validated at construction (§85, with node and sampler caps), every texture it samples is enumerable (so §63's feedback/ordering checks still see a §70 graph effect's full sample set), and §57's `ShaderMaterial` — the name a source-string material would have had — is recorded **permanently unshipped**. An operator the engine has not implemented is a refused value, not an executed one |
+| safe shader/plugin boundaries                    | **met**    | the plugin half (2026-08-28, `A-3`/RFC 0002): a plugin is a **value** the application installs — `PluginHost.add` and `ApplicationOptions.plugins` accept no URL, no module specifier, and no name from a document, and `tests/integration/plugin-boundary.test.ts` fails if any deserializing package reaches the host. It is a boundary, **not a sandbox** — see "Plugins run with your authority". The shader half (2026-08-28, `R-14`/RFC 0001, spec revision 1.11): **shading is a graph of closed operators, never source text** — §60's shipped surface (`ShaderGraph`/`NodeMaterial`/`NodeMaterialBuilder`, `@fourjs/materials`) accepts no GLSL or WGSL anywhere, a graph is plain JSON whose every operator is a member of a closed union validated at construction (§85, with node and sampler caps), every texture it samples is enumerable (so §63's feedback/ordering checks still see a §70 graph effect's full sample set), and §57's `ShaderMaterial` — the name a source-string material would have had — is recorded **permanently unshipped**. An operator the engine has not implemented is a refused value, not an executed one |
 
 Depth limiting is the sixth item's neighbour rather than one of the seven, and
 it is met: both decoders bound JSON nesting. It matters more than its absence
@@ -37,7 +37,7 @@ transport-side §96 limits live on it. Both defaults are **finite**; a limit
 that defaults to `Infinity` is documentation, not a limit.
 
 ```ts
-import { AssetManager, jsonLoader } from "four/assets";
+import { AssetManager, jsonLoader } from "fourJS/assets";
 
 const assets = new AssetManager({
   maximumBytes: 8 * 1024 * 1024, // default: 64 MiB
@@ -74,8 +74,8 @@ application records in its own source that it has decided to trust an origin.
 ## Documents: length and depth
 
 ```ts
-import { decodeSceneDocument } from "four/serialization";
-import { decodeReplayRecording } from "four/diagnostics";
+import { decodeSceneDocument } from "fourJS/serialization";
+import { decodeReplayRecording } from "fourJS/diagnostics";
 
 const scene = decodeSceneDocument(text, {
   maximumTextLength: 1_000_000, // default: 33_554_432 UTF-16 code units
@@ -131,7 +131,7 @@ repository:
   `insertAdjacentHTML`, `document.write`) or assigns a raw `style.cssText` — so
   neither `script-src` nor `style-src` needs `'unsafe-inline'`;
 - injects a `<script>` or `<style>` element of its own. The renderer draws into
-  a canvas the application supplies; `@four/ui` is a scene-graph widget tier
+  a canvas the application supplies; `@fourjs/ui` is a scene-graph widget tier
   that renders through that same canvas, not a DOM component library.
 
 A workable starting policy for an application built on fourJS:
@@ -193,7 +193,7 @@ and rejected outright rather than staged, because that is arbitrary code
 execution from a scene file in the plainest possible form.
 
 Both halves are checked, not asserted: `tests/integration/plugin-boundary.test.ts`
-fails if any source file under `@four/serialization` or `@four/assets` so much
+fails if any source file under `@fourjs/serialization` or `@fourjs/assets` so much
 as mentions the plugin host, and pins the fact that `add`'s parameter type
 admits no string.
 

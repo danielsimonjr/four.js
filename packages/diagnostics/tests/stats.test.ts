@@ -13,7 +13,7 @@
  *    place, which is what lets the frame loop own one for its lifetime.
  */
 
-import { constructionCount } from "@four/math";
+import { constructionCount } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import type { DebugBodyAccess, SolverStatistics } from "../src/debug-draw.js";

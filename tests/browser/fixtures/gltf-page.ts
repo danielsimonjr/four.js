@@ -31,17 +31,17 @@ import {
   AssetManager,
   createGltfLoader,
   type FetchResponse,
-} from "@four/assets";
-import { instantiateGltf } from "four";
-import { createRenderStatistics, resetRenderStatistics } from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/assets";
+import { instantiateGltf } from "fourJS";
+import { createRenderStatistics, resetRenderStatistics } from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /** Canvas size the page creates and the spec reads back. */
 const WIDTH = 320;

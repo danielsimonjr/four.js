@@ -48,7 +48,7 @@
  * the write than to leave an author debugging a migration that "does nothing".
  */
 
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 
 import {
   SCENE_FORMAT_VERSION,

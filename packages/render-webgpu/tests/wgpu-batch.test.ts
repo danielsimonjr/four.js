@@ -12,8 +12,8 @@
  * the planner's.
  */
 
-import { Matrix4 } from "@four/math";
-import type { RenderBatch, RenderItem } from "@four/render";
+import { Matrix4 } from "@fourjs/math";
+import type { RenderBatch, RenderItem } from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 import { createRecordingGpu } from "../../../tests/integration/helpers/recording-gpu.js";

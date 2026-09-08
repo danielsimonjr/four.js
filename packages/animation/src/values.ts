@@ -33,7 +33,7 @@
  *
  * For the in-place adapters `out` **may** alias `a` (the common case: the live
  * property is also the interpolation start). `out` must **not** alias `b`: the
- * vector and quaternion adapters delegate to `@four/math`, which copies `a`
+ * vector and quaternion adapters delegate to `@fourjs/math`, which copies `a`
  * into `out` before mixing in `b`, so an `out === b` call would have destroyed
  * `b` first. The color adapter reads each component before writing it and is
  * safe either way, but the contract is stated once for all adapters.
@@ -45,7 +45,7 @@ import {
   Vector3,
   Vector4,
   type ColorRGBA,
-} from "@four/math";
+} from "@fourjs/math";
 
 /**
  * Discriminator of {@link ValueAdapter}. Mirrors §17's track value types
@@ -70,18 +70,18 @@ export type ValueKind =
 
 /**
  * Straight (non-premultiplied) RGBA as a mutable 4-tuple — the materials-side
- * color convention (plan P4-2): `@four/math`'s {@link ColorRGBA}, re-exported.
+ * color convention (plan P4-2): `@fourjs/math`'s {@link ColorRGBA}, re-exported.
  *
- * Originally declared here structurally because `@four/animation` may not
- * depend on `@four/materials` (plan §3.1); the 2026-08-04 hoist moved the one
- * definition into `@four/math`, below both, so values keep passing between
+ * Originally declared here structurally because `@fourjs/animation` may not
+ * depend on `@fourjs/materials` (plan §3.1); the 2026-08-04 hoist moved the one
+ * definition into `@fourjs/math`, below both, so values keep passing between
  * the two packages without conversion.
  *
  * Components are **not clamped** anywhere in this module: §60a's pipeline is
  * linear-light with extended range, and clamping would silently rewrite
  * authored data mid-tween.
  */
-export type { ColorRGBA } from "@four/math";
+export type { ColorRGBA } from "@fourjs/math";
 
 /**
  * How one value type is duplicated, assigned, and interpolated.
@@ -122,10 +122,10 @@ export interface ValueAdapter<T> {
    * must use the return value.
    *
    * `t` is not clamped — values outside `[0, 1]` extrapolate for the continuous
-   * kinds, exactly as `@four/math` does — and the step kinds hold `a` for every
+   * kinds, exactly as `@fourjs/math` does — and the step kinds hold `a` for every
    * `t < 1`. Endpoint exactness at `t = 1` is not guaranteed in floating point
    * for the continuous kinds (they compute `a + (b - a) * t`, matching
-   * `@four/math`); a tween that must land precisely assigns the end value at
+   * `@fourjs/math`); a tween that must land precisely assigns the end value at
    * completion instead of lerping to it.
    */
   lerp(a: T, b: T, t: number, out: T): T;
@@ -149,7 +149,7 @@ export interface ValueAdapter<T> {
  * Scalar adapter (§17 "scalar").
  *
  * `out` is ignored — a number cannot be written through. Uses the same
- * `a + (b - a) * t` form as `@four/math`'s vector lerp so a scalar track and a
+ * `a + (b - a) * t` form as `@fourjs/math`'s vector lerp so a scalar track and a
  * vector track interpolate identically component for component.
  */
 export const numberAdapter: ValueAdapter<number> = {

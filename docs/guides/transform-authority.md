@@ -36,7 +36,7 @@ the old owner to write, then take the authority. `examples/first-2d-scene`
 does this for its draggable box:
 
 ```ts
-import { DragManager, PointerInput } from "four/input";
+import { DragManager, PointerInput } from "fourJS/input";
 
 const drags = new DragManager({
   pointerInput,
@@ -71,13 +71,13 @@ the world publishes `lerp/slerp(animationPose, physicsPose)` weighted by the
 transform at all.
 
 ```ts
-import { AnimationMixer, AnimationSystem } from "four/animation";
+import { AnimationMixer, AnimationSystem } from "fourJS/animation";
 import {
   createPoseTargetCaptureSystem,
   PhysicsSystem,
   RigidBody,
-} from "four/physics";
-import { PoseTarget } from "four/scene";
+} from "fourJS/physics";
+import { PoseTarget } from "fourJS/scene";
 
 const animation = new AnimationSystem(); // priority 300
 const physics = new PhysicsSystem(); // priority 600

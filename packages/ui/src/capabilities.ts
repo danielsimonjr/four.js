@@ -12,7 +12,7 @@
  * a token nothing references leaves the bundle entirely.
  */
 
-import { defineCapability } from "@four/core";
+import { defineCapability } from "@fourjs/core";
 
 import type { UIControlRegistry } from "./control-registry.js";
 

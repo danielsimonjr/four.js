@@ -1,8 +1,8 @@
 /**
  * §77's textures across the packages that have to agree about them, on the
- * WebGPU backend (WP-R1.2) — `@four/materials` declares the read contract,
- * `@four/render` owns the `Texture` and §84's process-wide counters,
- * `@four/geometry` supplies the uv stream, `@four/render-webgpu` uploads.
+ * WebGPU backend (WP-R1.2) — `@fourjs/materials` declares the read contract,
+ * `@fourjs/render` owns the `Texture` and §84's process-wide counters,
+ * `@fourjs/geometry` supplies the uv stream, `@fourjs/render-webgpu` uploads.
  *
  * The WebGPU restatement of `texture-mipmaps.test.ts`'s composition claims,
  * in the vocabulary the backend actually speaks:
@@ -21,21 +21,21 @@
  *    — and its blit passes submit before the frame that samples the chain.
  */
 
-import { boxGeometry, planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { boxGeometry, planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   Renderable,
   Texture,
   liveTextureCount,
   textureMemoryBytes,
-} from "@four/render";
-import { WebgpuRenderer, textureByteLength } from "@four/render-webgpu";
+} from "@fourjs/render";
+import { WebgpuRenderer, textureByteLength } from "@fourjs/render-webgpu";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {

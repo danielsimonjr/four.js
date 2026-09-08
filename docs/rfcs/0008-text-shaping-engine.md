@@ -16,7 +16,7 @@ HarfBuzz-wasm as the likely route. This RFC is that decision.
 
 Verified against the tree (2026-09-06):
 
-- `@four/text` is the §56 MVP tier: a built-in 6×12 monospace ASCII face,
+- `@fourjs/text` is the §56 MVP tier: a built-in 6×12 monospace ASCII face,
   `buildGlyphAtlas`, and `layoutText`. It **produces data, never nodes**. Its
   frozen §3.1 row is `core, math, geometry`.
 - `layoutText` is a pen walk: one atlas glyph per code unit, explicit `\n`
@@ -24,7 +24,7 @@ Verified against the tree (2026-09-06):
   post-walk. The module header lists shaping as staged on this RFC.
 - The `Text` node lives in the umbrella `four` (R-28): one geometry over one
   atlas material. It consumes `layoutText`'s quads. It does not shape.
-- `@four/ui` `Label` measures through the same layout. Text *input*
+- `@fourjs/ui` `Label` measures through the same layout. Text *input*
   (selection, caret, clusters) is still blocked on a real shaper (S-6).
 - RFC 0004 alternative C was rejected in part because an engine `fillText`
   would pre-empt this decision. That rejection still holds.
@@ -51,7 +51,7 @@ rewrite them.
 The engine for §56's non-MVP rows — complex scripts, OpenType GSUB/GPOS,
 ligatures, mark positioning, Arabic/Indic reordering in concert with a bidi
 pass — is **HarfBuzz compiled to WebAssembly**, loaded as an **optional**
-adapter. It is not compiled into `@four/text`'s default graph and it is not
+adapter. It is not compiled into `@fourjs/text`'s default graph and it is not
 a §3.1 dependency of `text`, `ui`, or `four`.
 
 Reasons, against the native alternative argued in § Alternatives:
@@ -63,7 +63,7 @@ Reasons, against the native alternative argued in § Alternatives:
 - WASM is the only form that runs in the browser *and* in the headless
   Node/Bun suites without a native addon. A `.node` HarfBuzz binding would
   split the matrix (browser vs CI) and fail the "engine runs without DOM"
-  rule `@four/text` already keeps.
+  rule `@fourjs/text` already keeps.
 - Same WASM module + same font bytes + same script/language/features is
   **same-runtime deterministic** (§33). Host-OS text APIs are not.
 
@@ -72,7 +72,7 @@ host-OS/ICU binding. Both lose for full §56. A small first-party path
 remains as the **default identity shaper** (today's 1:1 code-unit walk) so
 the MVP tier and the §86 payload budget do not move.
 
-### 2. The seam is a `ShapingEngine` in `@four/text`
+### 2. The seam is a `ShapingEngine` in `@fourjs/text`
 
 ```ts
 export interface ShapedGlyph {
@@ -126,7 +126,7 @@ precedent (the `"left"` path does not run the shift loop).
 The WASM adapter (`HarfBuzzShapingEngine`) lives in the same package as a
 **separate entry** — `four/text/harfbuzz` or a dynamic import — so a
 consumer that never names it does not download the wasm. If the wasm blob
-cannot legally sit inside `@four/text` without dragging every importer
+cannot legally sit inside `@fourjs/text` without dragging every importer
 (bundler / `exports` map), the packet splits it into a workspace package
 **only after** an owner amendment to §98. The default recommendation is
 the extra `exports` entry, not a 25th package.
@@ -154,7 +154,7 @@ A malformed table is `UNTRUSTED_INPUT_REJECTED`, not a throw from inside
 wasm that escapes as an opaque trap — the adapter catches wasm faults and
 re-throws `FourError`.
 
-`@four/assets` may grow a font loader later; this RFC does not add one.
+`@fourjs/assets` may grow a font loader later; this RFC does not add one.
 The shaper accepts bytes the application already has. No URL parameter
 (RFC 0002 / RFC 0004: a function or a buffer, never a specifier).
 
@@ -174,7 +174,7 @@ wrapping packet, not this one.
 
 Shaped advances are **font units**, converted to world units by
 `layoutText` using the same `size / lineHeight` scale the MVP already
-defines. Conversion is deterministic arithmetic in `@four/text`.
+defines. Conversion is deterministic arithmetic in `@fourjs/text`.
 
 Painted or host-rasterised glyph *images* remain display content (RFC
 0004's rule). Glyph **metrics** from HarfBuzz are not: they are a pure
@@ -186,7 +186,7 @@ checksummed.
 ### 6. Payload and tree-shaking
 
 §86's minimal 2D app is `core + math + scene + render-webgl` ≤ 150 kB
-gzip and does not include `@four/text`. The real risk is **ui-demo** and
+gzip and does not include `@fourjs/text`. The real risk is **ui-demo** and
 any example that imports `four/text`. The identity path must remain the
 default export; the wasm must be absent from every bundle that does not
 name `HarfBuzzShapingEngine` or `four/text/harfbuzz`.
@@ -217,7 +217,7 @@ adapter behind a separate export + one Latin-ligature golden + the
 
 **Deferred:** wrapping / UAX #14; SDF/MSDF; vertical writing; colour
 fonts (COLR/CPAL); variable-font axis animation; a §79 font resource;
-`@four/assets` font loader; a 25th package.
+`@fourjs/assets` font loader; a 25th package.
 
 ## Alternatives
 
@@ -233,7 +233,7 @@ explicitly *not* the full engine.
 **B. Host-OS / browser shaping (`measureText`, `Intl`, CoreText,
 Uniscribe, DirectWrite).** Nicest visual match to the platform. Rejected:
 not same-runtime portable, not available in the headless suites without
-a DOM or a native addon, and `@four/text` compiles without `lib.dom`.
+a DOM or a native addon, and `@fourjs/text` compiles without `lib.dom`.
 RFC 0004 already refused a DOM-typed paint seam for this reason.
 
 **C. rustybuzz (Rust → wasm) instead of HarfBuzz C → wasm.** rustybuzz
@@ -243,11 +243,11 @@ so long as the ABI above is stable and the build is pinned. This RFC
 does not freeze the crate vs `harfbuzzjs` vs a custom build; it freezes
 **HarfBuzz-compatible shaping** behind `ShapingEngine`.
 
-**D. Make HarfBuzz a hard dependency of `@four/text`.** Simplest import.
+**D. Make HarfBuzz a hard dependency of `@fourjs/text`.** Simplest import.
 It blows the payload budget for every UI label in existence and pulls
 wasm init onto the critical path of the bitmap tier. Rejected.
 
-**E. New `@four/text-harfbuzz` package now.** Cleaner graph, but it is a
+**E. New `@fourjs/text-harfbuzz` package now.** Cleaner graph, but it is a
 25th directory not in §98. Rejected until the owner amends the monorepo
 tree. The `exports` map (or a later amendment) is the escape hatch.
 
@@ -270,7 +270,7 @@ the optional-entry rule will need repeating, the way RFC 0004 repeats
 "no `fillRect`".
 
 **Committed to.** Full §56 shaping is HarfBuzz-compatible WASM, optional.
-The default engine remains the identity pen walk. `@four/text` stays
+The default engine remains the identity pen walk. `@fourjs/text` stays
 data-only and DOM-free. Font bytes are untrusted. No new §98 package
 in this RFC. SDF and wrapping stay separate packets.
 
@@ -288,7 +288,7 @@ Rows in `docs/COMPATIBILITY.md` this RFC moves:
   `Text` document already stores string + style, not glyph ids. Shaping
   is recovered at load from the string plus a font key (A-16:
   resources are keys). A font *key* in the document is a later additive
-  row if `@four/assets` grows fonts.
+  row if `@fourjs/assets` grows fonts.
 - **Plugin API versions (§81).** Unmoved. A shaper is a value the
   application constructs (RFC 0002's preferred shape). No new
   capability token is required; one MAY be added later if plugins need
@@ -332,7 +332,7 @@ None run. What the first packet must measure:
    pathological, and a font is more "decoded program-like tables" than
    a raster.
 4. **Does `Label` grow a `shaper` option in the first packet?** It can
-   pass through to `layoutText` with no new `@four/ui` dependency.
+   pass through to `layoutText` with no new `@fourjs/ui` dependency.
    Recommendation: yes, optional, default omitted.
 5. **Vertical text.** Interface-ready, implementation refused until a
    dedicated packet. Confirm.

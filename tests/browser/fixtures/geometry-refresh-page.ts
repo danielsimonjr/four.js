@@ -1,6 +1,6 @@
 /** Real-driver comparison: queue old and new geometry draws before readback. */
-import { BufferGeometry } from "@four/geometry";
-import { GeometryCache, type WebglContext } from "@four/render-webgl";
+import { BufferGeometry } from "@fourjs/geometry";
+import { GeometryCache, type WebglContext } from "@fourjs/render-webgl";
 
 const WIDTH = 448;
 const HEIGHT = 64;

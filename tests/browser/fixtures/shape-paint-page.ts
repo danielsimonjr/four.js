@@ -40,18 +40,18 @@ import {
   createRenderStatistics,
   registerShapePaints,
   resetRenderStatistics,
-} from "@four/render";
+} from "@fourjs/render";
 import {
   WebglRenderer,
   registerNodeMaterialPipeline,
-} from "@four/render-webgl";
+} from "@fourjs/render-webgl";
 import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /** Canvas size the spec creates and this file reads back. */
 const WIDTH = 320;

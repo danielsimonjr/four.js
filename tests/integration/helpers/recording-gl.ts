@@ -18,7 +18,7 @@ import {
   GL,
   type ParticleGlContext,
   type WebglCanvas,
-} from "@four/render-webgl";
+} from "@fourjs/render-webgl";
 
 /** One recorded entry point call, with the arguments it was given. */
 export interface RecordedCall {

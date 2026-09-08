@@ -1,7 +1,7 @@
 /**
  * R-35 — the §84/§113 debug overlay, assembled and drawn (2026-08-07).
  *
- * `@four/diagnostics` produces the overlay's geometry as *data* and can never
+ * `@fourjs/diagnostics` produces the overlay's geometry as *data* and can never
  * produce it as a `BufferGeometry`: the frozen §3.1 dependency matrix gives the
  * package exactly three edges — `core`, `math`, `scene` — and `geometry` is not
  * one of them. So `debugDrawStreams` emits two plain `Float32Array`s in the
@@ -31,7 +31,7 @@
  * edited by the other.
  */
 
-import { BufferGeometry } from "@four/geometry";
+import { BufferGeometry } from "@fourjs/geometry";
 import {
   DEBUG_DRAW_DEFAULT_COLORS,
   DEBUG_DRAW_STAGED,
@@ -41,15 +41,15 @@ import {
   collectContactPoints,
   debugDrawStreams,
   type DebugPhysicsEventLike,
-} from "@four/diagnostics";
-import { UnlitMaterial } from "@four/materials";
-import { Scene } from "@four/scene";
+} from "@fourjs/diagnostics";
+import { UnlitMaterial } from "@fourjs/materials";
+import { Scene } from "@fourjs/scene";
 import {
   Renderable,
   buildRenderList,
   isUnlitItem,
   type RenderItem,
-} from "@four/render";
+} from "@fourjs/render";
 import { describe, expect, it } from "vitest";
 
 /**

@@ -53,7 +53,7 @@ gates in `playwright.config.ts` do).
   the step-9 listeners consume for the repaint.
   Fulfils the role sketched for `first-physics-scene/` (that directory is now a thin
   re-export of this page, 2026-09-06).
-- [`ui-demo/`](ui-demo/) — **Implemented.** §73–§75's retained-mode UI: a `@four/ui` panel of
+- [`ui-demo/`](ui-demo/) — **Implemented.** §73–§75's retained-mode UI: a `@fourjs/ui` panel of
   buttons and labels laid out by the package and skinned by the application, driven by real
   pointer and keyboard input, with a drawn focus ring (`bun run ui-demo:build`). Listed
   here from 2026-08-05; it shipped earlier and this file had never mentioned it.
@@ -97,12 +97,12 @@ gates in `playwright.config.ts` do).
   on §118's list in one scene, one fixed-step loop and one frame — a textured lit cube spun
   by a `MotionComponent`, a 2D vector orbit, a `SpringJoint` pendulum, a bouncing body whose
   §29 landings fire a particle burst and a re-launch impulse, a motorised `HingeJoint`, two
-  world-space labels (one rides the bouncing body), a `@four/ui` panel drawn by a second,
+  world-space labels (one rides the bouncing body), a `@fourjs/ui` panel drawn by a second,
   screen-space viewport under §47's `ScreenCamera` (it was parented to the camera until
   2026-08-21, when R-37's camera landed and the workaround was retired), a §16 `Timeline`,
   and pause / slow-motion / single-step controls that are keyboard-operable. It is also the first example to select its backend _and_ its solver
   through the §62/§37 registries (`renderer: "auto"`, `solver: "auto"`), and the first to
-  assemble the §113 debug overlay from `@four/diagnostics` streams.
+  assemble the §113 debug overlay from `@fourjs/diagnostics` streams.
   Build it with `bun run flagship:build`; it carries **both** Rapier wasm images (the cost
   of `registerRapierSolver()`, measured) and is ~1.54 MB gzip. This entry read "**not yet
   written; directory is a placeholder**" until that date.

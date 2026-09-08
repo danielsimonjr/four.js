@@ -21,15 +21,15 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-import { AnimationMixer } from "@four/animation";
+import { AnimationMixer } from "@fourjs/animation";
 import {
   AssetManager,
   createGltfLoader,
   type FetchResponse,
-} from "@four/assets";
-import { StandardMaterial } from "@four/materials";
-import { Mesh } from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/assets";
+import { StandardMaterial } from "@fourjs/materials";
+import { Mesh } from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   Bone,
   OrthographicCamera,
@@ -37,15 +37,15 @@ import {
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
-} from "@four/scene";
-import { instantiateGltf } from "four";
+} from "@fourjs/scene";
+import { instantiateGltf } from "fourJS";
 import { describe, expect, it } from "vitest";
 
 import { RecordingCanvas, createRecordingGl } from "./helpers/recording-gl.js";
 
 /**
  * The fixture directory **as a URL** — see `tests/determinism/gltf-load.test.ts` for the
- * full reason. `@four/assets` resolves a glTF's relative URIs against the asset's URL by
+ * full reason. `@fourjs/assets` resolves a glTF's relative URIs against the asset's URL by
  * splitting on "/", so a native Windows path collapses the base to "" and sends
  * `quad.bin` to the process CWD.
  */

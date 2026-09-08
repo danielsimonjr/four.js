@@ -1,4 +1,4 @@
-import { Vector3 } from "@four/math";
+import { Vector3 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

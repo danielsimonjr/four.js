@@ -76,7 +76,7 @@
  * {@link LIGHT_UNIFORM_MEMBERS_WGSL} so the two structs cannot drift.
  */
 
-import { MAX_PUNCTUAL_LIGHTS, type SceneLights } from "@four/render";
+import { MAX_PUNCTUAL_LIGHTS, type SceneLights } from "@fourjs/render";
 
 import {
   GPU_SHADER_STAGE,

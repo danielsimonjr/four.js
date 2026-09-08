@@ -8,7 +8,7 @@
  * What only a browser can answer here (`webgpu-unlit.spec.ts`'s argument):
  *
  * 1. **The sprite WGSL compiles and draws.** The source under test is
- *    `SPRITE_SHADER_SOURCE` imported from `@four/render-webgpu` itself — the
+ *    `SPRITE_SHADER_SOURCE` imported from `@fourjs/render-webgpu` itself — the
  *    quad-uniform uv derivation, the widened 160-byte block, the
  *    `texture × tint` product — none of which a fake device ever executes.
  * 2. **The §65 interleaved layout draws.** `batchVertexBufferLayout` puts
@@ -25,7 +25,7 @@ import {
   SPRITE_SHADER_SOURCE,
   batchVertexBufferLayout,
   unlitShaderSource,
-} from "@four/render-webgpu";
+} from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */

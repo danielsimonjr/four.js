@@ -74,7 +74,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - RFC 0003 residue (staged in source, 2026-08-28):
 - RFC 0003 prototype measurements still owed:
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
-- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color strings on lights, light layers; hoist the lit shader's per-vertex inverse-transpose to a per-draw normal-matrix uniform when @four/math grows a Matrix3 utility (dated note in gl-program.ts)
+- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color strings on lights, light layers; hoist the lit shader's per-vertex inverse-transpose to a per-draw normal-matrix uniform when @fourjs/math grows a Matrix3 utility (dated note in gl-program.ts)
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
 - Follow-ups the R-1 plan explicitly defers
 - PH-11c — character/dynamics push interaction — DONE 2026-09-06 (`pushMass` / reduced-mass impulse / wake).
@@ -156,7 +156,7 @@ and only the first is unambiguous.
 - [x] **Stage 1 — BRANDING (done).** 220 replacements across 128 tracked files: every place
       the *library* was called `four.js` now reads **fourJS**. Surgical, not a blanket
       replace — verified the pattern leaves `four.js-monorepo`, `four.json`, `four.js/`
-      paths and `@four/*` untouched, and never touches bare `four`, which is overwhelmingly
+      paths and `@fourjs/*` untouched, and never touches bare `four`, which is overwhelmingly
       the numeral (130 "all four", 34 "four of", 11 "four packages").
       Generated docs were NOT hand-edited: the 31 occurrences in `duplicate-symbols.md` came
       from `tools/create-dependency-graph/duplicate-allowlist.json`, so the generator's INPUT
@@ -185,7 +185,7 @@ and only the first is unambiguous.
         Windows cannot leak goldens that could never match CI.
 
 - [ ] **Stage 2 — PACKAGE IDENTIFIERS (needs Daniel's call, not mine).** `four` → `fourjs`
-      and `@four/*` → `@fourjs/*`. Both are npm-legal (lowercase) and would match the
+      and `@fourjs/*` → `@fourjs/*`. Both are npm-legal (lowercase) and would match the
       already-chosen publish target `@danielsimonjr/fourjs`. **Why this is not a drive-by:**
       it rewrites every import specifier in the repo, the workspace map, the lockfile and
       `apply-publish-names.mjs`'s mapping — and Daniel has already fixed the *published*
@@ -389,7 +389,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       repair a misleading name; it only apologises after the fact.**
 
       Two things are true at once and both need a decision:
-      · **The name.** In a package called `@four/input`, `KeyboardInput` reads as "the way to
+      · **The name.** In a package called `@fourjs/input`, `KeyboardInput` reads as "the way to
         read the keyboard". It routes DOM key events to a focused scene node. Something like
         `SceneKeyRouter` / `FocusedKeyRouter` would not be reached for by a user wanting WASD.
       · **The gap it hides.** Grepped for a polled key-state helper across every package:
@@ -515,7 +515,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       taken over *parsed* content, and `JSON.parse` does not care about line endings.
 
       The real error was `ENOENT: open 'C:/Users/danie/Github/four.js/quad.bin'` — the
-      buffer URI resolving against the process CWD. `resolveUri` in `@four/assets`
+      buffer URI resolving against the process CWD. `resolveUri` in `@fourjs/assets`
       resolves a glTF's relative URIs against the asset's **URL**, lexically, splitting on
       `/`. That is correct and deliberate (§33: the package names no `URL` global). The
       tests passed `fileURLToPath(...)` — a *native* path — so on Windows
@@ -581,9 +581,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 
 - [x] **`KeyboardInput` is UI focus-routing, and its name sends game code to the wrong
       tool.** Found by the flight-sim persona; never filed until now, which is why it is
-      dated late. `@four/input`'s `KeyboardInput` takes
+      dated late. `@fourjs/input`'s `KeyboardInput` takes
       `(surface, { focusTarget: () => Node | null })` and dispatches to a *focused scene
-      node* — it pairs with `@four/ui`'s `keyboardFocusTarget(root)`. A game reading WASD
+      node* — it pairs with `@fourjs/ui`'s `keyboardFocusTarget(root)`. A game reading WASD
       wants none of that, and four offers no first-class alternative: its own
       `examples/character-controller` uses raw `window.addEventListener("keydown")`. So the
       sanctioned path for game input is the DOM, undocumented, while the class whose name
@@ -741,7 +741,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       simulation package (`math`, `motion`, `scene`, `physics`, `animation`, `particles`),
       because those are the packages a replay's numbers come from (§33). Registering it in
       `GATED` fails the same test's other half. Running it unconditionally is not free
-      either: ~100 B gzip in every bundle carrying `@four/scene`, and `examples/ui-demo`
+      either: ~100 B gzip in every bundle carrying `@fourjs/scene`, and `examples/ui-demo`
       sits **at** its 45 kB §86 budget. So the fix is an owner call — accept the bytes and
       raise that budget, put the check somewhere outside the simulation envelope, or leave
       the mistake to TypeScript.
@@ -758,7 +758,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       **DECIDED 2026-09-06: leave it to TypeScript. Closed, with the cost measured.**
       The DEV-gated version is forbidden — §33 bars a simulation package from branching on
       the build flag, and `scene` is one. So the only remaining shape is an unconditional
-      guard, which every shipped bundle carrying `@four/scene` pays for forever.
+      guard, which every shipped bundle carrying `@fourjs/scene` pays for forever.
       Measured rather than estimated: a guard whose entire message is
       `"Node is abstract; use Group (§6)."` — 49 characters, about as terse as a useful
       error gets — put `examples/ui-demo` **41 B over** its 45 kB §86 budget
@@ -774,7 +774,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 - [x] **Publish path was broken — `apply-publish-names` exited 1, so fourJS could not be
       published at all.** Found by dogfooding the publish path rather than the API. Rewriter did
       not match subpath specifiers while the validator flagged them; two renderer error messages
-      also named `@four/*` to consumers who would have `@danielsimonjr/fourjs-*`. Both fixed;
+      also named `@fourjs/*` to consumers who would have `@danielsimonjr/fourjs-*`. Both fixed;
       the tool now exits 0 (24 packages staged, 724 specifiers rewritten).
 
 - [x] **Dogfooding session 1 finding: `transformAuthority` defaults to `"manual"`, so a physics
@@ -901,7 +901,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 - [x] **A-11 analytic tier (`"geometry"`) — DONE 2026-08-29** (adopted RFC 0005
       Q3 executed): `node.hitTestMode` (`null` default = engine-selects;
       `"custom"` omitted until a callback strategy exists) +
-      `Pickable.triangles` + exact ray/triangle in `@four/input` (no new edge),
+      `Pickable.triangles` + exact ray/triangle in `@fourjs/input` (no new edge),
       §79 via one wrapper over every umbrella pair (unset scenes
       byte-identical), §85 refusals, §33 pure-math determinism pinned. 36 new
       tests; input/four/geometry 100×4. **A-11 is closed.** ui-demo budget
@@ -925,7 +925,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       (`maxUniformBufferBytes`/`maxBindings` on `WebglRenderer`) and
       `WebgpuRenderer`'s absent `maximumSkinningJoints`; the phantom
       `MAX_VERTEX_UNIFORM_VECTORS` conversion aside is deleted. Comment-only;
-      `@four/render` 627 tests and `pnpm run docs` (0 warnings) green.
+      `@fourjs/render` 627 tests and `pnpm run docs` (0 warnings) green.
 - [x] **docs/guides/materials-and-render-graph.md — DONE 2026-08-29**: rewritten
       to the tip (§60 RFC 0001, §62 R-1 complete, §65 opt-in R-9, §68–§70
       R-17/R-18/R-6, §55 `frame` R-29), every claim verified in source; four
@@ -941,7 +941,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 
       0001's landing decides WP-R1.9's
                                               input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-                                              reachability are backend-independent and re-exported through `@four/render`;
+                                              reachability are backend-independent and re-exported through `@fourjs/render`;
                                               the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
                                               (screen domain included, for §70 graph effects).
 
@@ -972,7 +972,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       and controller channel cost at 180 channels. §86 has no skinned-mesh
       performance target yet — propose one from those measurements.
 - [x] **glTF loader (§78) shipped 2026-08-29** — `createGltfLoader`/`GltfAsset`
-      (`@four/assets`) + `instantiateGltf` (`four`), glTF 2.0 core tier: both
+      (`@fourjs/assets`) + `instantiateGltf` (`four`), glTF 2.0 core tier: both
       containers, all six §53 attributes, §59 factors + base-colour texture,
       skins (landed 48-joint refusal), LINEAR/STEP animations via the RFC 0003
       binding form. Refusal list recorded in `gltf.ts`'s header; digests pinned
@@ -1003,7 +1003,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       transparent masks and contact shadows remain),
       §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color
       strings on lights, light layers; hoist the lit shader's per-vertex
-      inverse-transpose to a per-draw normal-matrix uniform when @four/math grows a
+      inverse-transpose to a per-draw normal-matrix uniform when @fourjs/math grows a
       Matrix3 utility (dated note in gl-program.ts)
 - [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
       family list now names `LitMaterial`
@@ -1101,7 +1101,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       GPU-readback RFC), device-loss recovery (today: new emitter).
       particles-demo budget bumped 35.5 → 36 kB with the +0.55 kB measurement.
 - [x] **Q3 promotion DONE 2026-08-29** — `ComputePassDescriptor` (+ structural
-      `ComputeBuffer`, `supportsCompute`) in `@four/render`; optional
+      `ComputeBuffer`, `supportsCompute`) in `@fourjs/render`; optional
       `Renderer.compute?()` (fourth optional-member instance); `render-webgpu`
       re-exports the very tokens; the umbrella's `Four.ComputePass` named-map
       sugar landed with it (§82 names it — key insertion order = binding
@@ -1117,33 +1117,33 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       fail-fast, optional-never-gates.
 
 - [x] **R-31 mechanism closed on WebGPU (WP-R1.8, 2026-08-29)** — see the R-31
-      residue item above for the remaining `@four/particles` wiring; WebGL 2
+      residue item above for the remaining `@fourjs/particles` wiring; WebGL 2
       declares the tier absent.
 - [ ] **Follow-ups the R-1 plan explicitly defers** (each needs its own filing): §63
       transient-target pooling and barrier scheduling (must land on both backends or
       neither); §65's persistent-mapped/staging-ring buffers; §27 GPU fields and §36
       `collisions: "depth-buffer"`; ~~RFC 0005's `Rectangle2` prerequisite for a regional
       `readPixels`~~ **DONE 2026-08-29** — `render/src/renderer.ts:464` states it outright
-      (*"`readPixels` joined the interface when `Rectangle2` landed in `@four/math`
+      (*"`readPixels` joined the interface when `Rectangle2` landed in `@fourjs/math`
       (2026-08-29; RFC 0005's recorded prerequisite, cleared)"*), `Rectangle2` is exported
-      from `@four/math`, and `render/src/read-pixels.ts:44` declares
+      from `@fourjs/math`, and `render/src/read-pixels.ts:44` declares
       `readPixels(target, region?)`.
 - [x] **PH-11 residue — §12 character controllers DONE 2026-08-21.**
-      `CharacterController` + `FirstPersonLook` in `@four/motion`, advanced by the
+      `CharacterController` + `FirstPersonLook` in `@fourjs/motion`, advanced by the
       existing `KinematicSystem` under §42's `"kinematic"` authority; §79 pair
       registered; new §33 golden; first-person closed by composition (character yaw +
       child-node pitch), not by a new rig class. Playground sensor-zone test verified
       green on the settled tree (the earlier failure was the in-flight build state).
 - [x] **PH-11b — solver-backed character controller DONE 2026-08-21.**
-      `SweptCharacterController` + `SweptCharacterSystem` in `@four/physics` over
+      `SweptCharacterController` + `SweptCharacterSystem` in `@fourjs/physics` over
       `PhysicsWorld.shapeCast` (§30): capsule sweep, slide-along-wall, step height,
       slope limit, ground snap. The recorded question is answered — it **holds** a
       `CharacterController` (its vertical state is ES-private with no setters, and
-      `grounded` is a promise about a plane), so `@four/motion` needed no edit. §39
+      `grounded` is a promise about a plane), so `@fourjs/motion` needed no edit. §39
       step 4 before the solve, §42 `"kinematic"`, §79 with the physics family, new §33
       golden on real Rapier 3D. Platform carry and pushing dynamics staged with seams
       named (`groundBody` + `translate()` published for the first).
-- [x] **PH-11c — character/dynamics push interaction (`@four/physics`).** DONE
+- [x] **PH-11c — character/dynamics push interaction (`@fourjs/physics`).** DONE
       2026-09-06 — reduced-mass impulse `μ · closingSpeed · (−n) · scale` at
       `ShapeCastHit.point`; `pushMass` default 80 kg; wakes sleepers;
       `pushDynamics` opt-out.
@@ -1160,7 +1160,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       wired into CI after `Build`; 21 errors in five classes fixed as the misspelled
       intent; the text visual golden regenerated deliberately (the fixture now clears
       as it always intended). Closes the hole R-8 identified.
-- [x] **`Rectangle2` in `@four/math` — DONE 2026-08-29**, and §61's
+- [x] **`Rectangle2` in `@fourjs/math` — DONE 2026-08-29**, and §61's
       `readPixels(target, region?)` landed with it on the interface and both
       backends (WebGPU region via `copyTextureToBuffer` origin; WebGL via the
       stalling form in the promise shape, defended in-source). RFC 0005 Q5's
@@ -1179,7 +1179,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       flagships on the ScreenCamera recipe; workaround notes deleted; AUDIT-120 and
       the text README corrected with a new check-docs pin.
 - [x] **Stale trackball staging note — DONE 2026-08-21** (rig table points at
-      `@four/scene`'s `TrackballRig`).
+      `@fourjs/scene`'s `TrackballRig`).
 - [x] **R-21 — §53 geometry model (2026-08-21).** `Geometry` base, `clone()`,
       `BoundingVolume` (box + circumscribing sphere). `GeometryBounds` aliased, R-8
       unmodified. Seven §53 subclasses and hierarchical volumes deliberately staged with
@@ -1200,13 +1200,13 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       gravity. §27 GPU fields, `collisions: "depth-buffer"`, GPU-emitter §79/§34,
       and device-loss recovery remain separate follow-up packets (see R-31
       residue above). The stale "blocked by R-1" note predated WP-R1.8.
-- [x] **R-7 — §67 stencil support (2026-08-21).** `StencilState` in `@four/materials`,
+- [x] **R-7 — §67 stencil support (2026-08-21).** `StencilState` in `@fourjs/materials`,
       `RendererOptions.stencil` / `RenderTargetOptions.stencil`, backend application and
       packed `DEPTH24_STENCIL8` allocation, `FRAME_BEFORE_R7` recorded on the reverted
       build, real-driver masking proof (browser gate now 64 tests). Budgets bumped
       34/31/39.5 kB with A/B measurements.
 - [x] **§67 clipping API (from R-7's residue) — closed 2026-08-28.** `node.clip` in
-      `@four/scene`; allocator/mask emission in `@four/render/src/clip.ts`; backend
+      `@fourjs/scene`; allocator/mask emission in `@fourjs/render/src/clip.ts`; backend
       application, §79 pair, batching break, per-view masks; browser proof
       `tests/browser/clipping.spec.ts` (nested intersection measured at exactly 1/6).
       §73's scroll view now waits only on §74 overflow/scroll extent + a gesture
@@ -1241,7 +1241,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `event-dispatch-split.json`. Steps 7–8 closed as not splittable, documented in
       `physics-event-system.ts`.
 - [x] **PH-20 — §33 rollback (2026-08-21).** `RollbackBuffer` + `RollbackTarget` in
-      `@four/diagnostics`; `tests/determinism/rollback.test.ts`.
+      `@fourjs/diagnostics`; `tests/determinism/rollback.test.ts`.
 - [x] **PH-22 residue (re-read 2026-08-21):** ~~`PH-22f` joint-anchor mutability~~
       **DONE 2026-09-06** (`Joint.setAnchors` is body-local; drained via
       `setJointAnchors` / Rapier `setAnchor1`/`setAnchor2`); ~~CCD/FABRIK/limits~~
@@ -1250,7 +1250,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`);
       ~~`PH-22l` `Clock`~~ **DONE 2026-09-06** (type alias for `TimeState`);
       ~~`PH-22n` remainder — §10's dropped-time warning is app-tier in
-      `packages/four`'s `Application`~~
+      `packages/fourJS`'s `Application`~~
       (**done 2026-08-30**: `Application.step` emits a `devWarnOnce` when
       `TimeState.droppedTime` is non-zero).
 - [x] **Step-8 sensor bookkeeping example — DONE 2026-08-29.**
@@ -1262,7 +1262,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       agreement band — an exact contact boundary may legitimately disagree by
       one). +405 B gzip; existing playground specs untouched and green.
 - [x] **R-8 DONE 2026-08-09** — §64 per-view render lists (`buildViewRenderList`, derive
-      not rebuild), §87 frustum culling (`Frustum` in `@four/math`,
+      not rebuild), §87 frustum culling (`Frustum` in `@fourjs/math`,
       `computeWorldBoundingSphere`, default-on, fails towards drawing), §49
       `frustumCulled` (§79-serialized), and §66 key 4 (`sortRenderListByDepth`, opt-in
       verb). Budgets bumped 32.5/30/38 kB with A/B measurements. Residue: occlusion
@@ -1273,11 +1273,11 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       (c) excess-property cases already rewritten.
 - [x] **PH-8 — §26/§27 force fields for rigid bodies.** Closed 2026-08-09: `ForceField` +
       `ForceFieldSystem` at §39's `PRIORITY_FORCES`, `PhysicsWorld.forEachActiveBody`,
-      required per-field units, structural reuse of `@four/particles`' §27 field set with
+      required per-field units, structural reuse of `@fourjs/particles`' §27 field set with
       no new §3.1 edge, new same-runtime golden
       `tests/determinism/golden/force-fields.json`.
 - [x] **PH-12 — §8 space modes, physics tier.** Closed 2026-08-09: `SpaceMode` vocabulary
-      in `@four/core`, `RigidBody.space`, `PhysicsWorld.addBody` enforcing §8's sentence
+      in `@fourjs/core`, `RigidBody.space`, `PhysicsWorld.addBody` enforcing §8's sentence
       with two distinct refusals, §79 round trip.
 - [x] **§8 node-level `NodeSpace` component (PH-12 remainder).** DONE 2026-09-06
       — class + `NODE_SPACE_SERIALIZER` + `registerSceneNodeTypes`. Presentation
@@ -1301,8 +1301,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       argument (one list, many views ⇒ a depth key would be wrong, not merely
       disruptive).
 - [x] **R-9 DONE 2026-08-09 (consecutive-run tier)** — §65 sprite and compatible-shape
-      batching: `RenderBatcher` (`@four/render`) + `createGlBatching()`
-      (`@four/render-webgl`), opt-in per renderer and 0 B in bundles that do not ask.
+      batching: `RenderBatcher` (`@fourjs/render`) + `createGlBatching()`
+      (`@fourjs/render-webgl`), opt-in per renderer and 0 B in bundles that do not ask.
       Drawn through the existing unlit program (no new pipeline, no shader edit); pixel-
       identical on SwiftShader (0/76 800 differ, 13 draws → 3); 100 k sprites → 7 draws,
       50 k shapes → 4. Two §86 rows moved from feature-blocked to half-measured.
@@ -1344,7 +1344,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       (`generateMipmap`, the min/mag split, a lazily negotiated
       `EXT_texture_filter_anisotropic`). `Texture.byteLength` bills the chain.
       Byte-identity structural, asserted as whole transcripts; new integration + browser
-      gates. `@four/assets` deliberately untouched — mipmap generation is an upload
+      gates. `@fourjs/assets` deliberately untouched — mipmap generation is an upload
       decision, and `new Texture({ ...asset, mipmaps: true })` already works. Budgets
       bumped 34.5/32/40.5 kB with A/B numbers.
 - [ ] **R-30c — the rest of §77, scoped by why each is not ordinary work:**
@@ -1367,14 +1367,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       mid-simulation, §79 serializers registered in the same batch, new determinism
       golden. 0 B in five of six bundles, +2.8 kB in `motor-digital-twin`.
 - [x] **§12 character controllers + first-person look (PH-11 residue).** DONE —
-      `CharacterController` + `FirstPersonLook` in `@four/motion` (2026-08-21),
-      `SweptCharacterController` + `SweptCharacterSystem` in `@four/physics`
+      `CharacterController` + `FirstPersonLook` in `@fourjs/motion` (2026-08-21),
+      `SweptCharacterController` + `SweptCharacterSystem` in `@fourjs/physics`
       (PH-11b, same date), and `examples/character-controller` as the tenth
       browser-gate site (2026-08-29). First-person closed by composition
       (character yaw + child-eye pitch), not a new rig class. PH-11c
       (kinematic→dynamic push) remains the only staged half.
 - [x] **Staged rigs — trackball and fly DONE 2026-09-06.** `TrackballRig` verified
-      in `@four/scene` (`packages/scene/src/trackball.ts`,
+      in `@fourjs/scene` (`packages/scene/src/trackball.ts`,
       `packages/scene/tests/trackball.test.ts`, R-37 2026-08-21). Fly documented as
       a working application snippet in
       `docs/guides/cameras-and-coordinate-conversion.md` (no class — reuses
@@ -1391,7 +1391,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       attachment, first-person look (`OrbitRig`, `FollowRig` + `SpringDamper`,
       `LookAtConstraint` + `ConstraintSystem` at 700, Rapier chase in
       `camera-rigs.test.ts`, `FirstPersonLook` + `CharacterController`),
-      `TrackballRig` (`@four/scene`, R-37), fly (guide snippet in
+      `TrackballRig` (`@fourjs/scene`, R-37), fly (guide snippet in
       `docs/guides/cameras-and-coordinate-conversion.md`). Remaining:
       shake/impulse (`CameraShake`, staged under "Staged rigs" above).
 - [x] **Examples onto `lookAt` — DONE 2026-08-21.** Camera and sun in
@@ -1458,12 +1458,12 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       2026-09-06 (`EffectRenderPass.rect`). Tone mapping / sRGB encode / pass
       inspector / outlines remain.
 - [x] **A-2/PH-13 CLOSED 2026-08-07** (one item, filed twice): §40 `UnitSystem` in
-      `@four/core` at the conversion/authoring tier the spec specifies; display-only
+      `@fourjs/core` at the conversion/authoring tier the spec specifies; display-only
       rule enforced by an integration test that forbids any other package importing it
 - [x] **§40 follow-ups:** `PhysicsWorldOptions.units` DONE 2026-09-06
       (`PhysicsWorldUnits` scale; omitted = identity). §79 header units and
       `parseAngle("90°")` locale/failure policy remain.
-- [x] **R-5 CLOSED (linear-pass tier) 2026-08-07:** `RenderGraph` in `@four/render` —
+- [x] **R-5 CLOSED (linear-pass tier) 2026-08-07:** `RenderGraph` in `@fourjs/render` —
       passes over R-4's target seam, transcript-identical to hand-written calls,
       tree-shakes out of all bundles. **R-6 (§70 post-FX) now unblocked — effects are
       graph passes; do not build a parallel mechanism**
@@ -1498,13 +1498,13 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       §83 leak audit gated; eight example configs define it false; 0.46–0.52 kB gzip
       saved each (ui-demo 30.46/31); §33 allowlist enforced by an integration test.
       A-1 follow-up (d) closed; A-5's dev-flag dependency discharged
-- [x] **A-4 remainder:** the `@four/diagnostics` §85 validation catalogue (closure
+- [x] **A-4 remainder:** the `@fourjs/diagnostics` §85 validation catalogue (closure
       step 2); converting scattered scene/physics checks to `devAssert` (step 3);
       **CLOSED 2026-09-07. Step 2 is DONE; step 3 is WON'T-DO, for the same reason
       step 4 was reverted — and the item should have said so already.**
       · *Step 2 verified independently, not taken on report:* `validation.ts` is 278
       lines / 18 exports, re-exported from `diagnostics/src/index.ts`, carries its own
-      `tests/validation.test.ts`, and is consumed by `packages/four`
+      `tests/validation.test.ts`, and is consumed by `packages/fourJS`
       (`application.ts`, `diagnostics.ts`) — a catalogue nothing imported would not
       have counted.
       · *Step 3 cannot be done as written.* `devAssert` opens `if (!DEV) return`, so
@@ -1518,11 +1518,11 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       · *Where the work actually belongs:* §33's envelope is the point, not an obstacle
       — a replay recorded in a dev build must reproduce bit-exactly in production, so a
       simulation package must behave identically either way. Checks that want DEV live
-      in `@four/diagnostics`, which is already GATED and already holds the catalogue.
+      in `@fourjs/diagnostics`, which is already GATED and already holds the catalogue.
       Scene/physics keep unconditional `console.warn` + WeakMap suppression, which is
       exactly what `warnAuthorityConflict` settled on when step 4 was reverted.
       ~~routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
-      package)~~ **REVERTED on `main` 2026-09-06** — `@four/scene` cannot import
+      package)~~ **REVERTED on `main` 2026-09-06** — `@fourjs/scene` cannot import
       `DEV` (§33 simulation envelope); `warnAuthorityConflict` stays
       `console.warn` + WeakMap once-per-pair suppress;
       define (0.75 kB); remaining §83 warnings: ~~disposed-in-use~~ **DONE 2026-09-06**
@@ -1531,7 +1531,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `devWarnOnce`); ~~stale physics handles~~ **DONE 2026-09-06**
       (`rejectStalePhysicsHandle`); ~~per-frame allocations~~ **DONE 2026-09-06**
       (`auditFrameAllocations`); ~~leaked resources / FinalizationRegistry~~
-      **DONE 2026-09-06** (`trackDisposable` in `@four/core`; Texture /
+      **DONE 2026-09-06** (`trackDisposable` in `@fourjs/core`; Texture /
       CanvasTexture / RenderTarget / BufferGeometry / Material constructors
       register; `dispose()` unregisters; `auditFinalizedLeaks` stays opt-in)
 - [x] **§118 flagship DONE 2026-08-07** (A-21's second half):
@@ -1600,12 +1600,12 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       update hook; list/virtual list/scroll view need §74 overflow + §67 clipping; text
       input needs §56 (S-6); embedded viewport needs §48; slider drag-past-the-track
       needs §71's analytic drag plane
-- [x] **R-4 DONE 2026-08-07:** `RenderTarget` (@four/render) + `RenderTargetCache`
-      (@four/render-webgl), `Renderer.render(..., target?)`; render-to-texture through
+- [x] **R-4 DONE 2026-08-07:** `RenderTarget` (@fourjs/render) + `RenderTargetCache`
+      (@fourjs/render-webgl), `Renderer.render(..., target?)`; render-to-texture through
       the untouched `MaterialTexture` seam; no-target frames issue zero framebuffer
       calls (byte-identical 449-call proof). **R-5 (§63 graph) and R-6 (§70 post-FX)
-      now unblocked.** Follow-ups: `Viewport.renderTarget` (needs @four/scene),
-      `readPixels` + `Rectangle2` in @four/math (§92 first consumer), stencil (R-7),
+      now unblocked.** Follow-ups: `Viewport.renderTarget` (needs @fourjs/scene),
+      `readPixels` + `Rectangle2` in @fourjs/math (§92 first consumer), stencil (R-7),
       MRT/multisample/float formats, samplable depth (§69)
 
 ### Gap-closure wave 2 (2026-08-07) — in progress
@@ -1626,7 +1626,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `loadWithDependencies` / `loadGraph`, injected `workerFactory` decode,
       injected `watch`. Content hashing already shipped 2026-08-21.
 - [x] **A-16 remainder (manifest half):** DONE 2026-09-06 —
-      `preloadManifestIntoCatalog` in `@four/four` walks a manifest, loads each
+      `preloadManifestIntoCatalog` in `@fourjs/four` walks a manifest, loads each
       key, and returns `resourceCatalog(...)`. `get(key)` stays synchronous.
       `tests/integration/texture-manifest.test.ts` uses the helper; the
       hand-rolled walk remains as a lower-level proof.
@@ -1634,7 +1634,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       compressed containers, video). §78 glTF/GLB shipped 2026-08-29 at the
       glTF 2.0-core tier; its staged residue lives with other rows: morph
       targets wait on the GPU morph path (RFC 0003 staging), CUBICSPLINE waits
-      on a squad/tangent decision in `@four/animation`, and the four
+      on a squad/tangent decision in `@fourjs/animation`, and the four
       unsampleable material texture slots (`ignoredTextures`) wait on the
       multi-texture-unit widening `gl-program.ts` records (R-13 follow-up) —
       metallic-roughness landed 2026-09-06; normal/occlusion/emissive remain.
@@ -1652,7 +1652,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `.colors`, `UnlitMaterial.map`/`.vertexColors`, `LitMaterial.map`, nine 3D
       primitives. **R-35 is now unblocked** (data path + vertexColors exist; what's left
       is wiring `DebugDrawBuffer`'s 7-float layout into a `BufferGeometry` — a
-      `@four/diagnostics` packet). R-9/R-13/R-22/R-30/R-32 lose their R-19 dependency
+      `@fourjs/diagnostics` packet). R-9/R-13/R-22/R-30/R-32 lose their R-19 dependency
 - [ ] **R-19/R-20 follow-ups:** §52 tessellation module (lifts the concave-extrude
       restriction); §55 atlas packet (retires the sprite `quad` uniform with authored
       uvs); ~~qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly~~
@@ -1723,7 +1723,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       (`LATEST_REPLAY_FORMAT_VERSION`/`MINIMUM_REPLAY_FORMAT_VERSION` with the old name
       as a deprecated alias; document bytes proven unchanged)
 
-- [x] **A-10 DONE 2026-08-07.** `@four/input` gains `KeyboardInput` over a duck-typed
+- [x] **A-10 DONE 2026-08-07.** `@fourjs/input` gains `KeyboardInput` over a duck-typed
       `KeySurface`, `SceneKeyEvent` with `preventDefault()`, `dispatchKeyEvent`, and the
       shared three-phase `propagation.ts`. Remaining input sources (wheel, gamepad, XR)
       plus `keypress` and focus/blur-as-input-events are recorded in
@@ -1740,10 +1740,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 (`MOTION_COMPONENT_SERIALIZER`, `registerSceneNodeTypes()`/`registerUISerializers()`), `PH-6`
 (§34 `worldConfiguration`). What they left behind:
 
-- [x] **PH-17 remainder — done 2026-08-06.** `@four/physics` exports
+- [x] **PH-17 remainder — done 2026-08-06.** `@fourjs/physics` exports
       `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER` (plus `serializeCollisionShape` /
       `deserializeCollisionShape` and the three document types), typed against the
-      `ComponentSerializerShape` `@four/motion` declares — imported over the existing
+      `ComponentSerializerShape` `@fourjs/motion` declares — imported over the existing
       `physics → motion` edge, so there is one transcription in the repo and no new §3.1
       edge. Registered by the umbrella's new `registerPhysicsSerializers()`, which
       `registerSceneNodeTypes()` calls; a physics scene now saves with no
@@ -1762,7 +1762,7 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 - [x] **A-9 remainder DONE 2026-08-09:** `pointerType` runs end to end — platform
       `string` in, `PointerDeviceType` (`"mouse" | "pen" | "touch"`) on every
       `ScenePointerEvent`, unknown values reported as absent rather than refused. A
-      mouse now keeps its hover across its own release (a `@four/ui` button no longer
+      mouse now keeps its hover across its own release (a `@fourjs/ui` button no longer
       un-highlights when clicked — `tests/integration/pointer-type.test.ts`);
       `pointercancel`, pen, and device-less sources keep the old teardown. Bounded:
       10 000 mouse clicks leave `trackedPointerCount` at 1
@@ -1776,7 +1776,7 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       (`FrameStats`; this is §45's diagnostics surface), `app.physics`,
       `autoResize`, and `reducedMotion` all shipped. `app.input` is
       **refused by design** (`application.ts` header: §45 names "input
-      routing" in prose, lists no input option, and `@four/input` has two
+      routing" in prose, lists no input option, and `@fourjs/input` has two
       coequal subsystems — electing one to _be_ `app.input` would invent
       an API).
 
@@ -1813,7 +1813,7 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       — CPU DONE 2026-09-06; R-32 appearance + GPU radial field +
       `collisions: "depth-buffer"` ground-rest stub DONE 2026-09-06. True
       depth-texture collide-and-kill and GPU snapshots remain.
-- [x] spatial-hash neighbors — DONE 2026-09-06 (`SpatialHash` in `@four/motion`, WP-8.2)
+- [x] spatial-hash neighbors — DONE 2026-09-06 (`SpatialHash` in `@fourjs/motion`, WP-8.2)
 
 ### Backlog additions (Phase 8, 2026-08-02)
 
@@ -1944,8 +1944,8 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       multi-stop ramps; stale §24/§12 entries retired.
 
 - [x] 2026-09-06 — **FinalizationRegistry leak tracking (A-4/A-5).** Tracker
-      lives in `@four/core` so render/geometry/materials never import
-      `@four/diagnostics`. Constructors register; `dispose()` unregisters;
+      lives in `@fourjs/core` so render/geometry/materials never import
+      `@fourjs/diagnostics`. Constructors register; `dispose()` unregisters;
       `auditFinalizedLeaks` remains an opt-in drain. `trackedDisposableId` is
       the test hook.
 
@@ -1957,7 +1957,7 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       for depth/stencil/samplable-depth accounting.
 
 - [x] 2026-09-06 — **SpatialHash (WP-8.2, #73).** Uniform-grid neighbours in
-      `@four/motion`.
+      `@fourjs/motion`.
 
 - [x] 2026-09-06 — **Auto-selection §62 (#73).** Real WebGPU rung in integration tests.
 
@@ -1983,7 +1983,7 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       `ForceField.sampleTorque` (N·m). Per-entry `wakesSleepingBodies`
       visits sleepers without letting a sibling gravity field defeat §32.
       A-4 step 4: `warnAuthorityConflict` stays `console.warn` (§33 bars
-      `devWarnOnce` in `@four/scene`; reverted on `main` 2026-09-06).
+      `devWarnOnce` in `@fourjs/scene`; reverted on `main` 2026-09-06).
 
 - [x] 2026-09-06 — **PoseTarget scale channel.** Physical side of the §19
       blend is identity `(1, 1, 1)` — the only scale a rigid body has.
@@ -2031,12 +2031,12 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       tracker rows); `check-docs` scans package READMEs + Architecture prose.
       Per-item scissor, RFC residue, R-32/R-33, PH-11c remain owner-gated.
 - [x] 2026-08-04 — **Lighting MVP shipped** (§120's last unshipped bullet; owner-directed,
-      minimal tier): `DirectionalLight` node + `Scene.ambientLight` in @four/scene (§68),
-      `LitMaterial` + `kind` discriminants in @four/materials (§57), optional `normals`
-      vertex attribute in @four/geometry (box now 24 verts with per-face normals, plane
+      minimal tier): `DirectionalLight` node + `Scene.ambientLight` in @fourjs/scene (§68),
+      `LitMaterial` + `kind` discriminants in @fourjs/materials (§57), optional `normals`
+      vertex attribute in @fourjs/geometry (box now 24 verts with per-face normals, plane
       +Z; 2D shapes stay unlit), `"lit"` render-item kind + duck-typed `collectSceneLights`
-      in @four/render, `LitProgram` (Lambert + ambient) + normal-stream upload in
-      @four/render-webgl. Unlit path untouched — every browser spec and pixel golden
+      in @fourjs/render, `LitProgram` (Lambert + ambient) + normal-stream upload in
+      @fourjs/render-webgl. Unlit path untouched — every browser spec and pixel golden
       passes; merged tree: 3,077 unit + 174 suite + 38 browser/visual tests, coverage
       ≥95% everywhere, TypeDoc 0 warnings, §86 gate 33.28/150 kB. Wider §68/§69/§59/§60a scope staged
       with dated notes (see backlog and docs/AUDIT-120.md S-5)
@@ -2063,7 +2063,7 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       phase9 determinism golden, particles-demo (fifth example site); 2,585 unit +
       138 suite + 32 browser tests
 - [x] 2026-08-02 — **Phase 8 complete** (§111): 5 packets + 1 doc fix — PID/spring-
-      damper/steering/RNG/prediction/IK in @four/motion, all six modules at 100%
+      damper/steering/RNG/prediction/IK in @fourjs/motion, all six modules at 100%
       coverage with genuinely independent analytic oracles; PID closes a real Rapier
       hinge loop to exact setpoint; every declined §111 component staged with a dated
       note; 2,359 unit + 131 suite + 27 browser tests

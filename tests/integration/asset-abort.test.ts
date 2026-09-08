@@ -4,7 +4,7 @@
  * The unit suite in `packages/assets/tests/cancellation.test.ts` drives the
  * policy with hand-rolled fakes. This one exists for the property those fakes
  * cannot prove: a real `AbortController`, a real `AbortSignal`, and a transport
- * with the platform `fetch`'s own signature satisfy `@four/assets`'s seams with
+ * with the platform `fetch`'s own signature satisfy `@fourjs/assets`'s seams with
  * **no adapter** — the property the generic `FetchLike<TSignal>` was built to
  * keep (see the module comment's variance measurement in `asset-manager.ts`).
  */
@@ -14,8 +14,8 @@ import {
   type AssetLoader,
   type FetchLike,
   type FetchResponse,
-} from "@four/assets";
-import { isFourError, type FourError } from "@four/core";
+} from "@fourjs/assets";
+import { isFourError, type FourError } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 const textLoader: AssetLoader<string> = {

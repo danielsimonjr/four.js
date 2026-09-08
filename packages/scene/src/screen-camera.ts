@@ -127,8 +127,8 @@
  * where the usual `same-runtime` statement applies.
  */
 
-import { FourError } from "@four/core";
-import type { DepthRange } from "@four/math";
+import { FourError } from "@fourjs/core";
+import type { DepthRange } from "@fourjs/math";
 
 import { Camera } from "./camera.js";
 
@@ -195,7 +195,7 @@ export const DEFAULT_SCREEN_FAR = 1000;
  *   and there is no reason the application should feed the one camera class
  *   that ships and refuse the one the user wrote. Declaring a method is how a
  *   camera opts in.
- * - **Bytes.** `@four/four`'s `Application` is in every bundle; an `instanceof`
+ * - **Bytes.** `@fourjs/four`'s `Application` is in every bundle; an `instanceof`
  *   would name the class and pull `ScreenCamera` into all of them whether or
  *   not the application has one. The structural test names nothing, so a scene
  *   without a screen camera pays zero for this feature.

@@ -23,10 +23,10 @@
  * name on every fixed step of a real `Application`.
  */
 
-import type { FourPlugin } from "@four/core";
-import { PRIORITY_PHYSICS_SOLVE, type SimulationSystem } from "@four/motion";
-import { SIMULATION_SYSTEMS } from "four";
-import { Application } from "four/application";
+import type { FourPlugin } from "@fourjs/core";
+import { PRIORITY_PHYSICS_SOLVE, type SimulationSystem } from "@fourjs/motion";
+import { SIMULATION_SYSTEMS } from "fourJS";
+import { Application } from "fourJS/application";
 import { describe, expect, it } from "vitest";
 
 /**

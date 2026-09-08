@@ -1,5 +1,5 @@
 {
-  "name": "@four/text",
+  "name": "@fourjs/text",
   "version": "0.0.0",
   "type": "module",
   "license": "MIT",
@@ -13,8 +13,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@four/core": "workspace:*",
-    "@four/math": "workspace:*",
-    "@four/geometry": "workspace:*"
+    "@fourjs/core": "workspace:*",
+    "@fourjs/math": "workspace:*",
+    "@fourjs/geometry": "workspace:*"
   }
 }

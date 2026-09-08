@@ -1,11 +1,11 @@
-import { FourError } from "@four/core";
+import { FourError } from "@fourjs/core";
 import {
   constructionCount,
   Matrix4,
   Quaternion,
   resetConstructionCount,
   Vector3,
-} from "@four/math";
+} from "@fourjs/math";
 import { describe, expect, it, vi } from "vitest";
 
 import {

@@ -3,7 +3,7 @@
  * §74 asks for. The pixels are the skin's.
  */
 
-import { Vector2 } from "@four/math";
+import { Vector2 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import { ImageWidget } from "../src/image.js";

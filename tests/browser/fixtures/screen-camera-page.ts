@@ -19,21 +19,21 @@
  * lands exactly where the origin convention says it does.
  */
 
-import { planeGeometry } from "@four/geometry";
-import { UnlitMaterial } from "@four/materials";
+import { planeGeometry } from "@fourjs/geometry";
+import { UnlitMaterial } from "@fourjs/materials";
 import {
   Renderable,
   createRenderStatistics,
   resetRenderStatistics,
-} from "@four/render";
-import { WebglRenderer } from "@four/render-webgl";
+} from "@fourjs/render";
+import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   Scene,
   ScreenCamera,
   createFullscreenViewport,
   resolveWorldTransforms,
   type ScreenOrigin,
-} from "@four/scene";
+} from "@fourjs/scene";
 
 /** Canvas size the spec restates. */
 const WIDTH = 320;

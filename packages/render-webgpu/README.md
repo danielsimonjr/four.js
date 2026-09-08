@@ -1,8 +1,8 @@
-# @four/render-webgpu
+# @fourjs/render-webgpu
 
 WebGPU backend — §62 backend 1. Part of [fourJS](../../README.md).
 
-Implements `@four/render`'s `Renderer` over WebGPU (WP-R1.1–R1.9, 2026-08-21…29; the R-1 plan is complete). Applications select a backend at the edge — nothing in `@four/scene`, `@four/motion`, or `@four/physics` may name anything in this package. **Calling `registerWebgpuRenderer()` moves an application off WebGL 2**, because `AUTO_RENDERER_ORDER` prefers WebGPU.
+Implements `@fourjs/render`'s `Renderer` over WebGPU (WP-R1.1–R1.9, 2026-08-21…29; the R-1 plan is complete). Applications select a backend at the edge — nothing in `@fourjs/scene`, `@fourjs/motion`, or `@fourjs/physics` may name anything in this package. **Calling `registerWebgpuRenderer()` moves an application off WebGL 2**, because `AUTO_RENDERER_ORDER` prefers WebGPU.
 
 This package was a reserved stub until WP-R1.1 landed 2026-08-21. The barrel no longer exports only `PACKAGE_NAME`.
 
@@ -16,4 +16,4 @@ Absent, not stubbed: RFC 0003's skinned pipelines and §71 picking (`createPicki
 
 Unit tests are colocated in `tests/` per §92. Browser-pixel coverage lives under `tests/browser/webgpu/`.
 
-Workspace name `@four/render-webgpu`; publishes as `@danielsimonjr/fourjs-render-webgpu`.
+Workspace name `@fourjs/render-webgpu`; publishes as `@danielsimonjr/fourjs-render-webgpu`.

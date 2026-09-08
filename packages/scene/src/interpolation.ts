@@ -79,7 +79,7 @@
  * tracked set is iterated as an array, in insertion order (ground rule 5).
  */
 
-import { Quaternion, Vector3 } from "@four/math";
+import { Quaternion, Vector3 } from "@fourjs/math";
 
 import type { Node } from "./node.js";
 
@@ -87,8 +87,8 @@ import type { Node } from "./node.js";
  * Priority of the system returned by {@link createSnapshotSystem}: step 10 of
  * the §39 order, "state snapshot".
  *
- * The value is duplicated from `@four/motion`'s `PRIORITY_SNAPSHOT` rather than
- * imported, because `@four/scene` must not depend on `@four/motion` — the
+ * The value is duplicated from `@fourjs/motion`'s `PRIORITY_SNAPSHOT` rather than
+ * imported, because `@fourjs/scene` must not depend on `@fourjs/motion` — the
  * dependency runs the other way (plan §3.1). The two constants must stay equal;
  * `tests/interpolation.test.ts` asserts it so the duplication cannot drift.
  */
@@ -320,12 +320,12 @@ export interface SnapshotSystemOptions {
 }
 
 /**
- * The §39 `SimulationSystem` shape, as `@four/scene` can state it.
+ * The §39 `SimulationSystem` shape, as `@fourjs/scene` can state it.
  *
- * This is structurally the interface `@four/motion` publishes — an object of
+ * This is structurally the interface `@fourjs/motion` publishes — an object of
  * this type is assignable to `SimulationSystem` and registers with
- * `SystemRegistry` unchanged — restated here because `@four/scene` must not
- * depend on `@four/motion` (plan §3.1: the edge runs motion → scene). The
+ * `SystemRegistry` unchanged — restated here because `@fourjs/scene` must not
+ * depend on `@fourjs/motion` (plan §3.1: the edge runs motion → scene). The
  * context parameters are `unknown` for the same reason: this system needs
  * nothing from them, and a wider parameter type stays assignable to the
  * narrower one.

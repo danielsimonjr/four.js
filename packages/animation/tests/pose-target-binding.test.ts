@@ -1,6 +1,6 @@
 /**
- * Cross-package proof for P7-1: `@four/animation` can drive a `PoseTarget`
- * (which lives in `@four/scene`) through the ordinary §16 binding machinery,
+ * Cross-package proof for P7-1: `@fourjs/animation` can drive a `PoseTarget`
+ * (which lives in `@fourjs/scene`) through the ordinary §16 binding machinery,
  * with no special case anywhere and without touching the node's transform.
  *
  * The import edge exercised here — animation → scene — is the allowed one (plan
@@ -13,8 +13,8 @@ import {
   Vector3,
   constructionCount,
   resetConstructionCount,
-} from "@four/math";
-import { Group, PoseTarget } from "@four/scene";
+} from "@fourjs/math";
+import { Group, PoseTarget } from "@fourjs/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBinding } from "../src/binding.js";

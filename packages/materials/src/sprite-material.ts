@@ -30,7 +30,7 @@
  *
  * In `texture.ts`, as {@link MaterialTexture} — read that module's header for
  * why the contract lives in this package at all rather than being imported from
- * `@four/render`, which owns the concrete class. It was declared *here* while
+ * `@fourjs/render`, which owns the concrete class. It was declared *here* while
  * sprites were the only textured pipeline; R-19 gave `UnlitMaterial` and
  * `LitMaterial` a `map`, which made it the family's texture contract.
  * {@link SpriteTexture} stays exported from this module, as an alias, because

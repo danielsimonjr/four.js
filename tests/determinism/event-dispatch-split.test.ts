@@ -6,9 +6,9 @@
  * which is a fixed-step change and therefore owes §33 a golden. This file is
  * that obligation, in the three forms WP-1.14 established:
  *
- * 1. **Headless.** The scenario imports `@four/physics`,
- *    `@four/physics-rapier`, `@four/motion`, `@four/math`, `@four/scene` and
- *    `@four/diagnostics` — no renderer package, no canvas, no DOM.
+ * 1. **Headless.** The scenario imports `@fourjs/physics`,
+ *    `@fourjs/physics-rapier`, `@fourjs/motion`, `@fourjs/math`, `@fourjs/scene` and
+ *    `@fourjs/diagnostics` — no renderer package, no canvas, no DOM.
  * 2. **Deterministic in-process.** Two independent runs, each on freshly
  *    constructed adapters and worlds, produce byte-identical per-step
  *    checksums and event digests — in *both* arms.

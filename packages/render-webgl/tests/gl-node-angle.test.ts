@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { emitShaderGraphGlsl } from "../src/index.js";
-import type { ShaderGraph } from "@four/render";
+import type { ShaderGraph } from "@fourjs/render";
 
 function angleGraph(): ShaderGraph {
   return {

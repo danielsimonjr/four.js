@@ -41,14 +41,14 @@ Three recorded positions constrain the design before any of it is written.
 1. **The texture seam already exists and has already been re-used once.** R-4's recorded
    decision — _"the render-to-texture seam is `MaterialTexture`, not a new type;
    `RenderTarget.colorTexture` satisfies it, so R-5/R-6 inherit zero adapter work and
-   `@four/materials` needed no widening"_ — is the template. A raster surface that produces
+   `@fourjs/materials` needed no widening"_ — is the template. A raster surface that produces
    `{ id, version, width, height, data, disposed, colorSpace }` is already a texture to
    every material and every backend in the repository, with no backend change and **no new
    duck-typed contract** (the count stays at five).
 2. **The §40 display-only rule is the closest analogue this repository has to what raster
    painting needs, and its enforcement is mechanical.**
    `tests/integration/units-display.test.ts` scans every `packages/*/src` file and fails if
-   any of them imports `@four/core`'s `units.ts`, with a visible `ALLOWED` allowlist whose
+   any of them imports `@fourjs/core`'s `units.ts`, with a visible `ALLOWED` allowlist whose
    editing is _"deliberately a visible act"_. The rule it enforces — a conversion tier that
    is inexact by construction must never touch a simulation path — transfers to host-painted
    pixels with the word "inexact" replaced by "unreproducible". §3 is that transfer.
@@ -97,7 +97,7 @@ guide and stop.** It is argued at full strength below, and it is not a straw man
 **Why engine surface still earns its place.** Four things the recipe does not give, in
 descending order of how much they matter:
 
-- **The §73 widget.** `@four/ui`'s frozen §3.1 row is `core, math, scene, input, text` — no
+- **The §73 widget.** `@fourjs/ui`'s frozen §3.1 row is `core, math, scene, input, text` — no
   `render`, no `materials`. A widget cannot own a texture, so the canvas view cannot be
   built out of the recipe by the application _inside a widget_; it needs a seam. §2b shows
   the seam is much smaller than the recorded blocker assumes.
@@ -120,13 +120,13 @@ no path builder, no font rasterizer, no compositing model. Every pixel is painte
 host or by the application; the engine's contribution is a buffer, a version, a size rule,
 and a place to put it.
 
-### 2a. `RasterSource` and `CanvasTexture` — `@four/render`, no new §3.1 edge
+### 2a. `RasterSource` and `CanvasTexture` — `@fourjs/render`, no new §3.1 edge
 
 **Placement.** `packages/render/src/raster.ts`, beside `texture.ts`. `render`'s §3.1 row is
 `core, math, scene, geometry, materials`; it already owns `Texture`, `TextureSource`, the
 §83 `resource-memory.ts` accounting, and the `implements SpriteTexture` declaration that
 pins the `MaterialTexture` contract from the other side. Nothing is added to the matrix.
-Alternative E argues the `@four/materials` placement and loses.
+Alternative E argues the `@fourjs/materials` placement and loses.
 
 **The seam is a read model, not a draw model.**
 
@@ -277,16 +277,16 @@ otherwise would be the kind of claim `check-docs.mjs` exists to catch.
 ### 2b. The §73 canvas-view widget — and the recorded blocker is wrong
 
 The blocker in `widget.ts:157` says the canvas view needs _"the immediate-mode drawing
-surface the dependency matrix keeps out of this package"_. Read against what `@four/ui`
+surface the dependency matrix keeps out of this package"_. Read against what `@fourjs/ui`
 already ships, that premise does not hold: **the widget does not draw, and never should.**
 `ImageWidget` established the split on 2026-08-07 and stated it in its own header — the
 widget owns the box, the intrinsic size, and the logical identity of its content; the
 `WidgetSkin` owns the texture, the material, and the quad, because the skin is application
-code that can see `@four/render` while the widget cannot.
+code that can see `@fourjs/render` while the widget cannot.
 
 A canvas view is `ImageWidget` with two differences: its content has no logical key (the
 application paints it), and its content changes (so it must say when). Both are expressible
-with what `@four/ui` has:
+with what `@fourjs/ui` has:
 
 ```ts
 export class CanvasViewWidget extends UIWidget {
@@ -332,7 +332,7 @@ application is willing to write the skin, since the widget itself does not name
 correction is recorded here because "the reason we said we could not build it was wrong" is
 worth more than the widget.
 
-Two gates the packet inherits: `packages/four/tests/scene-serializers.test.ts` _"enumerates
+Two gates the packet inherits: `packages/fourJS/tests/scene-serializers.test.ts` _"enumerates
 every umbrella barrel class carrying `static typeName` … and requires each registered"_, so
 the `ui:canvas-view` pair is a gate rather than a follow-up; and the widget's §79 payload is
 its box, `resolution`, and nothing else — **painted pixels are never serialized** (§3).
@@ -394,8 +394,8 @@ forbidden import and fails with a visible `ALLOWED` allowlist. The packet ships 
 analogue, `tests/integration/raster-display-only.test.ts`:
 
 - No source file in `core`, `math`, `scene`, `motion`, `animation`, `physics`,
-  `physics-*`, `particles`, or `serialization` may import `@four/render`'s raster module —
-  most of them cannot see `@four/render` at all under §3.1, and the test states the rule
+  `physics-*`, `particles`, or `serialization` may import `@fourjs/render`'s raster module —
+  most of them cannot see `@fourjs/render` at all under §3.1, and the test states the rule
   for the ones that could and for every package added later.
 - `ALLOWED` holds `packages/render/src/*` (which owns it), `packages/render-webgl/src/*`
   (which uploads it, through the `MaterialTexture` path it already has), and the `four`
@@ -472,7 +472,7 @@ reader will otherwise ask:
 That is RFC 0002's rule in a second place (_"untrusted content can never become a plugin …
 `PluginHost.add` accepts a plugin object only"_), and it is mechanically checkable by the
 same means: the raster test asserts that `CanvasTexture`'s parameter type admits no string,
-and that no module reachable from `@four/serialization` or `@four/assets` imports the raster
+and that no module reachable from `@fourjs/serialization` or `@fourjs/assets` imports the raster
 module. §2a's "no §79 representation" is what makes the second assertion true by
 construction rather than by discipline.
 
@@ -515,7 +515,7 @@ already uses — _"RFC-derived amendments carry the RFC's status"_, so it is mar
 
 > **Canvas view.** The canvas view is a **skin-drawn** control, in the split `image`
 > already follows: the widget owns its box, its device-pixel backing size, and a content
-> revision; the `WidgetSkin` owns the texture and the quad. `@four/ui` gains no drawing API
+> revision; the `WidgetSkin` owns the texture and the quad. `@fourjs/ui` gains no drawing API
 > — §73 does not require one, and the frozen package dependency matrix forbids it. The
 > painting surface it draws into is §77a. _(RFC 0004, draft, owner decision pending.)_
 
@@ -523,13 +523,13 @@ already uses — _"RFC-derived amendments carry the RFC's status"_, so it is mar
 
 | Revision | Date      | Summary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | -------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.9      | 2026-08-… | New §77a "Raster Painting and Dynamic Textures": a structural, DOM-free raster source contract feeding §77's texture system, with the §33 rule that painted pixels are display content and never simulation input (mechanically enforced, in the pattern §40's display-only rule established), the §96 size limits, and the constant-size restriction pending §77 change notification (`R-30`). §73's canvas-view control is recorded as a skin-drawn widget requiring no drawing API in `@four/ui`, correcting the staging note that said otherwise. §62's Canvas 2D backend is explicitly a separate concern and is unchanged. Frozen §1–120 numbering respected: the new section takes a letter suffix, added to `ALLOWED_LETTERED`. _(RFC 0004.)_ |
+| 1.9      | 2026-08-… | New §77a "Raster Painting and Dynamic Textures": a structural, DOM-free raster source contract feeding §77's texture system, with the §33 rule that painted pixels are display content and never simulation input (mechanically enforced, in the pattern §40's display-only rule established), the §96 size limits, and the constant-size restriction pending §77 change notification (`R-30`). §73's canvas-view control is recorded as a skin-drawn widget requiring no drawing API in `@fourjs/ui`, correcting the staging note that said otherwise. §62's Canvas 2D backend is explicitly a separate concern and is unchanged. Frozen §1–120 numbering respected: the new section takes a letter suffix, added to `ALLOWED_LETTERED`. _(RFC 0004.)_ |
 
 ### 6. Staging
 
 **MVP packet (S–M).** `RasterSource`, `RasterOrigin`, `CanvasTexture` in
 `packages/render/src/raster.ts`, with §85 validation, §83 accounting through the existing
-`noteTexture`, and the §96 limit; `CanvasViewWidget` in `@four/ui` plus its `ui:canvas-view`
+`noteTexture`, and the §96 limit; `CanvasViewWidget` in `@fourjs/ui` plus its `ui:canvas-view`
 §79 pair; `tests/integration/raster-display-only.test.ts`; §77a and the §73 note; a guide
 section carrying the browser adapter. **No backend change and no new duck-typed contract** —
 the count stays at five.
@@ -548,17 +548,17 @@ the count stays at five.
 
 **Size and tree-shaking expectations**, against measured precedents rather than hope:
 
-- **`@four/render`.** `CanvasTexture` is a class nobody references unless they use it, so it
+- **`@fourjs/render`.** `CanvasTexture` is a class nobody references unless they use it, so it
   should shake out entirely. That claim needs proving, not assuming: the recorded
   counter-examples are _"a fifth compiled-at-init pipeline costs **0.75 kB gzip in every
   example bundle** — nothing reachable from a class method tree-shakes"_, _"naming one leaf
   function in `debug-draw.ts` cost 939 B gzip"_, and _"`four/application`'s runtime import
-  of `@four/diagnostics` costs ~0.4 kB gzip per example even with stats off"_. The rule the
+  of `@fourjs/diagnostics` costs ~0.4 kB gzip per example even with stats off"_. The rule the
   packet must respect is that nothing on the render path may statically reference the raster
   module — the backend reaches a `CanvasTexture` only through `MaterialTexture`, which it
   already does, so the discipline is satisfied by construction and must be **grep-proven**
   in the A/B style the §62 registry packet used.
-- **`@four/ui` is the real risk, and it has 20 bytes of headroom.** R-29 recorded ui-demo at
+- **`@fourjs/ui` is the real risk, and it has 20 bytes of headroom.** R-29 recorded ui-demo at
   **32.98 / 33 kB — twenty bytes left** — and the standing note that _"the next
   bundle-touching packet needs a proposal"_. `CanvasViewWidget` is unreferenced by ui-demo
   and should shake out; but any example that calls `registerUISerializers()` pays for the
@@ -614,7 +614,7 @@ widget that needs one hundred lines.
 
 **C. An engine-owned immediate-mode drawing API — what the recorded blocker literally
 asks for.** A `PaintContext` with `fillRect`, `moveTo`, `fillText`, and the rest, living in
-`@four/render` or a new package, with `@four/ui` drawing through it. This is the biggest
+`@fourjs/render` or a new package, with `@fourjs/ui` drawing through it. This is the biggest
 thing anyone could build here and it loses on four counts, any one sufficient. (1) It is a
 second rasterizer: §50–§52 already specify a full 2D vector stack whose output is GPU
 geometry, and a raster path with its own fills, strokes, joins, and dashes would duplicate
@@ -634,12 +634,12 @@ A and shares its virtues. It loses on three specifics: assigning a new source re
 full §85 validation and re-does the §83 delta arithmetic every repaint, on what is by
 definition a per-frame path; it allocates a source object (and usually a byte array) per
 repaint, which is the allocation pattern §86's budgets exist to discourage; and it gives the
-`@four/ui` seam nothing, because `Texture` is as unnameable from `@four/ui` as
+`@fourjs/ui` seam nothing, because `Texture` is as unnameable from `@fourjs/ui` as
 `CanvasTexture` is. It also has no place to hang the §96 limit, the origin rule, or the
 constant-size refusal, so each of those becomes prose in a guide — which is alternative A
 with extra steps.
 
-**E. Put `RasterSource` in `@four/materials`, beside `MaterialTexture`.** Symmetric-looking:
+**E. Put `RasterSource` in `@fourjs/materials`, beside `MaterialTexture`.** Symmetric-looking:
 `materials` is where the texture _contract_ lives, so why not the raster contract too? It
 loses on what the two things are. `MaterialTexture` is declared in `materials` because
 `materials` is **below** `render` and must be able to name what a material points at; the
@@ -655,7 +655,7 @@ call `getImageData` itself and get the flip right every time. It is rejected on 
 repository has applied five times without exception: `FetchLike`, `PointerSurface`,
 `KeySurface`, `SurfaceObserver`, and `RendererOptions.canvas: unknown` are all structural
 precisely so the engine runs and type-checks in Node, in a worker, and in a headless test.
-`@four/render` compiles with **no `lib.dom`**; naming those types would not merely be
+`@fourjs/render` compiles with **no `lib.dom`**; naming those types would not merely be
 inconsistent, it would not compile, and fixing that by adding the DOM lib would drag it into
 every consumer of the backend-independent renderer interface. `TextureSource`'s own header
 already refused this exact widening for this exact reason. The nicety is available anyway,
@@ -675,7 +675,7 @@ application makes.
 unbatchable, unpickable, unserializable, unreplayable, and unreproducible. Each is
 documented, and together they are a real dilution of the retained-mode promise — the cost
 alternative A exists to weigh. §33's envelope gains a second mechanically enforced boundary
-to maintain, and a second `ALLOWED` allowlist someone must be careful about. `@four/ui` gets
+to maintain, and a second `ALLOWED` allowlist someone must be careful about. `@fourjs/ui` gets
 a tenth control against a 20-byte bundle headroom, which likely forces the budget decision
 that is already open. And there will be pressure — immediately, and forever — to add
 `fillRect`, because the moment an application can hand over pixels it will ask the engine to
@@ -691,8 +691,8 @@ is untouched and remains a reserved stub.
 
 Rows in `docs/COMPATIBILITY.md` this RFC moves:
 
-- **Public API (§90).** Additive throughout — new exports from `@four/render`
-  (`RasterSource`, `RasterOrigin`, `CanvasTexture`, `CanvasTextureOptions`) and `@four/ui`
+- **Public API (§90).** Additive throughout — new exports from `@fourjs/render`
+  (`RasterSource`, `RasterOrigin`, `CanvasTexture`, `CanvasTextureOptions`) and `@fourjs/ui`
   (`CanvasViewWidget`, its options), re-exported through the umbrella barrels per §97a.
   **Minor**, with no exceptions: unlike RFCs 0001 and 0003, this RFC widens **no closed
   union** — not `RenderItemKind`, not `ScreenEffect`, not `Material`'s family. A
@@ -730,7 +730,7 @@ None run; §95 item 6 asks for evidence _where practical_, and this is a design 
 ahead of a packet. What the packet must measure, stated now so it cannot be skipped:
 
 1. **Bundle delta, grep-proven, in the A/B style the §62 registry packet used.** Two
-   numbers: `@four/render` with and without a `CanvasTexture` reference (target: zero, and
+   numbers: `@fourjs/render` with and without a `CanvasTexture` reference (target: zero, and
    the raster module absent from every example bundle by grep), and **ui-demo with and
    without `CanvasViewWidget` referenced** — the second against a 20-byte headroom, which is
    the number most likely to fail. If ui-demo moves at all, the packet stops and the budget
@@ -788,6 +788,6 @@ ahead of a packet. What the packet must measure, stated now so it cannot be skip
    diagnostic. A §85 development-only warning after N frames of a stale-but-invalidated
    texture would catch it, at the cost of the raster tier learning what a frame is — which
    it currently does not, and which is the same argument that keeps `menu` and `tooltip`
-   staged in `@four/ui` (_"a hover delay is a §9 time reading, and the loop that owns time
+   staged in `@fourjs/ui` (_"a hover delay is a §9 time reading, and the loop that owns time
    lives above this package"_). Recommendation: no hook, no warning, and a prominent line in
    the guide.

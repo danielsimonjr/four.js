@@ -44,7 +44,7 @@
  * it. What shipped in 2026-08-02 was neither: a `computeBounds()` that
  * *returned* the box, with the field omitted because "the volume hierarchy
  * belongs to the culling packet (§87)". §87 has since landed
- * (`@four/render`'s `computeWorldBoundingSphere`, 2026-08-09) and answered that
+ * (`@fourjs/render`'s `computeWorldBoundingSphere`, 2026-08-09) and answered that
  * question in the other direction — it derives the world sphere culling wants
  * from the local **box**, and therefore needs the box to stay exactly what it
  * is. So this packet does not replace the box; it *names* it.
@@ -93,8 +93,8 @@
  * solver, a checksum, or a snapshot.
  */
 
-import type { Disposable } from "@four/core";
-import type { Vector3 } from "@four/math";
+import type { Disposable } from "@fourjs/core";
+import type { Vector3 } from "@fourjs/math";
 
 /**
  * §53's `BoundingVolume`: a geometry's extent in its own local space, as both

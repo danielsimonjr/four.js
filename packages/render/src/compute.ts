@@ -5,13 +5,13 @@
  * ## Where this came from, and why it moved
  *
  * WP-R1.8 landed §82's compute tier — pipelines, storage-buffer bind groups,
- * dispatch, exact readback — in `@four/render-webgpu`, the only backend that
+ * dispatch, exact readback — in `@fourjs/render-webgpu`, the only backend that
  * can run it, because `packages/render` was inside RFC 0004's concurrent
  * scope at the time. The R-1 plan's owner question **Q3** recommends this
  * package as the descriptor's home ("a backend-independent descriptor,
  * matching every other render type", with the spec's own `Four.ComputePass`
  * example arguing umbrella-level reach), and the recorded promotion is **one
- * re-export**: the types now live here, `@four/render-webgpu` re-exports them
+ * re-export**: the types now live here, `@fourjs/render-webgpu` re-exports them
  * (the capability-token identity precedent — a migration is a re-export, and
  * no call site moves), and {@link Renderer.compute} joins the interface as an
  * optional member.

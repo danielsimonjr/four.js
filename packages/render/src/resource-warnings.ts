@@ -7,7 +7,7 @@
  * simulation packages (§33).
  */
 
-import { DEV, devWarnOnce } from "@four/core";
+import { DEV, devWarnOnce } from "@fourjs/core";
 
 /** Resource kinds this warning names today. */
 export type DisposedResourceKind =

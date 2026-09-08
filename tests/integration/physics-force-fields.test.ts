@@ -1,19 +1,19 @@
 /**
- * §26/§27 force fields reach rigid bodies — and `@four/particles`' §27 field set
+ * §26/§27 force fields reach rigid bodies — and `@fourjs/particles`' §27 field set
  * is the same contract (PH-8, 2026-08-09).
  *
- * `@four/physics` declares `ForceField` and `@four/particles` declares
+ * `@fourjs/physics` declares `ForceField` and `@fourjs/particles` declares
  * `ParticleForceField`. Both are §27's interface transcribed member-for-member,
  * and the frozen §3.1 dependency matrix has no edge between the two packages —
  * so **nothing type-checks the two declarations against each other except a
  * file that can import both**. This is that file, exactly as
  * `tests/determinism/phase9-particles.test.ts` is the one place `ParticleSystem`
- * can be checked against `@four/motion`'s `SimulationSystem`.
+ * can be checked against `@fourjs/motion`'s `SimulationSystem`.
  *
  * The claim being pinned has four parts:
  *
- * 1. **Assignability.** Every built-in field factory in `@four/particles`
- *    produces a value assignable to `@four/physics`' `ForceField`, with no
+ * 1. **Assignability.** Every built-in field factory in `@fourjs/particles`
+ *    produces a value assignable to `@fourjs/physics`' `ForceField`, with no
  *    adapter, no cast and no import in either direction. The assignment happens
  *    in ordinary source, so `tsc` (via `tests/tsconfig.json` and `pnpm run
  *    docs`) is the real check and the runtime assertions only confirm the
@@ -37,8 +37,8 @@
  * body is the field under test.
  */
 
-import { Vector3 } from "@four/math";
-import { PRIORITY_FORCES, SystemRegistry, createTimeState } from "@four/motion";
+import { Vector3 } from "@fourjs/math";
+import { PRIORITY_FORCES, SystemRegistry, createTimeState } from "@fourjs/motion";
 import {
   dragField,
   radialField,
@@ -47,7 +47,7 @@ import {
   volumeField,
   vortexField,
   windField,
-} from "@four/particles";
+} from "@fourjs/particles";
 import {
   Collider,
   ForceFieldSystem,
@@ -55,9 +55,9 @@ import {
   PhysicsWorld,
   RigidBody,
   type ForceField,
-} from "@four/physics";
-import { Rapier2dAdapter } from "@four/physics-rapier";
-import { Group } from "@four/scene";
+} from "@fourjs/physics";
+import { Rapier2dAdapter } from "@fourjs/physics-rapier";
+import { Group } from "@fourjs/scene";
 import { afterEach, describe, expect, it } from "vitest";
 
 /** One fixed step in seconds (§7a, §10; Appendix A's 1/60). */
@@ -124,7 +124,7 @@ function pipeline(
   return registry;
 }
 
-describe("§27 fields from @four/particles satisfy @four/physics' ForceField", () => {
+describe("§27 fields from @fourjs/particles satisfy @fourjs/physics' ForceField", () => {
   it("accepts every built-in field factory with no adapter and no cast", () => {
     // The assignment *is* the assertion: each of these is a
     // `ParticleForceField` widened to a `ForceField` in ordinary source, so a
@@ -160,9 +160,9 @@ describe("§27 fields from @four/particles satisfy @four/physics' ForceField", (
 
   it("wraps a physics-side field in the particle volume wrapper (§27)", () => {
     // The other direction of the same structural claim: `volumeField` takes a
-    // `ParticleForceField`, and a field written against `@four/physics`' own
+    // `ParticleForceField`, and a field written against `@fourjs/physics`' own
     // interface is one — so §27's "volume-based inclusion and filtering" needed
-    // nothing added to `@four/physics`.
+    // nothing added to `@fourjs/physics`.
     const push: ForceField = {
       sample(_position, _velocity, _time, out) {
         return (out ?? new Vector3()).set(10, 0, 0);
@@ -203,7 +203,7 @@ describe("§26/§27 — a field moves a real solver's rigid bodies", () => {
     const heavy = ball(world, 7, 2);
 
     const forces = new ForceFieldSystem({ worlds: [world] });
-    // §27's uniform gravity, authored by `@four/particles` in m/s².
+    // §27's uniform gravity, authored by `@fourjs/particles` in m/s².
     forces.addField(
       uniformGravityField(new Vector3(0, -9.81, 0)),
       "acceleration",

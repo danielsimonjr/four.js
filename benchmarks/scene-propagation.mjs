@@ -66,7 +66,7 @@
  * gated.
  */
 
-import { Group, resolveWorldTransforms } from "@four/scene";
+import { Group, resolveWorldTransforms } from "@fourjs/scene";
 
 import {
   MEASUREMENT_NOTE,
@@ -313,7 +313,7 @@ const record = {
   specification:
     "§7 (world-transform resolution), §7b, §92 (CPU time); plan §6j P11-4, WP-11.4",
   recordedAt: new Date().toISOString(),
-  entryPoint: "resolveWorldTransforms(root, out) from @four/scene",
+  entryPoint: "resolveWorldTransforms(root, out) from @fourjs/scene",
   passKinds: {
     full: "the root is marked dirty before every pass, so every node is recomputed (asserted: recomputed === visited === nodeCount)",
     sparse: `${SPARSE_DIRTY_NODES} leaves are marked dirty before every pass (asserted: recomputed === ${SPARSE_DIRTY_NODES})`,

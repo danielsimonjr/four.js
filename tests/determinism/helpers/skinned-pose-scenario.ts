@@ -40,11 +40,11 @@ import {
   numberAdapter,
   quaternionAdapter,
   vector3Adapter,
-} from "@four/animation";
-import { createChecksum } from "@four/diagnostics";
-import { Quaternion, Vector3 } from "@four/math";
-import { Bone, Group, MorphWeights, Skeleton } from "@four/scene";
-import { Application } from "four/application";
+} from "@fourjs/animation";
+import { createChecksum } from "@fourjs/diagnostics";
+import { Quaternion, Vector3 } from "@fourjs/math";
+import { Bone, Group, MorphWeights, Skeleton } from "@fourjs/scene";
+import { Application } from "fourJS/application";
 
 /** §45 `fixedTimeStep`, in seconds (§7a: never milliseconds). */
 export const FIXED_TIME_STEP = 1 / 60;

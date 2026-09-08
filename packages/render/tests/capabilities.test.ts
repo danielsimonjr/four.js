@@ -9,7 +9,7 @@
  * compute-workload table for the third).
  */
 
-import { bindCapability } from "@four/core";
+import { bindCapability } from "@fourjs/core";
 import { describe, expect, it } from "vitest";
 
 import {

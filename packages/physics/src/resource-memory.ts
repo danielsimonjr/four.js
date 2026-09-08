@@ -2,7 +2,7 @@
  * §83 resource accounting for solver handles — how many bodies, colliders,
  * and joints are live in a {@link PhysicsWorld} (A-5 follow-up).
  *
- * The twin of `@four/geometry`'s and `@four/render`'s `resource-memory.ts`:
+ * The twin of `@fourjs/geometry`'s and `@fourjs/render`'s `resource-memory.ts`:
  * **numbers, not references**, so the tracker cannot itself become the leak
  * it reports; process-wide rather than per-world, because a handle belongs
  * to whoever created it (§83); absolute and never reset; never healed by
@@ -32,7 +32,7 @@
  * (`auditResourceLeaks` is inert when `DEV` is false), not on the count.
  *
  * {@link liveSolverHandleCount} is the combined total a caller passes to
- * `@four/diagnostics`' `auditResourceLeaks` as
+ * `@fourjs/diagnostics`' `auditResourceLeaks` as
  * `LiveResourceCounts.solverHandles`. The three population readers stay
  * separate so a report can still say which kind grew.
  */

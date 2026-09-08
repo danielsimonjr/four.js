@@ -5,7 +5,7 @@
  * suites (`wgpu-readback*.test.ts`, `webgl-renderer.test.ts`) own the bytes.
  */
 
-import { Rectangle2 } from "@four/math";
+import { Rectangle2 } from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {

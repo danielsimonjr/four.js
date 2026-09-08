@@ -95,7 +95,7 @@
  * `RigidBody` *is* an `EventEmitter` (§6b), so §29's `body.on("collisionstart",
  * …)` is literal. The emit side is **package-internal**: `PhysicsSystem`
  * normalizes the adapter's `drainEvents` output and emits after the fixed step
- * (§39 step 9). User code subscribes; nothing outside `@four/physics` should
+ * (§39 step 9). User code subscribes; nothing outside `@fourjs/physics` should
  * call `emit` for these types.
  *
  * ## Dimension (§21, plan P5-3)
@@ -115,8 +115,8 @@ import {
   type Component,
   type ComponentHost,
   type SpaceMode,
-} from "@four/core";
-import { Matrix3, Quaternion, Vector3 } from "@four/math";
+} from "@fourjs/core";
+import { Matrix3, Quaternion, Vector3 } from "@fourjs/math";
 
 import type { RigidBodyDescriptor } from "./descriptors.js";
 import {
@@ -312,7 +312,7 @@ interface MutableRigidBodyCommands {
 
 /**
  * The registry-writable view of {@link RigidBody.sleeping} — the same pattern
- * `@four/core` uses for `Component.host`: the property is `readonly` in the
+ * `@fourjs/core` uses for `Component.host`: the property is `readonly` in the
  * public contract so nothing else assigns it, and one named function in this
  * module performs the write.
  */
@@ -358,7 +358,7 @@ interface RigidBodyDirtyBinding {
  * move).
  *
  * **Package-internal.** `PhysicsWorld` is the only reader, through
- * {@link drainRigidBodySolverWrites}; nothing outside `@four/physics` should
+ * {@link drainRigidBodySolverWrites}; nothing outside `@fourjs/physics` should
  * depend on the numbering.
  */
 export const RIGID_BODY_MASS_PROPERTIES_DIRTY = 1;
@@ -410,7 +410,7 @@ export type RigidBodySleepEvent = SleepEvent<RigidBody>;
  * even type-only — would close an import cycle: `collider.ts` already imports
  * {@link RigidBody} at runtime to resolve `Collider.body`. Everywhere the
  * package is consumed the five keys read as one interface, exactly as
- * `@four/input`'s pointer names merge into `NodeEventMap`.
+ * `@fourjs/input`'s pointer names merge into `NodeEventMap`.
  *
  * Emission is package-internal (see the module header): `PhysicsSystem`
  * dispatches these after the fixed step, never during it (§6b, §39 step 9).
@@ -721,7 +721,7 @@ export class RigidBody
    * Plain and mutable, with no change hook and no validation: `PhysicsWorld` is
    * the only reader and it reads at registration, so writing it on an
    * already-registered body does nothing until the body is registered again.
-   * `@four/core`'s `isSimulationSpaceMode` answers §8's own question (world
+   * `@fourjs/core`'s `isSimulationSpaceMode` answers §8's own question (world
    * and local-plane pass; presentation frames fail).
    */
   space: SpaceMode;
@@ -1241,7 +1241,7 @@ export class RigidBody
    * a zero pose, which would teleport the node to the origin — this **falls
    * back to fully physical** (`{ physics: 1, animation: 0 }`, the constructed
    * default) and warns once per body via `console.warn`, the same development
-   * semantics `warnAuthorityConflict` uses in `@four/scene`: the first
+   * semantics `warnAuthorityConflict` uses in `@fourjs/scene`: the first
    * occurrence names the mistake and every repeat is suppressed, because a
    * misconfigured body would otherwise print once per fixed step forever. The
    * suppression is sticky for the life of the body — fixing the weights and
@@ -1711,7 +1711,7 @@ export function setRigidBodyDerivedMass(
  * Publishes a solver-reported sleep transition onto `body` (§32).
  *
  * **Package-internal**, and the only writer of {@link RigidBody.sleeping} —
- * mirroring how `@four/core` binds `Component.host`. Returns whether the state
+ * mirroring how `@fourjs/core` binds `Component.host`. Returns whether the state
  * actually changed, which is what tells `PhysicsSystem` to emit `"sleep"` or
  * `"wake"`; the emit itself happens after the fixed step (§6b, §39 step 9).
  */

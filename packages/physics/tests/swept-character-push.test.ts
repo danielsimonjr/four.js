@@ -6,8 +6,8 @@
  * the fake adapter so a queued impulse actually displaces a body.
  */
 
-import { Vector3 } from "@four/math";
-import { Group } from "@four/scene";
+import { Vector3 } from "@fourjs/math";
+import { Group } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import { Collider } from "../src/collider.js";

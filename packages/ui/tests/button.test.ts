@@ -10,9 +10,9 @@ import {
   dispatchKeyEvent,
   dispatchPointerEvent,
   type KeyModifiers,
-} from "@four/input";
-import { Group, type Node } from "@four/scene";
-import { buildGlyphAtlas } from "@four/text";
+} from "@fourjs/input";
+import { Group, type Node } from "@fourjs/scene";
+import { buildGlyphAtlas } from "@fourjs/text";
 import { describe, expect, it } from "vitest";
 
 import { Button } from "../src/button.js";
