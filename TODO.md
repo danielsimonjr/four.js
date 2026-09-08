@@ -202,7 +202,7 @@ and only the first is unambiguous.
       identity as `@danielsimonjr/fourjs`, so the internal scope is a naming decision with
       publish consequences, taken once. Cheap to do before first publish, expensive after.
 
-- [ ] **Stage 3 — REPO AND DIRECTORY (`four.js` → `fourJS`) — Daniel's call.** Renaming the
+- [x] **Stage 3 — REPO AND DIRECTORY (`four.js` → `fourJS`) — Daniel's call.** Renaming the
       GitHub repo and the local directory breaks every existing clone's remote and every
       absolute path in the agent trackers. Reversible, but it is an outward-facing change,
       so it is his to make, not mine.
@@ -817,7 +817,32 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 - [x] **`main` was RED on CI, Docs and Release; reverted #62 and #63 to restore it.** Both had been
       merged over documented failures. Full evidence in CHANGELOG; the short version is that
       vitest 4 and typedoc 0.28.20 have no TypeScript version in common.
-- [ ] **Lift the TypeScript/vitest pin once typedoc supports TS 7.** Currently ignored in
+- [ ] **Lift the TypeScript/vitest pin once typedoc supports TS 7.**
+      **RESEARCHED 2026-09-07 — the premise is wrong, and there IS a solution.** This row said
+      "wait for typedoc", which put a release gate on someone else's roadmap. It does not need to.
+      · **What TS 7 is:** the Go port of the compiler (`@typescript/native-preview` exists at
+        `7.0.0-dev`). typedoc consumes the compiler API, which is why it CRASHES on 7 rather
+        than merely warning — and why waiting for a peer-range bump was never the right signal.
+      · **The measured matrix already said so:** TS 7.0.2 → *docs crash, **lint passes***.
+        Only the docs step blocks TS 7. Lint is fine.
+      · **typedoc resolves its OWN TypeScript**, not the workspace's — verified: an isolated
+        install printed *"Using TypeScript 6.0.3 from ./node_modules/typescript"*.
+      · **Proven end to end:** that isolated typedoc, pointed at this repo's real sources and
+        `typedoc.json`, generated **0 errors / 24 warnings** — identical to the workspace
+        baseline. The "TS 6.0.3 → docs 7 errors" in `dependabot.yml` was `@types/node`
+        unresolved through workspace hoisting, not a typedoc/TS incompatibility.
+      · **So the path is:** give the docs step its own pinned typedoc + TypeScript, and the
+        workspace is free to move to TS 7 whenever wanted. Cost is one small tool package or a
+        pinned `bunx` invocation in the `docs` script.
+      · **What this does NOT unblock:** the vitest side. The matrix's 76 lint errors belong to
+        TS **6** + typescript-eslint, a separate dependency with its own range — measure that
+        before bundling it into the same PR.
+      · **And nothing is broken today:** the workspace is on TS 5.9.3 and every gate is green.
+        This is a deferred UPGRADE, not a defect — it should not count against a release gate.
+      Corrections to my own research, recorded because each nearly became a false finding:
+      typedoc's `1.0.0-dev.*` versions sort last in `npm view versions` but were published in
+      **2020**; they are not a newer release. And my earlier "still blocked" came from reading
+      `peerDependencies` on the `latest` tag alone, which is one signal, not research. Currently ignored in
       `.github/dependabot.yml`. Both must move in ONE PR — bumping either alone re-breaks a gate.
       Check `npm view typedoc peerDependencies` for a range that includes 7.x.
 - [x] **Pre-existing test-isolation defect (Vitest 4 spy history).** DONE

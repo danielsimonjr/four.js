@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — Stage 3, and the TS 7 block turns out not to be a block
+
+**Stage 3.** The repository and its directory are `fourJS`: GitHub renamed, remote updated,
+local directory moved, fetch verified from the new path. The old `four.js` name survives only
+where it is history (CHANGELOG entries) or data (`gltf-scene` asserting a fixture's content).
+
+One thing worth keeping from the rename: `mv` failed with **"Device or resource busy"** and the
+holder was my own shell — its working directory had been inside the repo. Renaming from a
+separate process succeeded immediately. A directory you are standing in cannot be renamed by
+the process standing in it, and the error names a device rather than the cause.
+
+**The TypeScript 7 item was mis-framed, and researching it properly dissolved it.**
+
+It read "lift the pin once typedoc supports TS 7" — which put a release gate on another
+project's roadmap. It does not need to:
+
+- **TS 7 is the Go port of the compiler.** typedoc consumes the compiler API, so it CRASHES
+  rather than warning — and a peer-range bump was never going to be the signal to watch for.
+- **The repo's own measured matrix already said the answer:** TS 7.0.2 gives *docs crash, lint
+  **passes***. Only the docs step blocks it.
+- **typedoc resolves its OWN TypeScript.** Verified: an isolated install printed *"Using
+  TypeScript 6.0.3 from ./node_modules/typescript"*.
+- **Proven end to end:** that isolated typedoc, run against this repo's real sources and
+  `typedoc.json`, produced **0 errors / 24 warnings** — identical to the workspace baseline.
+  The "TS 6.0.3 → docs 7 errors" recorded in `dependabot.yml` was `@types/node` unresolved
+  through workspace hoisting, not a typedoc/TypeScript incompatibility.
+
+So the docs step can keep its own pinned typedoc + TypeScript and the workspace is free to
+move to TS 7 whenever that is wanted. Nothing is broken today — the workspace is on 5.9.3 with
+every gate green — so this is a deferred UPGRADE, not a defect, and should not count against a
+release gate.
+
+**Two corrections to my own research**, recorded because each nearly became a false finding.
+typedoc's `1.0.0-dev.*` versions sort last in `npm view versions` but were published in **2020**
+— I briefly read them as a newer release that fixed this. And my earlier "still blocked" rested
+on `peerDependencies` from the `latest` tag alone: one signal, reported as research.
+
 ## Unreleased — Stage 2: the packages are `fourJS` / `@fourjs`, and it broke twice first
 
 Authorised by Daniel: *"Stage 2 @fourjs"*, *"All imports from four/* need to change to
