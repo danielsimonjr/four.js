@@ -75,6 +75,19 @@ The release gate that said *"wait for TypeDoc"* is gone. It was never the compil
 
 ### Added
 
+- **The TypeDoc blocker now has a TESTED solution, not a sketch** (`docs/MIGRATION.md` 3.1b).
+  A workspace package carrying `typedoc` + `typescript@6.0.3` as its own dependencies, with the
+  root moved to `typescript@7.0.2` and TypeDoc removed from it: Bun nested the conflicting
+  version rather than hoisting it (root **7.0.2**, tool package **6.0.3**), and the nested
+  TypeDoc built the repo's real docs at **exit 0, 0 errors, 24 warnings** — identical to the
+  current baseline.
+
+  **The finding that matters is that isolating TypeDoc alone buys nothing.** With TypeDoc
+  isolated and the root on TS 7, the root immediately fails on `typescript-eslint does not
+  support TS 7.0`. `typescript@6.0.3` has two consumers, so removing one leaves the other
+  holding the root exactly where it was. Isolation + the Oxlint swap together take the root to
+  **TypeScript 7.0.2 only**; either alone changes nothing. Both halves are now verified
+  independently on this repository; neither is landed.
 - **`docs/MIGRATION.md` — blocker research and alternatives (2026-09-08).** Each blocker was
   tested on this repository rather than read about.
 

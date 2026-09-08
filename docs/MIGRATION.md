@@ -142,9 +142,40 @@ Two options exist, and one is already proven by a shipping package:
    emitted `.d.ts` rather than the source graph, and bundle their own TypeScript by
    construction — so they are immune to the root compiler version.
 
-Neither is urgent. Today TypeDoc works, and `typescript@6.0.3` costs one dependency.
-Both matter the moment "one TypeScript at the root" becomes a requirement rather
-than a preference.
+**Option 1 was tested on this repository on 2026-09-08, and it works.** This is no
+longer a sketch:
+
+- A workspace package `tools/docs-isolated` declaring `typedoc@0.28.20` +
+  `typescript@6.0.3` as its own dependencies.
+- Root moved to `typescript@7.0.2` with TypeDoc removed from it entirely.
+- Bun nested the conflicting version rather than hoisting it: root resolved
+  **7.0.2**, the tool package resolved **6.0.3**.
+- The nested TypeDoc, run against the repo's real `typedoc.json`, produced
+  **exit 0, 0 errors, 24 warnings** and generated the HTML — **identical to the
+  current baseline**.
+
+So the TypeDoc blocker is solvable today, at the cost of one small tool package.
+
+**But isolating TypeDoc alone buys nothing**, and that is the part worth
+understanding before scheduling it. With TypeDoc isolated and the root on TS 7,
+the root immediately fails elsewhere:
+
+```
+typescript-eslint does not support TS 7.0.
+```
+
+`typescript@6.0.3` has **two** consumers. Removing one leaves the other holding the
+root exactly where it was. **The two changes only pay off together:**
+
+| Change | Alone | Together |
+|---|---|---|
+| Isolate TypeDoc (proven, section 3.1b) | root still pinned by typescript-eslint | ← |
+| Swap to Oxlint (proven, section 4a) | root still pinned by TypeDoc | **root becomes TypeScript 7.0.2 only** |
+
+Combined, `typescript@6.0.3` disappears from the root entirely and survives only
+inside one isolated docs tool. Both halves are independently verified on this
+repository; neither has been landed, because the Oxlint half is a gate-semantics
+change that needs a rule-parity diff and an explicit decision.
 
 ### 3.2 The consequence: two TypeScripts, deliberately
 
