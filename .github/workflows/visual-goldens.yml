@@ -1,0 +1,73 @@
+# §92 visual goldens can only be recorded on Linux.
+#
+# `tests/visual/` compares the canvas against committed PNGs, and Playwright
+# names a snapshot per platform: the committed files are `*-visual-linux.png`
+# because CI is ubuntu. Running `--update-snapshots` on Windows or macOS writes
+# `*-visual-win32.png` / `*-visual-darwin.png` beside them instead — the linux
+# golden stays stale, CI stays red, and the tree gains files that match nothing.
+# (Those strays are gitignored for exactly that reason.)
+#
+# So a deliberate change to anything the UI demo RENDERS — its title label, a
+# widget colour, the font — cannot be completed from a developer's machine
+# unless that machine is Linux. This job is the way to finish it.
+#
+# It UPLOADS the regenerated PNGs as an artifact rather than committing them.
+# A workflow that writes to `main` would be a bot merging its own output; the
+# author downloads the artifact, inspects the images, and commits them, so a
+# human still decides that the new picture is the intended one.
+name: Visual goldens
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    name: Re-record the §92 visual goldens
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Pinned to CI's exact toolchain on purpose: a golden is only comparable
+      # against the renderer that recorded it, so recording on a different Bun
+      # or Node than `ci.yml` compares with would reintroduce the mismatch this
+      # job exists to remove.
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22.22"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build the workspace
+        run: bun run build
+
+      - name: Build the examples the goldens are taken from
+        run: bun run examples:build
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
+      # `--update-snapshots` rewrites the committed PNGs in place. On this
+      # runner that means the `-visual-linux.png` files CI actually compares.
+      - name: Re-record
+        run: bunx playwright test tests/visual --project=visual --update-snapshots
+
+      - name: Show what changed
+        run: git --no-pager diff --stat -- tests/visual
+
+      - name: Upload the regenerated goldens
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-goldens-linux
+          path: tests/visual/**/*-visual-linux.png
+          if-no-files-found: error
