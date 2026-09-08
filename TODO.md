@@ -234,7 +234,17 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `AssetManager`'s own WP-11.2 decision, made for exactly this reason. Removes the
       single most likely first-use failure. §96 bounds are unchanged — they are enforced
       after the bytes arrive, not by withholding a transport.
-- [ ] **(C) Ship the polled key-state helper the library makes every consumer rewrite.**
+- [x] **(C) Ship the polled key-state helper the library makes every consumer rewrite.** **DONE 2026-09-07.**
+      `KeyboardState` in `@fourjs/input`: `isDown(code)`, a frozen live `held` view, and
+      `dispose()`. Keys on `code`, not `key`, so an AZERTY layout cannot change which physical
+      key WASD means. Built on the existing `KeySurface` seam, so the focus-loss behaviour is
+      TESTED without a DOM rather than asserted in a comment. 6 tests written first, all RED;
+      172/172 input tests after.
+      `examples/character-controller` now uses it, which is the proof it is usable — and a
+      correction to my own claim: that example already handled `blur` correctly, so it never
+      had the bug. **That is the stronger argument for the helper, not a weaker one** — the
+      code was right and every consumer still had to write it, so the ones who forgot the
+      `blur` half walked forever after an alt-tab. Its 5 browser tests pass unchanged.
       `isDown`/`heldKeys`/`pressedKeys` return **zero** hits today, and
       `examples/character-controller` hand-rolls a `Set<string>` off DOM listeners. ~20
       lines the library should own. This also removes the CAUSE of the `KeyboardInput`

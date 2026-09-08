@@ -95,6 +95,7 @@ import {
 import { Rapier3dAdapter } from "fourJS/physics-rapier";
 import { Renderable } from "fourJS/render";
 import { WebglRenderer } from "fourJS/render-webgl";
+import { KeyboardState } from "fourJS/input";
 import {
   DirectionalLight,
   Group,
@@ -362,44 +363,50 @@ characters.track(player);
 /**
  * §39 step 1: sample the held keys into the controllers' intent surface.
  *
- * The set of held keys is written by DOM listeners whenever the platform
- * delivers them; this system *reads* it once per fixed step, so a turn held
- * across three steps turns three steps' worth — the rate lives here, in
- * rad/s × the injected fixed delta, never in the event handler.
+ * Key state comes from `@fourjs/input`'s {@link KeyboardState}, which owns the
+ * two DOM listeners and clears itself on `blur`. This example kept its own
+ * `Set` until 2026-09-07 — correctly, blur handler and all. That is exactly why
+ * the helper now exists: the code was right and every consumer still had to
+ * write it, so the ones that forgot the `blur` half walked forever after an
+ * alt-tab. Deleting a correct copy is the point.
+ *
+ * This system *reads* that state once per fixed step, so a turn held across
+ * three steps turns three steps' worth — the rate lives here, in rad/s × the
+ * injected fixed delta, never in the event handler.
  */
 class ControlSystem implements SimulationSystem {
   priority = PRIORITY_INPUT;
 
-  /** `KeyboardEvent.code`s currently held. */
-  readonly held = new Set<string>();
+  /** Physical keys held right now, cleared automatically on focus loss. */
+  readonly keys = new KeyboardState(window);
 
   initialize(): void {
-    // Intentionally empty: the DOM listeners below own the key state.
+    // Intentionally empty: `KeyboardState` owns the listeners.
   }
 
   fixedUpdate(context: FixedUpdateContext): void {
     const dt = context.time.fixedDeltaTime;
-    const held = this.held;
-    const forward = (held.has("KeyW") ? 1 : 0) - (held.has("KeyS") ? 1 : 0);
-    const right = (held.has("KeyD") ? 1 : 0) - (held.has("KeyA") ? 1 : 0);
+    const held = this.keys;
+    const forward = (held.isDown("KeyW") ? 1 : 0) - (held.isDown("KeyS") ? 1 : 0);
+    const right = (held.isDown("KeyD") ? 1 : 0) - (held.isDown("KeyA") ? 1 : 0);
     controller.setMoveIntent(forward, right);
     // ← is +yaw and → is −yaw: yaw is measured from +Z towards +X (§7a), so a
     // negative delta swings the forward axis towards the character's right —
     // the same sign the drag handler and the doc example use.
     const turn =
-      (held.has("ArrowLeft") ? 1 : 0) - (held.has("ArrowRight") ? 1 : 0);
+      (held.isDown("ArrowLeft") ? 1 : 0) - (held.isDown("ArrowRight") ? 1 : 0);
     if (turn !== 0) {
       controller.turn(turn * TURN_RATE * dt);
     }
     const pitch =
-      (held.has("ArrowUp") ? 1 : 0) - (held.has("ArrowDown") ? 1 : 0);
+      (held.isDown("ArrowUp") ? 1 : 0) - (held.isDown("ArrowDown") ? 1 : 0);
     if (pitch !== 0) {
       look.look(pitch * LOOK_RATE * dt);
     }
   }
 
   dispose(): void {
-    this.held.clear();
+    this.keys.dispose();
   }
 }
 
@@ -448,19 +455,15 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     return;
   }
-  controls.held.add(event.code);
   if (event.code.startsWith("Arrow")) {
     event.preventDefault();
   }
 });
-window.addEventListener("keyup", (event) => {
-  controls.held.delete(event.code);
-});
-// A backgrounded tab never delivers the keyup — release everything instead of
-// walking into a wall forever.
-window.addEventListener("blur", () => {
-  controls.held.clear();
-});
+// No `keyup` or `blur` listener here any more: `KeyboardState` registers both,
+// including the release-everything-on-blur that keeps a backgrounded tab from
+// walking into a wall forever. The `keydown` listener above stays because it
+// does two things state cannot: Space is an EDGE (`jump()` answers "can I?"
+// itself) and the arrows need `preventDefault` so the page does not scroll.
 
 // Drag-look: yaw to the character, pitch to the eye — the exact split the
 // component doc-comment shows, with the platform's downward-positive deltas

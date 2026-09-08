@@ -16,6 +16,10 @@ export type {
   SurfaceKeyListener,
 } from "./keyboard-input.js";
 export { KeyboardInput } from "./keyboard-input.js";
+// Polled key state -- "is W down?" -- which is what `@fourjs/input` most
+// obviously means and did not ship until 2026-09-07. Distinct from
+// `KeyboardInput` above, which routes events to a FOCUSED scene node.
+export { KeyboardState } from "./keyboard-state.js";
 export type {
   PickHit,
   Pickable,
