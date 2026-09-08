@@ -111,6 +111,41 @@ another project's release schedule.
 ranges are a symptom. The deleted API is the cause. Widening a range changes
 nothing, because the call still throws.
 
+### 3.1a TypeDoc's own timeline, and why waiting is not a plan
+
+**Researched 2026-09-08.** [TypeStrong/typedoc#3098](https://github.com/TypeStrong/typedoc/issues/3098)
+is **open**, with no fix and no date. The maintainer's own account of the work:
+
+- TypeScript 7's API is *"a complete rewrite"*, and TypeDoc *"heavily depends on some
+  internal features in TypeScript 6 which are not present in the TypeScript 7 API"* —
+  so this is not a peer-range bump, it is a port.
+- The plan is a **feature freeze** once TS 7.0 ships, then the port.
+- *"There is no timeline for how long this will take"*, as the work happens *"during
+  free time on weekends, usually an hour or two per week."*
+
+Depending on **internal** APIs is the important detail. Those carry no compatibility
+promise even between minor versions, so there is no shortcut and no shim.
+
+**Conclusion: "wait for TypeDoc" is an open-ended bet, not a schedule.** If a single
+root TypeScript is ever a hard requirement, TypeDoc has to be isolated or replaced.
+
+### 3.1b Isolating or replacing the docs step
+
+Two options exist, and one is already proven by a shipping package:
+
+1. **Isolate TypeDoc with its own nested TypeScript.** `@microsoft/api-extractor`
+   demonstrates the pattern: it declares `typescript: 5.9.3` as a **direct
+   dependency**, not a peer, so it resolves its own compiler and constrains nothing
+   above it. Moving TypeDoc into its own workspace tool package with
+   `typescript@6.0.3` as a direct dependency would free the root entirely.
+2. **Replace TypeDoc with API Extractor + API Documenter.** These consume the
+   emitted `.d.ts` rather than the source graph, and bundle their own TypeScript by
+   construction — so they are immune to the root compiler version.
+
+Neither is urgent. Today TypeDoc works, and `typescript@6.0.3` costs one dependency.
+Both matter the moment "one TypeScript at the root" becomes a requirement rather
+than a preference.
+
 ### 3.2 The consequence: two TypeScripts, deliberately
 
 | Installed as | Version | Serves |
@@ -170,10 +205,32 @@ The build is also not a flat transpile. `tsconfig.base.json` sets
 builds a dependency-ordered project graph and reuses prior outputs. Bun has no
 equivalent.
 
-**Verdict: blocked, and not by a small gap.** Even if declaration emit shipped
-tomorrow, only `tsc` understands project references today. This layer stays on
-`tsc -b` — now on TypeScript 7, which is where the speed people expect from Bun
-actually arrived: **211–401 ms per package**.
+**Verdict: blocked today, but the gap is smaller than it looks.** This paragraph
+originally read "not by a small gap". That was wrong, and is corrected here after
+measuring rather than reasoning.
+
+There is a real path, and it does not wait on Bun. `oxc-transform`, `tsdown` and
+`rolldown-plugin-dts` all emit declarations from **`isolatedDeclarations`** — a mode
+that needs no type-checker, only explicit annotations at the module boundary. So the
+question is not "can Bun emit `.d.ts`" but "does this codebase satisfy
+`isolatedDeclarations`". Measured across all 24 packages with TypeScript 7:
+
+| Result | Count |
+|---|---|
+| Packages already **clean** | **9** (including `core` and `math`) |
+| Packages with violations | 15 |
+| **Total violations repo-wide** | **107** |
+
+Worst offenders: `render-webgpu` (28), `physics` (19), `geometry` (16), `ui` (9).
+Almost all are missing explicit return types — mechanical, not architectural.
+
+The honest verdict: **about 107 annotations stand between this repo and a tsc-free
+declaration emit.** That is a bounded task, not a blocker.
+
+Whether it is worth doing is a different question, and the answer today is probably
+no. `tsc -b` under TypeScript 7 already builds a package in **211–401 ms**, which is
+where the speed people expect from Bun actually arrived. Project references are still
+tsc-only. The case for switching is thinner than the case for keeping it.
 
 ### 4.2 L4 — `bun test` is not a drop-in for this suite (blocked today)
 
@@ -239,6 +296,83 @@ Stated so that nobody re-investigates them:
 
 ---
 
+## 4a. Oxlint: the one blocker with a real, available answer
+
+**Researched and tested on this repository, 2026-09-08.** Of the three blockers,
+exactly one has a shipping alternative today, and it inverts the problem rather than
+working around it.
+
+`typescript-eslint` cannot run on TypeScript 7. **Oxlint's type-aware mode
+*requires* TypeScript 7.** It is powered by `oxlint-tsgolint`, described by its own
+package as *"High-performance type-aware TypeScript linter powered by
+typescript-go"* — and `typescript-go` **is** TypeScript 7. Its version line
+(`7.0.2001`) tracks the compiler it binds to.
+
+So swapping the linter does not merely tolerate the migration. **It removes one of
+the two reasons `typescript@6.0.3` is installed at all.**
+
+### 4a.1 What was verified here, not read
+
+| Question | Result |
+|---|---|
+| Does type-aware linting actually work? | **Yes** — an injected `JSON.parse("{}")` misuse is caught as `typescript(no-unsafe-call)` and `no-unsafe-member-access` at the right positions |
+| Rule coverage vs typescript-eslint | **59 of 61** type-aware rules (upstream docs) |
+| Whole-repo run, no type-awareness | **4.4 s** |
+| Whole-repo run, **with** `--type-aware` | **13 s** |
+| Current `bun run lint` (eslint, type-checked) | **3 min 56 s** |
+| False alarms against this codebase | **none** — the 27 findings all came from rules this repo does not enable, and each was inspected |
+
+That is roughly **18x faster with type-awareness on**, and **53x** without.
+
+### 4a.2 The three repo-specific guards all survive
+
+`eslint.config.js` is lean — `recommendedTypeChecked` plus two custom rules — but
+those two rules are load-bearing. Each was reproduced in Oxlint and verified against
+a probe file:
+
+| Guard | Why it exists | Oxlint |
+|---|---|---|
+| ban `Date.now` | §33/§34 determinism | ✅ `no-restricted-properties` |
+| ban `Math.random` | §33/§34 determinism | ✅ `no-restricted-properties` |
+| ban `export default` | named exports only (plan §1 rule 7) | ✅ `import/no-default-export` |
+
+### 4a.3 The one genuine gap
+
+**Oxlint does not implement `no-restricted-syntax`.** This is not inference — Oxlint
+says so itself when the rule appears in a config:
+
+```
+Failed to parse oxlint configuration file.
+  x Rule 'no-restricted-syntax' not found in plugin 'eslint'
+```
+
+This repo uses that rule for exactly one thing: banning `ExportDefaultDeclaration`.
+`import/no-default-export` covers it, and covers it **better** — a purpose-built rule
+rather than a raw AST selector. So the gap is real but does not bite here.
+
+It would bite a config that used `no-restricted-syntax` for arbitrary AST patterns.
+Check before assuming this transfers to another repository.
+
+### 4a.4 Recommendation
+
+**Adopt Oxlint, and treat it as a gate-semantics change rather than a dependency
+bump.** The speed is the least interesting part. The reasons that matter:
+
+1. It **removes typescript-eslint as a TS 7 blocker**, leaving TypeDoc as the only
+   reason `typescript@6.0.3` exists.
+2. A 3m56s lint is a gate people learn to skip locally. A 13s lint is one they run.
+
+Two conditions before it replaces ESLint rather than joining it:
+
+- **Prove rule parity explicitly.** `recommendedTypeChecked` is ~60 rules; this
+  research exercised a handful. Run both linters over the same tree and diff the
+  findings before deleting the ESLint config. A quietly weaker lint gate is the
+  exact defect class this repository keeps rediscovering.
+- **Do not run both as gates.** Two linters over one tree is a second source of
+  truth about what is allowed. Swap, or stay.
+
+---
+
 ## 5. Adjacent finding: the coverage gate is partly illusory
 
 While testing whether Vitest 5 could land (3.2.7 is two majors behind 5.0.0), the
@@ -267,7 +401,8 @@ first converts a real quality gap into a red build with no owner.
 
 | Blocked thing | Unblocked when | What to watch |
 |---|---|---|
-| Drop `typescript@6.0.3` | TypeDoc **and** typescript-eslint both ship TS 7 support | both are at latest; neither does |
+| Drop `typescript@6.0.3` | **TypeDoc** alone, now — Oxlint removes the typescript-eslint half (section 4a) | typedoc#3098: open, no timeline |
+| typescript-eslint blocks TS 7 | **Already solved** — Oxlint's type-aware mode requires TS 7 | needs a rule-parity diff before the swap |
 | `bun build` replaces `tsc -b` | Bun emits `.d.ts` **and** follows project references | `bun build --help` for `--dts` |
 | `bun test` replaces Vitest | the three `vi.*` APIs exist **and** coverage thresholds can fail a build | run `bun test` in `packages/core` |
 | Vitest 5 | the five-package coverage campaign in section 5 lands | `bun run coverage` |
@@ -311,15 +446,24 @@ cd packages/core && bun test
 **We can and did migrate to TypeScript 7 on Bun 1.4.2.** What remains impossible is
 narrower than the question implies, and is worth stating exactly:
 
-1. **One TypeScript** is impossible because TypeScript 7 deleted the compiler API,
-   and the two tools that consume it have no released version that works. Their peer
-   ranges are a symptom, not the cause.
-2. **Bun as the build tool** is impossible because a library ships `.d.ts`, and
-   `bun build` cannot emit them at all — nor follow the 22-package
-   project-reference graph.
+1. **One TypeScript** is impossible because TypeScript 7 deleted the compiler API.
+   Their peer ranges are a symptom, not the cause. **Research on 2026-09-08 halved
+   this**: Oxlint's type-aware mode *requires* TS 7, so swapping the linter removes
+   typescript-eslint from the blocker list entirely (section 4a). **TypeDoc is then
+   the only reason `typescript@6.0.3` exists** — and its own issue is open with no
+   timeline, so it must be isolated or replaced rather than waited on (3.1a, 3.1b).
+2. **Bun as the build tool** is blocked because a library ships `.d.ts` and
+   `bun build` cannot emit them, nor follow the 22-package project-reference graph.
+   But "impossible" was too strong: `isolatedDeclarations` gives a tsc-free
+   declaration path, and this codebase is **107 annotations away** from satisfying
+   it, with 9 of 24 packages already clean (section 4.1). The reason not to do it is
+   now cost/benefit, not capability — `tsc -b` on TS 7 builds a package in
+   211–401 ms.
 3. **Bun as the test runner** is impossible because three `vi.*` APIs this suite
    uses **68 times** (`stubGlobal` 24, `unstubAllGlobals` 22, `resetModules` 22) do
    not exist there, and because `bun test` cannot fail a build on a coverage
    threshold.
 
-None of the three is caused by fourJS, and none waits on a decision here.
+None of the three is caused by fourJS. **One now waits on a decision here**: whether
+to swap typescript-eslint for Oxlint, which is a gate-semantics change and needs a
+rule-parity diff first, not a dependency bump.

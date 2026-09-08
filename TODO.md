@@ -968,6 +968,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       · **Reasoning and evidence now live in `docs/MIGRATION.md`** (2026-09-08), including the
         exit criteria for every layer and the commands to re-measure. Read it before re-opening
         this row — the numbers in it expire when the tools move.
+      · **Research 2026-09-08 halved this blocker.** Oxlint's type-aware mode *requires*
+        TypeScript 7 (it is `typescript-go` underneath), so swapping typescript-eslint for
+        Oxlint removes half the reason `typescript@6.0.3` is installed — and takes lint from
+        **3m56s to 13s**. All three repo-specific guards were verified to survive. **TypeDoc is
+        then the only holdout**, and its issue is open with no timeline, so it needs isolating
+        or replacing rather than waiting on. See `docs/MIGRATION.md` sections 3.1a, 3.1b, 4a.
+        **The Oxlint swap is a gate-semantics change and wants a rule-parity diff first — it is
+        a decision, not a bump.**
 
 - [x] **Open-PR sweep 2026-09-06: Dependabot hygiene + stale branches.** #65
       (rapier 0.20) and #66 (eslint 10 dev-deps) **closed** and ignored in

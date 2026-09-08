@@ -51,6 +51,30 @@ The release gate that said *"wait for TypeDoc"* is gone. It was never the compil
 
 ### Added
 
+- **`docs/MIGRATION.md` — blocker research and alternatives (2026-09-08).** Each blocker was
+  tested on this repository rather than read about.
+
+  **Oxlint is a real answer to one of the three, and it inverts the problem.** Its type-aware
+  mode does not merely tolerate TypeScript 7 — it **requires** it, being powered by
+  `oxlint-tsgolint`, i.e. `typescript-go`. Verified here: type-aware rules genuinely fire
+  (injected `no-unsafe-call` / `no-unsafe-member-access` caught at the right positions), and all
+  three repo-specific guards survive — `Date.now` and `Math.random` via
+  `no-restricted-properties`, `export default` via `import/no-default-export`, which is a better
+  instrument than the AST selector it replaces. Measured: **4.4 s** whole-repo, **13 s** with
+  `--type-aware`, against **3 min 56 s** for the current ESLint run. The one genuine gap is
+  `no-restricted-syntax`, which Oxlint reports as absent by name and which this repo only used
+  for the default-export ban.
+
+  **TypeDoc cannot be waited on.** Its TS 7 issue is open with no timeline, the work is an API
+  port done "an hour or two per week", and it depends on TypeScript **internals**, which carry
+  no compatibility promise. Isolation or replacement is the plan; `@microsoft/api-extractor`
+  proves the pattern by declaring `typescript` as a direct dependency rather than a peer.
+
+  **A verdict in this document was wrong and is corrected.** Section 4.1 said the `bun build`
+  declaration gap was "not a small gap". Measured across all 24 packages, the codebase is
+  **107 `isolatedDeclarations` annotations** away from a tsc-free `.d.ts` emit, with **9
+  packages already clean**. That is a bounded task, not a blocker — the reason to keep `tsc -b`
+  is now cost/benefit, not capability.
 - **`docs/MIGRATION.md`** — what TypeScript-on-Bun can and cannot do here, and why.
 
   Written because the question kept being answered from summary rather than from measurement,
