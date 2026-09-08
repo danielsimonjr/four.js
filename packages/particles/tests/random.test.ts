@@ -185,14 +185,31 @@ describe("SeededRandom — derived draws", () => {
     const twin = random.clone();
     let min = 1;
     let max = 0;
+    /*
+     * The draws are checked in plain JS and asserted ONCE, rather than through
+     * 60,000 `expect()` calls (20,000 iterations x 3). The arithmetic is free;
+     * the assertion machinery is not, and at 60,000 calls this test took ~5.4s
+     * and failed vitest's 5s deadline -- a timeout that read as a broken PRNG.
+     *
+     * The proof that the draws were never the cost is in this same file:
+     * "is uniform enough" makes 80,000 draws in 17ms, four times the work,
+     * because it asserts nine times instead of a quarter of a million.
+     *
+     * Coverage is unchanged -- every one of the 20,000 values is still checked
+     * against all three conditions, and the first violation is reported with
+     * its index, which a bare `expect` in a loop did not give either.
+     */
+    let violation: string | undefined;
     for (let i = 0; i < 20000; i += 1) {
       const value = random.nextFloat01();
-      expect(value).toBe(twin.nextUint32() / 4294967296);
-      expect(value).toBeGreaterThanOrEqual(0);
-      expect(value).toBeLessThan(1);
+      const expected = twin.nextUint32() / 4294967296;
+      if (violation === undefined && (value !== expected || value < 0 || value >= 1)) {
+        violation = `draw ${i}: got ${value}, expected ${expected} in [0, 1)`;
+      }
       min = Math.min(min, value);
       max = Math.max(max, value);
     }
+    expect(violation).toBeUndefined();
     expect(min).toBeLessThan(0.001);
     expect(max).toBeGreaterThan(0.999);
   });
@@ -216,17 +233,25 @@ describe("SeededRandom — derived draws", () => {
 
   it("maps nextRange onto [min, max), degenerate and reversed included", () => {
     const random = new SeededRandom(5);
+    // Same shape as the test above, for the same reason: this one ran 3.8s of a
+    // 5s budget on 44,000 `expect()` calls and was one slow machine from red.
+    let outside: string | undefined;
     for (let i = 0; i < 20000; i += 1) {
       const value = random.nextRange(-Math.PI, Math.PI);
-      expect(value).toBeGreaterThanOrEqual(-Math.PI);
-      expect(value).toBeLessThan(Math.PI);
+      if (outside === undefined && !(value >= -Math.PI && value < Math.PI)) {
+        outside = `draw ${i}: ${value} outside [-PI, PI)`;
+      }
     }
+    expect(outside).toBeUndefined();
     expect(random.nextRange(2.5, 2.5)).toBe(2.5);
+    let reversed: string | undefined;
     for (let i = 0; i < 2000; i += 1) {
       const value = random.nextRange(10, 4);
-      expect(value).toBeGreaterThan(4);
-      expect(value).toBeLessThanOrEqual(10);
+      if (reversed === undefined && !(value > 4 && value <= 10)) {
+        reversed = `reversed draw ${i}: ${value} outside (4, 10]`;
+      }
     }
+    expect(reversed).toBeUndefined();
   });
 
   it("consumes exactly one output per derived draw", () => {
