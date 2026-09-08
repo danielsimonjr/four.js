@@ -427,13 +427,12 @@ uiRoot.transform.position.set(PANEL_LEFT, PANEL_TOP, 0);
 
 const title = new Label({
   name: "title",
-  // NOTE: still the old spelling, deliberately and temporarily. This string is
-  // RENDERED, so it is pixel-coupled to `tests/visual/ui-demo.spec.ts-snapshots/
-  // ui-demo-*-visual-linux.png`. Those goldens are LINUX (CI is ubuntu) and cannot
-  // be re-recorded from a Windows box -- `--update-snapshots` here writes
-  // `-visual-win32.png` instead, which would leave CI just as red plus two dead
-  // files. Rebranding this label needs a Linux run; tracked in TODO.md.
-  text: "four.js - ui demo",
+  // RENDERED text, so it is pixel-coupled to
+  // `tests/visual/ui-demo.spec.ts-snapshots/ui-demo-*-visual-linux.png`. Changing
+  // it requires re-recording those goldens on Linux -- see the `Visual goldens`
+  // workflow, which exists for exactly this and cannot be replaced by a local run
+  // on Windows or macOS.
+  text: "fourJS - ui demo",
   atlas,
   size: TITLE_TEXT_SIZE,
 });
