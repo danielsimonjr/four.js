@@ -8,6 +8,14 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## Unreleased — the root is TypeScript 7 only
 
+> **Note on the commit split, recorded because `git log` is misleading here.** This work
+> landed as two commits whose messages do not match their contents: `2d05ece`
+> (*"build: root is TypeScript 7 only…"*) contains **only** the `eslint.config.js`
+> deletion, and `75f0b34` (*"docs: …"*) contains the **entire** toolchain change plus the
+> docs. Cause: the staging command hit a bad pathspec and aborted, and I committed without
+> checking its exit code. History was already pushed, so it is left intact and corrected
+> here rather than rewritten. **Read `75f0b34` for the change.**
+
 The migration to TypeScript-on-Bun is complete for the workspace root. `typescript@6.0.3` had
 exactly **two** consumers, so neither could be removed alone; both were addressed together.
 
