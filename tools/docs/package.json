@@ -1,0 +1,13 @@
+{
+  "name": "@fourjs-tools/docs",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Isolates TypeDoc and the TypeScript it needs, so the workspace root can be TypeScript 7 only.",
+  "scripts": {
+    "build": "typedoc --options ../../typedoc.json"
+  },
+  "devDependencies": {
+    "typedoc": "0.28.20",
+    "typescript": "6.0.3"
+  }
+}

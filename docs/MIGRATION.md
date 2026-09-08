@@ -1,17 +1,27 @@
 # Migration: TypeScript-on-Bun
 
-**Status as of 2026-09-08.** Half of this migration is done and shipped. The other
-half is blocked by facts outside this repository. This document records which half
-is which, what the evidence is, and what must change before the rest can move.
+**Status as of 2026-09-08 — the migration is DONE for the root.** The workspace root
+runs **TypeScript 7.0.2 on Bun 1.4.2**, with no second compiler above it. What remains
+is bounded and named below, and none of it blocks the root.
 
-The short answer to *"why can't we migrate fourJS to TypeScript-on-Bun?"* is:
+An earlier revision of this document said the opposite. It is kept honest by saying so:
+it concluded *"we cannot yet run one TypeScript"*, because it had proved each half
+separately and not yet put them together. Both halves landed on 2026-09-08.
 
-> **We did migrate the compiler.** fourJS builds and type-checks with
-> **TypeScript 7.0.2** on **Bun 1.4.2**, and CI is green.
-> **We cannot yet make Bun the whole toolchain**, and we cannot yet run **one**
-> TypeScript. Both limits share one root cause: **TypeScript 7 deleted the compiler
-> API that every type-aware tool consumes**, and Bun does not implement the two
-> capabilities a *library* needs — declaration emit and threshold-gated coverage.
+> **What changed.** `typescript@6.0.3` had exactly **two** consumers — TypeDoc and
+> typescript-eslint — so removing either alone left the other holding the root.
+> **typescript-eslint was replaced by Oxlint**, whose type-aware mode *requires*
+> TypeScript 7; **TypeDoc was isolated** into a workspace package that owns its own
+> compiler. Neither on its own would have moved the root.
+
+| Layer | Before | Now |
+|---|---|---|
+| Package manager | Bun 1.4.2 | unchanged |
+| Type check + build | TS 7.0.2 | unchanged |
+| **Lint** | ESLint 9 + typescript-eslint (**pinned root to TS < 6.1**) | **Oxlint + oxlint-tsgolint (requires TS 7)** |
+| **API docs** | TypeDoc at root (**pinned root to TS ≤ 6.0**) | **`tools/docs` workspace package, TS 6.0.3 nested** |
+| Root `typescript` | 6.0.3 | **7.0.2, and nothing constrains it** |
+| Test runner | Vitest 3.2.7 | unchanged — see section 5 |
 
 Everything below is measured on this repository. Commands to re-measure are in
 [section 7](#7-how-to-re-measure).
@@ -31,12 +41,24 @@ they succeed and fail separately, so this document scores them separately.
 | L4 | **Test runner** | Vitest 3.2.7 | **No** — section 4.2 |
 | L5 | **Example bundling** | Vite 8 | **Probably — but do not** — section 4.3 |
 
-A sixth concern, **API docs and lint**, is not Bun's business at all. It is the thing
-that pins the second TypeScript. See section 3.
+A sixth concern, **API docs and lint**, is not Bun's business at all — but it was the
+thing pinning the second TypeScript, and it is now resolved: lint moved to Oxlint
+(section 4a) and TypeDoc was isolated (section 3.1b). **L1 and L2 are done; L3, L4 and
+L5 stay on `tsc`, Vitest and Vite by choice, for the reasons in section 4.**
 
 ---
 
 ## 2. What is already done (2026-09-08)
+
+**The root migration is complete.** Landed in three steps on one day:
+
+1. **TypeScript 7.0.2 + Bun 1.4.2** for build and type-check.
+2. **Oxlint replaced ESLint + typescript-eslint** — the linter stopped being a TS 7
+   blocker and became a TS 7 *consumer*.
+3. **TypeDoc moved to `tools/docs`** with its own `typescript@6.0.3`.
+
+Result: `bun install --frozen-lockfile` resolves root `typescript` to **7.0.2** and
+`tools/docs/node_modules/typescript` to **6.0.3**, and every gate is green.
 
 - **TypeScript 7.0.2** builds and type-checks the library.
 - **Bun 1.4.2** locally, in `packageManager`, in `engines`, and in all five
@@ -58,7 +80,10 @@ zero. This green is a real check.
 
 ---
 
-## 3. The hard blocker: TypeScript 7 removed the compiler API
+## 3. The root cause: TypeScript 7 removed the compiler API
+
+*(This section explains the constraint that shaped everything above. It is no longer
+a blocker for this repository — it is why the solution has the shape it does.)*
 
 TypeScript 7 is the **Go port**. It is not TypeScript 6 plus features. It is a
 different program that accepts the same language.
@@ -177,21 +202,24 @@ inside one isolated docs tool. Both halves are independently verified on this
 repository; neither has been landed, because the Oxlint half is a gate-semantics
 change that needs a rule-parity diff and an explicit decision.
 
-### 3.2 The consequence: two TypeScripts, deliberately
+### 3.2 The consequence: one root compiler, one isolated one
 
-| Installed as | Version | Serves |
+| Where | Version | Serves |
 |---|---|---|
-| `ts7` (alias of `typescript`) | **7.0.2** | `bun run build`, every `typecheck:*` |
-| `typescript` | **6.0.3** | TypeDoc, typescript-eslint |
+| root `typescript` | **7.0.2** | `bun run build`, every `typecheck:*`, and Oxlint's type-aware mode |
+| `tools/docs/node_modules/typescript` | **6.0.3** | TypeDoc, and nothing else |
 
-`typescript@6.0.3` is the **newest release both tools accept**, and both tools are
-already at their latest published versions. **This is not a stale pin.** No release
-of either supports TypeScript 7.
+An earlier arrangement installed TypeScript 7 under an alias (`ts7`) alongside a root
+`typescript@6.0.3`, because two tools needed the old API. That alias is **gone** — with
+Oxlint in place and TypeDoc isolated, the root name is free, and keeping the same
+package installed twice under two names was a second source of truth.
 
-`typescript` keeps the plain name because module resolution decides which compiler
-the tools receive. TypeDoc and typescript-eslint both resolve `"typescript"` by
-name and offer no option to point elsewhere. Inverting the naming would hand them
-TypeScript 7 and break both.
+**Every `tsc` call still names its compiler by path** (`node
+../../node_modules/typescript/bin/tsc`). That is not left over from the alias: a
+workspace member can hoist a `tsc` binary, so `node_modules/.bin/tsc` is not
+guaranteed to be the root's. Naming the path is what makes the compiler a decision
+rather than an install-order accident — which it silently was on 2026-09-08, when the
+build ran on TypeScript 7 while `typescript` resolved to 6.0.3.
 
 ### 3.3 Two compilers over one source will diverge, so that is gated
 
@@ -221,7 +249,7 @@ Every `tsc` invocation now names its compiler by path
 
 ---
 
-## 4. Why Bun cannot own the rest of the toolchain yet
+## 4. Why Bun does not own the build, tests, or bundling
 
 ### 4.1 L3 — `bun build` cannot emit `.d.ts` (hard blocker)
 
@@ -384,23 +412,47 @@ rather than a raw AST selector. So the gap is real but does not bite here.
 It would bite a config that used `no-restricted-syntax` for arbitrary AST patterns.
 Check before assuming this transfers to another repository.
 
-### 4a.4 Recommendation
+### 4a.4 What was landed, and the parity evidence
 
-**Adopt Oxlint, and treat it as a gate-semantics change rather than a dependency
-bump.** The speed is the least interesting part. The reasons that matter:
+**Adopted 2026-09-08.** ESLint and typescript-eslint were removed from the repository;
+`.oxlintrc.json` replaces `eslint.config.js`. The swap was treated as a
+gate-semantics change, so parity was established before the old config was deleted:
 
-1. It **removes typescript-eslint as a TS 7 blocker**, leaving TypeDoc as the only
-   reason `typescript@6.0.3` exists.
-2. A 3m56s lint is a gate people learn to skip locally. A 13s lint is one they run.
+| Parity check | Result |
+|---|---|
+| `recommendedTypeChecked` rules reproduced | **47 of 47** — every rule name accepted by Oxlint |
+| Rules **mutation-verified** (a real violation injected, must be reported) | **16**, covering every type-aware rule in use |
+| Findings on the tree, old config | 0 errors |
+| Findings on the tree, new config | **0 errors** |
+| Lint wall-clock | **3 m 56 s → 13 s** |
 
-Two conditions before it replaces ESLint rather than joining it:
+The four scoped overrides in `eslint.config.js` are reproduced in `.oxlintrc.json`:
 
-- **Prove rule parity explicitly.** `recommendedTypeChecked` is ~60 rules; this
-  research exercised a handful. Run both linters over the same tree and diff the
-  findings before deleting the ESLint config. A quietly weaker lint gate is the
-  exact defect class this repository keeps rediscovering.
-- **Do not run both as gates.** Two linters over one tree is a second source of
-  truth about what is allowed. Swap, or stay.
+| Override | Why it exists | Ported as |
+|---|---|---|
+| `disableTypeChecked` for `**/*.js,mjs,cjs` | plain JS has no types to check | 43 `typescript/*` rules `"off"` for those globs |
+| `no-restricted-properties` off in `**/tests/**` | tests may use `Date.now` / `Math.random` | same override |
+| `no-restricted-syntax` off in `*.config.*` | tooling configs need default exports | `import/no-default-export` off |
+| `disableTypeChecked` for `examples/**` | examples were outside every tsconfig | not needed — `examples/tsconfig.json` types them now |
+
+**The JS override is the one that mattered, and it was found by measurement rather
+than by reading.** Omitting it produced **1,612 findings**, 97% of them `no-unsafe-*`
+in `tools/*.mjs` and `benchmarks/*.mjs` — plain JavaScript being type-linted with no
+types. With it: **0 errors**. A port that had been eyeballed rather than run would
+have shipped that.
+
+**One deliberate difference from ESLint.** Oxlint's default `correctness` category
+enables rules `recommendedTypeChecked` did not, which surface **42 warnings** —
+`no-unsafe-optional-chaining` (17), `no-misused-spread` (13), and a handful of others,
+all in tests and tools. They are warnings, not errors, so the gate passes. They are
+kept rather than silenced because they are real coverage the previous linter did not
+have; a sample was inspected and read as deliberate. **Triaging them is filed in
+TODO.md** — a permanently-warning gate is how warnings get ignored.
+
+**The one genuine gap remains `no-restricted-syntax`**, which Oxlint does not
+implement. It was used here for exactly one thing — banning `export default` — and
+`import/no-default-export` covers that better. A repo using it for arbitrary AST
+selectors would not port this cleanly.
 
 ---
 
@@ -428,18 +480,20 @@ first converts a real quality gap into a red build with no owner.
 
 ---
 
-## 6. Exit criteria — what unblocks each layer
+## 6. What is left, and what unblocks it
 
-| Blocked thing | Unblocked when | What to watch |
+The root is done. Three items remain, none of which blocks it:
+
+| Item | Status | Unblocked when |
 |---|---|---|
-| Drop `typescript@6.0.3` | **TypeDoc** alone, now — Oxlint removes the typescript-eslint half (section 4a) | typedoc#3098: open, no timeline |
-| typescript-eslint blocks TS 7 | **Already solved** — Oxlint's type-aware mode requires TS 7 | needs a rule-parity diff before the swap |
-| `bun build` replaces `tsc -b` | Bun emits `.d.ts` **and** follows project references | `bun build --help` for `--dts` |
-| `bun test` replaces Vitest | the three `vi.*` APIs exist **and** coverage thresholds can fail a build | run `bun test` in `packages/core` |
-| Vitest 5 | the five-package coverage campaign in section 5 lands | `bun run coverage` |
+| **Drop `typescript@6.0.3` entirely** | isolated in `tools/docs`; costs one dependency | TypeDoc ships TS 7 support ([#3098](https://github.com/TypeStrong/typedoc/issues/3098), open, no timeline) — or is replaced by API Extractor, which bundles its own compiler |
+| **Vitest 3 → 5** | blocked by a real coverage gap, not by the runner | the five-package coverage campaign in section 5 lands |
+| **Triage the 42 Oxlint warnings** | non-blocking; new coverage ESLint never had | someone reads them and either fixes or explicitly allows each |
+| `bun build` replaces `tsc -b` | possible, ~107 `isolatedDeclarations` annotations away | not recommended — `tsc -b` on TS 7 builds a package in 211–401 ms and project references are tsc-only |
+| `bun test` replaces Vitest | blocked | three `vi.*` APIs (68 uses) exist **and** `bun test` can fail a build on a coverage threshold |
 
-None of the first three is a fourJS task; they are other projects' roadmaps. The
-fourth is ours, and is the only one worth scheduling.
+Only the second and third are ours. The rest are other projects' roadmaps or
+deliberate choices.
 
 ---
 
@@ -449,19 +503,28 @@ Do not trust this document's numbers after the tools move. A measurement expires
 when its instrument changes.
 
 ```bash
-# Which TypeScript is which
-node node_modules/ts7/bin/tsc --version
-node -p "require('./node_modules/typescript/package.json').version"
+# Which TypeScript is where
+node -p "require('./node_modules/typescript/package.json').version"              # root -> 7.0.2
+node -p "require('./tools/docs/node_modules/typescript/package.json').version"   # docs -> 6.0.3
 
 # Does TypeScript 7 still type-check everything?
 bun run typecheck:tests && bun run typecheck:examples && bun run typecheck:config
 
-# Do the two compilers still agree?
+# Do the two compilers still agree? (the isolated 6.0.3 over the same projects)
 bun run typecheck:ts6
 
-# Do the tools still break on TS 7?  (destructive: reinstall 6.0.3 afterwards)
-bun add -d typescript@7.0.2 && bun run docs; bunx eslint playwright.config.ts
-bun add -d typescript@6.0.3
+# Lint, and its wall-clock
+time bun run lint
+
+# Docs still build from the isolated package?
+bun run docs
+
+# Can the root move off the second compiler yet?  (TypeDoc is the only holdout)
+npm view typedoc peerDependencies --json
+
+# Why a workspace package and not `bun add --dev typedoc`: a PEER resolves from the
+# root, so bun satisfies it with the hoisted 7.0.2 and TypeDoc crashes. Reproduce:
+#   bun add --dev typedoc && bunx typedoc   ->  Cannot read properties of undefined
 
 # Can Bun emit declarations yet?
 bun build --help | grep -iE "dts|declaration"
@@ -474,27 +537,22 @@ cd packages/core && bun test
 
 ## 8. Summary
 
-**We can and did migrate to TypeScript 7 on Bun 1.4.2.** What remains impossible is
-narrower than the question implies, and is worth stating exactly:
+**fourJS runs TypeScript 7.0.2 on Bun 1.4.2, with one compiler at the root.**
 
-1. **One TypeScript** is impossible because TypeScript 7 deleted the compiler API.
-   Their peer ranges are a symptom, not the cause. **Research on 2026-09-08 halved
-   this**: Oxlint's type-aware mode *requires* TS 7, so swapping the linter removes
-   typescript-eslint from the blocker list entirely (section 4a). **TypeDoc is then
-   the only reason `typescript@6.0.3` exists** — and its own issue is open with no
-   timeline, so it must be isolated or replaced rather than waited on (3.1a, 3.1b).
-2. **Bun as the build tool** is blocked because a library ships `.d.ts` and
-   `bun build` cannot emit them, nor follow the 22-package project-reference graph.
-   But "impossible" was too strong: `isolatedDeclarations` gives a tsc-free
-   declaration path, and this codebase is **107 annotations away** from satisfying
-   it, with 9 of 24 packages already clean (section 4.1). The reason not to do it is
-   now cost/benefit, not capability — `tsc -b` on TS 7 builds a package in
-   211–401 ms.
-3. **Bun as the test runner** is impossible because three `vi.*` APIs this suite
-   uses **68 times** (`stubGlobal` 24, `unstubAllGlobals` 22, `resetModules` 22) do
-   not exist there, and because `bun test` cannot fail a build on a coverage
-   threshold.
+The migration turned on a single observation: `typescript@6.0.3` had **two**
+consumers, so neither could be removed alone. Both were addressed on the same day —
+the linter by **replacing** it with one that requires TS 7, the docs tool by
+**isolating** it where its own compiler cannot constrain anything else.
 
-None of the three is caused by fourJS. **One now waits on a decision here**: whether
-to swap typescript-eslint for Oxlint, which is a gate-semantics change and needs a
-rule-parity diff first, not a dependency bump.
+What is deliberately *not* Bun:
+
+1. **The build stays `tsc -b`.** `bun build` cannot emit `.d.ts`, and a library ships
+   315 of them. A tsc-free path exists (`isolatedDeclarations`, ~107 annotations away)
+   but buys little — TS 7 already builds a package in 211–401 ms, and project
+   references are tsc-only.
+2. **The tests stay Vitest.** `bun test` lacks three `vi.*` APIs this suite uses 68
+   times, and cannot fail a build on a coverage threshold. Losing that gate would be a
+   downgrade wearing a speed improvement.
+3. **The examples stay Vite.** Replaceable, and not worth the churn.
+
+Each of those is a choice with a measured reason, not a blocker.

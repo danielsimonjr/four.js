@@ -599,18 +599,24 @@ in CI.
 ## Build & Packaging
 
 - **Toolchain** (§91, exact pins in plan §3.2): strict TypeScript, ESM
-  only, Bun workspace (`>= 1.4.2`), Vitest, Playwright, ESLint 9 +
-  typescript-eslint, Prettier, Vite 8, TypeDoc, Changesets (release workflow
-  deferred to first publish). Task orchestration is
+  only, Bun workspace (`>= 1.4.2`), Vitest, Playwright, **Oxlint** (type-aware),
+  Prettier, Vite 8, TypeDoc, Changesets (release workflow deferred to first
+  publish). ESLint and typescript-eslint were removed 2026-09-08. Task orchestration is
   `bun run --filter './packages/*'` (Turborepo was replaced 2026-08-03).
-- **Two TypeScript compilers, on purpose** (2026-09-08). The library **builds
-  and type-checks with TypeScript 7.0.2**; **TypeScript 6.0.3 stays installed
-  only because TypeDoc and typescript-eslint cannot run on 7.** TS 7 is the Go
-  port: its package exports `.` as `lib/version.cjs` plus `unstable/*` modules,
-  so the legacy `import ts from "typescript"` compiler API is gone. Measured,
-  not assumed — TypeDoc dies with `Cannot read properties of undefined (reading
-  'PropertyDeclaration')` and typescript-eslint refuses with `typescript-eslint
-  does not support TS 7.0`.
+- **The ROOT is TypeScript 7.0.2 only** (2026-09-08). TS 7 is the Go port: its
+  package exports `.` as `lib/version.cjs` plus `unstable/*` modules, so the
+  legacy `import ts from "typescript"` compiler API is gone, and every tool that
+  consumed it breaks rather than degrades.
+- **One consumer of TypeScript 6 survives, and it is isolated.** TypeDoc lives in
+  the `tools/docs` workspace package with `typescript@6.0.3` as a **direct**
+  dependency, so it resolves its own compiler and constrains nothing above it.
+  A peer dependency cannot do this — `bun add --dev typedoc` at the root resolves
+  the peer to the hoisted 7.0.2 and TypeDoc dies with `Cannot read properties of
+  undefined (reading 'PropertyDeclaration')`. Measured both ways.
+- **Linting is Oxlint, and that is what freed the root.** typescript-eslint
+  refuses TS 7 by name; Oxlint's type-aware mode *requires* TS 7 (it is
+  `typescript-go` underneath). All 47 `recommendedTypeChecked` rules are
+  reproduced in `.oxlintrc.json`, 16 of them mutation-verified.
 
   Consequences a reader needs:
   - Every `tsc` invocation **names its compiler by path**. Both packages install

@@ -6,6 +6,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — the root is TypeScript 7 only
+
+The migration to TypeScript-on-Bun is complete for the workspace root. `typescript@6.0.3` had
+exactly **two** consumers, so neither could be removed alone; both were addressed together.
+
+### Changed
+
+- **ESLint and typescript-eslint are gone; linting is Oxlint.** typescript-eslint refuses
+  TypeScript 7 by name. Oxlint's type-aware mode **requires** it — `oxlint-tsgolint` is
+  `typescript-go` underneath — so the linter stopped blocking the migration and started
+  depending on it. `.oxlintrc.json` replaces `eslint.config.js`.
+
+  Treated as a gate-semantics change, not a dependency bump, so parity was established
+  **before** the old config was deleted: **47 of 47** `recommendedTypeChecked` rules reproduced,
+  **16 mutation-verified** (a real violation injected for each, and required to be reported),
+  0 errors on the tree under both linters. Lint wall-clock **3 m 56 s → 13 s**.
+
+  The load-bearing detail was found by running it rather than reading it: omitting the
+  `disableTypeChecked`-for-JavaScript override produced **1,612 findings**, 97% `no-unsafe-*`
+  in `tools/*.mjs` and `benchmarks/*.mjs` — plain JS type-linted with no types. With the
+  override: 0 errors. An eyeballed port would have shipped that.
+
+  One deliberate difference: Oxlint's default `correctness` category adds **42 warnings** that
+  `recommendedTypeChecked` never enabled. They are warnings, the gate passes, and they are kept
+  rather than silenced because they are real coverage the old linter lacked. Triage is filed.
+
+- **TypeDoc moved into `tools/docs`, a workspace package owning `typescript@6.0.3`.** It
+  consumes the compiler API TS 7 removed, and [its own issue](https://github.com/TypeStrong/typedoc/issues/3098)
+  is open with no timeline — so it is isolated rather than waited on. Docs still build at
+  **0 errors / 24 warnings**, unchanged.
+
+  **`bun add --dev typedoc` does not work, and the reason is worth recording** so nobody
+  retries it: a **peer** dependency resolves from the root, so Bun satisfied TypeDoc's
+  `typescript` peer with the hoisted 7.0.2 and TypeDoc died on `PropertyDeclaration`. A
+  **direct** dependency of a workspace member gets its own `node_modules`. Both measured.
+
+- **The `ts7` alias is removed.** With the root name free, `ts7@npm:typescript@7.0.2` alongside
+  `typescript@7.0.2` was the same package installed twice under two names — a second source of
+  truth. All 24 package builds and every root script now name `node_modules/typescript/bin/tsc`
+  directly. The explicit path stays: a workspace member can hoist a `tsc`, so `.bin/tsc` is not
+  guaranteed to be the root's.
+
+### Fixed
+
+- **`.github/dependabot.yml` carried two ignores that are now false.** The `typescript >= 6`
+  ignore would have pinned the root off the compiler it just adopted, and the `eslint >= 10`
+  ignore named a dependency the repo no longer has. Both removed, with the reasons recorded.
+  The `vitest` ignore stays — blocked by the coverage gap in `docs/MIGRATION.md` section 5,
+  which is unrelated to TypeScript.
 ## Unreleased — TypeScript 7 and Bun 1.4.2
 
 The release gate that said *"wait for TypeDoc"* is gone. It was never the compiler's gate.

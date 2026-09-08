@@ -38,27 +38,39 @@ implemented" in its README is the honest 0.x package. `NPM_TOKEN` remains an
 owner secret and is not in this repository. GitHub Pages is already the
 docs-workflow deploy target (`.github/workflows/docs.yml`).
 
-**TypeScript 7 adopted 2026-09-08 — and the old advice here was wrong.** This
-paragraph used to read *"do not lift the pin until TypeDoc accepts 7.x"*, which
-put the toolchain on another project's release schedule. It never needed to.
-TypeDoc's peer range constrains **TypeDoc**, not the compiler that builds the
-library.
+**TypeScript 7 is the ROOT compiler, and the root now has only one** (2026-09-08).
+This paragraph twice said something weaker and both readings were wrong: first *"do
+not lift the pin until TypeDoc accepts 7.x"*, which put the compiler on another
+project's release schedule; then *"two TypeScripts, deliberately"*, which was true
+for a day.
 
-- **Builds and type-checks: `typescript@7.0.2`**, via the `ts7` alias. Verified
-  from a clean tree: 24 packages, 315 `.d.ts` emitted, and 7,246 tests across
-  282 files passing against artifacts TS 7 produced.
-- **TypeDoc and typescript-eslint: `typescript@6.0.3`.** These consume the
-  legacy compiler API, which TS 7 removed — TypeDoc throws on
-  `PropertyDeclaration`, typescript-eslint refuses by name. 6.0.3 is the newest
-  release both accept (`typedoc@0.28.20` allows `6.0.x`; `typescript-eslint@8.70`
-  peers `<6.1.0`). Both are still the latest published versions, so this is not
-  a stale pin — no release supports TS 7 yet.
-- **`typecheck:ts6` is a CI gate**, because two compilers over one source can
-  diverge silently. It immediately found one: TS 6.0.3 rejects the `.ts` import
-  extensions in three §93 examples that 5.9 and 7.0 accept.
+- **Root: `typescript@7.0.2`.** Builds, type-checks, and backs the linter. Verified
+  from a clean tree: 24 packages, 315 `.d.ts` emitted, 7,246 tests across 282 files.
+- **Linting: `oxlint` + `oxlint-tsgolint`.** ESLint and typescript-eslint are no
+  longer dependencies. Oxlint's type-aware mode *requires* TypeScript 7 — it is
+  `typescript-go` underneath — so the linter went from blocking the migration to
+  depending on it. `.oxlintrc.json` reproduces all 47 `recommendedTypeChecked`
+  rules plus the two repo-specific guards; lint runs in ~13 s where ESLint took
+  3 m 56 s.
+- **Docs: `tools/docs`**, a workspace package pinning `typedoc@0.28.20` and
+  `typescript@6.0.3` as **direct** dependencies. TypeDoc consumes the legacy
+  compiler API that TS 7 removed, and its own issue
+  ([TypeStrong/typedoc#3098](https://github.com/TypeStrong/typedoc/issues/3098)) is
+  open with no timeline, so it is isolated rather than waited on. Docs still build
+  at 0 errors / 24 warnings — unchanged from before the move.
+- **`typecheck:ts6` remains a CI gate.** TypeDoc still parses this source with 6.0.3,
+  so two compilers read the code and can disagree — 6.0 rejects the `.ts` import
+  extensions in three §93 examples that 5.9 and 7.0 accept. The gate turns that into
+  a red build instead of a docs build that silently stops covering part of the API.
 
-Drop `typescript@6.0.3` when TypeDoc and typescript-eslint both ship TS 7
-support. Nothing else waits on them.
+**Why a workspace package rather than a dev dependency.** `bun add --dev typedoc`
+does not work, and it is worth recording why so nobody retries it: a **peer**
+dependency resolves from the root, so Bun satisfied TypeDoc's `typescript` peer with
+the hoisted 7.0.2 and TypeDoc crashed. A **direct** dependency of a workspace member
+gets its own `node_modules`. Both paths were measured on 2026-09-08.
+
+The root carries **no** `typescript` version ignore in `.github/dependabot.yml` any
+more. Do not re-add one.
 
 ---
 

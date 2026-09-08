@@ -139,7 +139,7 @@ bun run build                   # tsc -b across packages/* (sequential)
 bun run test                    # per-package unit tests (Vitest)
 bun run test:suites             # cross-package integration + determinism suites
 bun run test:browser            # Playwright + SwiftShader browser gates
-bun run lint                    # eslint (type-checked)
+bun run lint                    # oxlint (type-aware, via tsgolint/TypeScript 7)
 bun run docs                    # TypeDoc API reference
 bun run check-spec              # specification consistency checks
 bun run graph                   # regenerate docs/Architecture (dependency graph)

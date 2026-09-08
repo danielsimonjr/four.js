@@ -66,14 +66,16 @@ jobs:
       - name: Typecheck root config files
         run: bun run typecheck:config
 
-      # fourJS builds and type-checks with TypeScript 7, but typedoc and
-      # typescript-eslint cannot run on it (TS 7 removed the legacy compiler API:
-      # typedoc dies on `PropertyDeclaration`, typescript-eslint refuses outright),
-      # so TypeScript 6.0.3 stays installed for them. That means two compilers see
-      # this source, and they DO disagree -- 6.0 rejects the `.ts` import extensions
-      # in three §93 examples that 5.9 and 7.0 both accept. This gate is what makes
-      # such a divergence a red build instead of a silent TS7-only codebase.
-      - name: Typecheck under TypeScript 6 (toolchain compiler cross-check)
+      # The ROOT is TypeScript 7 only (2026-09-08). One consumer of TypeScript 6
+      # survives: TypeDoc, isolated in tools/docs with typescript@6.0.3 as a direct
+      # dependency, because TS 7 removed the legacy compiler API TypeDoc depends on.
+      #
+      # TypeDoc still PARSES this source with that 6.0.3, so two compilers read the
+      # code and they DO disagree -- 6.0 rejects the `.ts` import extensions in three
+      # §93 examples that 5.9 and 7.0 both accept. This gate runs the isolated 6.0.3
+      # over the same projects, so a divergence is a red build rather than a docs
+      # build that silently stops covering part of the library.
+      - name: Typecheck under TypeScript 6 (isolated docs compiler cross-check)
         run: bun run typecheck:ts6
 
       - name: Test

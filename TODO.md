@@ -63,6 +63,17 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
     a red build with no owner.
   · Written up with the rest of the toolchain reasoning in `docs/MIGRATION.md` section 5.
 
+- **Triage the 42 Oxlint warnings the ESLint config never surfaced.** The 2026-09-08 swap
+  reproduced `recommendedTypeChecked` exactly (47/47 rules, 16 mutation-verified), but Oxlint's
+  default `correctness` category enables rules ESLint here did not: `no-unsafe-optional-chaining`
+  (17), `no-misused-spread` (13), `no-self-assign` (4), `require-array-sort-compare` (4),
+  `no-loss-of-precision` (2), `no-irregular-whitespace` (1), `no-control-regex` (1). All are in
+  tests and tools, all are **warnings**, so `bun run lint` exits 0. A sample of three read as
+  deliberate (an optional chain on a call expected to exist; whitespace and control-char regexes
+  that are the point of their tests). **They were kept rather than silenced because they are real
+  coverage the previous linter did not have** — but a gate that prints 42 warnings every run is
+  how warnings get ignored. Each one wants a fix or an explicit allow.
+
 ### 2 · Hours — one contained fix, already diagnosed
 
 Each has its cause written down. The thinking is done; what remains is the change and its test.
@@ -962,9 +973,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       · **The vitest half of this row was never blocked by TypeDoc at all** — vitest declares
         no `typescript` peer. Two unrelated pins were bundled into one sentence. Split out
         below as its own item.
-      · **Still open, but no longer a release gate:** drop `typescript@6.0.3` when TypeDoc and
-        typescript-eslint ship TS 7 support. Both are at their latest published versions
-        (`typedoc@0.28.20`, `typescript-eslint@8.70.0`) and neither supports it yet.
+      · **RESOLVED 2026-09-08 — the root is TypeScript 7.0.2 only.** Not by either tool
+        shipping support. typescript-eslint was **replaced** by Oxlint (whose type-aware mode
+        REQUIRES TS 7), and TypeDoc was **isolated** into `tools/docs` with `typescript@6.0.3`
+        as a direct dependency. `typescript@6.0.3` had exactly two consumers, so neither could
+        be removed alone — that is why both had to land together.
+      · What remains is one dependency, not a gate: drop `typescript@6.0.3` entirely when
+        TypeDoc ships TS 7 support (its issue is open with no timeline) or is replaced by API
+        Extractor, which bundles its own compiler. Nothing waits on it.
       · **Reasoning and evidence now live in `docs/MIGRATION.md`** (2026-09-08), including the
         exit criteria for every layer and the commands to re-measure. Read it before re-opening
         this row — the numbers in it expire when the tools move.

@@ -9,7 +9,7 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "node ../../node_modules/ts7/bin/tsc -b tsconfig.build.json",
+    "build": "node ../../node_modules/typescript/bin/tsc -b tsconfig.build.json",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {

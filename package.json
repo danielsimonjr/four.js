@@ -9,7 +9,8 @@
   },
   "packageManager": "bun@1.4.2",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "tools/docs"
   ],
   "scripts": {
     "bench": "bun benchmarks/run-all.mjs",
@@ -20,7 +21,7 @@
     "check-docs": "bun tools/check-docs.mjs",
     "check-spec": "bun tools/check-spec.mjs",
     "coverage": "bun tools/run-in-packages.mjs --concurrency=4 vitest run --coverage --config ../../vitest.coverage.config.ts",
-    "docs": "bunx typedoc",
+    "docs": "bun run --filter @fourjs-tools/docs build",
     "example:build": "bunx vite build examples/first-2d-scene",
     "examples:build": "bun run example:build && bun run first-3d-scene:build && bun run playground:build && bun run mechanism:build && bun run blending:build && bun run particles-demo:build && bun run ui-demo:build && bun run flagship:build && bun run twin:build && bun run character:build && bun run gltf-model:build",
     "first-3d-scene:build": "bunx vite build examples/first-3d-scene",
@@ -31,7 +32,7 @@
     "graph:duplicates": "bun tools/create-dependency-graph/check-duplicates.mjs --no-regen",
     "graph:query": "bun tools/query-dependency-graph/query-dependency-graph.mjs --emit",
     "graph:test": "node --test tools/query-dependency-graph/query-dependency-graph.test.mjs",
-    "lint": "bunx eslint .",
+    "lint": "bunx oxlint --type-aware",
     "mechanism:build": "bunx vite build examples/mechanism",
     "particles-demo:build": "bunx vite build examples/particles-demo",
     "playground:build": "bunx vite build examples/physics-playground",
@@ -44,12 +45,12 @@
     "test:browser": "bunx playwright test",
     "test:suites": "bunx vitest run --config vitest.suites.config.ts --passWithNoTests",
     "twin:build": "bunx vite build examples/flagship/motor-digital-twin",
-    "typecheck:examples": "node node_modules/ts7/bin/tsc --noEmit -p examples",
-    "typecheck:tests": "node node_modules/ts7/bin/tsc --noEmit -p tests",
+    "typecheck:examples": "node node_modules/typescript/bin/tsc --noEmit -p examples",
+    "typecheck:tests": "node node_modules/typescript/bin/tsc --noEmit -p tests",
     "ui-demo:build": "bunx vite build examples/ui-demo",
     "gltf-model:build": "bunx vite build examples/gltf-model",
-    "typecheck:config": "node node_modules/ts7/bin/tsc --noEmit -p tsconfig.json",
-    "typecheck:ts6": "node node_modules/typescript/bin/tsc --noEmit -p tests && node node_modules/typescript/bin/tsc --noEmit -p examples && node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
+    "typecheck:config": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "typecheck:ts6": "node tools/docs/node_modules/typescript/bin/tsc --noEmit -p tests && node tools/docs/node_modules/typescript/bin/tsc --noEmit -p examples && node tools/docs/node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.2",
@@ -81,15 +82,13 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.4.1",
     "@vitest/coverage-v8": "3.2.7",
-    "eslint": "9.39.5",
     "fourJS": "workspace:*",
     "js-yaml": "^4.3.0",
+    "oxlint": "1.82.0",
+    "oxlint-tsgolint": "7.0.2001",
     "prettier": "3.9.6",
     "size-limit": "13.0.3",
-    "ts7": "npm:typescript@7.0.2",
-    "typedoc": "0.28.20",
-    "typescript": "6.0.3",
-    "typescript-eslint": "8.69.0",
+    "typescript": "7.0.2",
     "vite": "8.2.2",
     "vitest": "3.2.7",
     "yaml": "2.9.0"
