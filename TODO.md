@@ -31,6 +31,15 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
 
 - Coverage thresholds are package-level — DONE 2026-09-06 (80% per-file floor under the 95% package gate).
 
+- **Why does a 12.8s test survive a 5s deadline?** `tests/barrels.test.ts >
+  re-exports at least one symbol from animation` reports **12802ms** and passes, and
+  `tests/application.test.ts` reports 9809ms, yet the only raised `testTimeout` in the repo
+  is `vitest.coverage.config.ts` (30s), which is not the config these run under. Either the
+  duration shown is not what the deadline measures, or a config is being picked up that I
+  did not find. **Recorded as an open question, not an explanation** — found while fixing
+  the PRNG timeout (2026-09-07), deliberately not guessed at. Until it is understood, the
+  headroom on every slow test in the suite is unknown.
+
 ### 2 · Hours — one contained fix, already diagnosed
 
 Each has its cause written down. The thinking is done; what remains is the change and its test.
@@ -250,9 +259,20 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       lines the library should own. This also removes the CAUSE of the `KeyboardInput`
       trap: once a "read the keyboard" API exists, that class stops being what people
       reach for.
-- [ ] **(D) Rename `KeyboardInput` to say what it does.** It routes DOM key events to a
+- [x] **(D) Rename `KeyboardInput` to say what it does.** It routes DOM key events to a
       focused scene node; the name promises the opposite. Free to do pre-publish, and
       cheap: 6 files reference it. Do it AFTER (C), so the replacement exists first.
+      · **CLOSED 2026-09-07 WITHOUT THE RENAME — deliberately.** Reading the pair before
+        touching it changed the answer: `PointerInput` and `KeyboardInput` are symmetric
+        §72 event sources (platform events in, scene events out; routed by picking and by
+        focus), so the name is accurate in that frame. The trap was never the name — it
+        was that the package offered NO polled-state option, so the one keyboard-shaped
+        class got reached for by people who wanted the other thing. **(C) removed that
+        cause.** Renaming now would churn 100 references (not 6 — that estimate was wrong
+        by 17x) and break a documented pair to fix something already fixed.
+      · What WAS wrong and is now fixed: the dev error told callers to "listen to the DOM
+        directly, as `examples/character-controller` does" — false in both halves since
+        (C) landed. It names `KeyboardState` now, and the two classes cross-reference.
 
 - [x] **(E) `TimeState.deltaTime` — DECIDED: do NOT rename. Document the unit instead.**
       This is the one I came in expecting to change, and the measurement reversed it.
@@ -269,7 +289,11 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
         more than the flaw.
       · **What is actually wrong is the DOCS:** `TimeState`'s fields say "frame delta"
         and never say *seconds*. That is fixed with (E) below at no risk.
-- [ ] **(E1) Say "seconds" in `TimeState`'s docstrings** — the zero-risk 90% of (E).
+- [x] **(E1) Say "seconds" in `TimeState`'s docstrings** — the zero-risk 90% of (E).
+      · DONE 2026-09-07. Six duration fields never named a unit; only `fixedDeltaTime`
+        did. `performance.now()` and `requestAnimationFrame` both hand out milliseconds,
+        so the wrong guess type-checks and yields motion 1000x too fast. Each field
+        repeats the unit, because a reader meets the field, not the type's header.
 
 
 > **VERIFICATION RECORD — not a task, so deliberately not a checkbox.**
