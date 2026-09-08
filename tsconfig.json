@@ -1,0 +1,23 @@
+{
+  // Owns the root-level CONFIG files, and nothing else.
+  //
+  // These three had no owning project at all, so type-aware linting fell back to
+  // typescript-eslint's inferred "default project" via `allowDefaultProject`. That
+  // worked by luck: the inferred project happened to pick up `@types/node` under
+  // TypeScript 5.9, and stopped doing so under 6.0 — turning `process.env` into an
+  // unresolved type and producing 24 `no-unsafe-*` errors in playwright.config.ts
+  // alone. The lint was never really type-checking these files; it was reading types
+  // it was never guaranteed.
+  //
+  // `files` is an exact list, not a glob: every other .ts in the repo already has a
+  // nearer tsconfig (packages/*, tests/, examples/), and this must not steal them.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "files": ["playwright.config.ts", "vitest.coverage.config.ts", "vitest.suites.config.ts"]
+}

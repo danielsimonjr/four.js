@@ -59,6 +59,23 @@ jobs:
       - name: Typecheck tests
         run: bun run typecheck:tests
 
+      # The root config files (playwright.config.ts, the two vitest configs) had no
+      # owning tsconfig at all until 2026-09-08, so nothing type-checked them and
+      # type-aware lint read them through an inferred project that silently lost
+      # @types/node on TypeScript 6. They have a real project now; this gates it.
+      - name: Typecheck root config files
+        run: bun run typecheck:config
+
+      # fourJS builds and type-checks with TypeScript 7, but typedoc and
+      # typescript-eslint cannot run on it (TS 7 removed the legacy compiler API:
+      # typedoc dies on `PropertyDeclaration`, typescript-eslint refuses outright),
+      # so TypeScript 6.0.3 stays installed for them. That means two compilers see
+      # this source, and they DO disagree -- 6.0 rejects the `.ts` import extensions
+      # in three §93 examples that 5.9 and 7.0 both accept. This gate is what makes
+      # such a divergence a red build instead of a silent TS7-only codebase.
+      - name: Typecheck under TypeScript 6 (toolchain compiler cross-check)
+        run: bun run typecheck:ts6
+
       - name: Test
         run: bun run test
 

@@ -33,7 +33,11 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["*.js", "*.mjs", "*.ts"],
+          // "*.ts" was removed 2026-09-08: the three root config .ts files now have a
+          // real owning project (./tsconfig.json). They were being linted against the
+          // inferred default project, which silently lost @types/node on TypeScript 6.0
+          // and reported 24 no-unsafe-* errors for a `process` it could no longer see.
+          allowDefaultProject: ["*.js", "*.mjs"],
         },
         tsconfigRootDir: import.meta.dirname,
       },

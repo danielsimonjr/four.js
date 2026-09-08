@@ -1,9 +1,9 @@
 {
   // Type-checking-only project for the runnable examples. The examples are not
   // workspace packages: they are consumers, and they import the umbrella
-  // package by its published specifier (`four/...`), which resolves through the
-  // workspace symlink to `packages/fourjs/dist/*.d.ts`. `pnpm run build` must
-  // therefore run before `pnpm run typecheck:examples`.
+  // package by its published specifier (`fourJS/...`), which resolves through the
+  // workspace symlink to `packages/fourjs/dist/*.d.ts`. `bun run build` must
+  // therefore run before `bun run typecheck:examples`.
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "composite": false,
@@ -13,6 +13,15 @@
     // Examples run in a browser: they touch `document`, `window`, and
     // `HTMLCanvasElement`, none of which are in the default ES2022 lib.
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Three §93 entries are thin re-exports that import a sibling example's
+    // source directly (`import "../first-2d-scene/main.ts"`). Vite resolves that
+    // fine, and TypeScript 5.9 and 7.0 both accept it -- but 6.0 rejects it with
+    // TS5097 unless this flag is set. Found by the `typecheck:ts6` cross-check
+    // gate on 2026-09-08, which exists precisely to catch the two compilers
+    // disagreeing; without it the examples would have quietly become
+    // TS7-only. Safe here because this project is `noEmit` and the bundler,
+    // not tsc, produces the output.
+    "allowImportingTsExtensions": true,
     "types": []
   },
   "include": ["**/*.ts"],
