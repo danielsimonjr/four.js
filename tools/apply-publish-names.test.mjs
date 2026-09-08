@@ -30,7 +30,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // --- name mapping ----------------------------------------------------------
 
 test("publishName maps the umbrella and the scoped packages, and only those", () => {
-  assert.equal(publishName("four"), "@danielsimonjr/fourjs");
+  assert.equal(publishName("fourJS"), "@danielsimonjr/fourjs");
   assert.equal(publishName("@fourjs/core"), "@danielsimonjr/fourjs-core");
   assert.equal(
     publishName("@fourjs/physics-rapier"),
@@ -38,7 +38,8 @@ test("publishName maps the umbrella and the scoped packages, and only those", ()
   );
   assert.equal(publishName("@dimforge/rapier2d-compat"), null);
   assert.equal(publishName("vite"), null);
-  assert.equal(publishName("fourier"), null); // a prefix of "four" is not "four"
+  assert.equal(publishName("fourjs"), null); // lowercase is NOT the umbrella name
+  assert.equal(publishName("fourier"), null); // a prefix is not the name
 });
 
 test("resolveWorkspaceRange reproduces workspace publish-time substitution", () => {
@@ -57,13 +58,13 @@ const FIXTURE = {
   exports: { ".": { types: "./dist/index.d.ts", import: "./dist/index.js" } },
   files: ["dist"],
   dependencies: { "@fourjs/core": "workspace:*", "gl-matrix": "^3.4.3" },
-  devDependencies: { four: "workspace:^", vitest: "3.2.7" },
+  devDependencies: { fourJS: "workspace:^", vitest: "3.2.7" },
 };
 
 test("rewriteManifest renames keys, resolves workspace ranges, and leaves the rest alone", () => {
   const versions = new Map([
     ["@fourjs/core", "0.1.0"],
-    ["four", "0.1.0"],
+    ["fourJS", "0.1.0"],
   ]);
   const out = rewriteManifest(FIXTURE, versions);
   assert.equal(out.name, "@danielsimonjr/fourjs-render-webgl");
@@ -174,15 +175,15 @@ test("no @fourjs/ string survives in any rewritten package.json", () => {
       `${pkg.relDir} still carries an @fourjs/ name`,
     );
     assert.ok(
-      !json.includes('"four"'),
-      `${pkg.relDir} still carries the bare name "four"`,
+      !json.includes('"fourJS"'),
+      `${pkg.relDir} still carries the bare name "fourJS"`,
     );
   }
 });
 
 test("the umbrella's subpath exports survive the rewrite intact (§91 tree-shaking)", () => {
-  const umbrella = packages.find((p) => p.manifest.name === "four");
-  assert.ok(umbrella, "workspace package `four` not found");
+  const umbrella = packages.find((p) => p.manifest.name === "fourJS");
+  assert.ok(umbrella, "workspace package `fourJS` not found");
   const rewritten = rewriteManifest(umbrella.manifest, versions);
 
   // Byte for byte: same keys, same order, same condition objects.

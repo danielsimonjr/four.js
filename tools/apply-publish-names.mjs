@@ -176,7 +176,7 @@ export function checkRewrite(source, rewritten) {
   // Backstop for anything the field-by-field walk above does not know about:
   // a future manifest field holding a workspace name (a `bin` map, a
   // `publishConfig.directory`, an `imports` alias) would slip past it.
-  const residue = JSON.stringify(rewritten).match(/@four\//g);
+  const residue = JSON.stringify(rewritten).match(/@fourjs\//g);
   if (residue) {
     problems.push(
       `${residue.length} "@fourjs/" string(s) survive in the rewritten manifest`,
@@ -199,9 +199,9 @@ const CODE_EXTENSIONS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"];
 // Subpaths included: `"@fourjs/render-webgl/register"` is as real a specifier as
 // `"@fourjs/render-webgl"`, and the validator below flags both. Matching only the bare
 // name left every subpath token behind and failed the run it was meant to protect.
-const SCOPED_STRING = /(["'])@four\/([a-z0-9-]+(?:\/[a-z0-9-]+)*)\1/g;
+const SCOPED_STRING = /(["'])@fourjs\/([a-z0-9-]+(?:\/[a-z0-9-]+)*)\1/g;
 const BARE_SPECIFIER =
-  /(\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)(["'])four\2/g;
+  /(\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)(["'])fourJS\2/g;
 
 /**
  * Rewrites workspace names inside emitted code. Returns the new text and the
@@ -331,7 +331,7 @@ function stagePackage(root, pkg, rewritten, outDir) {
     // Residue check on the staged bytes themselves, not on what the rewrite
     // believed it did: a quoted workspace name left in a shipped file is the
     // one failure mode of this tool that a consumer discovers instead of CI.
-    if (/(["'])@four\//.test(text)) {
+    if (/(["'])@fourjs\//.test(text)) {
       problems.push(
         `${relative(outDir, file)}: a quoted "@fourjs/" name survives in the staged file`,
       );
