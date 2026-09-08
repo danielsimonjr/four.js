@@ -56,7 +56,7 @@ Alongside the frame loop, three event-shaped flows run at their own rates: point
 
 ## The §10 Frame Loop
 
-**Sources**: `packages/fourJS/src/application.ts`, `packages/motion/src/scheduler.ts`, `packages/motion/src/systems.ts`, `packages/scene/src/world-transforms.ts`, `packages/scene/src/interpolation.ts`, `packages/render/src/render-list.ts`, `packages/render-webgl/src/webgl-renderer.ts`.
+**Sources**: `packages/fourjs/src/application.ts`, `packages/motion/src/scheduler.ts`, `packages/motion/src/systems.ts`, `packages/scene/src/world-transforms.ts`, `packages/scene/src/interpolation.ts`, `packages/render/src/render-list.ts`, `packages/render-webgl/src/webgl-renderer.ts`.
 
 `Application.step(elapsedSeconds)` is one frame. The host — a rAF driver, a test, or the replay player — chooses the cadence; nothing in the engine reads a wall clock.
 

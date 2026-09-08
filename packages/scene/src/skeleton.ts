@@ -75,7 +75,7 @@ import { resolveWorldTransform } from "./world-transforms.js";
  * requires a component serializer for it, and a bone is a node, not a
  * component. Its §79 identity is the registered node type `"scene:bone"`,
  * matched by constructor identity like every other node class (see
- * `packages/fourJS/src/scene-serializers.ts`).
+ * `packages/fourjs/src/scene-serializers.ts`).
  *
  * No bone-axis convention is imposed — see the module header.
  */

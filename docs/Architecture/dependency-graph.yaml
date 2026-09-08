@@ -18,7 +18,7 @@ entryPoints:
   - file: packages/diagnostics/src/index.ts
     type: main
     description: "--- PH-20 (§33 rollback) ---------------------------------------------------"
-  - file: packages/fourJS/src/index.ts
+  - file: packages/fourjs/src/index.ts
     type: main
     description: "The umbrella package (§98): one namespace per workspace package, plus the"
   - file: packages/geometry/src/index.ts
@@ -3000,8 +3000,8 @@ modules:
         - COORDINATE_ENVELOPE
         - UNSTABLE_SCALE_RATIO
         - NEAR_ZERO_SCALE
-  packages/fourJS:
-    packages/fourJS/src/animation.ts:
+  packages/fourjs:
+    packages/fourjs/src/animation.ts:
       description: animation module
       externalDependencies: []
       nodeDependencies: []
@@ -3014,7 +3014,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/animation"
-    packages/fourJS/src/application.ts:
+    packages/fourjs/src/application.ts:
       description: The `Application` composition root (§45, plan D4).
       externalDependencies: []
       nodeDependencies: []
@@ -3112,7 +3112,7 @@ modules:
         - ApplicationEventMap
         - PhysicsWorldContext
         - ApplicationOptions
-    packages/fourJS/src/assets.ts:
+    packages/fourjs/src/assets.ts:
       description: assets module
       externalDependencies: []
       nodeDependencies: []
@@ -3125,7 +3125,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/assets"
-    packages/fourJS/src/capabilities.ts:
+    packages/fourjs/src/capabilities.ts:
       description: The umbrella's own §81 capability token (RFC 0002).
       externalDependencies: []
       nodeDependencies: []
@@ -3143,7 +3143,7 @@ modules:
         - EDITOR_TOOLS
       constants:
         - EDITOR_TOOLS
-    packages/fourJS/src/compute-pass.ts:
+    packages/fourjs/src/compute-pass.ts:
       description: §82's `Four.ComputePass` — the named-map sugar over `@fourjs/render`'s
       externalDependencies: []
       nodeDependencies: []
@@ -3161,7 +3161,7 @@ modules:
         - ComputePass
       interfaces:
         - ComputePassOptions
-    packages/fourJS/src/core.ts:
+    packages/fourjs/src/core.ts:
       description: core module
       externalDependencies: []
       nodeDependencies: []
@@ -3174,7 +3174,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/core"
-    packages/fourJS/src/diagnostics.ts:
+    packages/fourjs/src/diagnostics.ts:
       description: diagnostics module
       externalDependencies: []
       nodeDependencies: []
@@ -3187,7 +3187,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/diagnostics"
-    packages/fourJS/src/editor-tools.ts:
+    packages/fourjs/src/editor-tools.ts:
       description: The §81 editor-tool registry — a named map of tool factories the **host**
       externalDependencies: []
       nodeDependencies: []
@@ -3201,7 +3201,7 @@ modules:
         - EditorToolRegistry
       classes:
         - EditorToolRegistry
-    packages/fourJS/src/geometry.ts:
+    packages/fourjs/src/geometry.ts:
       description: geometry module
       externalDependencies: []
       nodeDependencies: []
@@ -3214,7 +3214,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/geometry"
-    packages/fourJS/src/gltf.ts:
+    packages/fourjs/src/gltf.ts:
       description: §78 glTF assembly — `instantiateGltf` (A-19's closing packet, 2026-08-29).
       externalDependencies: []
       nodeDependencies: []
@@ -3269,7 +3269,7 @@ modules:
         - GltfInstance
       functions:
         - instantiateGltf
-    packages/fourJS/src/index.ts:
+    packages/fourjs/src/index.ts:
       description: "The umbrella package (§98): one namespace per workspace package, plus the"
       externalDependencies: []
       nodeDependencies: []
@@ -3551,7 +3551,7 @@ modules:
         - ComputePassOptions
         - GltfInstance
         - PreloadManifestIntoCatalogOptions
-    packages/fourJS/src/input.ts:
+    packages/fourjs/src/input.ts:
       description: input module
       externalDependencies: []
       nodeDependencies: []
@@ -3564,7 +3564,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/input"
-    packages/fourJS/src/live-resource-counts.ts:
+    packages/fourjs/src/live-resource-counts.ts:
       description: Aggregates §83 live-resource counts for `auditResourceLeaks`.
       externalDependencies: []
       nodeDependencies: []
@@ -3600,7 +3600,7 @@ modules:
         - readLiveResourceCounts
       functions:
         - readLiveResourceCounts
-    packages/fourJS/src/manifest-catalog.ts:
+    packages/fourjs/src/manifest-catalog.ts:
       description: Preload a §79 manifest into a synchronous {@link SceneResourceCatalog}
       externalDependencies: []
       nodeDependencies: []
@@ -3626,7 +3626,7 @@ modules:
         - preloadManifestIntoCatalog
         - preloadManifestIntoCatalog
         - preloadManifestIntoCatalog
-    packages/fourJS/src/materials.ts:
+    packages/fourjs/src/materials.ts:
       description: materials module
       externalDependencies: []
       nodeDependencies: []
@@ -3639,7 +3639,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/materials"
-    packages/fourJS/src/math.ts:
+    packages/fourjs/src/math.ts:
       description: math module
       externalDependencies: []
       nodeDependencies: []
@@ -3652,7 +3652,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/math"
-    packages/fourJS/src/motion.ts:
+    packages/fourjs/src/motion.ts:
       description: motion module
       externalDependencies: []
       nodeDependencies: []
@@ -3665,7 +3665,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/motion"
-    packages/fourJS/src/particles.ts:
+    packages/fourjs/src/particles.ts:
       description: particles module
       externalDependencies: []
       nodeDependencies: []
@@ -3678,7 +3678,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/particles"
-    packages/fourJS/src/physics-box2d.ts:
+    packages/fourjs/src/physics-box2d.ts:
       description: physics-box2d module
       externalDependencies: []
       nodeDependencies: []
@@ -3691,7 +3691,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/physics-box2d"
-    packages/fourJS/src/physics-rapier.ts:
+    packages/fourjs/src/physics-rapier.ts:
       description: physics-rapier module
       externalDependencies: []
       nodeDependencies: []
@@ -3704,7 +3704,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/physics-rapier"
-    packages/fourJS/src/physics-soft.ts:
+    packages/fourjs/src/physics-soft.ts:
       description: physics-soft module
       externalDependencies: []
       nodeDependencies: []
@@ -3717,7 +3717,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/physics-soft"
-    packages/fourJS/src/physics.ts:
+    packages/fourjs/src/physics.ts:
       description: physics module
       externalDependencies: []
       nodeDependencies: []
@@ -3730,7 +3730,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/physics"
-    packages/fourJS/src/pick-provider.ts:
+    packages/fourjs/src/pick-provider.ts:
       description: "The four-line adapter RFC 0005 §2 promised (§71, §45; 2026-08-28): a"
       externalDependencies: []
       nodeDependencies: []
@@ -3752,7 +3752,7 @@ modules:
         - createPickProvider
       functions:
         - createPickProvider
-    packages/fourJS/src/plugins.ts:
+    packages/fourjs/src/plugins.ts:
       description: The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`) —
       externalDependencies: []
       nodeDependencies: []
@@ -3830,7 +3830,7 @@ modules:
         - EDITOR_TOOLS
         - EditorToolRegistry
         - EditorToolFactory
-    packages/fourJS/src/render-canvas.ts:
+    packages/fourjs/src/render-canvas.ts:
       description: render-canvas module
       externalDependencies: []
       nodeDependencies: []
@@ -3843,7 +3843,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/render-canvas"
-    packages/fourJS/src/render-svg.ts:
+    packages/fourjs/src/render-svg.ts:
       description: render-svg module
       externalDependencies: []
       nodeDependencies: []
@@ -3856,7 +3856,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/render-svg"
-    packages/fourJS/src/render-webgl.ts:
+    packages/fourjs/src/render-webgl.ts:
       description: render-webgl module
       externalDependencies: []
       nodeDependencies: []
@@ -3869,7 +3869,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/render-webgl"
-    packages/fourJS/src/render-webgpu.ts:
+    packages/fourjs/src/render-webgpu.ts:
       description: render-webgpu module
       externalDependencies: []
       nodeDependencies: []
@@ -3882,7 +3882,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/render-webgpu"
-    packages/fourJS/src/render.ts:
+    packages/fourjs/src/render.ts:
       description: render module
       externalDependencies: []
       nodeDependencies: []
@@ -3895,7 +3895,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/render"
-    packages/fourJS/src/scene-serializers.ts:
+    packages/fourjs/src/scene-serializers.ts:
       description: §79 node types and component serializers for the classes the engine itself
       externalDependencies: []
       nodeDependencies: []
@@ -4120,7 +4120,7 @@ modules:
         - LINE_NODE_TYPE
         - POLYLINE_NODE_TYPE
         - ARC_NODE_TYPE
-    packages/fourJS/src/scene.ts:
+    packages/fourjs/src/scene.ts:
       description: scene module
       externalDependencies: []
       nodeDependencies: []
@@ -4133,7 +4133,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/scene"
-    packages/fourJS/src/serialization.ts:
+    packages/fourjs/src/serialization.ts:
       description: serialization module
       externalDependencies: []
       nodeDependencies: []
@@ -4146,7 +4146,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/serialization"
-    packages/fourJS/src/text-node.ts:
+    packages/fourjs/src/text-node.ts:
       description: "`Text` (§49, §56) — a string, a font atlas and a material become **one** draw"
       externalDependencies: []
       nodeDependencies: []
@@ -4182,7 +4182,7 @@ modules:
         - Text
       interfaces:
         - TextOptions
-    packages/fourJS/src/text.ts:
+    packages/fourjs/src/text.ts:
       description: text module
       externalDependencies: []
       nodeDependencies: []
@@ -4195,7 +4195,7 @@ modules:
       exports: []
       reExported:
         - "* from @fourjs/text"
-    packages/fourJS/src/ui.ts:
+    packages/fourjs/src/ui.ts:
       description: ui module
       externalDependencies: []
       nodeDependencies: []
@@ -18389,41 +18389,41 @@ dependencyGraph:
         - packages/diagnostics/src/validation.ts
     - name: Packages/four
       files:
-        - packages/fourJS/src/animation.ts
-        - packages/fourJS/src/application.ts
-        - packages/fourJS/src/assets.ts
-        - packages/fourJS/src/capabilities.ts
-        - packages/fourJS/src/compute-pass.ts
-        - packages/fourJS/src/core.ts
-        - packages/fourJS/src/diagnostics.ts
-        - packages/fourJS/src/editor-tools.ts
-        - packages/fourJS/src/geometry.ts
-        - packages/fourJS/src/gltf.ts
-        - packages/fourJS/src/index.ts
-        - packages/fourJS/src/input.ts
-        - packages/fourJS/src/live-resource-counts.ts
-        - packages/fourJS/src/manifest-catalog.ts
-        - packages/fourJS/src/materials.ts
-        - packages/fourJS/src/math.ts
-        - packages/fourJS/src/motion.ts
-        - packages/fourJS/src/particles.ts
-        - packages/fourJS/src/physics-box2d.ts
-        - packages/fourJS/src/physics-rapier.ts
-        - packages/fourJS/src/physics-soft.ts
-        - packages/fourJS/src/physics.ts
-        - packages/fourJS/src/pick-provider.ts
-        - packages/fourJS/src/plugins.ts
-        - packages/fourJS/src/render-canvas.ts
-        - packages/fourJS/src/render-svg.ts
-        - packages/fourJS/src/render-webgl.ts
-        - packages/fourJS/src/render-webgpu.ts
-        - packages/fourJS/src/render.ts
-        - packages/fourJS/src/scene-serializers.ts
-        - packages/fourJS/src/scene.ts
-        - packages/fourJS/src/serialization.ts
-        - packages/fourJS/src/text-node.ts
-        - packages/fourJS/src/text.ts
-        - packages/fourJS/src/ui.ts
+        - packages/fourjs/src/animation.ts
+        - packages/fourjs/src/application.ts
+        - packages/fourjs/src/assets.ts
+        - packages/fourjs/src/capabilities.ts
+        - packages/fourjs/src/compute-pass.ts
+        - packages/fourjs/src/core.ts
+        - packages/fourjs/src/diagnostics.ts
+        - packages/fourjs/src/editor-tools.ts
+        - packages/fourjs/src/geometry.ts
+        - packages/fourjs/src/gltf.ts
+        - packages/fourjs/src/index.ts
+        - packages/fourjs/src/input.ts
+        - packages/fourjs/src/live-resource-counts.ts
+        - packages/fourjs/src/manifest-catalog.ts
+        - packages/fourjs/src/materials.ts
+        - packages/fourjs/src/math.ts
+        - packages/fourjs/src/motion.ts
+        - packages/fourjs/src/particles.ts
+        - packages/fourjs/src/physics-box2d.ts
+        - packages/fourjs/src/physics-rapier.ts
+        - packages/fourjs/src/physics-soft.ts
+        - packages/fourjs/src/physics.ts
+        - packages/fourjs/src/pick-provider.ts
+        - packages/fourjs/src/plugins.ts
+        - packages/fourjs/src/render-canvas.ts
+        - packages/fourjs/src/render-svg.ts
+        - packages/fourjs/src/render-webgl.ts
+        - packages/fourjs/src/render-webgpu.ts
+        - packages/fourjs/src/render.ts
+        - packages/fourjs/src/scene-serializers.ts
+        - packages/fourjs/src/scene.ts
+        - packages/fourjs/src/serialization.ts
+        - packages/fourjs/src/text-node.ts
+        - packages/fourjs/src/text.ts
+        - packages/fourjs/src/ui.ts
     - name: Packages/geometry
       files:
         - packages/geometry/src/buffer-geometry.ts

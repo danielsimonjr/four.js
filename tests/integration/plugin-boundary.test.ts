@@ -49,11 +49,11 @@ const packagesRoot = join(repositoryRoot, "packages");
  * The names that only the plugin host and its declarers may mention.
  *
  * A package appearing here has been confirmed *not* to be on a deserialization
- * path: `core` declares the machinery, `fourJS` re-exports the capability tokens
+ * path: `core` declares the machinery, `fourjs` (the directory; package name `fourJS`) re-exports the capability tokens
  * and installs from §45's option. Adding a third entry means someone has
  * decided that package may host plugins — write the reason and the date.
  */
-const ALLOWED = new Set(["core", "fourJS"]);
+const ALLOWED = new Set(["core", "fourjs"]);
 
 /**
  * The packages that may additionally *declare* capability tokens
@@ -70,7 +70,7 @@ const ALLOWED = new Set(["core", "fourJS"]);
  */
 const TOKEN_DECLARERS = new Set([
   "core",
-  "fourJS",
+  "fourjs",
   "motion",
   "physics",
   "render",

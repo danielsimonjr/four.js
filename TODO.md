@@ -1250,7 +1250,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`);
       ~~`PH-22l` `Clock`~~ **DONE 2026-09-06** (type alias for `TimeState`);
       ~~`PH-22n` remainder — §10's dropped-time warning is app-tier in
-      `packages/fourJS`'s `Application`~~
+      `packages/fourjs`'s `Application`~~
       (**done 2026-08-30**: `Application.step` emits a `devWarnOnce` when
       `TimeState.droppedTime` is non-zero).
 - [x] **Step-8 sensor bookkeeping example — DONE 2026-08-29.**
@@ -1504,7 +1504,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       step 4 was reverted — and the item should have said so already.**
       · *Step 2 verified independently, not taken on report:* `validation.ts` is 278
       lines / 18 exports, re-exported from `diagnostics/src/index.ts`, carries its own
-      `tests/validation.test.ts`, and is consumed by `packages/fourJS`
+      `tests/validation.test.ts`, and is consumed by `packages/fourjs`
       (`application.ts`, `diagnostics.ts`) — a catalogue nothing imported would not
       have counted.
       · *Step 3 cannot be done as written.* `devAssert` opens `if (!DEV) return`, so

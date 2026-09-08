@@ -37,7 +37,7 @@
  * **It was written on 2026-08-13 (R-28), and it landed in the umbrella package
  * `four`** — the only one the frozen §3.1 matrix lets see both this package and
  * `@fourjs/render`. It takes an atlas and a material and turns a string into one
- * geometry of glyph quads: `packages/fourJS/src/text-node.ts`.
+ * geometry of glyph quads: `packages/fourjs/src/text-node.ts`.
  *
  * ## Y-up, once (§7a)
  *

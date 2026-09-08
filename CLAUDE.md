@@ -89,7 +89,7 @@ participate. Key cross-cutting designs to understand before implementing anythin
 ## Package layout
 
 `packages/` follows the monorepo tree in Part VIII, §98 (Proposed Monorepo). All
-packages are `@fourjs/`-scoped; `packages/fourJS` is the umbrella package. Rough layering:
+packages are `@fourjs/`-scoped; `packages/fourjs` is the umbrella package. Rough layering:
 
 - Foundation: `core`, `math`
 - Scene/time: `scene`, `motion`, `animation`

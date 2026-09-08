@@ -242,7 +242,7 @@ const GATED: ReadonlyMap<string, string> = new Map([
     "§85's validation catalogue — named checks and devAssert scans; no simulation numbers",
   ],
   [
-    join("packages", "fourJS", "src", "application.ts"),
+    join("packages", "fourjs", "src", "application.ts"),
     "§84's statistics wiring (A-1). Measurement only: `stats` is read by nobody inside the engine, and the frame's event order, transforms and draw calls are identical either way",
   ],
   [
@@ -286,7 +286,7 @@ const GATED: ReadonlyMap<string, string> = new Map([
     "§78's ignored-feature notices (A-19, 2026-08-29). Message only: every ignored feature is recorded unconditionally in GltfAsset.ignored — the §33 evidence is the determinism suite's pinned digest, which is computed over the parse output and holds in both builds — and only the console.warn naming each feature moves with the flag. Parsing is IO, runs before any fixed step, and its output is a pure function of the input bytes either way",
   ],
   [
-    join("packages", "fourJS", "src", "gltf.ts"),
+    join("packages", "fourjs", "src", "gltf.ts"),
     "§78's ignored-texture-slot warning at instantiation (A-19, 2026-08-29). Message only: the instantiated nodes, materials (factors applied, unsampleable slots absent), and clips are identical in both builds — the slot list itself is parse data on the material record — and only the console.warn saying the base map is the one sampled moves with the flag. Assembly runs outside the fixed step and writes nothing any simulation reads",
   ],
   [

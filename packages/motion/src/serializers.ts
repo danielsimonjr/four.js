@@ -216,7 +216,7 @@ export const MOTION_COMPONENT_SERIALIZER: ComponentSerializerShape<MotionCompone
  * serializer (A-15, 2026-08-06), which turned "this scene contains a
  * `KinematicController`" into a `serializeScene` that could not save the scene
  * at all. Four of the five shipped components had a serializer; this is the
- * fifth. `packages/fourJS/tests/scene-serializers.test.ts` now enumerates every
+ * fifth. `packages/fourjs/tests/scene-serializers.test.ts` now enumerates every
  * exported class carrying a `static typeName` and asserts each one is
  * registered, so the sixth component cannot be forgotten the same way.
  *

@@ -2,7 +2,7 @@
   // Type-checking-only project for the runnable examples. The examples are not
   // workspace packages: they are consumers, and they import the umbrella
   // package by its published specifier (`four/...`), which resolves through the
-  // workspace symlink to `packages/fourJS/dist/*.d.ts`. `pnpm run build` must
+  // workspace symlink to `packages/fourjs/dist/*.d.ts`. `pnpm run build` must
   // therefore run before `pnpm run typecheck:examples`.
   "extends": "../tsconfig.base.json",
   "compilerOptions": {

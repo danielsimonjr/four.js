@@ -298,7 +298,7 @@ Done (per package, after the wave's orchestrator install):
 `pnpm --filter @fourjs/P run build && pnpm --filter @fourjs/P run test` exits 0.
 
 **WP-0.5 [H] Umbrella package `four`** — Depends: all WP-0.4. Reads: §3.1, §3.4, §98.
-Files: `packages/fourJS/{package.json,tsconfig.json,tsconfig.build.json,src/index.ts,src/<p>.ts ×23,tests/smoke.test.ts}`.
+Files: `packages/fourjs/{package.json,tsconfig.json,tsconfig.build.json,src/index.ts,src/<p>.ts ×23,tests/smoke.test.ts}`.
 *(Files line corrected 2026-07-31: `tsconfig.build.json` was missing, same omission as
 WP-0.4's; noted by the Phase-0 exit verifier. The landed package is complete.)*
 Steps: §3.4 template, name `four`, deps = all 23; one `src/<p>.ts` re-export module per
@@ -489,7 +489,7 @@ dispose removes.
 
 **WP-1.12 [S] Application composition root** — Depends: WP-1.9, WP-1.10, WP-1.11.
 Reads: §45, §6b, §10, D4 + WP-1.9/1.10/1.11 source.
-Files: `packages/fourJS/src/application.ts`, `src/index.ts`, `tests/application.test.ts`.
+Files: `packages/fourjs/src/application.ts`, `src/index.ts`, `tests/application.test.ts`.
 Steps: minimal `Application` (§45 subset): owns a Scene, a Scheduler, the system registry;
 `initialize/start/stop/pause/resume/step/dispose`; emits `fixedUpdate`/`update`/`render`
 (§6b) from scheduler callbacks; manual `step(elapsed)` mode for headless (renderer arrives

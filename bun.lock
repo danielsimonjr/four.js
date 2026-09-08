@@ -77,7 +77,7 @@
         "@fourjs/scene": "workspace:*",
       },
     },
-    "packages/fourJS": {
+    "packages/fourjs": {
       "name": "fourJS",
       "version": "0.0.2",
       "dependencies": {
@@ -734,7 +734,7 @@
 
     "foreground-child": ["foreground-child@3.3.1", "", { "dependencies": { "cross-spawn": "^7.0.6", "signal-exit": "^4.0.1" } }, "sha512-gIXjKqtFuWEgzFRJA9WCQeSJLZDjgJUOMCMzxtvFq/37KojM1BFGufqsCy0r4qSQmYLsZYMeyRqzIWOMup03sw=="],
 
-    "fourJS": ["fourJS@workspace:packages/fourJS"],
+    "fourJS": ["fourJS@workspace:packages/fourjs"],
 
     "fsevents": ["fsevents@2.3.3", "", { "os": "darwin" }, "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="],
 

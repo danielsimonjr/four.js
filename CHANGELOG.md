@@ -284,7 +284,7 @@ and nobody had said so.
 
 - **Step 2 (the §85 validation catalogue) is done**, verified rather than assumed:
   `diagnostics/src/validation.ts` is 278 lines / 18 exports, re-exported from the package
-  entry, covered by its own test, and consumed by `packages/fourJS`. A catalogue nothing
+  entry, covered by its own test, and consumed by `packages/fourjs`. A catalogue nothing
   imported would not have counted.
 - **Step 3 (convert scene/physics checks to `devAssert`) is WON'T-DO.** `devAssert` opens
   `if (!DEV) return`, so converting those checks means the simulation packages import the
@@ -656,7 +656,7 @@ and was only stale build output. Verified after `bun run build`: 9/9 twin specs 
 
 ### 2026-09-06 — Open-TODO pass: Windows runner, Dependabot lockfile, A-26 renderer table
 
-- **Windows unit-test timeouts.** `packages/fourJS/tests/barrels.test.ts` now
+- **Windows unit-test timeouts.** `packages/fourjs/tests/barrels.test.ts` now
   imports each barrel inside its test so the first `await` does not pay every
   dynamic import at once. `packages/core/tests/random.test.ts` and
   `packages/geometry/tests/svg-path.test.ts` take a 30 s timeout (Vitest 3.2

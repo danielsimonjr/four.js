@@ -387,7 +387,7 @@ Three options; the packet must pick one and record why:
 directly, and `pnpm run size` limits (34 kB for `first-3d-scene`, 31.5 kB for
 `particles-demo`, 39.5 kB for `ui-demo`) are the tight ones.
 
-**The hazard is real and must be a gate, not an assumption.** `packages/fourJS/src/index.ts`
+**The hazard is real and must be a gate, not an assumption.** `packages/fourjs/src/index.ts`
 carries `export * as renderWebgpu from "@fourjs/render-webgpu";`, and four examples import
 from the umbrella `four` package (`import { Text } from "fourJS"`). Today that costs nothing
 because the stub exports one string constant. A namespace re-export of a package containing

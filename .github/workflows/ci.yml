@@ -43,7 +43,7 @@ jobs:
 
       # The examples are consumers, not workspace packages: they import the
       # umbrella package by its published specifier, which resolves to
-      # `packages/fourJS/dist/*.d.ts`. The build step above must therefore precede
+      # `packages/fourjs/dist/*.d.ts`. The build step above must therefore precede
       # this one.
       - name: Typecheck examples
         run: bun run typecheck:examples
@@ -55,7 +55,7 @@ jobs:
       # and three integration harnesses asserted on invisible draws for it
       # (R-8). `tests/tsconfig.json` already existed; this is the step that runs
       # it. Placed after Build for the same reason as the examples: the suites
-      # import `four/*` through the workspace symlink into `packages/fourJS/dist`.
+      # import `four/*` through the workspace symlink into `packages/fourjs/dist`.
       - name: Typecheck tests
         run: bun run typecheck:tests
 

@@ -50,7 +50,7 @@ The codebase is organized into the following modules:
 - **packages/assets**: 9 files
 - **packages/core**: 14 files
 - **packages/diagnostics**: 12 files
-- **packages/fourJS**: 35 files
+- **packages/fourjs**: 35 files
 - **packages/geometry**: 12 files
 - **packages/input**: 8 files
 - **packages/materials**: 14 files
@@ -82,7 +82,7 @@ The codebase is organized into the following modules:
 | `@fourjs/assets` (`packages/assets/`) | `@fourjs/core` | 9 | 0 |
 | `@fourjs/core` (`packages/core/`) | (none) | 14 | 0 |
 | `@fourjs/diagnostics` (`packages/diagnostics/`) | `@fourjs/core`, `@fourjs/math` | 12 | 1 |
-| `four` (`packages/fourJS/`) | `@fourjs/animation`, `@fourjs/core`, `@fourjs/diagnostics`, `@fourjs/geometry`, `@fourjs/motion`, `@fourjs/math`, `@fourjs/assets`, `@fourjs/physics`, `@fourjs/scene`, `@fourjs/render`, `@fourjs/materials`, `@fourjs/input`, `@fourjs/particles`, `@fourjs/physics-box2d`, `@fourjs/physics-rapier`, `@fourjs/physics-soft`, `@fourjs/serialization`, `@fourjs/ui`, `@fourjs/render-canvas`, `@fourjs/render-svg`, `@fourjs/render-webgl`, `@fourjs/render-webgpu`, `@fourjs/text` | 35 | 0 |
+| `four` (`packages/fourjs/`) | `@fourjs/animation`, `@fourjs/core`, `@fourjs/diagnostics`, `@fourjs/geometry`, `@fourjs/motion`, `@fourjs/math`, `@fourjs/assets`, `@fourjs/physics`, `@fourjs/scene`, `@fourjs/render`, `@fourjs/materials`, `@fourjs/input`, `@fourjs/particles`, `@fourjs/physics-box2d`, `@fourjs/physics-rapier`, `@fourjs/physics-soft`, `@fourjs/serialization`, `@fourjs/ui`, `@fourjs/render-canvas`, `@fourjs/render-svg`, `@fourjs/render-webgl`, `@fourjs/render-webgpu`, `@fourjs/text` | 35 | 0 |
 | `@fourjs/geometry` (`packages/geometry/`) | `@fourjs/math`, `@fourjs/core` | 12 | 0 |
 | `@fourjs/input` (`packages/input/`) | `@fourjs/core`, `@fourjs/math`, `@fourjs/scene` | 8 | 0 |
 | `@fourjs/materials` (`packages/materials/`) | `@fourjs/core`, `@fourjs/math` | 14 | 0 |
@@ -111,7 +111,7 @@ graph LR
     P1[packages/assets]
     P2[packages/core]
     P3[packages/diagnostics]
-    P4[packages/fourJS]
+    P4[packages/fourjs]
     P5[packages/geometry]
     P6[packages/input]
     P7[packages/materials]
@@ -1072,7 +1072,7 @@ graph LR
 
 ## Packages/four Dependencies
 
-### `packages/fourJS/src/animation.ts` - animation module
+### `packages/fourjs/src/animation.ts` - animation module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1084,7 +1084,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/application.ts` - The `Application` composition root (§45, plan D4).
+### `packages/fourjs/src/application.ts` - The `Application` composition root (§45, plan D4).
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1112,7 +1112,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/assets.ts` - assets module
+### `packages/fourjs/src/assets.ts` - assets module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1124,7 +1124,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/capabilities.ts` - The umbrella's own §81 capability token (RFC 0002).
+### `packages/fourjs/src/capabilities.ts` - The umbrella's own §81 capability token (RFC 0002).
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1141,7 +1141,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/compute-pass.ts` - §82's `Four.ComputePass` — the named-map sugar over `@fourjs/render`'s
+### `packages/fourjs/src/compute-pass.ts` - §82's `Four.ComputePass` — the named-map sugar over `@fourjs/render`'s
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1155,7 +1155,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/core.ts` - core module
+### `packages/fourjs/src/core.ts` - core module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1167,7 +1167,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/diagnostics.ts` - diagnostics module
+### `packages/fourjs/src/diagnostics.ts` - diagnostics module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1179,7 +1179,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/editor-tools.ts` - The §81 editor-tool registry — a named map of tool factories the **host**
+### `packages/fourjs/src/editor-tools.ts` - The §81 editor-tool registry — a named map of tool factories the **host**
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1192,7 +1192,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/geometry.ts` - geometry module
+### `packages/fourjs/src/geometry.ts` - geometry module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1204,7 +1204,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/gltf.ts` - §78 glTF assembly — `instantiateGltf` (A-19's closing packet, 2026-08-29).
+### `packages/fourjs/src/gltf.ts` - §78 glTF assembly — `instantiateGltf` (A-19's closing packet, 2026-08-29).
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1224,7 +1224,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/index.ts` - The umbrella package (§98): one namespace per workspace package, plus the
+### `packages/fourjs/src/index.ts` - The umbrella package (§98): one namespace per workspace package, plus the
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1252,7 +1252,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/input.ts` - input module
+### `packages/fourjs/src/input.ts` - input module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1264,7 +1264,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/live-resource-counts.ts` - Aggregates §83 live-resource counts for `auditResourceLeaks`.
+### `packages/fourjs/src/live-resource-counts.ts` - Aggregates §83 live-resource counts for `auditResourceLeaks`.
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1280,7 +1280,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/manifest-catalog.ts` - Preload a §79 manifest into a synchronous {@link SceneResourceCatalog}
+### `packages/fourjs/src/manifest-catalog.ts` - Preload a §79 manifest into a synchronous {@link SceneResourceCatalog}
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1298,7 +1298,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/materials.ts` - materials module
+### `packages/fourjs/src/materials.ts` - materials module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1310,7 +1310,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/math.ts` - math module
+### `packages/fourjs/src/math.ts` - math module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1322,7 +1322,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/motion.ts` - motion module
+### `packages/fourjs/src/motion.ts` - motion module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1334,7 +1334,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/particles.ts` - particles module
+### `packages/fourjs/src/particles.ts` - particles module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1346,7 +1346,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/physics-box2d.ts` - physics-box2d module
+### `packages/fourjs/src/physics-box2d.ts` - physics-box2d module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1358,7 +1358,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/physics-rapier.ts` - physics-rapier module
+### `packages/fourjs/src/physics-rapier.ts` - physics-rapier module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1370,7 +1370,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/physics-soft.ts` - physics-soft module
+### `packages/fourjs/src/physics-soft.ts` - physics-soft module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1382,7 +1382,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/physics.ts` - physics module
+### `packages/fourjs/src/physics.ts` - physics module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1394,7 +1394,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/pick-provider.ts` - The four-line adapter RFC 0005 §2 promised (§71, §45; 2026-08-28): a
+### `packages/fourjs/src/pick-provider.ts` - The four-line adapter RFC 0005 §2 promised (§71, §45; 2026-08-28): a
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1408,7 +1408,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/plugins.ts` - The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`) —
+### `packages/fourjs/src/plugins.ts` - The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`) —
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1433,7 +1433,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/render-canvas.ts` - render-canvas module
+### `packages/fourjs/src/render-canvas.ts` - render-canvas module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1445,7 +1445,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/render-svg.ts` - render-svg module
+### `packages/fourjs/src/render-svg.ts` - render-svg module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1457,7 +1457,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/render-webgl.ts` - render-webgl module
+### `packages/fourjs/src/render-webgl.ts` - render-webgl module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1469,7 +1469,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/render-webgpu.ts` - render-webgpu module
+### `packages/fourjs/src/render-webgpu.ts` - render-webgpu module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1481,7 +1481,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/render.ts` - render module
+### `packages/fourjs/src/render.ts` - render module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1493,7 +1493,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/scene-serializers.ts` - §79 node types and component serializers for the classes the engine itself
+### `packages/fourjs/src/scene-serializers.ts` - §79 node types and component serializers for the classes the engine itself
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1523,7 +1523,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/scene.ts` - scene module
+### `packages/fourjs/src/scene.ts` - scene module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1535,7 +1535,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/serialization.ts` - serialization module
+### `packages/fourjs/src/serialization.ts` - serialization module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1547,7 +1547,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/text-node.ts` - `Text` (§49, §56) — a string, a font atlas and a material become **one** draw
+### `packages/fourjs/src/text-node.ts` - `Text` (§49, §56) — a string, a font atlas and a material become **one** draw
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1564,7 +1564,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/text.ts` - text module
+### `packages/fourjs/src/text.ts` - text module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -1576,7 +1576,7 @@ graph LR
 
 ---
 
-### `packages/fourJS/src/ui.ts` - ui module
+### `packages/fourjs/src/ui.ts` - ui module
 
 **Workspace Dependencies:**
 | Package | Import |
@@ -6113,7 +6113,7 @@ graph LR
 | `packages/math/src/index` | 10 files | 0 files |
 | `packages/render/src/render-list` | 6 files | 4 files |
 | `packages/render/src/render-target` | 2 files | 8 files |
-| `packages/fourJS/src/index` | 9 files | 0 files |
+| `packages/fourjs/src/index` | 9 files | 0 files |
 | `packages/geometry/src/index` | 9 files | 0 files |
 | `packages/motion/src/serializers` | 8 files | 1 file |
 | `packages/physics/src/serializers` | 8 files | 1 file |

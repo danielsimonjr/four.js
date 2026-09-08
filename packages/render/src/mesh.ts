@@ -267,7 +267,7 @@ export class Mesh<M extends Material = SurfaceMaterial> extends Renderable<M> {
  * not exist yet, and the earliest moment the mesh and its bones are guaranteed
  * to share a tree is the first read after instantiation — which is exactly
  * when the serializer's writer, the render list, or the application asks.
- * `packages/fourJS/src/scene-serializers.ts` is the caller; an application's own
+ * `packages/fourjs/src/scene-serializers.ts` is the caller; an application's own
  * factory may call it for the same purpose. Any previously assigned or pending
  * skeleton is replaced.
  *

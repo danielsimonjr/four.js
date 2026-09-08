@@ -85,7 +85,7 @@ export class MorphWeights implements Component {
 
 `animation` reaches it through `node.getComponent(MorphWeights)` — an edge that already exists. `render` reads the same component when building the render item. `Mesh.morphTargetWeights` remains available as a **getter that reads the component**, so §54's spelling still works and the storage sits where §3.1 permits. As a bonus it becomes serializable through the existing §79 component registry with no new machinery.
 
-Note for the packet: `packages/fourJS/tests/scene-serializers.test.ts` _"enumerates every umbrella barrel class carrying `static typeName` … and requires each registered; a sixth component fails the suite until registered."_ `MorphWeights` is that sixth component, and `Bone` needs a node-type registration. Both are gates, not follow-ups.
+Note for the packet: `packages/fourjs/tests/scene-serializers.test.ts` _"enumerates every umbrella barrel class carrying `static typeName` … and requires each registered; a sixth component fails the suite until registered."_ `MorphWeights` is that sixth component, and `Bone` needs a node-type registration. Both are gates, not follow-ups.
 
 ### 2. §17's two "missing track types" are binding gaps, not value-kind gaps
 

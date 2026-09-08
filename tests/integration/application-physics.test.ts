@@ -1,7 +1,7 @@
 /**
  * A-6 — §45's `physics` option, against a real solver (2026-08-08).
  *
- * `packages/fourJS/tests/application.test.ts` proves the composition root's
+ * `packages/fourjs/tests/application.test.ts` proves the composition root's
  * *contract* with a world using a double: construct or accept, initialize once,
  * step then dispatch per fixed step, count bodies after the frame, dispose only
  * what it built. What no unit test in `four` can prove is that the contract is

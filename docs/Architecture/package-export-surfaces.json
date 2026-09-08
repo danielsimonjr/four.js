@@ -398,7 +398,7 @@
       "warnUnstableScale",
       "warnVersionMismatch"
     ],
-    "packages/fourJS": [
+    "packages/fourjs": [
       "Application",
       "ApplicationEventMap",
       "ApplicationOptions",

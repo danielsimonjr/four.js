@@ -332,7 +332,7 @@ application is willing to write the skin, since the widget itself does not name
 correction is recorded here because "the reason we said we could not build it was wrong" is
 worth more than the widget.
 
-Two gates the packet inherits: `packages/fourJS/tests/scene-serializers.test.ts` _"enumerates
+Two gates the packet inherits: `packages/fourjs/tests/scene-serializers.test.ts` _"enumerates
 every umbrella barrel class carrying `static typeName` … and requires each registered"_, so
 the `ui:canvas-view` pair is a gate rather than a follow-up; and the widget's §79 payload is
 its box, `resolution`, and nothing else — **painted pixels are never serialized** (§3).

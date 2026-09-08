@@ -3,7 +3,7 @@
  * (2026-08-28).
  *
  * `@fourjs/core`'s unit tests prove the plugin machinery against toy
- * capabilities; `packages/fourJS` proves which capabilities an `Application`
+ * capabilities; `packages/fourjs` proves which capabilities an `Application`
  * provides. Neither can prove the thing §81 actually promises, because it is a
  * claim about four packages at once: **a plugin can register a renderer
  * backend, a physics solver, a component serializer, and a scene migration

@@ -587,7 +587,7 @@ readable; never delete the pointer itself.
     control 9/9); 7 of 9 bundles hash-identical; particles-demo +0.55 kB
     (budget bumped 35.5 → 36 kB with the measurement).
   - **Multi-agent note (eighth confirmation):** the glTF sibling shared
-    `packages/fourJS/src/index.ts` (both packets' export blocks coexisted; the
+    `packages/fourjs/src/index.ts` (both packets' export blocks coexisted; the
     file was left unstaged so neither packet claimed the other's hunk — the
     second landing took it); a docs sibling moved the tip mid-session; all
     gates ran green on the moved tree.
@@ -1536,7 +1536,7 @@ readable; never delete the pointer itself.
     registrable, `registerWebgpuRenderer()` silently moves an application off WebGL 2.
     Filed as an owner question rather than decided.
   - **Gotcha (bundles): the umbrella re-exports the WebGPU stub**
-    (`export * as renderWebgpu` in `packages/fourJS/src/index.ts`), and four examples
+    (`export * as renderWebgpu` in `packages/fourjs/src/index.ts`), and four examples
     import from `four`. Free today; at sub-kB headroom it must be a `pnpm run size`
     gate in the first packet, not an assumption about namespace tree-shaking.
 
@@ -2207,7 +2207,7 @@ Camera`, not `OrthographicCamera`: the six bounds come from
     Diagnosis is `grep` the symbol in `packages/*/dist/*.js` and compare mtimes; the fix
     is a rebuild, never a source edit. Joins the stash/revert/ports incident classes.
   - **Gotcha (multi-agent): never `git show HEAD:<file> > <file>` on a file a sibling is
-    also editing.** Doing it to `packages/fourJS/src/scene-serializers.ts` for a size A/B
+    also editing.** Doing it to `packages/fourjs/src/scene-serializers.ts` for a size A/B
     silently discarded the sibling's in-flight work (caught immediately by the build,
     restored from a scratchpad copy taken beforehand). The safe form of a same-tree A/B
     is a **surgical** removal of only your own lines; back the file up first, and
@@ -2374,7 +2374,7 @@ Camera`, not `OrthographicCamera`: the six bounds come from
     so nobody "fixes" the predicate to match the implementation.
   - **Blocker worth remembering: a new component class cannot land in one package
     alone.** A `static typeName` is §79's key, `serializeScene` **throws** on a component
-    with no registered serializer, and `packages/fourJS/tests/scene-serializers.test.ts`
+    with no registered serializer, and `packages/fourjs/tests/scene-serializers.test.ts`
     enumerates every exported class carrying one. So class + serializer +
     `registerSceneNodeTypes` registration are **one packet**, always — which is why
     PH-12's node-level `NodeSpace` was built, measured against the gate, and withdrawn in
@@ -3321,7 +3321,7 @@ views, interpolation, target)`, asserted transcript-identical against hand-writt
   - **`KinematicController`'s §79 payload is deliberately empty** (`{}`): no constructor
     options; in-flight commands are simulation state; `followPath` holds a live
     `Trajectory` no document can reference. **Registry completeness is enforced
-    mechanically** — `packages/fourJS/tests/scene-serializers.test.ts` enumerates every
+    mechanically** — `packages/fourjs/tests/scene-serializers.test.ts` enumerates every
     umbrella barrel class carrying `static typeName` (currently `collider,
 kinematic-controller, motion, pose-target, rigid-body`) and requires each registered;
     a sixth component fails the suite until registered.

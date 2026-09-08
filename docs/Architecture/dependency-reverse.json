@@ -87,8 +87,8 @@
     "packages/diagnostics/src/debug-draw.ts": [
       "packages/diagnostics/src/index.ts"
     ],
-    "packages/fourJS/src/application.ts": [
-      "packages/fourJS/src/index.ts"
+    "packages/fourjs/src/application.ts": [
+      "packages/fourjs/src/index.ts"
     ],
     "packages/geometry/src/buffer-geometry.ts": [
       "packages/geometry/src/index.ts",

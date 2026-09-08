@@ -52,7 +52,7 @@ jobs:
 
       # TypeDoc reads the built reference chain, and the examples import the
       # umbrella package by its published specifier, which resolves to
-      # `packages/fourJS/dist`. Both need this first.
+      # `packages/fourjs/dist`. Both need this first.
       - name: Build
         run: bun run build
 
