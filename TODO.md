@@ -164,6 +164,11 @@ and only the first is unambiguous.
       a dated record, and rewriting what past entries said is not rebranding.
       Gates: check-docs OK, check-spec OK, graph:check OK, lint clean, **24/24 packages,
       7,520 tests passing**.
+      ⚠ **Stage 1 was INCOMPLETE for ~2 hours while I reported it done.** A
+      directory-scoped `git stash` during a generator-stability test, later dropped, threw
+      away the branding in the five AUTHORED `docs/Architecture/*.md`; the generated files
+      beside them were rebuilt and hid it. Restored 2026-09-07. No gate could have caught
+      it — nothing compares prose against a brand.
 
 - [ ] **Stage 1b — rebrand the ONE rendered string, which needs a Linux runner.**
       `examples/ui-demo`'s title label is drawn on the canvas, so it is pixel-coupled to

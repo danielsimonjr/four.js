@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — a directory-scoped `git stash` ate part of the rebrand
+
+Asked whether the rebrand was finished, I measured instead of recalling — and found 11
+occurrences of `four.js` still in the AUTHORED architecture docs (`API`, `ARCHITECTURE`,
+`COMPONENTS`, `DATAFLOW`, `OVERVIEW`) plus the `COMPATIBILITY` preamble.
+`# four.js - System Architecture` was still the first line of the architecture doc an hour
+after I reported the rebrand done.
+
+They had been rebranded, and then I destroyed them. Testing whether the dependency-graph
+generator was stable, I ran `git stash push -- docs/Architecture/` for a clean baseline,
+regenerated, and later `git stash drop`.
+
+**The trap is that the directory holds both kinds of file.** The generated ones were rebuilt
+by the next `bun run graph`, so they lost nothing and everything looked fine. The authored
+ones in the same directory had their edits thrown away with the stash — silently, because
+nothing re-reads a hand-written doc after a regeneration, and no gate compares prose to a
+brand.
+
+Restored: 11 replacements across the five authored docs, plus `COMPATIBILITY.md`'s title,
+which sits outside its `BEGIN GENERATED` block (the generator contains no occurrences, so
+the title is authored text). Generated blocks verified untouched — check-compat, check-docs
+and check-spec all OK.
+
+The 11 that remain are deliberate: CHANGELOG history (5), `TODO.md` quoting the old name
+inside filed items (3), `ui-demo`'s rendered label (1, blocked on a Linux golden), and
+`gltf-scene.test.ts` asserting the fixture file's own content (1).
+
+**Carry this forward: `git stash` scoped to a directory mixes generated and authored files,
+and regenerating restores only one of them.** The half that cannot regenerate disappears
+with no failing gate to announce it.
+
 ## Unreleased — what the rebrand broke, and why local green was not CI green
 
 The rebrand turned `main` red twice. Both were mine, both are fixed, and the second one is
