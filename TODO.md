@@ -173,6 +173,14 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       caused by the rebrand (whose 40 changes under `packages/` are provably all comments,
       README prose and error strings).
 
+      · **Third data point, 2026-09-08 (`eba3c85`), and the cleanest one yet.** It failed on CI
+        with *"every frame landed on an exact fixed-step pose"* (`expect(errors).toEqual([])`,
+        expected >= 2), and **a re-run of the SAME run id on the SAME commit passed** — no code
+        change at all between the two outcomes. That removes the last doubt that some diff was
+        responsible: here there was no diff. It also cost a CI cycle and a root-cause detour
+        during the TypeScript 7 landing, which is the real argument for fixing it rather than
+        re-diagnosing it each time it fires.
+
       **Failure signature:** `every frame landed on an exact fixed-step pose`, 0 mid-step
       frames against a floor of 2. That is the SAME aliasing mode the 2026-09-06 entry
       ("Smoothness interpolation flake") was written to fix by sampling after a known
