@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — the two capability gaps dogfooding found are closed
+
+Decisions (B) and (C) of the four delegated on 2026-09-07. Both were found by building a
+consumer app rather than by reading the code, and both are about what the library did not
+offer rather than what it got wrong.
+
+### glTF loads its own external buffers now
+
+`createGltfLoader()` defaults its transport to `globalThis.fetch`. The commonest glTF shape —
+a `.gltf` naming an external `.bin` — failed on a first attempt, because `AssetManager`
+resolves the global by explicit WP-11.2 decision while the loader it is handed did not. The
+manager fetched the document and the loader could not fetch the buffer beside it.
+
+Implemented by EXPORTING `AssetManager`'s existing `resolveGlobalFetch` package-internally,
+not by writing a second copy: two implementations of "what transport do we default to" is the
+second-source-of-truth defect found elsewhere in this repo three times this week. Resolved per
+load rather than at construction, so a stubbed or late-installed global is still seen — which
+is also what makes it testable. The refusal survives for the case it was written for: a
+runtime with NO transport still refuses loudly and still names `{ fetch }`.
+
+### `KeyboardState`, the twenty lines every consumer rewrote
+
+`@fourjs/input` shipped without the thing "input" most obviously means — *is W down right
+now*. Three consumers in this repo had written it themselves and disagreed:
+`character-controller` keyed on `code`, a flight-sim probe on `key.toLowerCase()`.
+
+`KeyboardState(surface)` gives `isDown(code)`, a frozen live `held` view and an idempotent
+`dispose()`. It keys on **`code`**, the physical key, so an AZERTY layout cannot change which
+key WASD means. `held` is a Proxy that passes reads through and throws on mutation — a plain
+`ReadonlySet` cast compiles and still lets a JS caller corrupt engine state.
+
+Built on the existing `KeySurface` seam rather than taking `window`, so the behaviour that
+justifies owning this centrally — clearing every held key on `blur` — is covered by a test
+with **no DOM**, instead of a comment claiming it.
+
+**A correction, because it is the better argument.** Converting
+`examples/character-controller` I first wrote that it "had the bug". It did not — it handled
+`blur` correctly all along. That makes the case for the helper stronger, not weaker: the code
+was right and every consumer still had to write it, so whoever forgot the `blur` half walked
+forever after an alt-tab. Deleting a *correct* copy is the point.
+
+This does not close the `KeyboardInput` naming trap — that is (D). What it removes is the
+reason people reach for the wrong class: there is now a right one.
+
+### And a gate I ignored
+
+`94a0ecc` was committed and pushed with `bun run lint` FAILING. I ran it, it printed FAIL, and
+I pushed anyway. The failure was trivial (a redundant `as never` in a test) and is fixed in
+`021b5aa`, but the miss is worth recording on its own: a gate that is ignored is worse than a
+gate that is missing, because the next reader reasonably takes green as checked.
+
 ## Unreleased — Stage 3, and the TS 7 block turns out not to be a block
 
 **Stage 3.** The repository and its directory are `fourJS`: GitHub renamed, remote updated,
