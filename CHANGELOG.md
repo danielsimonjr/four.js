@@ -12,6 +12,30 @@ The release gate that said *"wait for TypeDoc"* is gone. It was never the compil
 
 ### Fixed
 
+- **59 capability tokens and GPU labels still carried the `four:` namespace.** The console prefix
+  was fixed on 2026-09-07; this is the rest of the same miss, and it is the larger half —
+  **292 occurrences across 59 files**.
+
+  Two classes, both of them "four as a name, tag or handler":
+  · **§81 capability tokens** — `four:renderer-registry`, `four:solver-registry`,
+    `four:asset-loaders`, `four:component-serializers` and the rest. These are a **public
+    extension-point API**: third-party plugins bind to these exact strings. Renaming is free
+    now and breaking later, which is the argument for doing it before 0.1 rather than after.
+  · **WebGPU debug labels** — `four:frame`, `four:shadow`, `four:lights`, `four:draw-uniforms`.
+    These surface in browser GPU captures, so they are user-visible whenever anyone profiles.
+
+  Verified not to be a data-format change first: the tokens are registry keys, never written
+  into serialized scenes, and **no JSON, golden or snapshot** contains one.
+
+  The rename is anchored on the string-literal openers (`"four:` and `` `four: ``) rather than on
+  the bare token, because this repo has prose that reads *"The remaining four: offset path"* and
+  *"Three decimals, not four:"*. A blanket substitution would have corrupted three English
+  sentences — they are deliberately untouched.
+
+- **`dev.ts` stopped shipping the retired brand in its own explanation.** The comment describing
+  the rebrand spelled the old prefix, and that comment ships in `dist/*.d.ts` — so the fix was
+  putting the retired brand back in front of consumers. The lesson is kept; the literal is gone.
+  No built artifact now contains it.
 - **Every runtime warning still said `[four]` to the user.** The rebrand renamed the packages,
   the scope and the specifiers, but the console prefix is a string literal, not an identifier, so
   it was never touched — `const PREFIX = "[four]"`. Verified at runtime after the fix:

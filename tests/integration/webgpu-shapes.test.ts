@@ -249,10 +249,10 @@ describe("WP-R1.4 — §58 paints ride the vertex-colour variant", () => {
     // *variant* on this backend (`wgpu-unlit.ts`), so the flat module is
     // never even compiled for a frame that only paints.
     expect(indexedDraws(test.gpu)).toEqual([shape.geometry.drawCount]);
-    expect(moduleLabels(test.gpu)).toContain("four:unlit|vc");
+    expect(moduleLabels(test.gpu)).toContain("fourJS:unlit|vc");
     expect(
       pipelineLabels(test.gpu).some((label) =>
-        label.startsWith("four:unlit|vc|"),
+        label.startsWith("fourJS:unlit|vc|"),
       ),
     ).toBe(true);
   });
@@ -278,7 +278,7 @@ describe("WP-R1.4 — §58 paints ride the vertex-colour variant", () => {
       .callsOf("device.createRenderPipeline")
       .find((call) =>
         String((call.args[0] as { label?: string }).label).startsWith(
-          "four:unlit|vc|",
+          "fourJS:unlit|vc|",
         ),
       );
     expect(pipelineCall).toBeDefined();
@@ -352,7 +352,7 @@ describe("WP-R1.4 — §58 paints ride the vertex-colour variant", () => {
 
     expect(names(stroked.gpu)).toEqual(names(unpainted.gpu));
     for (const test of [stroked, unpainted]) {
-      expect(moduleLabels(test.gpu)).not.toContain("four:unlit|vc");
+      expect(moduleLabels(test.gpu)).not.toContain("fourJS:unlit|vc");
       for (const call of test.gpu.callsOf("pass.setVertexBuffer")) {
         expect(call.args[0]).toBe(0);
       }

@@ -118,7 +118,7 @@ describe("ApplicationOptions.plugins", () => {
     app.step(1 / 60);
     expect(counts.steps).toBe(1);
     expect(app.pluginContext?.capabilities).toEqual([
-      "four:simulation-systems",
+      "fourJS:simulation-systems",
     ]);
     app.dispose();
   });
@@ -140,8 +140,8 @@ describe("ApplicationOptions.plugins", () => {
     });
     await scoped.initialize();
     expect(scoped.pluginContext?.capabilities).toEqual([
-      "four:simulation-systems",
-      "four:renderer-registry",
+      "fourJS:simulation-systems",
+      "fourJS:renderer-registry",
     ]);
     scoped.dispose();
 
@@ -157,7 +157,7 @@ describe("ApplicationOptions.plugins", () => {
       ],
     });
     await expect(unscoped.initialize()).rejects.toThrow(
-      /"four:renderer-registry" is not provided/,
+      /"fourJS:renderer-registry" is not provided/,
     );
     expect(unscoped.initialized).toBe(false);
     unscoped.dispose();
@@ -320,17 +320,17 @@ describe("capability tokens", () => {
       EDITOR_TOOLS,
       COMPUTE_WORKLOADS,
     ]).toEqual([
-      { name: "four:simulation-systems", revocable: true },
-      { name: "four:renderer-registry", revocable: false },
-      { name: "four:solver-registry", revocable: false },
-      { name: "four:component-serializers", revocable: false },
-      { name: "four:scene-migrations", revocable: false },
-      { name: "four:render-graph", revocable: false },
-      { name: "four:asset-loaders", revocable: false },
-      { name: "four:shader-operators", revocable: false },
-      { name: "four:ui-controls", revocable: false },
-      { name: "four:editor-tools", revocable: false },
-      { name: "four:compute-workloads", revocable: false },
+      { name: "fourJS:simulation-systems", revocable: true },
+      { name: "fourJS:renderer-registry", revocable: false },
+      { name: "fourJS:solver-registry", revocable: false },
+      { name: "fourJS:component-serializers", revocable: false },
+      { name: "fourJS:scene-migrations", revocable: false },
+      { name: "fourJS:render-graph", revocable: false },
+      { name: "fourJS:asset-loaders", revocable: false },
+      { name: "fourJS:shader-operators", revocable: false },
+      { name: "fourJS:ui-controls", revocable: false },
+      { name: "fourJS:editor-tools", revocable: false },
+      { name: "fourJS:compute-workloads", revocable: false },
     ]);
   });
 });

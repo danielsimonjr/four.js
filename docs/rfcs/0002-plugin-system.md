@@ -83,21 +83,21 @@ Each owning package exports its token beside its registry — one line each, no 
 ```ts
 // @fourjs/render
 export const RENDERER_REGISTRY = defineCapability<RendererRegistry>(
-  "four:renderer-registry",
+  "fourJS:renderer-registry",
 );
 // @fourjs/physics
 export const SOLVER_REGISTRY = defineCapability<SolverRegistry>(
-  "four:solver-registry",
+  "fourJS:solver-registry",
 );
 // @fourjs/serialization
 export const COMPONENT_SERIALIZERS =
-  defineCapability<ComponentSerializerRegistry>("four:component-serializers");
+  defineCapability<ComponentSerializerRegistry>("fourJS:component-serializers");
 export const SCENE_MIGRATIONS = defineCapability<SceneMigrationRegistry>(
-  "four:scene-migrations",
+  "fourJS:scene-migrations",
 );
 // @fourjs/motion
 export const SIMULATION_SYSTEMS = defineCapability<SystemRegistry>(
-  "four:simulation-systems",
+  "fourJS:simulation-systems",
 );
 ```
 

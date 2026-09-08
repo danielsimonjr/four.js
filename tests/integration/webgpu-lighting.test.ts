@@ -143,14 +143,14 @@ describe("WP-R1.5 — a scene with no lit material allocates none of it", () => 
     rig.renderer.render(rig.scene, rig.views);
 
     const labels = bufferLabels(rig.gpu);
-    expect(labels.some((label) => label === "four:lights")).toBe(false);
-    expect(labels.some((label) => label.startsWith("four:normals:"))).toBe(
+    expect(labels.some((label) => label === "fourJS:lights")).toBe(false);
+    expect(labels.some((label) => label.startsWith("fourJS:normals:"))).toBe(
       false,
     );
     expect(
       moduleLabels(rig.gpu).some(
         (label) =>
-          label.startsWith("four:lit") || label.startsWith("four:standard"),
+          label.startsWith("fourJS:lit") || label.startsWith("fourJS:standard"),
       ),
     ).toBe(false);
     expect(
@@ -159,7 +159,7 @@ describe("WP-R1.5 — a scene with no lit material allocates none of it", () => 
         .map((call) => String((call.args[0] as { label?: string }).label))
         .filter(
           (label) =>
-            label === "four:lights" || label === "four:standard-uniforms",
+            label === "fourJS:lights" || label === "fourJS:standard-uniforms",
         ),
     ).toEqual([]);
   });
@@ -314,20 +314,20 @@ describe("WP-R1.5 — each shaded variant is one module, compiled once", () => {
 
     const shaded = moduleLabels(rig.gpu).filter(
       (label) =>
-        label.startsWith("four:lit") || label.startsWith("four:standard"),
+        label.startsWith("fourJS:lit") || label.startsWith("fourJS:standard"),
     );
     expect(shaded.sort()).toEqual([
-      "four:lit|n",
-      "four:lit|n|map",
-      "four:standard|n",
+      "fourJS:lit|n",
+      "fourJS:lit|n|map",
+      "fourJS:standard|n",
     ]);
     // One light block serves the whole frame: one buffer, one layout.
     expect(
-      bufferLabels(rig.gpu).filter((label) => label === "four:lights"),
+      bufferLabels(rig.gpu).filter((label) => label === "fourJS:lights"),
     ).toHaveLength(1);
     // Every shaded geometry uploaded its normal stream, in GL's order.
     expect(
-      bufferLabels(rig.gpu).filter((label) => label.startsWith("four:normals:"))
+      bufferLabels(rig.gpu).filter((label) => label.startsWith("fourJS:normals:"))
         .length,
     ).toBe(4);
   });

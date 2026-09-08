@@ -114,7 +114,7 @@ export function createStandardBindGroupLayout(
   device: GpuDevice,
 ): GpuBindGroupLayout {
   return device.createBindGroupLayout({
-    label: "four:standard-uniforms",
+    label: "fourJS:standard-uniforms",
     entries: [
       {
         binding: 0,

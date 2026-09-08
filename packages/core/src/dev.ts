@@ -121,10 +121,14 @@ const emittedWarnings = new Set<string>();
  * The prefix every engine console message carries, so a host can filter.
  *
  * Exported because it was not, and eight other source files each hardcoded
- * their own `"[four] "` literal into a direct `console.warn` instead — thirteen
- * copies of one fact, which is why the 2026-09 rebrand renamed the packages,
- * the scope and the specifiers but left every runtime warning still saying
- * `[four]` to the user. Import this; do not retype it.
+ * their own copy of the pre-rebrand prefix into a direct `console.warn` instead
+ * — thirteen copies of one fact, which is why the 2026-09 rebrand renamed the
+ * packages, the scope and the specifiers but left every runtime warning still
+ * carrying the old brand. Import this; do not retype it.
+ *
+ * The old literal is deliberately not written out here: this comment ships in
+ * `dist/*.d.ts`, so spelling it would put the retired brand back in front of
+ * consumers — the exact thing the rename removed.
  */
 export const DEV_WARNING_PREFIX = "[fourJS]";
 const PREFIX = DEV_WARNING_PREFIX;

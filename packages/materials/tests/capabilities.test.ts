@@ -17,9 +17,9 @@ const time: ShaderOperatorFactory = () => ({ kind: "time" });
 const other: ShaderOperatorFactory = () => ({ kind: "time" });
 
 describe("SHADER_OPERATORS", () => {
-  it("is the four:shader-operators token, not revocable (RFC 0002 Q3)", () => {
+  it("is the fourJS:shader-operators token, not revocable (RFC 0002 Q3)", () => {
     expect(SHADER_OPERATORS).toEqual({
-      name: "four:shader-operators",
+      name: "fourJS:shader-operators",
       revocable: false,
     });
   });

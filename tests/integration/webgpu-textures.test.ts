@@ -133,7 +133,7 @@ describe("WebGPU §77 textures, composed from the real packages", () => {
       .callsOf("device.createTexture")
       .find((call) =>
         String((call.args[0] as { label?: string }).label).startsWith(
-          "four:texture:",
+          "fourJS:texture:",
         ),
       )?.args[0] as { mipLevelCount?: number };
     expect(allocation.mipLevelCount).toBe(3);
@@ -225,7 +225,7 @@ describe("WebGPU §77 textures, composed from the real packages", () => {
             mipmapFilter: string;
           },
       )
-      .find((descriptor) => descriptor.label.startsWith("four:sampler:"));
+      .find((descriptor) => descriptor.label.startsWith("fourJS:sampler:"));
     expect(sampler).toMatchObject({
       minFilter: "linear",
       mipmapFilter: "linear",

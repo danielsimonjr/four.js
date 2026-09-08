@@ -101,7 +101,7 @@ export async function readTexturePixels(
   height: number,
   region?: Rectangle2,
 ): Promise<ArrayBuffer | null> {
-  const encoder = device.createCommandEncoder({ label: "four:readback" });
+  const encoder = device.createCommandEncoder({ label: "fourJS:readback" });
   if (encoder.copyTextureToBuffer === undefined) {
     return null;
   }
@@ -109,7 +109,7 @@ export async function readTexturePixels(
   const readHeight = region === undefined ? height : region.height;
   const bytesPerRow = readbackBytesPerRow(readWidth);
   const buffer = device.createBuffer({
-    label: "four:readback",
+    label: "fourJS:readback",
     size: bytesPerRow * readHeight,
     usage: GPU_BUFFER_USAGE.COPY_DST | GPU_BUFFER_USAGE.MAP_READ,
   });

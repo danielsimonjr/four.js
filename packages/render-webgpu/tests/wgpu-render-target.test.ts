@@ -180,7 +180,7 @@ describe("WgpuRenderTargetCache", () => {
       format: string;
       usage: number;
     };
-    expect(color.label).toBe(`four:render-target:${target.id}`);
+    expect(color.label).toBe(`fourJS:render-target:${target.id}`);
     expect(color.size).toEqual([32, 16]);
     expect(color.format).toBe(RENDER_TARGET_COLOR_FORMAT);
     expect(color.usage).toBe(
@@ -293,7 +293,7 @@ describe("WgpuRenderTargetCache", () => {
     expect(
       (gpu.callsOf("device.createSampler")[0]?.args[0] as { label: string })
         .label,
-    ).toBe("four:render-target-sampler");
+    ).toBe("fourJS:render-target-sampler");
     expect(targets.sample(first)).toBe(groupA);
     first.dispose();
     second.dispose();
@@ -334,12 +334,12 @@ describe("WebgpuRenderer.render into a target (WP-R1.6)", () => {
 
     expect(gpu.countOf("context.getCurrentTexture")).toBe(0);
     expect(textureLabels(gpu)).toEqual([
-      `four:render-target:${target.id}`,
-      `four:render-target-depth:${target.id}`,
+      `fourJS:render-target:${target.id}`,
+      `fourJS:render-target-depth:${target.id}`,
     ]);
     // The frame's own depth attachment is not allocated for an off-screen
     // frame — the target's is the depth buffer.
-    expect(textureLabels(gpu)).not.toContain("four:depth");
+    expect(textureLabels(gpu)).not.toContain("fourJS:depth");
     const viewport = gpu.callsOf("pass.setViewport")[0]?.args;
     expect(viewport?.slice(0, 4)).toEqual([0, 0, 64, 32]);
     const descriptor = gpu.callsOf("encoder.beginRenderPass")[0]?.args[0] as {
@@ -468,7 +468,7 @@ describe("WebgpuRenderer.render into a target (WP-R1.6)", () => {
       .callsOf("device.createBindGroup")
       .filter((call) =>
         String((call.args[0] as { label?: string }).label).startsWith(
-          "four:render-target-map:",
+          "fourJS:render-target-map:",
         ),
       );
     expect(sampleGroups).toHaveLength(1);
@@ -549,7 +549,7 @@ describe("WebgpuRenderer.render into a target (WP-R1.6)", () => {
     renderer.render(root, [view()]);
     expect(
       textureLabels(gpu).filter((label) =>
-        label.startsWith("four:render-target"),
+        label.startsWith("fourJS:render-target"),
       ),
     ).toEqual([]);
     expect(gpu.countOf("context.getCurrentTexture")).toBe(1);

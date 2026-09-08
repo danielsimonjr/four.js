@@ -76,7 +76,7 @@ describe("the particle uniform block (§36, WP-R1.8)", () => {
     const gpu = createRecordingGpu();
     createParticleBindGroupLayout(gpu.device as GpuDevice);
     expect(gpu.callsOf("device.createBindGroupLayout")[0]?.args[0]).toEqual({
-      label: "four:particle-uniforms",
+      label: "fourJS:particle-uniforms",
       entries: [
         {
           binding: 0,
@@ -193,7 +193,7 @@ describe("WgpuParticleCache — one instance buffer per system (§61, §64)", ()
     expect(cache.size).toBe(1);
     expect(record?.capacityFloats).toBe(4 * PARTICLE_INSTANCE_FLOATS);
     expect(gpu.callsOf("device.createBuffer")[0]?.args[0]).toEqual({
-      label: "four:particles:system-a",
+      label: "fourJS:particles:system-a",
       size: 4 * PARTICLE_INSTANCE_FLOATS * 4,
       usage: GPU_BUFFER_USAGE.VERTEX | GPU_BUFFER_USAGE.COPY_DST,
     });

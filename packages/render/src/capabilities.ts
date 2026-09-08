@@ -42,7 +42,7 @@ import type { RendererRegistry } from "./renderer-registry.js";
  * the §96 boundary test's textual ban is blunt on purpose).
  */
 export const RENDERER_REGISTRY =
-  /* @__PURE__ */ defineCapability<RendererRegistry>("four:renderer-registry");
+  /* @__PURE__ */ defineCapability<RendererRegistry>("fourJS:renderer-registry");
 
 /**
  * §81's *"render passes"* — **differently shaped from the other five §81
@@ -67,7 +67,7 @@ export const RENDERER_REGISTRY =
  * Q1 was careful to avoid.
  */
 export const RENDER_GRAPH =
-  /* @__PURE__ */ defineCapability<RenderGraph>("four:render-graph");
+  /* @__PURE__ */ defineCapability<RenderGraph>("fourJS:render-graph");
 
 /**
  * §81's *"compute workloads"*: a named {@link ComputeWorkloadRegistry} of
@@ -80,5 +80,5 @@ export const RENDER_GRAPH =
  */
 export const COMPUTE_WORKLOADS =
   /* @__PURE__ */ defineCapability<ComputeWorkloadRegistry>(
-    "four:compute-workloads",
+    "fourJS:compute-workloads",
   );

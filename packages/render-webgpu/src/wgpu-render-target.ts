@@ -294,7 +294,7 @@ export class WgpuRenderTargetCache {
     }
     if (record.sampleBindGroup === null) {
       record.sampleBindGroup = this.#device.createBindGroup({
-        label: `four:render-target-map:${target.id}`,
+        label: `fourJS:render-target-map:${target.id}`,
         layout: this.#sampleLayout(),
         entries: [
           { binding: MAP_TEXTURE_BINDING, resource: record.colorView },
@@ -327,7 +327,7 @@ export class WgpuRenderTargetCache {
    */
   sampleSampler(): GpuSampler {
     this.#sampler ??= this.#device.createSampler({
-      label: "four:render-target-sampler",
+      label: "fourJS:render-target-sampler",
       addressModeU: "clamp-to-edge",
       addressModeV: "clamp-to-edge",
       magFilter: "linear",
@@ -376,7 +376,7 @@ export class WgpuRenderTargetCache {
     const height = target.height;
 
     const colorTexture = device.createTexture({
-      label: `four:render-target:${target.id}`,
+      label: `fourJS:render-target:${target.id}`,
       size: [width, height],
       format: RENDER_TARGET_COLOR_FORMAT,
       usage:
@@ -389,7 +389,7 @@ export class WgpuRenderTargetCache {
     let depthTexture: GpuTexture | null = null;
     if (depthFormat !== null) {
       depthTexture = device.createTexture({
-        label: `four:render-target-depth:${target.id}`,
+        label: `fourJS:render-target-depth:${target.id}`,
         size: [width, height],
         format: depthFormat,
         // The samplable form is the one whose being-sampled-later is the

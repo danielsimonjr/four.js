@@ -23,9 +23,9 @@ function probeLoader(name: string): AssetLoader<string> {
 }
 
 describe("ASSET_LOADERS", () => {
-  it("is the four:asset-loaders token, not revocable (RFC 0002 Q3)", () => {
+  it("is the fourJS:asset-loaders token, not revocable (RFC 0002 Q3)", () => {
     expect(ASSET_LOADERS).toEqual({
-      name: "four:asset-loaders",
+      name: "fourJS:asset-loaders",
       revocable: false,
     });
   });

@@ -283,7 +283,7 @@ export interface WgpuPipelineDescriptor {
    * kinds**: on WebGPU the normal stream is a vertex-layout fact a pipeline
    * bakes in (`wgpu-lit.ts`'s departure 2), so both values are pipeline
    * identity and both append a key segment; absence appends nothing, which is
-   * what keeps every pre-WP-R1.5 key — and every `four:<key>` label in landed
+   * what keeps every pre-WP-R1.5 key — and every `fourJS:<key>` label in landed
    * transcripts — byte-identical (the `stencil`/`batch` rule, third
    * application).
    */
@@ -309,7 +309,7 @@ export interface WgpuPipelineDescriptor {
    * `PARTICLE_VERTEX_BUFFER_LAYOUTS`) over the **same** WGSL module.
    * Appended to the key **only when `true`** (the `shadow` rule, second
    * application): `false` and absent name the very pipeline every landed
-   * CPU-simulated transcript compiled, so its key and its `four:<key>`
+   * CPU-simulated transcript compiled, so its key and its `fourJS:<key>`
    * label stay byte-identical.
    */
   readonly gpuInstances?: boolean;
@@ -332,7 +332,7 @@ export interface WgpuPipelineDescriptor {
  * content as absence. That is still a total, injective function — absence
  * appends nothing, and no required field's value can spell the prefixes —
  * and it is what keeps every earlier packet's key, and therefore every
- * `four:<key>` pipeline label already recorded in landed transcripts,
+ * `fourJS:<key>` pipeline label already recorded in landed transcripts,
  * byte-identical for a descriptor that does not carry them.
  */
 export function pipelineKey(descriptor: WgpuPipelineDescriptor): string {
@@ -537,7 +537,7 @@ export class WgpuPipelineCache {
     this.#particleLayout = particleLayout;
     this.#drawLayout = bindGroupLayout;
     this.#layout = device.createPipelineLayout({
-      label: "four:pipeline-layout",
+      label: "fourJS:pipeline-layout",
       bindGroupLayouts: [bindGroupLayout],
     });
   }
@@ -627,7 +627,7 @@ export class WgpuPipelineCache {
         return null;
       }
       this.#spritePipelineLayout ??= this.#device.createPipelineLayout({
-        label: "four:pipeline-layout:sprite",
+        label: "fourJS:pipeline-layout:sprite",
         bindGroupLayouts: [sprite(), texture()],
       });
       return this.#spritePipelineLayout;
@@ -638,7 +638,7 @@ export class WgpuPipelineCache {
         return null;
       }
       this.#particlePipelineLayout ??= this.#device.createPipelineLayout({
-        label: "four:pipeline-layout:particles",
+        label: "fourJS:pipeline-layout:particles",
         bindGroupLayouts: [particle()],
       });
       return this.#particlePipelineLayout;
@@ -657,7 +657,7 @@ export class WgpuPipelineCache {
       return null;
     }
     this.#texturedPipelineLayout ??= this.#device.createPipelineLayout({
-      label: "four:pipeline-layout:map",
+      label: "fourJS:pipeline-layout:map",
       bindGroupLayouts: [this.#drawLayout, provider()],
     });
     return this.#texturedPipelineLayout;
@@ -684,13 +684,13 @@ export class WgpuPipelineCache {
         return null;
       }
       this.#effectGradePipelineLayout ??= this.#device.createPipelineLayout({
-        label: "four:pipeline-layout:effect:grade",
+        label: "fourJS:pipeline-layout:effect:grade",
         bindGroupLayouts: [texture(), effect()],
       });
       return this.#effectGradePipelineLayout;
     }
     this.#effectPipelineLayout ??= this.#device.createPipelineLayout({
-      label: "four:pipeline-layout:effect",
+      label: "fourJS:pipeline-layout:effect",
       bindGroupLayouts: [texture()],
     });
     return this.#effectPipelineLayout;
@@ -736,7 +736,7 @@ export class WgpuPipelineCache {
         return existing;
       }
       const created = this.#device.createPipelineLayout({
-        label: `four:pipeline-layout:${family}:shadow${
+        label: `fourJS:pipeline-layout:${family}:shadow${
           descriptor.map ? ":map" : ""
         }`,
         bindGroupLayouts:
@@ -755,7 +755,7 @@ export class WgpuPipelineCache {
         return existing;
       }
       const created = this.#device.createPipelineLayout({
-        label: `four:pipeline-layout:${family}:map`,
+        label: `fourJS:pipeline-layout:${family}:map`,
         bindGroupLayouts: [drawLayout, lights(), texture()],
       });
       if (standard) {
@@ -772,7 +772,7 @@ export class WgpuPipelineCache {
       return existing;
     }
     const created = this.#device.createPipelineLayout({
-      label: `four:pipeline-layout:${family}`,
+      label: `fourJS:pipeline-layout:${family}`,
       bindGroupLayouts: [drawLayout, lights()],
     });
     if (standard) {
@@ -826,7 +826,7 @@ export class WgpuPipelineCache {
       return existing;
     }
     const module = this.#device.createShaderModule({
-      label: `four:${key}`,
+      label: `fourJS:${key}`,
       code:
         kind === "clear"
           ? CLEAR_SHADER_SOURCE
@@ -913,7 +913,7 @@ export class WgpuPipelineCache {
     );
     const blend = blendStateFor(descriptor.blend);
     return this.#device.createRenderPipeline({
-      label: `four:${key}`,
+      label: `fourJS:${key}`,
       layout,
       vertex: {
         module,

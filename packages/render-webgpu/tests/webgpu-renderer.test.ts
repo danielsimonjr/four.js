@@ -385,7 +385,7 @@ function mapAllocations(gpu: RecordingGpu): number {
     .callsOf("device.createTexture")
     .filter((call) =>
       String((call.args[0] as { label?: string }).label).startsWith(
-        "four:texture:",
+        "fourJS:texture:",
       ),
     ).length;
 }
@@ -544,7 +544,7 @@ describe("WebgpuRenderer.initialize", () => {
     const viewsPass = gpu
       .callsOf("encoder.beginRenderPass")
       .find(
-        (call) => (call.args[0] as { label?: string } | undefined)?.label === "four:views",
+        (call) => (call.args[0] as { label?: string } | undefined)?.label === "fourJS:views",
       );
     expect(
       (viewsPass?.args[0] as { timestampWrites?: unknown } | undefined)
@@ -1528,7 +1528,7 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
     expect(harness.gpu.countOf("pass.draw")).toBe(2);
     expect(
       pipelineLabels(harness.gpu).some((label) =>
-        label.startsWith("four:sprite|"),
+        label.startsWith("fourJS:sprite|"),
       ),
     ).toBe(true);
     // The sprite's own group-0 layout and the texture's group 1, both created
@@ -1582,7 +1582,7 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
     root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
     harness.renderer.render(root, [createView()]);
 
-    const descriptor = pipelineDescriptor(harness.gpu, "four:sprite|") as {
+    const descriptor = pipelineDescriptor(harness.gpu, "fourJS:sprite|") as {
       fragment: { targets: { blend?: { color: { srcFactor: string } } }[] };
     };
     expect(descriptor.fragment.targets[0]?.blend?.color.srcFactor).toBe(
@@ -1689,7 +1689,7 @@ describe("WebgpuRenderer clipping (§67, WP-R1.3)", () => {
       label: string;
       format: string;
     };
-    expect(depth.label).toBe("four:depth");
+    expect(depth.label).toBe("fourJS:depth");
     expect(depth.format).toBe("depth24plus-stencil8");
     const pass = harness.gpu.callsOf("encoder.beginRenderPass")[0]?.args[0] as {
       depthStencilAttachment: {
@@ -1703,7 +1703,7 @@ describe("WebgpuRenderer clipping (§67, WP-R1.3)", () => {
 
   it("clears the stencil rectangle with the clear draw (passOp zero)", () => {
     harness.renderer.render(clippedScene(), [createView()]);
-    const clear = pipelineDescriptor(harness.gpu, "four:clear") as {
+    const clear = pipelineDescriptor(harness.gpu, "fourJS:clear") as {
       depthStencil: {
         stencilFront: { compare: string; passOp: string };
         stencilWriteMask: number;
@@ -1859,7 +1859,7 @@ describe("WebgpuRenderer clipping (§67, WP-R1.3)", () => {
     harness.renderer.render(root, [createView()]);
 
     const label = pipelineLabels(harness.gpu).find((candidate) =>
-      candidate.startsWith("four:sprite|"),
+      candidate.startsWith("fourJS:sprite|"),
     );
     expect(label).toContain("|s:equal,1,0,");
     expect(stencilReferences(harness.gpu)).toEqual([1]);
@@ -1881,7 +1881,7 @@ describe("WebgpuRenderer clipping (§67, WP-R1.3)", () => {
     expect(mask.vertex.buffers).toHaveLength(1);
     expect(
       pipelineLabels(harness.gpu).some((label) =>
-        label.startsWith("four:sprite|"),
+        label.startsWith("fourJS:sprite|"),
       ),
     ).toBe(true);
     expect(stencilReferences(harness.gpu)).toEqual([1]);
@@ -1968,7 +1968,7 @@ describe("WebgpuRenderer batching (§65, WP-R1.3)", () => {
     );
     expect(
       pipelineLabels(harness.gpu).some((label) =>
-        label.startsWith("four:batch|"),
+        label.startsWith("fourJS:batch|"),
       ),
     ).toBe(true);
     // The per-item geometry is never uploaded: the run draws from the
@@ -2029,7 +2029,7 @@ describe("WebgpuRenderer batching (§65, WP-R1.3)", () => {
 
     expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
     const label = pipelineLabels(harness.gpu).find((candidate) =>
-      candidate.startsWith("four:batch|"),
+      candidate.startsWith("fourJS:batch|"),
     );
     expect(label).toContain("|map|");
     const groups = harness.gpu
@@ -2071,7 +2071,7 @@ describe("WebgpuRenderer batching (§65, WP-R1.3)", () => {
 
     expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
     const label = pipelineLabels(harness.gpu).find((candidate) =>
-      candidate.startsWith("four:batch|"),
+      candidate.startsWith("fourJS:batch|"),
     );
     expect(label).toContain("line-list");
     expect(statistics.drawCalls).toBe(1);
@@ -2091,7 +2091,7 @@ describe("WebgpuRenderer batching (§65, WP-R1.3)", () => {
 
     expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
     const label = pipelineLabels(harness.gpu).find((candidate) =>
-      candidate.startsWith("four:batch|"),
+      candidate.startsWith("fourJS:batch|"),
     );
     expect(label).toContain("|s:equal,1,0,");
     expect(stencilReferences(harness.gpu)).toEqual([1]);
@@ -2110,7 +2110,7 @@ describe("WebgpuRenderer batching (§65, WP-R1.3)", () => {
     harness.renderer.render(root, [createView()]);
 
     const label = pipelineLabels(harness.gpu).find((candidate) =>
-      candidate.startsWith("four:batch|"),
+      candidate.startsWith("fourJS:batch|"),
     );
     // Stencil-capable format, no stencil segment: the run tests nothing.
     expect(label).toContain("depth24plus-stencil8");
@@ -2414,20 +2414,20 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     harness.renderer.render(root, [createView()]);
 
     expect(pipelineLabels(harness.gpu)).toContain(
-      "four:lit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+      "fourJS:lit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
     );
-    expect(moduleLabels(harness.gpu)).toContain("four:lit|n");
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:lit|n");
     // The lazy lights subsystem: one layout, one buffer, one bind group.
     expect(
-      layoutLabels(harness.gpu).filter((label) => label === "four:lights"),
+      layoutLabels(harness.gpu).filter((label) => label === "fourJS:lights"),
     ).toHaveLength(1);
     expect(
-      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+      bufferLabels(harness.gpu).filter((label) => label === "fourJS:lights"),
     ).toHaveLength(1);
     // The normal stream uploaded for the shaded draw, in GL's order.
     expect(
       bufferLabels(harness.gpu).some((label) =>
-        label.startsWith("four:normals:"),
+        label.startsWith("fourJS:normals:"),
       ),
     ).toBe(true);
     // The draw binds the view's block at group 1, offset 0.
@@ -2454,13 +2454,13 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     );
     harness.renderer.render(root, [createView()]);
 
-    expect(moduleLabels(harness.gpu)).toContain("four:lit");
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:lit");
     expect(
       pipelineLabels(harness.gpu).some((label) => label.endsWith("|n:-")),
     ).toBe(true);
     expect(
       bufferLabels(harness.gpu).some((label) =>
-        label.startsWith("four:normals:"),
+        label.startsWith("fourJS:normals:"),
       ),
     ).toBe(false);
     // One vertex buffer bound: position alone, slot 0.
@@ -2477,7 +2477,7 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
 
     harness.renderer.render(root, [createView()]);
 
-    expect(moduleLabels(harness.gpu)).toContain("four:lit|n|map");
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:lit|n|map");
     // position, normal, uv — three slots, one counter.
     expect(
       harness.gpu.callsOf("pass.setVertexBuffer").map((call) => call.args[0]),
@@ -2508,7 +2508,7 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
 
     harness.renderer.render(root, [createView()]);
-    expect(moduleLabels(harness.gpu)).toContain("four:lit|n");
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:lit|n");
     expect(mapAllocations(harness.gpu)).toBe(0);
     expect(harness.gpu.countOf("pass.draw")).toBe(2);
   });
@@ -2524,7 +2524,7 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
 
     harness.renderer.render(root, [createView()]);
     expect(pipelineLabels(harness.gpu)).toContain(
-      "four:lit|-|-|additive|dt|-|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+      "fourJS:lit|-|-|additive|dt|-|cw|triangle-list|bgra8unorm|depth24plus|n:y",
     );
     const floats = drawUniformUpload(harness.gpu);
     const colorBase = UNIFORM_STRIDE_BYTES / 4 + DRAW_COLOR_OFFSET / 4;
@@ -2551,10 +2551,10 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
 
     harness.renderer.render(root, [view]);
 
-    expect(moduleLabels(harness.gpu)).toContain("four:standard|n");
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:standard|n");
     expect(
       layoutLabels(harness.gpu).filter(
-        (label) => label === "four:standard-uniforms",
+        (label) => label === "fourJS:standard-uniforms",
       ),
     ).toHaveLength(1);
     // §59's two extra vec4s, in the block's spare stride bytes.
@@ -2707,7 +2707,7 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     harness.renderer.render(root, [createView()]);
     harness.renderer.render(root, [createView()]);
     expect(
-      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+      bufferLabels(harness.gpu).filter((label) => label === "fourJS:lights"),
     ).toHaveLength(1);
 
     // A fifth view exceeds the four-block floor: the buffer regrows once and
@@ -2721,7 +2721,7 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     ];
     harness.renderer.render(root, views);
     expect(
-      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+      bufferLabels(harness.gpu).filter((label) => label === "fourJS:lights"),
     ).toHaveLength(2);
     expect(lightsUpload(harness.gpu).size).toBe(
       5 * LIGHT_UNIFORM_STRIDE_FLOATS,
@@ -2751,7 +2751,7 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
       .filter(
         (call) =>
           (call.args[0] as { label?: string }).label ===
-          "four:standard-uniforms",
+          "fourJS:standard-uniforms",
       );
     expect(standardGroups).toHaveLength(2);
   });
@@ -2804,7 +2804,7 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     // The lit pipeline was never created: the cache was disposed by the time
     // the arm asked it.
     expect(
-      pipelineLabels(harness.gpu).some((label) => label.includes("four:lit")),
+      pipelineLabels(harness.gpu).some((label) => label.includes("fourJS:lit")),
     ).toBe(false);
     expect(harness.renderer.disposed).toBe(true);
   });
@@ -2823,7 +2823,7 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
 
     harness.renderer.render(root, [createView()]);
     const clippedLit = pipelineLabels(harness.gpu).find(
-      (label) => label.includes("four:lit") && label.includes("|s:equal"),
+      (label) => label.includes("fourJS:lit") && label.includes("|s:equal"),
     );
     expect(clippedLit).toBeDefined();
     expect(clippedLit).toContain("|n:y");
@@ -2837,7 +2837,7 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
     harness.renderer.render(root, [createView()]);
     expect(pipelineLabels(harness.gpu)).toContain(
-      "four:lit|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+      "fourJS:lit|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
     );
   });
 
@@ -2878,11 +2878,11 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
 
     harness.renderer.render(root, [createView()]);
     expect(
-      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+      bufferLabels(harness.gpu).filter((label) => label === "fourJS:lights"),
     ).toHaveLength(1);
     expect(bindGroupOffsets(harness.gpu, 1)).toEqual([[0], [0]]);
     expect(moduleLabels(harness.gpu)).toEqual(
-      expect.arrayContaining(["four:lit|n", "four:standard|n"]),
+      expect.arrayContaining(["fourJS:lit|n", "fourJS:standard|n"]),
     );
   });
 });
@@ -2966,7 +2966,7 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
 
     const transcript = harness.gpu.transcript().join("\n");
     expect(harness.gpu.countOf("encoder.beginRenderPass")).toBe(1);
-    expect(transcript).not.toContain("four:shadow");
+    expect(transcript).not.toContain("fourJS:shadow");
     expect(transcript).not.toContain("sampler_comparison");
     expect(transcript).not.toContain("|sh:y");
     expect(harness.gpu.countOf("device.createSampler")).toBe(0);
@@ -2982,8 +2982,8 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
     // attachment nothing reads.
     const passes = passDescriptors(harness.gpu);
     expect(passes.map((pass) => pass.label)).toEqual([
-      "four:shadow",
-      "four:views",
+      "fourJS:shadow",
+      "fourJS:views",
     ]);
     expect(passes[0].depthStencilAttachment).toEqual({
       view: expect.anything() as unknown,
@@ -3002,16 +3002,16 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
           call.args[0] as { label?: string; format?: string; usage?: number },
       )
       .find((descriptor) =>
-        String(descriptor.label).startsWith("four:render-target-depth:"),
+        String(descriptor.label).startsWith("fourJS:render-target-depth:"),
       );
     expect(depthAllocation?.format).toBe("depth32float");
     expect((depthAllocation?.usage ?? 0) & 0x04).toBe(0x04);
 
     // The caster drew through the one shadow pipeline over the shared
     // one-group layout, at the shadow target's own formats.
-    expect(moduleLabels(harness.gpu)).toContain("four:shadow");
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:shadow");
     expect(pipelineLabels(harness.gpu)).toContain(
-      "four:shadow|-|-|none|dt|dw|cw|triangle-list|rgba8unorm|depth32float",
+      "fourJS:shadow|-|-|none|dt|dw|cw|triangle-list|rgba8unorm|depth32float",
     );
   });
 
@@ -3063,19 +3063,19 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
     // The receiver's variant, the opt-out's plain landed pipeline (same key
     // a shadowless frame compiles), and the standard receiver's variant.
     expect(labels).toContain(
-      "four:lit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y|sh:y",
+      "fourJS:lit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y|sh:y",
     );
     expect(labels).toContain(
-      "four:lit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+      "fourJS:lit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
     );
     expect(labels).toContain(
-      "four:standard|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y|sh:y",
+      "fourJS:standard|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y|sh:y",
     );
     expect(moduleLabels(harness.gpu)).toEqual(
       expect.arrayContaining([
-        "four:lit|n|sh",
-        "four:lit|n",
-        "four:standard|n|sh",
+        "fourJS:lit|n|sh",
+        "fourJS:lit|n",
+        "fourJS:standard|n|sh",
       ]),
     );
 
@@ -3083,14 +3083,14 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
     // the same lights buffer the plain group binds.
     expect(
       layoutLabels(harness.gpu).filter(
-        (label) => label === "four:shadow-lights",
+        (label) => label === "fourJS:shadow-lights",
       ),
     ).toHaveLength(1);
     expect(harness.gpu.countOf("device.createSampler")).toBe(1);
     const shadowGroups = harness.gpu
       .callsOf("device.createBindGroup")
       .map((call) => call.args[0] as { label?: string; entries: unknown[] })
-      .filter((descriptor) => descriptor.label === "four:shadow-lights");
+      .filter((descriptor) => descriptor.label === "fourJS:shadow-lights");
     expect(shadowGroups).toHaveLength(1);
     expect(shadowGroups[0].entries).toHaveLength(3);
     expect(
@@ -3146,7 +3146,7 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
         .callsOf("device.createBindGroup")
         .filter(
           (call) =>
-            (call.args[0] as { label?: string }).label === "four:shadow-lights",
+            (call.args[0] as { label?: string }).label === "fourJS:shadow-lights",
         ).length;
     expect(shadowGroupCount()).toBe(1);
 
@@ -3159,7 +3159,7 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
       .callsOf("device.createTexture")
       .map((call) => call.args[0] as { label?: string; size?: number[] })
       .filter((descriptor) =>
-        String(descriptor.label).startsWith("four:render-target-depth:"),
+        String(descriptor.label).startsWith("fourJS:render-target-depth:"),
       );
     expect(depthAllocations.map((descriptor) => descriptor.size)).toEqual([
       [256, 256],
@@ -3266,7 +3266,7 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
     // The encoder opened only the views pass: the shadow pass returned
     // before beginning, because its target could not be acquired.
     expect(passDescriptors(harness.gpu).map((pass) => pass.label)).toEqual([
-      "four:views",
+      "fourJS:views",
     ]);
     expect(harness.gpu.countOf("pass.draw")).toBe(0);
   });
@@ -3303,19 +3303,19 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
 
     const passes = passDescriptors(harness.gpu);
     expect(passes.map((pass) => pass.label)).toEqual([
-      "four:shadow",
-      "four:views",
+      "fourJS:shadow",
+      "fourJS:views",
     ]);
     // The caster pipeline keeps the map's own formats; the receiver bakes
     // the off-screen colour format — two families, two format tuples.
     const labels = pipelineLabels(harness.gpu);
     expect(labels).toContain(
-      "four:shadow|-|-|none|dt|dw|cw|triangle-list|rgba8unorm|depth32float",
+      "fourJS:shadow|-|-|none|dt|dw|cw|triangle-list|rgba8unorm|depth32float",
     );
     expect(
       labels.some(
         (label) =>
-          label.startsWith("four:lit") &&
+          label.startsWith("fourJS:lit") &&
           label.includes("|rgba8unorm|") &&
           label.endsWith("|sh:y"),
       ),
@@ -3339,7 +3339,7 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
       .callsOf("device.createBindGroup")
       .filter(
         (call) =>
-          (call.args[0] as { label?: string }).label === "four:shadow-lights",
+          (call.args[0] as { label?: string }).label === "fourJS:shadow-lights",
       );
     expect(shadowGroups).toHaveLength(2);
   });
@@ -3497,8 +3497,8 @@ describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
     // The clear pipeline, then the particle pipeline — created by this first
     // particle frame, not at initialization.
     expect(pipelineLabels(harness.gpu)).toEqual([
-      "four:clear|-|-|none|-|dw|-|triangle-list|bgra8unorm|depth24plus",
-      "four:particles|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|depth24plus",
+      "fourJS:clear|-|-|none|-|dw|-|triangle-list|bgra8unorm|depth24plus",
+      "fourJS:particles|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|depth24plus",
     ]);
     const descriptor = harness.gpu.callsOf("device.createRenderPipeline")[1]
       ?.args[0] as {
@@ -3523,13 +3523,13 @@ describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
     // group reads the particle block off the shared strided buffer.
     expect(
       layoutLabels(harness.gpu).filter(
-        (label) => label === "four:particle-uniforms",
+        (label) => label === "fourJS:particle-uniforms",
       ),
     ).toHaveLength(1);
     const groups = harness.gpu
       .callsOf("device.createBindGroup")
       .map((call) => call.args[0] as { label?: string; entries: unknown[] })
-      .filter((descriptor_) => descriptor_.label === "four:particle-uniforms");
+      .filter((descriptor_) => descriptor_.label === "fourJS:particle-uniforms");
     expect(groups).toHaveLength(1);
     expect(
       (groups[0]?.entries[0] as { resource: { size?: number } }).resource.size,
@@ -3645,7 +3645,7 @@ describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
       .callsOf("device.createBuffer")
       .map((call) => call.args[0] as { label?: string; size?: number })
       .filter((descriptor) =>
-        String(descriptor.label).startsWith("four:particles:"),
+        String(descriptor.label).startsWith("fourJS:particles:"),
       );
     expect(allocations.map((descriptor) => descriptor.size)).toEqual([
       2 * PARTICLE_INSTANCE_FLOATS * 4,
@@ -3668,13 +3668,13 @@ describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
     // Clear, mask, panel content (unclipped), particles (clipped).
     expect(harness.gpu.countOf("pass.draw")).toBe(4);
     const label = pipelineLabels(harness.gpu).find((entry) =>
-      entry.startsWith("four:particles"),
+      entry.startsWith("fourJS:particles"),
     );
     // The engine's clip record is the particle pipeline's stencil — an
     // `equal` test over the accumulated planes, on the stencil-carrying
     // frame format.
     expect(label).toBe(
-      "four:particles|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|" +
+      "fourJS:particles|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|" +
         "depth24plus-stencil8|s:equal,1,0,keep,keep,keep",
     );
     // …and the clipped draw put the pass's reference where the mask left it.
@@ -3696,7 +3696,7 @@ describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
         .callsOf("device.createBuffer")
         .filter((call) =>
           String((call.args[0] as { label?: string }).label).startsWith(
-            "four:particles:",
+            "fourJS:particles:",
           ),
         ),
     ).toHaveLength(0);
@@ -3724,7 +3724,7 @@ describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
         .callsOf("device.createBuffer")
         .filter((call) =>
           String((call.args[0] as { label?: string }).label).startsWith(
-            "four:",
+            "fourJS:",
           ),
         ),
     ).toHaveLength(0);

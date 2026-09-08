@@ -1050,9 +1050,9 @@ export class WgpuNodePipelineStore
           };
 
     const device = this.#host.device;
-    const encoder = device.createCommandEncoder({ label: "four:effect" });
+    const encoder = device.createCommandEncoder({ label: "fourJS:effect" });
     const renderPass = encoder.beginRenderPass({
-      label: "four:effect:graph",
+      label: "fourJS:effect:graph",
       // "load", not "clear" — §70's replace contract, `wgpu-effect.ts`.
       colorAttachments: [
         { view: colorView(), loadOp: "load", storeOp: "store" },
@@ -1151,7 +1151,7 @@ export class WgpuNodePipelineStore
   #createRecord(emitted: EmittedWgslNodeShader): NodeProgramRecord {
     const device = this.#host.device;
     const module = device.createShaderModule({
-      label: `four:node:${emitted.domain}`,
+      label: `fourJS:node:${emitted.domain}`,
       code: emitted.code,
     });
     const groups: GpuBindGroupLayout[] = [];
@@ -1169,7 +1169,7 @@ export class WgpuNodePipelineStore
       }
     }
     const pipelineLayout = device.createPipelineLayout({
-      label: `four:pipeline-layout:node:${emitted.domain}`,
+      label: `fourJS:pipeline-layout:node:${emitted.domain}`,
       bindGroupLayouts: groups,
     });
     return {
@@ -1200,7 +1200,7 @@ export class WgpuNodePipelineStore
       return existing;
     }
     const layout = this.#host.device.createBindGroupLayout({
-      label: `four:node-uniforms:${key}`,
+      label: `fourJS:node-uniforms:${key}`,
       entries: [
         {
           binding: 0,
@@ -1244,7 +1244,7 @@ export class WgpuNodePipelineStore
       );
     }
     const layout = this.#host.device.createBindGroupLayout({
-      label: `four:node-textures:${String(count)}`,
+      label: `fourJS:node-textures:${String(count)}`,
       entries,
     });
     this.#textureLayouts.set(count, layout);
@@ -1263,7 +1263,7 @@ export class WgpuNodePipelineStore
     }
     const blend = blendStateFor(state.blend);
     const pipeline = this.#host.device.createRenderPipeline({
-      label: `four:node|${key}`,
+      label: `fourJS:node|${key}`,
       layout: record.pipelineLayout,
       vertex: {
         module: record.module,
@@ -1309,7 +1309,7 @@ export class WgpuNodePipelineStore
     );
     this.#buffer?.destroy();
     this.#buffer = this.#host.device.createBuffer({
-      label: "four:node-uniforms",
+      label: "fourJS:node-uniforms",
       size: capacity,
       usage: GPU_BUFFER_USAGE.UNIFORM | GPU_BUFFER_USAGE.COPY_DST,
     });
@@ -1323,7 +1323,7 @@ export class WgpuNodePipelineStore
   /** The surface draw group over the shared buffer, rebuilt after regrowth. */
   #drawBindGroup(record: NodeProgramRecord, buffer: GpuBuffer): GpuBindGroup {
     record.drawBindGroup ??= this.#host.device.createBindGroup({
-      label: "four:node-uniforms",
+      label: "fourJS:node-uniforms",
       layout: this.#blockLayout(record.emitted.blockBytes, true),
       entries: [
         {
@@ -1444,7 +1444,7 @@ export class WgpuNodePipelineStore
       return cached.group;
     }
     const group = this.#host.device.createBindGroup({
-      label: "four:node-textures",
+      label: "fourJS:node-textures",
       layout: this.#textureLayout(count),
       entries: this.#textureBindGroupEntries(count),
     });
@@ -1507,7 +1507,7 @@ export class WgpuNodePipelineStore
     const device = this.#host.device;
     const emitted = record.emitted;
     record.screenBuffer ??= device.createBuffer({
-      label: "four:node-effect-uniforms",
+      label: "fourJS:node-effect-uniforms",
       size: emitted.blockBytes,
       usage: GPU_BUFFER_USAGE.UNIFORM | GPU_BUFFER_USAGE.COPY_DST,
     });
@@ -1541,7 +1541,7 @@ export class WgpuNodePipelineStore
     }
     device.queue.writeBuffer(record.screenBuffer, 0, staging);
     record.screenBindGroup ??= device.createBindGroup({
-      label: "four:node-effect-uniforms",
+      label: "fourJS:node-effect-uniforms",
       layout: this.#blockLayout(emitted.blockBytes, false),
       entries: [
         {

@@ -23,13 +23,13 @@ import {
 } from "../src/index.js";
 
 describe("serialization capability tokens", () => {
-  it("are the four:component-serializers and four:scene-migrations tokens, not revocable (RFC 0002 Q3)", () => {
+  it("are the fourJS:component-serializers and fourJS:scene-migrations tokens, not revocable (RFC 0002 Q3)", () => {
     expect(COMPONENT_SERIALIZERS).toEqual({
-      name: "four:component-serializers",
+      name: "fourJS:component-serializers",
       revocable: false,
     });
     expect(SCENE_MIGRATIONS).toEqual({
-      name: "four:scene-migrations",
+      name: "fourJS:scene-migrations",
       revocable: false,
     });
   });

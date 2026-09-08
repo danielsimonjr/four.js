@@ -164,7 +164,7 @@ export function createLightsBindGroupLayout(
   device: GpuDevice,
 ): GpuBindGroupLayout {
   return device.createBindGroupLayout({
-    label: "four:lights",
+    label: "fourJS:lights",
     entries: [
       {
         binding: 0,

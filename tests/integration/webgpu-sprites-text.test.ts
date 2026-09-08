@@ -112,7 +112,7 @@ describe("§55 sprites on WebGPU (WP-R1.3)", () => {
     renderer.render(scene, views);
 
     expect(
-      pipelineLabels(gpu).some((label) => label.startsWith("four:sprite|")),
+      pipelineLabels(gpu).some((label) => label.startsWith("fourJS:sprite|")),
     ).toBe(true);
     expect(gpu.countOf("queue.writeTexture")).toBe(1);
     expect(
@@ -170,7 +170,7 @@ describe("§55 sprites on WebGPU (WP-R1.3)", () => {
     expect(gpu.countOf("pass.drawIndexed")).toBe(1);
     expect(gpu.callsOf("pass.drawIndexed")[0]?.args[0]).toBe(18);
     expect(
-      pipelineLabels(gpu).some((label) => label.startsWith("four:batch|")),
+      pipelineLabels(gpu).some((label) => label.startsWith("fourJS:batch|")),
     ).toBe(true);
     expect(statistics.drawCalls).toBe(1);
     expect(statistics.triangles).toBe(6);
@@ -197,7 +197,7 @@ describe("§56 text on WebGPU (WP-R1.3) — R-28's claims, restated", () => {
     expect(gpu.countOf("queue.writeTexture")).toBe(1);
     expect(
       pipelineLabels(gpu).some((label) =>
-        label.startsWith("four:unlit|-|map|"),
+        label.startsWith("fourJS:unlit|-|map|"),
       ),
     ).toBe(true);
   });
@@ -267,7 +267,7 @@ describe("§56 text on WebGPU (WP-R1.3) — R-28's claims, restated", () => {
     expect(
       labels.some(
         (label) =>
-          label.startsWith("four:unlit|-|map|") &&
+          label.startsWith("fourJS:unlit|-|map|") &&
           label.includes("|s:equal,1,0,"),
       ),
     ).toBe(true);

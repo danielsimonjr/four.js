@@ -167,7 +167,7 @@ describe("R-23 on WebGPU — §67 through the real frame path", () => {
     // The clear zeroes the planes inside its scissored triangle…
     expect(
       labels.some(
-        (label) => label.startsWith("four:clear") && label.includes(",zero"),
+        (label) => label.startsWith("fourJS:clear") && label.includes(",zero"),
       ),
     ).toBe(true);
     // …the mask writes its plane with colour, depth test and depth writes off
@@ -175,7 +175,7 @@ describe("R-23 on WebGPU — §67 through the real frame path", () => {
     expect(
       labels.some(
         (label) =>
-          label.startsWith("four:unlit|-|-|none|-|-|-") &&
+          label.startsWith("fourJS:unlit|-|-|none|-|-|-") &&
           label.includes("|s:always,255,1,keep,keep,replace"),
       ),
     ).toBe(true);

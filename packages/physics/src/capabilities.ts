@@ -33,5 +33,5 @@ import type { SolverRegistry } from "./solver-registry.js";
  * `@fourjs/physics` in every bundle).
  */
 export const SOLVER_REGISTRY = /* @__PURE__ */ defineCapability<SolverRegistry>(
-  "four:solver-registry",
+  "fourJS:solver-registry",
 );

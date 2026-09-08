@@ -29,4 +29,4 @@ import type { AssetLoaderRegistry } from "./loader-registry.js";
  * name throws.
  */
 export const ASSET_LOADERS =
-  /* @__PURE__ */ defineCapability<AssetLoaderRegistry>("four:asset-loaders");
+  /* @__PURE__ */ defineCapability<AssetLoaderRegistry>("fourJS:asset-loaders");

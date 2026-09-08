@@ -82,7 +82,7 @@ export function createSpriteBindGroupLayout(
   device: GpuDevice,
 ): GpuBindGroupLayout {
   return device.createBindGroupLayout({
-    label: "four:sprite-uniforms",
+    label: "fourJS:sprite-uniforms",
     entries: [
       {
         binding: 0,

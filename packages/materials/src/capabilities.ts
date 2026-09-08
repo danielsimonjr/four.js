@@ -28,5 +28,5 @@ import type { ShaderOperatorRegistry } from "./shader-operators.js";
  */
 export const SHADER_OPERATORS =
   /* @__PURE__ */ defineCapability<ShaderOperatorRegistry>(
-    "four:shader-operators",
+    "fourJS:shader-operators",
   );

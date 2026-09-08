@@ -784,7 +784,7 @@ describe("WgpuTextureCache", () => {
 
     const descriptor = gpu.callsOf("device.createSampler")[0]?.args[0];
     expect(descriptor).toEqual({
-      label: "four:sampler:clamp-to-edge|linear|linear|nearest|1",
+      label: "fourJS:sampler:clamp-to-edge|linear|linear|nearest|1",
       addressModeU: "clamp-to-edge",
       addressModeV: "clamp-to-edge",
       magFilter: "linear",
@@ -1016,7 +1016,7 @@ const TEST_STENCIL: WgpuStencilDescriptor = {
 
 describe("pipelineKey — the §67 stencil and §65 batch segments (WP-R1.3)", () => {
   it("appends nothing for an absent or null field — pre-R1.3 keys are byte-identical", () => {
-    // The labels recorded in landed transcripts are `four:<key>`, so this is
+    // The labels recorded in landed transcripts are `fourJS:<key>`, so this is
     // the byte-identity claim for every clipless, batchless descriptor.
     expect(pipelineKey({ ...BASE, stencil: null, batch: null })).toBe(
       pipelineKey(BASE),

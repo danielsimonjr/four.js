@@ -26,4 +26,4 @@ import type { EditorToolRegistry } from "./editor-tools.js";
  * Not revocable — the registry has no removal.
  */
 export const EDITOR_TOOLS =
-  /* @__PURE__ */ defineCapability<EditorToolRegistry>("four:editor-tools");
+  /* @__PURE__ */ defineCapability<EditorToolRegistry>("fourJS:editor-tools");

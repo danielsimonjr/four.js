@@ -197,7 +197,7 @@ declared the way `SIMULATION_SYSTEMS` already is:
 
 ```ts
 export const PATH_PLANNERS =
-  defineCapability<PathPlannerRegistry>("four:path-planners");
+  defineCapability<PathPlannerRegistry>("fourJS:path-planners");
 ```
 
 `PathPlannerRegistry` is `register(adapter)` / `resolve(name)` /
@@ -301,7 +301,7 @@ Rows in `docs/COMPATIBILITY.md` this RFC moves:
   value, not a node. A future document that *names* a registered planner
   (by `name` string, never a module specifier) is a later packet and
   would be additive.
-- **Plugin API versions (§81).** Additive token `four:path-planners`.
+- **Plugin API versions (§81).** Additive token `fourJS:path-planners`.
   `PLUGIN_API_VERSION` does not need a bump for a new optional
   capability — existing plugins do not require it. Record the token in
   §5 of `COMPATIBILITY.md` when the packet lands. No solver

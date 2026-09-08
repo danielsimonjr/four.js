@@ -71,7 +71,7 @@ describe("the widened shadow-light layout (wgpu-shadow.ts)", () => {
     const { device: gpuDevice, gpu } = device();
     createShadowLightsBindGroupLayout(gpuDevice);
     expect(gpu.callsOf("device.createBindGroupLayout")[0]?.args[0]).toEqual({
-      label: "four:shadow-lights",
+      label: "fourJS:shadow-lights",
       entries: [
         {
           binding: 0,
@@ -102,7 +102,7 @@ describe("the widened shadow-light layout (wgpu-shadow.ts)", () => {
     // GL's arithmetic per tap: nearest (one texel per comparison, so the 3×3
     // filter stays the explicit nine-tap average) and `receiver <= occluder`.
     expect(gpu.callsOf("device.createSampler")[0]?.args[0]).toEqual({
-      label: "four:shadow-sampler",
+      label: "fourJS:shadow-sampler",
       addressModeU: "clamp-to-edge",
       addressModeV: "clamp-to-edge",
       magFilter: "nearest",
@@ -348,20 +348,20 @@ describe("pipelineKey and the cache — the shadow axis", () => {
       .callsOf("device.createPipelineLayout")
       .map((call) => String((call.args[0] as { label?: string }).label));
     expect(layoutLabels).toEqual([
-      "four:pipeline-layout:lit:shadow",
-      "four:pipeline-layout:lit:shadow:map",
-      "four:pipeline-layout:standard:shadow",
-      "four:pipeline-layout:standard:shadow:map",
+      "fourJS:pipeline-layout:lit:shadow",
+      "fourJS:pipeline-layout:lit:shadow:map",
+      "fourJS:pipeline-layout:standard:shadow",
+      "fourJS:pipeline-layout:standard:shadow:map",
     ]);
     const moduleLabels = gpu
       .callsOf("device.createShaderModule")
       .map((call) => String((call.args[0] as { label?: string }).label));
     expect(moduleLabels).toEqual([
-      "four:shadow",
-      "four:lit|n|sh",
-      "four:lit|n|map|sh",
-      "four:standard|n|sh",
-      "four:standard|n|map|sh",
+      "fourJS:shadow",
+      "fourJS:lit|n|sh",
+      "fourJS:lit|n|map|sh",
+      "fourJS:standard|n|sh",
+      "fourJS:standard|n|map|sh",
     ]);
   });
 

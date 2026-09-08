@@ -227,14 +227,14 @@ export class WgpuGpuTimer {
       count: 2,
     });
     const resolve = device.createBuffer({
-      label: "four:gpu-time-resolve",
+      label: "fourJS:gpu-time-resolve",
       size: TIMESTAMP_PAIR_BYTES,
       usage: RESOLVE_USAGE,
     });
     const slots: TimerSlot[] = [
       {
         buffer: device.createBuffer({
-          label: "four:gpu-time-read-0",
+          label: "fourJS:gpu-time-read-0",
           size: TIMESTAMP_PAIR_BYTES,
           usage: READ_USAGE,
         }),
@@ -242,7 +242,7 @@ export class WgpuGpuTimer {
       },
       {
         buffer: device.createBuffer({
-          label: "four:gpu-time-read-1",
+          label: "fourJS:gpu-time-read-1",
           size: TIMESTAMP_PAIR_BYTES,
           usage: READ_USAGE,
         }),

@@ -26,4 +26,4 @@ import type { UIControlRegistry } from "./control-registry.js";
  * the same name throws.
  */
 export const UI_CONTROLS =
-  /* @__PURE__ */ defineCapability<UIControlRegistry>("four:ui-controls");
+  /* @__PURE__ */ defineCapability<UIControlRegistry>("fourJS:ui-controls");

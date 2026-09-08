@@ -100,7 +100,7 @@ export function createEffectBindGroupLayout(
   device: GpuDevice,
 ): GpuBindGroupLayout {
   return device.createBindGroupLayout({
-    label: "four:effect-uniforms",
+    label: "fourJS:effect-uniforms",
     entries: [
       {
         binding: 0,

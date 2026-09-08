@@ -87,7 +87,7 @@ describe("readTexturePixels", () => {
       size: number;
       usage: number;
     };
-    expect(allocation.label).toBe("four:readback");
+    expect(allocation.label).toBe("fourJS:readback");
     expect(allocation.size).toBe(512);
     expect(allocation.usage).toBe(
       GPU_BUFFER_USAGE.COPY_DST | GPU_BUFFER_USAGE.MAP_READ,
@@ -173,7 +173,7 @@ describe("WebgpuRenderer.readPixels", () => {
         .callsOf("device.createTexture")
         .filter((call) =>
           String((call.args[0] as { label?: string }).label).startsWith(
-            "four:render-target:",
+            "fourJS:render-target:",
           ),
         ),
     ).toHaveLength(1);

@@ -99,7 +99,7 @@ describe("WgpuParticleSimulation creation (§36, §83)", () => {
     // compute trio, because the draw binds this allocation as the instance
     // position stream (module header).
     expect(creates[0]).toEqual({
-      label: "four:particle-sim:node-1:positions",
+      label: "fourJS:particle-sim:node-1:positions",
       size: 10 * PARTICLE_SIMULATION_VECTOR_BYTES,
       usage:
         GPU_BUFFER_USAGE.STORAGE |
@@ -107,16 +107,16 @@ describe("WgpuParticleSimulation creation (§36, §83)", () => {
         GPU_BUFFER_USAGE.COPY_DST |
         GPU_BUFFER_USAGE.COPY_SRC,
     });
-    expect(creates[1]?.label).toBe("four:particle-sim:node-1:velocities");
+    expect(creates[1]?.label).toBe("fourJS:particle-sim:node-1:velocities");
     expect(creates[1]?.usage).toBe(
       GPU_BUFFER_USAGE.STORAGE |
         GPU_BUFFER_USAGE.COPY_DST |
         GPU_BUFFER_USAGE.COPY_SRC,
     );
-    expect(creates[2]?.label).toBe("four:particle-sim:node-1:params");
+    expect(creates[2]?.label).toBe("fourJS:particle-sim:node-1:params");
     expect(creates[2]?.size).toBe(64);
     expect(creates[3]).toEqual({
-      label: "four:particle-sim:node-1:scratch",
+      label: "fourJS:particle-sim:node-1:scratch",
       size: PARTICLE_SIMULATION_SCRATCH_BYTES,
       usage: GPU_BUFFER_USAGE.COPY_SRC | GPU_BUFFER_USAGE.COPY_DST,
     });

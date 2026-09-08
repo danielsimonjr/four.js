@@ -13,9 +13,9 @@ import { describe, expect, it } from "vitest";
 import { SOLVER_REGISTRY, SolverRegistry } from "../src/index.js";
 
 describe("SOLVER_REGISTRY", () => {
-  it("is the four:solver-registry token, not revocable (RFC 0002 Q3)", () => {
+  it("is the fourJS:solver-registry token, not revocable (RFC 0002 Q3)", () => {
     expect(SOLVER_REGISTRY).toEqual({
-      name: "four:solver-registry",
+      name: "fourJS:solver-registry",
       revocable: false,
     });
   });

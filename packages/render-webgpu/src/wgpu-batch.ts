@@ -346,7 +346,7 @@ export class WgpuBatching implements WgpuRenderBatching {
     index: number,
   ): GpuBuffer {
     return device.createBuffer({
-      label: `four:batch-vertices:${String(index)}`,
+      label: `fourJS:batch-vertices:${String(index)}`,
       size: batch.vertices.length * FLOAT_BYTES,
       usage: GPU_BUFFER_USAGE.VERTEX | GPU_BUFFER_USAGE.COPY_DST,
     });
@@ -358,7 +358,7 @@ export class WgpuBatching implements WgpuRenderBatching {
     index: number,
   ): GpuBuffer {
     return device.createBuffer({
-      label: `four:batch-indices:${String(index)}`,
+      label: `fourJS:batch-indices:${String(index)}`,
       size: batch.indices.length * FLOAT_BYTES,
       usage: GPU_BUFFER_USAGE.INDEX | GPU_BUFFER_USAGE.COPY_DST,
     });

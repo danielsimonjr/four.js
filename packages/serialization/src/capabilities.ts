@@ -44,7 +44,7 @@ import type { ComponentSerializerRegistry } from "./serializer.js";
  */
 export const COMPONENT_SERIALIZERS =
   /* @__PURE__ */ defineCapability<ComponentSerializerRegistry>(
-    "four:component-serializers",
+    "fourJS:component-serializers",
   );
 
 /**
@@ -54,5 +54,5 @@ export const COMPONENT_SERIALIZERS =
  */
 export const SCENE_MIGRATIONS =
   /* @__PURE__ */ defineCapability<SceneMigrationRegistry>(
-    "four:scene-migrations",
+    "fourJS:scene-migrations",
   );

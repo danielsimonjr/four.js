@@ -94,7 +94,7 @@ describe("createComputeBuffer (§82, §83)", () => {
     expect(buffer.byteLength).toBe(64);
     expect(buffer.disposed).toBe(false);
     expect(gpu.callsOf("device.createBuffer")[0]?.args[0]).toEqual({
-      label: "four:compute-buffer",
+      label: "fourJS:compute-buffer",
       size: 64,
       usage:
         GPU_BUFFER_USAGE.STORAGE |
@@ -108,7 +108,7 @@ describe("createComputeBuffer (§82, §83)", () => {
     const gpu = createRecordingGpu();
     const data = new Float32Array([1, 2, 3]);
     const buffer = createComputeBuffer(gpu.device as GpuDevice, {
-      label: "four:test-positions",
+      label: "fourJS:test-positions",
       data,
     });
 
@@ -116,7 +116,7 @@ describe("createComputeBuffer (§82, §83)", () => {
     expect(
       (gpu.callsOf("device.createBuffer")[0]?.args[0] as { label: string })
         .label,
-    ).toBe("four:test-positions");
+    ).toBe("fourJS:test-positions");
     expect(gpu.callsOf("queue.writeBuffer")[0]?.args[2]).toEqual([1, 2, 3]);
   });
 
@@ -213,7 +213,7 @@ describe("WgpuComputeCache.dispatch (§82)", () => {
     // The layout: one COMPUTE-visible storage entry per binding, read-only
     // where the descriptor says so.
     expect(gpu.callsOf("device.createBindGroupLayout")[0]?.args[0]).toEqual({
-      label: "four:compute:rw",
+      label: "fourJS:compute:rw",
       entries: [
         {
           binding: 0,
@@ -447,7 +447,7 @@ describe("readComputeBufferBytes (§82)", () => {
       Array.from({ length: 16 }, (_, index) => index % 251),
     );
     expect(gpu.callsOf("device.createBuffer")[0]?.args[0]).toEqual({
-      label: "four:compute-readback",
+      label: "fourJS:compute-readback",
       size: 16,
       usage: GPU_BUFFER_USAGE.COPY_DST | GPU_BUFFER_USAGE.MAP_READ,
     });

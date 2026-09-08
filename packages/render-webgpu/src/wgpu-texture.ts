@@ -586,7 +586,7 @@ export class WgpuTextureCache {
       return existing;
     }
     const sampler = this.#device.createSampler({
-      label: `four:sampler:${key}`,
+      label: `fourJS:sampler:${key}`,
       addressModeU: state.addressMode,
       addressModeV: state.addressMode,
       magFilter: state.magFilter,
@@ -634,7 +634,7 @@ export class WgpuTextureCache {
     // one-level texture is neither, and asks for neither.
     const generate = levels > 1 && data !== null;
     const handle = device.createTexture({
-      label: `four:texture:${texture.id}`,
+      label: `fourJS:texture:${texture.id}`,
       size: [width, height],
       format,
       usage:
@@ -667,7 +667,7 @@ export class WgpuTextureCache {
       view,
       sampler,
       bindGroup: device.createBindGroup({
-        label: `four:map:${texture.id}`,
+        label: `fourJS:map:${texture.id}`,
         layout: this.bindGroupLayout,
         entries: [
           { binding: MAP_TEXTURE_BINDING, resource: view },
@@ -699,24 +699,24 @@ export class WgpuTextureCache {
     const device = this.#device;
     const pipeline = this.#mipPipeline(format);
     const sampler = this.#mipBlitSampler();
-    const encoder = device.createCommandEncoder({ label: "four:mipmaps" });
+    const encoder = device.createCommandEncoder({ label: "fourJS:mipmaps" });
     let levelWidth = width;
     let levelHeight = height;
     for (let level = 1; level < levels; level += 1) {
       levelWidth = Math.max(1, levelWidth >> 1);
       levelHeight = Math.max(1, levelHeight >> 1);
       const source = texture.createView({
-        label: `four:mip-source:${String(level - 1)}`,
+        label: `fourJS:mip-source:${String(level - 1)}`,
         baseMipLevel: level - 1,
         mipLevelCount: 1,
       });
       const destination = texture.createView({
-        label: `four:mip-target:${String(level)}`,
+        label: `fourJS:mip-target:${String(level)}`,
         baseMipLevel: level,
         mipLevelCount: 1,
       });
       const pass = encoder.beginRenderPass({
-        label: `four:mipmap:${String(level)}`,
+        label: `fourJS:mipmap:${String(level)}`,
         colorAttachments: [
           {
             view: destination,
@@ -734,7 +734,7 @@ export class WgpuTextureCache {
       pass.setBindGroup(
         0,
         this.#device.createBindGroup({
-          label: `four:mip-bind:${String(level)}`,
+          label: `fourJS:mip-bind:${String(level)}`,
           layout: this.bindGroupLayout,
           entries: [
             { binding: MAP_TEXTURE_BINDING, resource: source },
@@ -751,7 +751,7 @@ export class WgpuTextureCache {
   /** The blit's sampler: linear, clamped, mip-free — created on first use. */
   #mipBlitSampler(): GpuSampler {
     this.#mipSampler ??= this.#device.createSampler({
-      label: "four:mipmap-sampler",
+      label: "fourJS:mipmap-sampler",
       addressModeU: "clamp-to-edge",
       addressModeV: "clamp-to-edge",
       magFilter: "linear",
@@ -771,7 +771,7 @@ export class WgpuTextureCache {
     }
     const device = this.#device;
     this.#mipPipelineLayout ??= device.createPipelineLayout({
-      label: "four:mipmap-layout",
+      label: "fourJS:mipmap-layout",
       bindGroupLayouts: [this.bindGroupLayout],
     });
     // One module for every format: the WGSL names no format — the render
@@ -779,12 +779,12 @@ export class WgpuTextureCache {
     // *pipeline* but never a second module (`wgpu-pipeline-cache.ts`'s
     // module-under-pipeline split, restated for a two-entry cache).
     this.#mipModule ??= device.createShaderModule({
-      label: "four:mipmap",
+      label: "fourJS:mipmap",
       code: MIPMAP_SHADER_SOURCE,
     });
     const module = this.#mipModule;
     const pipeline = device.createRenderPipeline({
-      label: `four:mipmap:${format}`,
+      label: `fourJS:mipmap:${format}`,
       layout: this.#mipPipelineLayout,
       vertex: { module, entryPoint: VERTEX_ENTRY_POINT, buffers: [] },
       fragment: {

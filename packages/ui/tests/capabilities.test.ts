@@ -17,9 +17,9 @@ import {
 class Probe extends UIWidget {}
 
 describe("UI_CONTROLS", () => {
-  it("is the four:ui-controls token, not revocable (RFC 0002 Q3)", () => {
+  it("is the fourJS:ui-controls token, not revocable (RFC 0002 Q3)", () => {
     expect(UI_CONTROLS).toEqual({
-      name: "four:ui-controls",
+      name: "fourJS:ui-controls",
       revocable: false,
     });
   });

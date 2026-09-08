@@ -12,9 +12,9 @@ const translate = () => ({ id: "translate" });
 const rotate = () => ({ id: "rotate" });
 
 describe("EDITOR_TOOLS", () => {
-  it("is the four:editor-tools token, not revocable, and host-side", () => {
+  it("is the fourJS:editor-tools token, not revocable, and host-side", () => {
     expect(EDITOR_TOOLS).toEqual({
-      name: "four:editor-tools",
+      name: "fourJS:editor-tools",
       revocable: false,
     });
   });

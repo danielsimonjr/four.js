@@ -49,6 +49,6 @@ import type { SystemRegistry } from "./systems.js";
  * registry is `app.systems`, which the application owns outright.
  */
 export const SIMULATION_SYSTEMS =
-  /* @__PURE__ */ defineCapability<SystemRegistry>("four:simulation-systems", {
+  /* @__PURE__ */ defineCapability<SystemRegistry>("fourJS:simulation-systems", {
     revocable: true,
   });

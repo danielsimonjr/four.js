@@ -129,7 +129,7 @@ export interface FourPlugin {
  * gaining an edge to it, and what makes a sixth capability additive.
  */
 export interface PluginCapability<T> {
-  /** The capability's identity, e.g. `"four:renderer-registry"`. */
+  /** The capability's identity, e.g. `"fourJS:renderer-registry"`. */
   readonly name: string;
   /**
    * Whether a plugin that acquired this capability can still be uninstalled
@@ -164,7 +164,7 @@ export interface DefineCapabilityOptions {
  *
  * ```ts
  * export const SOLVER_REGISTRY = defineCapability<SolverRegistry>(
- *   "four:solver-registry",
+ *   "fourJS:solver-registry",
  * );
  * ```
  */

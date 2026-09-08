@@ -163,7 +163,7 @@ describe("WebGPU particles — the real @fourjs/particles node (§36, WP-R1.8)",
     const particleGroups = gpu
       .callsOf("device.createBindGroup")
       .map((call) => call.args[0] as { label?: string; entries: unknown[] })
-      .filter((descriptor) => descriptor.label === "four:particle-uniforms");
+      .filter((descriptor) => descriptor.label === "fourJS:particle-uniforms");
     expect(particleGroups).toHaveLength(1);
     expect(
       (particleGroups[0]?.entries[0] as { resource: { size?: number } })

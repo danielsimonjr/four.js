@@ -177,7 +177,7 @@ describe("a plugin registering through §81's capability grants", () => {
     expect(isFourError(thrown) && thrown.code).toBe(
       "INVALID_APPLICATION_STATE",
     );
-    expect((thrown as Error).message).toContain("four:component-serializers");
+    expect((thrown as Error).message).toContain("fourJS:component-serializers");
     // Still installed, and the serializer still registered: the refusal happens
     // *instead of* a half-removal. `ComponentSerializerRegistry` has no removal
     // at all — deliberately, so a document's shape cannot depend on evaluation

@@ -164,7 +164,7 @@ describe("the WebGPU node pipeline, end to end (§60, §62; WP-R1.9)", () => {
       .map((call) => (call.args[0] as { label?: string }).label);
     // The node module compiles during the frame's pre-pass sizing, before
     // the clear draw's — beginFrame is where first-sight compilation lives.
-    expect(labels).toEqual(["four:node:surface", "four:clear"]);
+    expect(labels).toEqual(["fourJS:node:surface", "fourJS:clear"]);
     expect(rig.recording.countOf("pass.drawIndexed")).toBe(3);
 
     // The next frame compiles nothing further.

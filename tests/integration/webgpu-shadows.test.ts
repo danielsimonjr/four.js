@@ -181,7 +181,7 @@ describe("WP-R1.7 — a non-casting scene is byte-identical (claim 1)", () => {
     const toggledOff = await render(true);
     expect(toggledOff).toEqual(untouched);
     const tape = untouched.join("\n");
-    expect(tape).not.toContain("four:shadow");
+    expect(tape).not.toContain("fourJS:shadow");
     expect(tape).not.toContain("sampler_comparison");
     expect(tape).not.toContain("depth32float");
   });
@@ -197,7 +197,7 @@ describe("WP-R1.7 — a casting light renders a map and samples it (claims 2–4
     rig.renderer.render(rig.scene, rig.views);
 
     // One shadow pass before the views pass.
-    expect(passLabels(rig.gpu)).toEqual(["four:shadow", "four:views"]);
+    expect(passLabels(rig.gpu)).toEqual(["fourJS:shadow", "fourJS:views"]);
 
     // The map is the R1.6 samplable row: depth32float, TEXTURE_BINDING.
     const depthAllocation = rig.gpu
@@ -207,7 +207,7 @@ describe("WP-R1.7 — a casting light renders a map and samples it (claims 2–4
           call.args[0] as { label?: string; format?: string; size?: number[] },
       )
       .find((descriptor) =>
-        String(descriptor.label).startsWith("four:render-target-depth:"),
+        String(descriptor.label).startsWith("fourJS:render-target-depth:"),
       );
     expect(depthAllocation?.format).toBe("depth32float");
     expect(depthAllocation?.size).toEqual([512, 512]);
@@ -215,12 +215,12 @@ describe("WP-R1.7 — a casting light renders a map and samples it (claims 2–4
     // The receivers compile the shadowed variant, whose module carries the
     // distinct binding types GL has no analogue for.
     expect(moduleLabels(rig.gpu)).toEqual(
-      expect.arrayContaining(["four:shadow", "four:lit|n|sh"]),
+      expect.arrayContaining(["fourJS:shadow", "fourJS:lit|n|sh"]),
     );
     const shadowedModule = rig.gpu
       .callsOf("device.createShaderModule")
       .map((call) => call.args[0] as { label?: string; code?: string })
-      .find((descriptor) => descriptor.label === "four:lit|n|sh");
+      .find((descriptor) => descriptor.label === "fourJS:lit|n|sh");
     expect(shadowedModule?.code).toContain("texture_depth_2d");
     expect(shadowedModule?.code).toContain("sampler_comparison");
     expect(shadowedModule?.code).toContain("textureSampleCompareLevel");
@@ -277,7 +277,7 @@ describe("WP-R1.7 — a casting light renders a map and samples it (claims 2–4
     expect(labels.some((label) => label.endsWith("|n:y|sh:y"))).toBe(true);
     expect(
       labels.some(
-        (label) => label.startsWith("four:lit") && label.endsWith("|n:y"),
+        (label) => label.startsWith("fourJS:lit") && label.endsWith("|n:y"),
       ),
     ).toBe(true);
   });

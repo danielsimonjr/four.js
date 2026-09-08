@@ -127,7 +127,7 @@ describe("the light uniform layout (wgpu-lights.ts)", () => {
     const { device: gpuDevice, gpu } = device();
     createLightsBindGroupLayout(gpuDevice);
     expect(gpu.callsOf("device.createBindGroupLayout")[0]?.args[0]).toEqual({
-      label: "four:lights",
+      label: "fourJS:lights",
       entries: [
         {
           binding: 0,
@@ -305,7 +305,7 @@ describe("WgpuPipelineCache — the shaded families", () => {
     const { device: gpuDevice, gpu } = device();
     createStandardBindGroupLayout(gpuDevice);
     expect(gpu.callsOf("device.createBindGroupLayout")[0]?.args[0]).toEqual({
-      label: "four:standard-uniforms",
+      label: "fourJS:standard-uniforms",
       entries: [
         {
           binding: 0,
@@ -336,7 +336,7 @@ describe("WgpuPipelineCache — the shaded families", () => {
       gpu
         .callsOf("device.createShaderModule")
         .map((call) => (call.args[0] as { label?: string }).label),
-    ).toEqual(["four:lit|n", "four:lit", "four:lit|n|map", "four:standard|n"]);
+    ).toEqual(["fourJS:lit|n", "fourJS:lit", "fourJS:lit|n|map", "fourJS:standard|n"]);
   });
 
   it("composes each family's pipeline layout once and caches it", () => {
@@ -355,10 +355,10 @@ describe("WgpuPipelineCache — the shaded families", () => {
         .callsOf("device.createPipelineLayout")
         .map((call) => (call.args[0] as { label?: string }).label),
     ).toEqual([
-      "four:pipeline-layout:lit",
-      "four:pipeline-layout:lit:map",
-      "four:pipeline-layout:standard",
-      "four:pipeline-layout:standard:map",
+      "fourJS:pipeline-layout:lit",
+      "fourJS:pipeline-layout:lit:map",
+      "fourJS:pipeline-layout:standard",
+      "fourJS:pipeline-layout:standard:map",
     ]);
   });
 
@@ -453,15 +453,15 @@ describe("WgpuGeometryCache — the normal stream (WP-R1.5)", () => {
       gpu
         .callsOf("device.createBuffer")
         .map((call) => String((call.args[0] as { label?: string }).label));
-    expect(labels().some((label) => label.startsWith("four:normals:"))).toBe(
+    expect(labels().some((label) => label.startsWith("fourJS:normals:"))).toBe(
       false,
     );
 
     const shaded = cache.acquire(normalGeometry(true), true);
     expect(shaded?.normalBuffer).not.toBeNull();
     // GL's allocation order: positions → normals → (uvs → colours → indices).
-    expect(labels().slice(-2)[0]).toContain("four:positions:");
-    expect(labels().slice(-1)[0]).toContain("four:normals:");
+    expect(labels().slice(-2)[0]).toContain("fourJS:positions:");
+    expect(labels().slice(-1)[0]).toContain("fourJS:normals:");
   });
 
   it("upgrades a record in place when its first shaded draw arrives", () => {

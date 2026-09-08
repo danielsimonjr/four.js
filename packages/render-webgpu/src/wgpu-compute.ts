@@ -200,7 +200,7 @@ export function createComputeBuffer(
     );
   }
   const buffer = device.createBuffer({
-    label: options.label ?? "four:compute-buffer",
+    label: options.label ?? "fourJS:compute-buffer",
     size,
     usage:
       GPU_BUFFER_USAGE.STORAGE |
@@ -272,13 +272,13 @@ export async function readComputeBufferBytes(
     });
   }
   const encoder = device.createCommandEncoder({
-    label: "four:compute-readback",
+    label: "fourJS:compute-readback",
   });
   if (encoder.copyBufferToBuffer === undefined) {
     return null;
   }
   const staging = device.createBuffer({
-    label: "four:compute-readback",
+    label: "fourJS:compute-readback",
     size: buffer.byteLength,
     usage: GPU_BUFFER_USAGE.COPY_DST | GPU_BUFFER_USAGE.MAP_READ,
   });
@@ -426,12 +426,12 @@ export class WgpuComputeCache {
       pass.shader,
     );
 
-    const encoder = device.createCommandEncoder({ label: "four:compute" });
+    const encoder = device.createCommandEncoder({ label: "fourJS:compute" });
     if (encoder.beginComputePass === undefined) {
       return false;
     }
     const computePass = encoder.beginComputePass({
-      label: `four:compute:${pass.label ?? "pass"}`,
+      label: `fourJS:compute:${pass.label ?? "pass"}`,
     });
     computePass.setPipeline(pipeline);
     // `null` exactly for a binding-less kernel — the layout and the bindings
@@ -440,7 +440,7 @@ export class WgpuComputeCache {
       computePass.setBindGroup(
         0,
         device.createBindGroup({
-          label: `four:compute:${pass.label ?? "pass"}`,
+          label: `fourJS:compute:${pass.label ?? "pass"}`,
           layout: bindGroupLayout,
           entries: bindings.map((binding, index) => ({
             binding: index,
@@ -491,13 +491,13 @@ export class WgpuComputeCache {
     let module = this.#modules.get(source);
     if (module === undefined) {
       module = this.#device.createShaderModule({
-        label: "four:compute",
+        label: "fourJS:compute",
         code: source,
       });
       this.#modules.set(source, module);
     }
     const pipeline = createComputePipeline({
-      label: `four:compute:${entryPoint}`,
+      label: `fourJS:compute:${entryPoint}`,
       layout: this.#acquirePipelineLayout(pattern),
       compute: { module, entryPoint },
     });
@@ -521,7 +521,7 @@ export class WgpuComputeCache {
       return existing;
     }
     const layout = this.#device.createBindGroupLayout({
-      label: `four:compute:${pattern}`,
+      label: `fourJS:compute:${pattern}`,
       entries: [...pattern].map((access, index) => ({
         binding: index,
         visibility: GPU_SHADER_STAGE.COMPUTE,
@@ -545,7 +545,7 @@ export class WgpuComputeCache {
     }
     const layout = this.#acquireBindGroupLayout(pattern);
     const pipelineLayout = this.#device.createPipelineLayout({
-      label: `four:compute:${pattern}`,
+      label: `fourJS:compute:${pattern}`,
       bindGroupLayouts: layout === null ? [] : [layout],
     });
     this.#pipelineLayouts.set(pattern, pipelineLayout);

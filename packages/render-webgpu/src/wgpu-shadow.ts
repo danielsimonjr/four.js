@@ -164,7 +164,7 @@ export function createShadowLightsBindGroupLayout(
   device: GpuDevice,
 ): GpuBindGroupLayout {
   return device.createBindGroupLayout({
-    label: "four:shadow-lights",
+    label: "fourJS:shadow-lights",
     entries: [
       {
         binding: 0,
@@ -198,7 +198,7 @@ export function createShadowLightsBindGroupLayout(
  */
 export function createShadowSampler(device: GpuDevice): GpuSampler {
   return device.createSampler({
-    label: "four:shadow-sampler",
+    label: "fourJS:shadow-sampler",
     addressModeU: "clamp-to-edge",
     addressModeV: "clamp-to-edge",
     magFilter: "nearest",

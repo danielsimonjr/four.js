@@ -328,7 +328,7 @@ export const BONE_NODE_TYPE = "scene:bone";
  * The document `type` a {@link Text} serializes as (§49, §56; R-28,
  * 2026-08-13).
  *
- * `render:text`, not `four:text`, and the prefix rule above says why: it is a
+ * `render:text`, not `fourJS:text`, and the prefix rule above says why: it is a
  * namespace, not an import path. §49 puts `Text` in the drawing family beside
  * `Sprite`; the class lives in this package only because the frozen §3.1 matrix
  * forbids `@fourjs/render` from importing `@fourjs/text` (see `text-node.ts`), and

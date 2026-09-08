@@ -114,7 +114,7 @@ describe("WebGPU render-to-texture, composed from the real packages", () => {
         .callsOf("device.createTexture")
         .filter((call) =>
           String((call.args[0] as { label?: string }).label).startsWith(
-            "four:render-target:",
+            "fourJS:render-target:",
           ),
         ),
     ).toHaveLength(1);
@@ -123,7 +123,7 @@ describe("WebGPU render-to-texture, composed from the real packages", () => {
         .callsOf("device.createBindGroup")
         .filter((call) =>
           String((call.args[0] as { label?: string }).label).startsWith(
-            "four:render-target-map:",
+            "fourJS:render-target-map:",
           ),
         ),
     ).toHaveLength(1);
@@ -202,7 +202,7 @@ describe("WebGPU render-to-texture, composed from the real packages", () => {
         (call) =>
           call.name === "encoder.beginRenderPass" &&
           String((call.args[0] as { label?: string }).label).startsWith(
-            "four:effect",
+            "fourJS:effect",
           ),
       ),
     ).toHaveLength(0);

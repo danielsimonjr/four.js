@@ -123,7 +123,7 @@ export function createParticleBindGroupLayout(
   device: GpuDevice,
 ): GpuBindGroupLayout {
   return device.createBindGroupLayout({
-    label: "four:particle-uniforms",
+    label: "fourJS:particle-uniforms",
     entries: [
       {
         binding: 0,
@@ -492,7 +492,7 @@ export class WgpuParticleCache {
     }
 
     const buffer = this.#device.createBuffer({
-      label: `four:particles:${item.id}`,
+      label: `fourJS:particles:${item.id}`,
       size: capacityFloats * Float32Array.BYTES_PER_ELEMENT,
       usage: GPU_BUFFER_USAGE.VERTEX | GPU_BUFFER_USAGE.COPY_DST,
     });

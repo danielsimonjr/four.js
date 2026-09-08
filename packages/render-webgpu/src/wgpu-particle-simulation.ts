@@ -192,7 +192,7 @@ export class WgpuParticleSimulation {
     // encoder is recorded nowhere and dropped, and the refusal names itself
     // where the simulation is authored (§85).
     const probe = device.createCommandEncoder({
-      label: "four:particle-sim:probe",
+      label: "fourJS:particle-sim:probe",
     });
     if (probe.copyBufferToBuffer === undefined) {
       unsupported(
@@ -205,7 +205,7 @@ export class WgpuParticleSimulation {
     this.#compute = compute;
     this.systemId = options.systemId;
     this.capacity = options.capacity;
-    this.#label = options.label ?? `four:particle-sim:${options.systemId}`;
+    this.#label = options.label ?? `fourJS:particle-sim:${options.systemId}`;
     this.#onDispose = onDispose;
 
     const laneBytes = options.capacity * PARTICLE_SIMULATION_VECTOR_BYTES;

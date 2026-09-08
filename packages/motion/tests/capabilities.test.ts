@@ -13,9 +13,9 @@ import { describe, expect, it } from "vitest";
 import { SIMULATION_SYSTEMS, SystemRegistry } from "../src/index.js";
 
 describe("SIMULATION_SYSTEMS", () => {
-  it("is the four:simulation-systems token, revocable (RFC 0002 Q3)", () => {
+  it("is the fourJS:simulation-systems token, revocable (RFC 0002 Q3)", () => {
     expect(SIMULATION_SYSTEMS).toEqual({
-      name: "four:simulation-systems",
+      name: "fourJS:simulation-systems",
       revocable: true,
     });
   });

@@ -494,7 +494,7 @@ function nodeTextureGroups(gpu: RecordingGpu): number {
     .callsOf("device.createBindGroup")
     .filter(
       (call) =>
-        (call.args[0] as { label?: string }).label === "four:node-textures",
+        (call.args[0] as { label?: string }).label === "fourJS:node-textures",
     ).length;
 }
 

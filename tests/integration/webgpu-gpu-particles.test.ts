@@ -338,7 +338,7 @@ describe("the Q3 promotion across the backends (§82)", () => {
             }[];
           },
       )
-      .find((descriptor) => descriptor.label === "four:compute:named");
+      .find((descriptor) => descriptor.label === "fourJS:compute:named");
     expect(group?.entries.map((entry) => entry.binding)).toEqual([0, 1, 2]);
     expect(group?.entries[0]?.resource.buffer).toBe(parameters.buffer);
     expect(group?.entries[1]?.resource.buffer).toBe(positions.buffer);
@@ -346,8 +346,8 @@ describe("the Q3 promotion across the backends (§82)", () => {
     const layout = gpu
       .callsOf("device.createBindGroupLayout")
       .map((call) => call.args[0] as { label?: string })
-      .find((descriptor) => descriptor.label?.startsWith("four:compute:"));
-    expect(layout?.label).toBe("four:compute:rww");
+      .find((descriptor) => descriptor.label?.startsWith("fourJS:compute:"));
+    expect(layout?.label).toBe("fourJS:compute:rww");
     renderer.dispose();
     parameters.dispose();
     positions.dispose();

@@ -22,17 +22,17 @@ import {
 } from "../src/index.js";
 
 describe("render capability tokens", () => {
-  it("are the four:renderer-registry, four:render-graph, and four:compute-workloads tokens, not revocable (RFC 0002 Q3)", () => {
+  it("are the fourJS:renderer-registry, fourJS:render-graph, and fourJS:compute-workloads tokens, not revocable (RFC 0002 Q3)", () => {
     expect(RENDERER_REGISTRY).toEqual({
-      name: "four:renderer-registry",
+      name: "fourJS:renderer-registry",
       revocable: false,
     });
     expect(RENDER_GRAPH).toEqual({
-      name: "four:render-graph",
+      name: "fourJS:render-graph",
       revocable: false,
     });
     expect(COMPUTE_WORKLOADS).toEqual({
-      name: "four:compute-workloads",
+      name: "fourJS:compute-workloads",
       revocable: false,
     });
   });

@@ -1276,7 +1276,7 @@ export class WebgpuRenderer implements Renderer {
     const gpuTimer =
       this.#gpuTimer !== null && this.#gpuTimer.armed ? this.#gpuTimer : null;
     const timestampWrites = gpuTimer?.beginPass(device);
-    const encoder = device.createCommandEncoder({ label: "four:frame" });
+    const encoder = device.createCommandEncoder({ label: "fourJS:frame" });
     let block = 0;
 
     // §69's shadow map (WP-R1.7), recorded **before** the views pass — §63's
@@ -1321,7 +1321,7 @@ export class WebgpuRenderer implements Renderer {
         : null;
 
     const pass = encoder.beginRenderPass({
-      label: "four:views",
+      label: "fourJS:views",
       colorAttachments: [
         {
           view: colorView,
@@ -2221,9 +2221,9 @@ export class WebgpuRenderer implements Renderer {
       destinationRecord === null
         ? context.getCurrentTexture().createView()
         : destinationRecord.colorView;
-    const encoder = device.createCommandEncoder({ label: "four:effect" });
+    const encoder = device.createCommandEncoder({ label: "fourJS:effect" });
     const renderPass = encoder.beginRenderPass({
-      label: `four:effect:${kind}`,
+      label: `fourJS:effect:${kind}`,
       // "load", not "clear": an effect replaces every covered texel with its
       // own fragment, so there is nothing to clear — and §70's contract is
       // that it *replaces* what the destination held, never composites.
@@ -2582,7 +2582,7 @@ export class WebgpuRenderer implements Renderer {
   /** The grade's 16-byte uniform buffer, created by the first grade. */
   #acquireEffectBuffer(device: GpuDevice): GpuBuffer {
     this.#effectBuffer ??= device.createBuffer({
-      label: "four:effect-uniforms",
+      label: "fourJS:effect-uniforms",
       size: EFFECT_UNIFORM_BYTES,
       usage: GPU_BUFFER_USAGE.UNIFORM | GPU_BUFFER_USAGE.COPY_DST,
     });
@@ -2603,7 +2603,7 @@ export class WebgpuRenderer implements Renderer {
    */
   #acquireEffectBindGroup(device: GpuDevice): GpuBindGroup {
     this.#effectBindGroup ??= device.createBindGroup({
-      label: "four:effect-uniforms",
+      label: "fourJS:effect-uniforms",
       layout: this.#acquireEffectLayout(device),
       entries: [
         {
@@ -3015,7 +3015,7 @@ export class WebgpuRenderer implements Renderer {
     buffer: GpuBuffer,
   ): GpuBindGroup {
     this.#particleBindGroup ??= device.createBindGroup({
-      label: "four:particle-uniforms",
+      label: "fourJS:particle-uniforms",
       layout: this.#acquireParticleLayout(device),
       entries: [
         {
@@ -3160,7 +3160,7 @@ export class WebgpuRenderer implements Renderer {
    */
   #acquireSpriteBindGroup(device: GpuDevice, buffer: GpuBuffer): GpuBindGroup {
     this.#spriteBindGroup ??= device.createBindGroup({
-      label: "four:sprite-uniforms",
+      label: "fourJS:sprite-uniforms",
       layout: this.#acquireSpriteLayout(device),
       entries: [
         {
@@ -3194,7 +3194,7 @@ export class WebgpuRenderer implements Renderer {
     buffer: GpuBuffer,
   ): GpuBindGroup {
     this.#standardBindGroup ??= device.createBindGroup({
-      label: "four:standard-uniforms",
+      label: "fourJS:standard-uniforms",
       layout: this.#acquireStandardLayout(device),
       entries: [
         {
@@ -3232,7 +3232,7 @@ export class WebgpuRenderer implements Renderer {
     }
     this.#shadowSampler ??= createShadowSampler(device);
     this.#shadowBindGroup = device.createBindGroup({
-      label: "four:shadow-lights",
+      label: "fourJS:shadow-lights",
       layout: this.#acquireShadowLightsLayout(device),
       entries: [
         {
@@ -3310,7 +3310,7 @@ export class WebgpuRenderer implements Renderer {
     }
 
     const pass = encoder.beginRenderPass({
-      label: "four:shadow",
+      label: "fourJS:shadow",
       colorAttachments: [
         { view: record.colorView, loadOp: "load", storeOp: "store" },
       ],
@@ -3433,7 +3433,7 @@ export class WebgpuRenderer implements Renderer {
     const capacity = Math.max(blocks, this.#lightsCapacity * 2, 4);
     this.#lightsBuffer?.destroy();
     const buffer = device.createBuffer({
-      label: "four:lights",
+      label: "fourJS:lights",
       size: capacity * LIGHT_UNIFORM_STRIDE_BYTES,
       usage: GPU_BUFFER_USAGE.UNIFORM | GPU_BUFFER_USAGE.COPY_DST,
     });
@@ -3443,7 +3443,7 @@ export class WebgpuRenderer implements Renderer {
     );
     this.#lightsCapacity = capacity;
     this.#lightsBindGroup = device.createBindGroup({
-      label: "four:lights",
+      label: "fourJS:lights",
       layout: this.#acquireLightsLayout(device),
       entries: [
         {
@@ -3545,7 +3545,7 @@ export class WebgpuRenderer implements Renderer {
     const capacity = Math.max(blocks, this.#uniformCapacity * 2, 16);
     this.#uniformBuffer?.destroy();
     const buffer = device.createBuffer({
-      label: "four:draw-uniforms",
+      label: "fourJS:draw-uniforms",
       size: capacity * UNIFORM_STRIDE_BYTES,
       usage: GPU_BUFFER_USAGE.UNIFORM | GPU_BUFFER_USAGE.COPY_DST,
     });
@@ -3553,7 +3553,7 @@ export class WebgpuRenderer implements Renderer {
     this.#uniformStaging = new Float32Array(capacity * UNIFORM_STRIDE_FLOATS);
     this.#uniformCapacity = capacity;
     this.#bindGroup = device.createBindGroup({
-      label: "four:draw-uniforms",
+      label: "fourJS:draw-uniforms",
       layout,
       entries: [
         {
@@ -3592,7 +3592,7 @@ export class WebgpuRenderer implements Renderer {
     ) {
       this.#depthTexture?.destroy?.();
       this.#depthTexture = device.createTexture({
-        label: "four:depth",
+        label: "fourJS:depth",
         size: [width, height],
         format,
         usage: GPU_TEXTURE_USAGE.RENDER_ATTACHMENT,

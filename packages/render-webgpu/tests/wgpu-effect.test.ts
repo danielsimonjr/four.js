@@ -187,7 +187,7 @@ describe("WebgpuRenderer.renderEffect", () => {
       colorAttachments: { loadOp: string }[];
       depthStencilAttachment?: unknown;
     };
-    expect(descriptor.label).toBe("four:effect:copy");
+    expect(descriptor.label).toBe("fourJS:effect:copy");
     expect(descriptor.colorAttachments[0]?.loadOp).toBe("load");
     expect(descriptor.depthStencilAttachment).toBeUndefined();
     // The swap-chain pipeline bakes the swap-chain format.
@@ -236,7 +236,7 @@ describe("WebgpuRenderer.renderEffect", () => {
         .callsOf("device.createShaderModule")
         .filter(
           (call) =>
-            (call.args[0] as { label: string }).label === "four:effect|copy",
+            (call.args[0] as { label: string }).label === "fourJS:effect|copy",
         ),
     ).toHaveLength(1);
     // The off-screen copy attached the destination's view, not a swap chain.
@@ -261,7 +261,7 @@ describe("WebgpuRenderer.renderEffect", () => {
       label: string;
       size: number;
     };
-    expect(allocation.label).toBe("four:effect-uniforms");
+    expect(allocation.label).toBe("fourJS:effect-uniforms");
     expect(allocation.size).toBe(EFFECT_UNIFORM_BYTES);
     // Group 1 bound beside the source's group 0.
     expect(
@@ -296,7 +296,7 @@ describe("WebgpuRenderer.renderEffect", () => {
           label: string;
         }
       ).label,
-    ).toBe("four:effect|output-transform");
+    ).toBe("fourJS:effect|output-transform");
 
     renderer.dispose();
     source.dispose();

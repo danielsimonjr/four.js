@@ -88,7 +88,7 @@ export function createDrawBindGroupLayout(
   device: GpuDevice,
 ): GpuBindGroupLayout {
   return device.createBindGroupLayout({
-    label: "four:draw-uniforms",
+    label: "fourJS:draw-uniforms",
     entries: [
       {
         binding: 0,
@@ -175,7 +175,7 @@ export function createTextureBindGroupLayout(
   device: GpuDevice,
 ): GpuBindGroupLayout {
   return device.createBindGroupLayout({
-    label: "four:map",
+    label: "fourJS:map",
     entries: [
       {
         binding: MAP_TEXTURE_BINDING,

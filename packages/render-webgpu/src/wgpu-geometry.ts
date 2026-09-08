@@ -174,7 +174,7 @@ export class WgpuGeometryCache {
           existing.normalBuffer = this.#uploadBuffer(
             geometry.normals,
             GPU_BUFFER_USAGE.VERTEX,
-            `four:normals:${geometry.id}`,
+            `fourJS:normals:${geometry.id}`,
           );
         }
         return existing;
@@ -220,7 +220,7 @@ export class WgpuGeometryCache {
     const positionBuffer = this.#uploadBuffer(
       geometry.positions,
       GPU_BUFFER_USAGE.VERTEX,
-      `four:positions:${geometry.id}`,
+      `fourJS:positions:${geometry.id}`,
     );
 
     // Allocation order is positions → normals → uvs → colours → indices, the
@@ -234,7 +234,7 @@ export class WgpuGeometryCache {
         : this.#uploadBuffer(
             normalData,
             GPU_BUFFER_USAGE.VERTEX,
-            `four:normals:${geometry.id}`,
+            `fourJS:normals:${geometry.id}`,
           );
 
     const uvs = geometry.uvs;
@@ -244,7 +244,7 @@ export class WgpuGeometryCache {
         : this.#uploadBuffer(
             uvs,
             GPU_BUFFER_USAGE.VERTEX,
-            `four:uvs:${geometry.id}`,
+            `fourJS:uvs:${geometry.id}`,
           );
 
     const colors = geometry.colors;
@@ -254,7 +254,7 @@ export class WgpuGeometryCache {
         : this.#uploadBuffer(
             colors,
             GPU_BUFFER_USAGE.VERTEX,
-            `four:colors:${geometry.id}`,
+            `fourJS:colors:${geometry.id}`,
           );
 
     const indices = geometry.indices;
@@ -264,7 +264,7 @@ export class WgpuGeometryCache {
         : this.#uploadBuffer(
             indices,
             GPU_BUFFER_USAGE.INDEX,
-            `four:indices:${geometry.id}`,
+            `fourJS:indices:${geometry.id}`,
           );
 
     return {
