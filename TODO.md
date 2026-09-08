@@ -61,6 +61,7 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
     The campaign is the real task; the bump falls out of it for free.
   · **Do the coverage work first, then the bump.** Bumping first turns a real quality gap into
     a red build with no owner.
+  · Written up with the rest of the toolchain reasoning in `docs/MIGRATION.md` section 5.
 
 ### 2 · Hours — one contained fix, already diagnosed
 
@@ -964,6 +965,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       · **Still open, but no longer a release gate:** drop `typescript@6.0.3` when TypeDoc and
         typescript-eslint ship TS 7 support. Both are at their latest published versions
         (`typedoc@0.28.20`, `typescript-eslint@8.70.0`) and neither supports it yet.
+      · **Reasoning and evidence now live in `docs/MIGRATION.md`** (2026-09-08), including the
+        exit criteria for every layer and the commands to re-measure. Read it before re-opening
+        this row — the numbers in it expire when the tools move.
 
 - [x] **Open-PR sweep 2026-09-06: Dependabot hygiene + stale branches.** #65
       (rapier 0.20) and #66 (eslint 10 dev-deps) **closed** and ignored in

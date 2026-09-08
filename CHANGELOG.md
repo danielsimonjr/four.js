@@ -51,6 +51,22 @@ The release gate that said *"wait for TypeDoc"* is gone. It was never the compil
 
 ### Added
 
+- **`docs/MIGRATION.md`** — what TypeScript-on-Bun can and cannot do here, and why.
+
+  Written because the question kept being answered from summary rather than from measurement,
+  and because the previous answer in `COMPATIBILITY.md` was wrong in a way that cost real time:
+  it read the TypeDoc peer range as the constraint, which put this library's compiler on another
+  project's release schedule.
+
+  Scores the five layers separately — package manager, type checking, library build, test runner,
+  example bundling — because they are said in one breath but succeed and fail independently. Two
+  are done, one is ours to fix, and two are blocked on other projects.
+
+  Records the root cause once: TypeScript 7 is the Go port, its `"."` export is
+  `lib/version.cjs`, and the compiler API every type-aware tool consumes no longer exists. Shows
+  both resulting failures verbatim rather than describing them, states what is **not** a blocker
+  so nobody re-investigates it, and carries the commands to re-measure every figure — a
+  measurement expires when its instrument changes.
 - **`typecheck:ts6` — a CI gate for the two compilers disagreeing.** It earned itself
   immediately: TS 6.0.3 rejects the `.ts` import extensions in three §93 examples that 5.9 and
   7.0 both accept (`TS5097`). Without the gate the examples would have quietly become
