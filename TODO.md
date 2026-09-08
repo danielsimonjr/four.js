@@ -170,7 +170,12 @@ and only the first is unambiguous.
       beside them were rebuilt and hid it. Restored 2026-09-07. No gate could have caught
       it — nothing compares prose against a brand.
 
-- [ ] **Stage 1b — rebrand the ONE rendered string, which needs a Linux runner.**
+- [x] **Stage 1b — rebrand the ONE rendered string, which needs a Linux runner.** **DONE 2026-09-07.**
+      Unblocked by adding the `Visual goldens` workflow (`f19d70b`): a Linux `workflow_dispatch`
+      job that re-records and UPLOADS the PNGs as an artifact rather than committing them, so a
+      human still confirms the new picture. Label changed in `ed04bd6`, goldens recorded by run
+      34180385893, and only the two ui-demo images differ — `text-label-nearest` came back
+      byte-identical, which is the check that the job re-records nothing it should not.
       `examples/ui-demo`'s title label is drawn on the canvas, so it is pixel-coupled to
       `tests/visual/ui-demo.spec.ts-snapshots/ui-demo-*-visual-linux.png`. Changing it to
       "fourJS" turned CI red (run 34161187665, both §92 visual goldens), and the golden
