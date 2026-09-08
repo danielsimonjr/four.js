@@ -1,4 +1,4 @@
-# four.js - Component Reference
+# fourJS - Component Reference
 
 **Version**: Unreleased (implementation plan complete — Phases 0–11 closed per `MEMORY.md`; §120 MVP at 43/43 shipped-or-MVP after the 2026-08-04 lighting packet)
 **Last Updated**: 2026-08-05
@@ -24,7 +24,7 @@ Companion documents: [ARCHITECTURE.md](./ARCHITECTURE.md) (system design), [OVER
 
 ## Overview
 
-four.js is a Bun workspace of 24 `@four/`-scoped packages (the umbrella is plain `four`), layered strictly by the §3.1 dependency matrix — never add or reverse an edge:
+fourJS is a Bun workspace of 24 `@four/`-scoped packages (the umbrella is plain `four`), layered strictly by the §3.1 dependency matrix — never add or reverse an edge:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐

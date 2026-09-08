@@ -1,4 +1,4 @@
-# four.js - Data Flow Documentation
+# fourJS - Data Flow Documentation
 
 **Version**: Unreleased (implementation plan complete — Phases 0–11 closed per `MEMORY.md`)
 **Last Updated**: 2026-08-05

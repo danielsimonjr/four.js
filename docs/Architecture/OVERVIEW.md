@@ -1,4 +1,4 @@
-# four.js — Project Overview
+# fourJS — Project Overview
 
 _"One scene. Every dimension. Everything moves."_
 
@@ -27,7 +27,7 @@ for UI — five libraries, five scene models, five clocks, five coordinate
 conventions. The glue is where projects bleed: render meshes chasing physics
 bodies a frame late, tweens fighting physics for the same transform,
 milliseconds in one API and seconds in another, and no story for determinism
-or replay. four.js's bet is that **the integration itself is the product**.
+or replay. fourJS's bet is that **the integration itself is the product**.
 The first audience is engineering/simulation web apps and digital twins (which
 need determinism, replay, explicit units, and mixed 2D diagrams + 3D models),
 then interactive-content developers, then games.

@@ -1,4 +1,4 @@
-# four.js — API Reference Map
+# fourJS — API Reference Map
 
 A curated map of the public API, organized by consumer task. For the system
 design behind these surfaces see [ARCHITECTURE.md](ARCHITECTURE.md) and

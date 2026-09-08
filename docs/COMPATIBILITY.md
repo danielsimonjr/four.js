@@ -1,4 +1,4 @@
-# four.js compatibility tables
+# fourJS compatibility tables
 
 §90 requires the project to publish compatibility tables for five things:
 browser support, WebGPU/WebGL feature tiers, physics solver adapters, scene
