@@ -40,11 +40,27 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
   the PRNG timeout (2026-09-07), deliberately not guessed at. Until it is understood, the
   headroom on every slow test in the suite is unknown.
 
-- **vitest is two majors behind: 3.2.7 installed, 5.0.0 latest.** Split out of the
-  TypeScript/vitest row on 2026-09-08, which wrongly implied TypeDoc blocked it — vitest
-  declares **no `typescript` peer**, so it was never blocked by that at all. `@vitest/coverage-v8`
-  is pinned to the same 3.2.7 and must move with it. Not attempted in the TS 7 pass on purpose:
-  a two-major test-runner jump risks the very gates that prove the compiler migration.
+- **vitest 3.2.7 -> 5.0.0: ATTEMPTED 2026-09-08, reverted, and it found something.** Split out
+  of the TypeScript/vitest row, which wrongly implied TypeDoc blocked it — vitest declares **no
+  `typescript` peer**. Both majors were bumped together (`vitest` + `@vitest/coverage-v8`, whose
+  peer is an exact `5.0.0`), which is the split-bump trap avoided.
+  · **The runner half is clean.** All **7,246 tests across 282 files pass** on vitest 5, plus
+    `test:suites`. No API breakage at all.
+  · **What blocks it is the COVERAGE GATE, and the gate was the thing that was wrong.** vitest 5
+    reports lower numbers because its v8 provider remaps accurately; the old numbers were
+    inflated. Proven on one file rather than asserted: `render/src/resource-warnings.ts` reports
+    **100% under vitest 3** and **66.66% statements under vitest 5** — and it contains
+    `if (!DEV) return;` which **no test exercises**, because no test sets `DEV` false. 100% was
+    impossible. vitest 3 was over-reporting; vitest 5 is right.
+  · **So the 95% gate is partly illusory today.** Under honest measurement six thresholds fail:
+    global branches in **physics (92.1%)**, **render-webgl (92.1%)** and **text (94.64%)**, plus
+    per-file `physics-rapier/src/init.ts`, `render/src/resource-warnings.ts` and
+    `render-webgl/src/gl-particles.ts`.
+  · **Reverted to 3.2.7 deliberately.** Landing the bump would mean either weakening a coverage
+    gate or running a five-package test campaign — neither belongs inside a compiler migration.
+    The campaign is the real task; the bump falls out of it for free.
+  · **Do the coverage work first, then the bump.** Bumping first turns a real quality gap into
+    a red build with no owner.
 
 ### 2 · Hours — one contained fix, already diagnosed
 
