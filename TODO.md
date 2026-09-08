@@ -357,6 +357,13 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       supply, but it is the same shape as the glTF-transport row above: the default path does
       not cover the common case.
 
+      · **PARTIAL 2026-09-07 — mitigated, NOT fixed.** The §79 messages now carry a caveat
+        saying the name comes from `constructor.name` and a minifier may have rewritten it,
+        and the structured context gained `nodeClassIsMinifiable` / `componentClassIsMinifiable`
+        so a tool can tell. That is the *apologise-after-the-fact* fix this very item warns
+        against. **The root fix is still open**: source the name from the registry's own type
+        names, which minification cannot touch. Keep this item open until it is.
+
 
 - [x] **§42 `transformAuthority` is mandatory knowledge for animating anything, and the README
       never mentions it.** **FIXED 2026-09-07** — the quick start now
@@ -1446,6 +1453,13 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       (lazy after init; `textureFormats` already shipped). `TextureSource.dimension`
       refuses non-2d. Still open: cube/array/3D uploads, compressed containers,
       video/`ImageBitmap`, map roles, async upload.
+
+      · **OVERLAP, found 2026-09-07:** "A-19 remainder" below describes the SAME remaining
+        work — *"renderer-side §77 only (`R-30b`: cube/array/3D, compressed containers,
+        video)"*. Two open checkboxes, one body of work, so the burndown count reads one
+        higher than the work justifies. Merge them before scheduling either; the surviving
+        item should be this one, since A-19's row is mostly the glTF residue and its
+        dependencies rather than the §77 uploads.
 
 - [x] **Examples onto `Text` — DONE 2026-08-21**, extended to both flagships
       (layer assignment needs one node per label). Draw calls: first-2d 30 → 1,
