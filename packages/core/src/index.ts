@@ -29,6 +29,7 @@ export {
 // out of anything the simulation computes.
 export {
   DEV,
+  DEV_WARNING_PREFIX,
   devAssert,
   devWarn,
   devWarnOnce,

@@ -10,6 +10,21 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 The release gate that said *"wait for TypeDoc"* is gone. It was never the compiler's gate.
 
+### Fixed
+
+- **Every runtime warning still said `[four]` to the user.** The rebrand renamed the packages,
+  the scope and the specifiers, but the console prefix is a string literal, not an identifier, so
+  it was never touched — `const PREFIX = "[four]"`. Verified at runtime after the fix:
+  `devWarn("probe message")` now prints `[fourJS] probe message`.
+
+  Worse than one line: **thirteen hardcoded `"[four] "` literals across eight source files**,
+  each re-implementing the prefix in a direct `console.warn` rather than importing it — thirteen
+  copies of one fact. `DEV_WARNING_PREFIX` is now exported from `@fourjs/core` and every call
+  site imports it, so the next rename is one edit.
+
+  One assertion escaped the first sweep because it is a **regex** (`/\[four\] §10 dropped/`), where
+  the brackets are escaped and a plain-string search walks straight past it. Same trap the rebrand
+  hit in September; caught here by the test suite rather than by the search.
 ### Changed
 
 - **The library now builds and type-checks with `typescript@7.0.2`.** Verified from a clean

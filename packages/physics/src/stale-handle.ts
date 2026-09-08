@@ -8,7 +8,11 @@
  * `devWarnOnce`. The throw is the behaviour; the message is diagnostics.
  */
 
-import { FourError, type FourErrorCode } from "@fourjs/core";
+import {
+  DEV_WARNING_PREFIX,
+  FourError,
+  type FourErrorCode,
+} from "@fourjs/core";
 
 const warnedStaleHandles = new Set<string>();
 
@@ -33,7 +37,7 @@ export function rejectStalePhysicsHandle(
   const warnKey = `${kind}:${key}`;
   if (!warnedStaleHandles.has(warnKey)) {
     warnedStaleHandles.add(warnKey);
-    console.warn(`[four] ${message}`);
+    console.warn(`${DEV_WARNING_PREFIX} ${message}`);
   }
   throw new FourError(code, message, context ? { context } : undefined);
 }

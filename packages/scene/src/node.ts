@@ -32,6 +32,7 @@
 
 import {
   ComponentRegistry,
+  DEV_WARNING_PREFIX,
   EventEmitter,
   FourError,
   type Component,
@@ -885,7 +886,7 @@ export abstract class Node
       // import DEV / `devWarnOnce` (`dev-build-mode.test.ts`). The WeakSet is
       // the once-per-node suppress; production prints the first detach.
       console.warn(
-        `[four] §83: node "${child.id}" was detached with ${String(listeners)} event ` +
+        `${DEV_WARNING_PREFIX} §83: node "${child.id}" was detached with ${String(listeners)} event ` +
           "listener(s) still registered; call the unsubscribers from on() or " +
           "removeAllListeners() so the subtree is not retained (§6b).",
       );

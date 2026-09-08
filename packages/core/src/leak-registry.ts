@@ -20,7 +20,7 @@
  *
  * `FinalizationRegistry` callbacks run at an unspecified time on an
  * unspecified turn. Warning from inside one would make tests racy and would
- * interleave `[four]` lines with whatever the host was doing. So the
+ * interleave `[fourJS]` lines with whatever the host was doing. So the
  * callback only enqueues `{ label, creationSite }`, and
  * {@link auditFinalizedLeaks} is the call that prints — the same opt-in
  * shape as the counter audit.
@@ -39,7 +39,7 @@
  * // …forget to dispose…
  * // later, after GC, or in a test via reportFinalized(id):
  * auditFinalizedLeaks();
- * // [four] §83: "level-atlas" was garbage-collected without dispose(). Creation site: …
+ * // [fourJS] §83: "level-atlas" was garbage-collected without dispose(). Creation site: …
  * ```
  *
  * {@link disposeTracked} marks the resource so a later finalization is not a

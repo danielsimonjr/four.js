@@ -134,6 +134,7 @@
 
 import {
   DEFAULT_SPACE_MODE,
+  DEV_WARNING_PREFIX,
   FourError,
   isSimulationSpaceMode,
 } from "@fourjs/core";
@@ -3465,7 +3466,7 @@ export class PhysicsWorld {
       const node = registration.node;
       const label = node.name === "" ? node.id : `${node.id} ("${node.name}")`;
       console.warn(
-        `[four] Dynamic body ${label} has no collider and no inertiaTensor, so its ` +
+        `${DEV_WARNING_PREFIX} Dynamic body ${label} has no collider and no inertiaTensor, so its ` +
           "angular inertia is zero and the solver will never rotate it (§23, §25): it " +
           "translates and answers joints, but a torque or a motor does nothing. `mass` " +
           "supplies mass, not the inertia tensor. Attach a Collider to derive one from " +
@@ -3574,7 +3575,7 @@ export class PhysicsWorld {
     }
     warned.add(key);
     console.warn(
-      `[four] ${message} Further ${key} occurrences in this world are suppressed.`,
+      `${DEV_WARNING_PREFIX} ${message} Further ${key} occurrences in this world are suppressed.`,
     );
   }
 

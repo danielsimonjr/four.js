@@ -59,7 +59,7 @@
  * level.load();
  * level.dispose();
  * auditResourceLeaks(before, read(), { label: "level teardown" });
- * // [four] §83: 3 textures (786432 B) survived "level teardown" without dispose().
+ * // [fourJS] §83: 3 textures (786432 B) survived "level teardown" without dispose().
  * ```
  *
  * ## Why the counts arrive as plain numbers

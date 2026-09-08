@@ -280,7 +280,7 @@ describe("Application — main-loop events (§10, §6b)", () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
     const first = String(warnSpy.mock.calls[0]?.[0]);
     expect(first).toMatch(
-      /\[four\] §10 dropped .+s of simulation time this frame/,
+      /\[fourJS\] §10 dropped .+s of simulation time this frame/,
     );
     expect(first).toContain(
       `${app.time.droppedTime.toFixed(4)}s and is not recovered`,

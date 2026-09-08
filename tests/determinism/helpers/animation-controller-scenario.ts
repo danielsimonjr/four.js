@@ -424,7 +424,7 @@ export async function runControllerScenario(): Promise<ControllerScenarioResult>
   const originalWarn = console.warn;
   let authorityWarningCount = 0;
   console.warn = (...args: unknown[]): void => {
-    if (typeof args[0] === "string" && args[0].startsWith("[four]")) {
+    if (typeof args[0] === "string" && args[0].startsWith("[fourJS]")) {
       authorityWarningCount += 1;
       return;
     }

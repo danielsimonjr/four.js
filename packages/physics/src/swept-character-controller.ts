@@ -236,6 +236,7 @@
  * `tests/determinism/swept-character.test.ts` is the golden, on real Rapier 3D.
  */
 
+import { DEV_WARNING_PREFIX } from "@fourjs/core";
 import type { Component, ComponentHost } from "@fourjs/core";
 import { Vector3 } from "@fourjs/math";
 import {
@@ -1392,7 +1393,7 @@ export class SweptCharacterSystem implements SimulationSystem {
     }
     warned.add(node.id);
     console.warn(
-      `[four] SweptCharacterSystem: ${message} Further occurrences on this node are suppressed.`,
+      `${DEV_WARNING_PREFIX} SweptCharacterSystem: ${message} Further occurrences on this node are suppressed.`,
     );
   }
 

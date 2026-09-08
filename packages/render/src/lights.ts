@@ -63,7 +63,7 @@
  * assignments.
  */
 
-import { DEV, devWarnOnce } from "@fourjs/core";
+import { DEV, DEV_WARNING_PREFIX, devWarnOnce } from "@fourjs/core";
 import { Matrix4, Vector3 } from "@fourjs/math";
 import type { Node } from "@fourjs/scene";
 
@@ -664,7 +664,7 @@ export function collectSceneLights(root: Node, out: SceneLights): SceneLights {
       devWarnOnce(`punctual-overflow:${root.id}`, message);
     } else if (!warnedOverflowRoots.has(root)) {
       warnedOverflowRoots.add(root);
-      console.warn(`[four] ${message}`);
+      console.warn(`${DEV_WARNING_PREFIX} ${message}`);
     }
   }
   return out;

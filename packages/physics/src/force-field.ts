@@ -109,6 +109,7 @@
  *   is in — `PhysicsWorld.addBody` refuses any other (PH-12).
  */
 
+import { DEV_WARNING_PREFIX } from "@fourjs/core";
 import { Vector3 } from "@fourjs/math";
 import {
   PRIORITY_FORCES,
@@ -908,7 +909,7 @@ export class ForceFieldSystem implements SimulationSystem {
     if (!warned.has(nodeId)) {
       warned.add(nodeId);
       console.warn(
-        `[four] ForceFieldSystem sampled an "acceleration" field at the dynamic RigidBody on node ${nodeId}, which has no mass: none was authored and it has no collider to derive one from (§23, §25). The contribution is dropped rather than turned into a NaN force. Author body.mass or attach a Collider. Further occurrences on this body are suppressed.`,
+        `${DEV_WARNING_PREFIX} ForceFieldSystem sampled an "acceleration" field at the dynamic RigidBody on node ${nodeId}, which has no mass: none was authored and it has no collider to derive one from (§23, §25). The contribution is dropped rather than turned into a NaN force. Author body.mass or attach a Collider. Further occurrences on this body are suppressed.`,
       );
     }
     return 0;

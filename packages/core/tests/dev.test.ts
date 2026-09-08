@@ -74,7 +74,7 @@ describe("devWarn", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     devWarn("something is off");
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0][0]).toBe("[four] something is off");
+    expect(warn.mock.calls[0][0]).toBe("[fourJS] something is off");
   });
 
   it("warns every time — deduplication is devWarnOnce's job", () => {
@@ -96,7 +96,7 @@ describe("devWarnOnce", () => {
   it("emits the first time and reports that it did", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     expect(devWarnOnce("k", "first")).toBe(true);
-    expect(warn).toHaveBeenCalledWith("[four] first");
+    expect(warn).toHaveBeenCalledWith("[fourJS] first");
   });
 
   it("stays silent for a repeated key, even with a different message", () => {

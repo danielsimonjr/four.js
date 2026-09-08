@@ -1201,7 +1201,7 @@ export async function runPhase6Scenario(): Promise<Phase6ScenarioResult> {
   });
 
   // --- drive (§10) ---------------------------------------------------------
-  // §42 conflict warnings go to `console.warn` with a `[four]` prefix; counting
+  // §42 conflict warnings go to `console.warn` with a `[fourJS]` prefix; counting
   // them here turns "every transform is written by its one owner" into a
   // measured zero. Anything else — Rapier's own loader notices, for instance —
   // is passed through untouched. Restored in `finally` so a failure cannot leak
@@ -1209,7 +1209,7 @@ export async function runPhase6Scenario(): Promise<Phase6ScenarioResult> {
   const originalWarn = console.warn;
   let authorityWarningCount = 0;
   console.warn = (...args: unknown[]): void => {
-    if (typeof args[0] === "string" && args[0].startsWith("[four]")) {
+    if (typeof args[0] === "string" && args[0].startsWith("[fourJS]")) {
       authorityWarningCount += 1;
       return;
     }

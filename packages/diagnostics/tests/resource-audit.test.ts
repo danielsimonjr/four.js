@@ -91,7 +91,7 @@ describe("auditResourceLeaks", () => {
     expect(report.message).toContain("3 geometries (4096 B)");
     expect(report.message).toContain("level teardown");
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toContain("[four] §83");
+    expect(String(warn.mock.calls[0][0])).toContain("[fourJS] §83");
   });
 
   it("counts textures and render targets separately but their bytes together", () => {

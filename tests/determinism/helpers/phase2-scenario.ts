@@ -454,7 +454,7 @@ export async function runPhase2Scenario(): Promise<Phase2ScenarioResult> {
   const originalWarn = console.warn;
   let authorityWarningCount = 0;
   console.warn = (...args: unknown[]): void => {
-    if (typeof args[0] === "string" && args[0].startsWith("[four]")) {
+    if (typeof args[0] === "string" && args[0].startsWith("[fourJS]")) {
       authorityWarningCount += 1;
       return;
     }

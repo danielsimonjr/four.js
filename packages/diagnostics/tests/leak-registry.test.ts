@@ -39,7 +39,7 @@ describe("leak registry", () => {
     reportFinalized(id);
     expect(auditFinalizedLeaks()).toBe(1);
     const text = String(warn.mock.calls[0]?.[0]);
-    expect(text).toContain("[four]");
+    expect(text).toContain("[fourJS]");
     expect(text).toContain("§83");
     expect(text).toContain("level-atlas");
     expect(text).toContain("at loadLevel (demo.ts:40)");

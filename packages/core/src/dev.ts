@@ -117,11 +117,20 @@ export const DEV: boolean =
  */
 const emittedWarnings = new Set<string>();
 
-/** The prefix every engine console message carries, so a host can filter. */
-const PREFIX = "[four]";
+/**
+ * The prefix every engine console message carries, so a host can filter.
+ *
+ * Exported because it was not, and eight other source files each hardcoded
+ * their own `"[four] "` literal into a direct `console.warn` instead — thirteen
+ * copies of one fact, which is why the 2026-09 rebrand renamed the packages,
+ * the scope and the specifiers but left every runtime warning still saying
+ * `[four]` to the user. Import this; do not retype it.
+ */
+export const DEV_WARNING_PREFIX = "[fourJS]";
+const PREFIX = DEV_WARNING_PREFIX;
 
 /**
- * Writes a development warning to `console.warn`, prefixed with `[four]`.
+ * Writes a development warning to `console.warn`, prefixed with `[fourJS]`.
  *
  * A no-op in a production build. Prefer `if (DEV) devWarn(…)` whenever the
  * message costs anything to build (see the module header).

@@ -566,14 +566,14 @@ export async function runPhase4Scenario(): Promise<Phase4ScenarioResult> {
 
   // --- drive (§10) ---------------------------------------------------------
   // §42 conflict warnings and §16 property-conflict warnings both go to
-  // `console.warn` with a `[four]` prefix; counting them here turns "every write
+  // `console.warn` with a `[fourJS]` prefix; counting them here turns "every write
   // is under proper authority and no two writers collide" into a measured zero.
   // Restored in `finally` so a failure cannot leak a patched console into the
   // rest of the suite.
   const originalWarn = console.warn;
   let authorityWarningCount = 0;
   console.warn = (...args: unknown[]): void => {
-    if (typeof args[0] === "string" && args[0].startsWith("[four]")) {
+    if (typeof args[0] === "string" && args[0].startsWith("[fourJS]")) {
       authorityWarningCount += 1;
       return;
     }

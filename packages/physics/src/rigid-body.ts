@@ -110,6 +110,7 @@
 
 import {
   DEFAULT_SPACE_MODE,
+  DEV_WARNING_PREFIX,
   EventEmitter,
   FourError,
   type Component,
@@ -1358,7 +1359,7 @@ export class RigidBody
     }
     warned.add(key);
     console.warn(
-      `[four] ${message} Further ${key} occurrences on this body are suppressed.`,
+      `${DEV_WARNING_PREFIX} ${message} Further ${key} occurrences on this body are suppressed.`,
     );
   }
 
@@ -1369,9 +1370,9 @@ export class RigidBody
     }
     this.#zeroWeightsWarned = true;
     console.warn(
-      "[four] A RigidBody has physicsWeight = 0 and animationWeight = 0, " +
-        "which describes no pose; falling back to fully physical " +
-        "(physicsWeight 1). Set one of the two weights above 0 (§19). " +
+      `${DEV_WARNING_PREFIX} A RigidBody has physicsWeight = 0 and ` +
+        "animationWeight = 0, which describes no pose; falling back to fully " +
+        "physical (physicsWeight 1). Set one of the two weights above 0 (§19). " +
         "Further occurrences on this body are suppressed.",
     );
   }

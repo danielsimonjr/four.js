@@ -548,7 +548,7 @@ export interface Phase10ScenarioResult {
  * third for the seek — so the seek's tail is reached from a snapshot rather than
  * from a world that had already played the whole recording.
  *
- * §42 conflict warnings go to `console.warn` with a `[four]` prefix; they are
+ * §42 conflict warnings go to `console.warn` with a `[fourJS]` prefix; they are
  * counted here so "every transform is written by its one owner" is a measured
  * zero. Anything else — Rapier's own loader notices — is passed through.
  */
@@ -556,7 +556,7 @@ export async function runPhase10Scenario(): Promise<Phase10ScenarioResult> {
   const originalWarn = console.warn;
   let authorityWarningCount = 0;
   console.warn = (...args: unknown[]): void => {
-    if (typeof args[0] === "string" && args[0].startsWith("[four]")) {
+    if (typeof args[0] === "string" && args[0].startsWith("[fourJS]")) {
       authorityWarningCount += 1;
       return;
     }

@@ -62,6 +62,8 @@
  * two files. Every `Node` satisfies this shape, and TypeScript's structural
  * typing means callers pass their nodes exactly as before.
  */
+import { DEV_WARNING_PREFIX } from "@fourjs/core";
+
 export interface AuthorityNode {
   /** `Node.id` — stable identity for the warning and its suppression. */
   readonly id: string;
@@ -168,7 +170,7 @@ export function warnAuthorityConflict(
 
   const label = node.name === "" ? node.id : `${node.id} ("${node.name}")`;
   console.warn(
-    `[four] A "${writer}" system tried to write the transform of node ` +
+    `${DEV_WARNING_PREFIX} A "${writer}" system tried to write the transform of node ` +
       `${label}, which is owned by "${node.transformAuthority}" authority; ` +
       "the write was refused (§42: exactly one system owns a node's " +
       `transform). Set node.transformAuthority = "${writer}" if that system ` +

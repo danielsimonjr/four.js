@@ -69,7 +69,7 @@
  * iterators over the entry array.
  */
 
-import { FourError } from "@fourjs/core";
+import { DEV_WARNING_PREFIX, FourError } from "@fourjs/core";
 import type { Quaternion, Vector2, Vector3, Vector4 } from "@fourjs/math";
 import { Node, warnAuthorityConflict } from "@fourjs/scene";
 import type { TransformAuthority } from "@fourjs/scene";
@@ -228,7 +228,7 @@ export function claimProperty(
   const previous = slots.get(key);
   if (previous !== undefined) {
     console.warn(
-      `[four] Two animation writers target the property "${path}" of the same ` +
+      `${DEV_WARNING_PREFIX} Two animation writers target the property "${path}" of the same ` +
         `object (a ${previous.writerKind}, then a ${claim.writerKind}); the ` +
         "last-started tween wins (§16) and the earlier writer stops writing " +
         "this property. Stop the earlier writer, or sequence the two on a " +

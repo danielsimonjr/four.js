@@ -16,7 +16,7 @@ describe("warnDisposedInUse (§83)", () => {
     expect(warnDisposedInUse("texture", "t1")).toBeUndefined();
     expect(warnDisposedInUse("texture", "t2")).toBeUndefined();
     expect(warn).toHaveBeenCalledTimes(2);
-    expect(String(warn.mock.calls[0]?.[0])).toContain("[four]");
+    expect(String(warn.mock.calls[0]?.[0])).toContain("[fourJS]");
     expect(String(warn.mock.calls[0]?.[0])).toContain("t1");
   });
 });
