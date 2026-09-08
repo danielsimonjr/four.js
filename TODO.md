@@ -40,6 +40,12 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
   the PRNG timeout (2026-09-07), deliberately not guessed at. Until it is understood, the
   headroom on every slow test in the suite is unknown.
 
+- **vitest is two majors behind: 3.2.7 installed, 5.0.0 latest.** Split out of the
+  TypeScript/vitest row on 2026-09-08, which wrongly implied TypeDoc blocked it — vitest
+  declares **no `typescript` peer**, so it was never blocked by that at all. `@vitest/coverage-v8`
+  is pinned to the same 3.2.7 and must move with it. Not attempted in the TS 7 pass on purpose:
+  a two-major test-runner jump risks the very gates that prove the compiler migration.
+
 ### 2 · Hours — one contained fix, already diagnosed
 
 Each has its cause written down. The thinking is done; what remains is the change and its test.
@@ -883,7 +889,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 - [x] **`main` was RED on CI, Docs and Release; reverted #62 and #63 to restore it.** Both had been
       merged over documented failures. Full evidence in CHANGELOG; the short version is that
       vitest 4 and typedoc 0.28.20 have no TypeScript version in common.
-- [ ] **Lift the TypeScript/vitest pin once typedoc supports TS 7.**
+- [x] **Lift the TypeScript/vitest pin once typedoc supports TS 7.**
       **RESEARCHED 2026-09-07 — the premise is wrong, and there IS a solution.** This row said
       "wait for typedoc", which put a release gate on someone else's roadmap. It does not need to.
       · **What TS 7 is:** the Go port of the compiler (`@typescript/native-preview` exists at
@@ -923,6 +929,25 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       takes `bodies`. CCD / contact-distance / snapshot-joint assertions
       updated to the measured 0.20 behaviour. Dependabot ignore for 0.20
       removed.
+
+      · **DONE 2026-09-08 — the repo builds and type-checks on TypeScript 7.0.2.** Not by
+        isolating the docs step as sketched above, but more simply: `typescript` stays at
+        **6.0.3** (what TypeDoc and typescript-eslint resolve) and TS 7 is installed
+        alongside as the `ts7` alias, which the 24 package builds and every typecheck script
+        now call **by explicit path**. Clean-tree evidence: 315 `.d.ts` emitted, 7,246 tests
+        across 282 files green against TS-7-built artifacts, and an injected `TS2322` caught
+        — so the green is a real check, not a no-op.
+      · **CORRECTION — this item's own research note was wrong.** It claimed *"TS 7.0.2 →
+        docs crash, **lint passes**"*. Lint does **not** pass: typescript-eslint refuses TS 7
+        by name (`typescript-eslint does not support TS 7.0`, exit 2), which is why TS 6.0.3
+        has to stay for lint as well as docs. My own note was a hypothesis with my handwriting
+        on it; today's reading is direct and reproducible.
+      · **The vitest half of this row was never blocked by TypeDoc at all** — vitest declares
+        no `typescript` peer. Two unrelated pins were bundled into one sentence. Split out
+        below as its own item.
+      · **Still open, but no longer a release gate:** drop `typescript@6.0.3` when TypeDoc and
+        typescript-eslint ship TS 7 support. Both are at their latest published versions
+        (`typedoc@0.28.20`, `typescript-eslint@8.70.0`) and neither supports it yet.
 
 - [x] **Open-PR sweep 2026-09-06: Dependabot hygiene + stale branches.** #65
       (rapier 0.20) and #66 (eslint 10 dev-deps) **closed** and ignored in

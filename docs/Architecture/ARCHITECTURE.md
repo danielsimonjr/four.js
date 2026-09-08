@@ -598,11 +598,29 @@ in CI.
 
 ## Build & Packaging
 
-- **Toolchain** (§91, exact pins in plan §3.2): strict TypeScript 5.9.3, ESM
-  only, Bun workspace, Vitest, Playwright, ESLint 9 + typescript-eslint,
-  Prettier, Vite 8, TypeDoc, Changesets (release workflow deferred to first
-  publish). Task orchestration is `bun run --filter './packages/*'`
-  (Turborepo was replaced 2026-08-03).
+- **Toolchain** (§91, exact pins in plan §3.2): strict TypeScript, ESM
+  only, Bun workspace (`>= 1.4.2`), Vitest, Playwright, ESLint 9 +
+  typescript-eslint, Prettier, Vite 8, TypeDoc, Changesets (release workflow
+  deferred to first publish). Task orchestration is
+  `bun run --filter './packages/*'` (Turborepo was replaced 2026-08-03).
+- **Two TypeScript compilers, on purpose** (2026-09-08). The library **builds
+  and type-checks with TypeScript 7.0.2**; **TypeScript 6.0.3 stays installed
+  only because TypeDoc and typescript-eslint cannot run on 7.** TS 7 is the Go
+  port: its package exports `.` as `lib/version.cjs` plus `unstable/*` modules,
+  so the legacy `import ts from "typescript"` compiler API is gone. Measured,
+  not assumed — TypeDoc dies with `Cannot read properties of undefined (reading
+  'PropertyDeclaration')` and typescript-eslint refuses with `typescript-eslint
+  does not support TS 7.0`.
+
+  Consequences a reader needs:
+  - Every `tsc` invocation **names its compiler by path**. Both packages install
+    a binary called `tsc`, so `node_modules/.bin/tsc` is decided by install
+    order — it silently pointed at TS 7 while `typescript` resolved to 6.0.3.
+    Package builds run `node ../../node_modules/ts7/bin/tsc`; nothing relies on
+    the ambiguous shim.
+  - Two compilers read this source, and they **do** disagree. `typecheck:ts6`
+    is a CI gate for exactly that: it caught TS 6 rejecting the `.ts` import
+    extensions in three §93 examples that 5.9 and 7.0 both accept.
 - **Build**: `tsc -b` with project references mirroring the §3.1 matrix. Each
   package carries two tsconfigs — `tsconfig.json` (dev/lint, `noEmit`) and
   `tsconfig.build.json` (declaration-emitting, `references` per dependency).

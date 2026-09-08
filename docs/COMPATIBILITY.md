@@ -38,10 +38,27 @@ implemented" in its README is the honest 0.x package. `NPM_TOKEN` remains an
 owner secret and is not in this repository. GitHub Pages is already the
 docs-workflow deploy target (`.github/workflows/docs.yml`).
 
-**TypeDoc / TypeScript pin, re-verified 2026-09-06.** `typedoc@0.28.20` is
-still the latest published TypeDoc and still peers at TypeScript `<= 6.0.x`
-(TypeStrong/typedoc#3098; TS 7 support is waiting on 7.1). The workspace
-stays on `typescript@5.9.3`. Do not lift the pin until TypeDoc accepts 7.x.
+**TypeScript 7 adopted 2026-09-08 — and the old advice here was wrong.** This
+paragraph used to read *"do not lift the pin until TypeDoc accepts 7.x"*, which
+put the toolchain on another project's release schedule. It never needed to.
+TypeDoc's peer range constrains **TypeDoc**, not the compiler that builds the
+library.
+
+- **Builds and type-checks: `typescript@7.0.2`**, via the `ts7` alias. Verified
+  from a clean tree: 24 packages, 315 `.d.ts` emitted, and 7,246 tests across
+  282 files passing against artifacts TS 7 produced.
+- **TypeDoc and typescript-eslint: `typescript@6.0.3`.** These consume the
+  legacy compiler API, which TS 7 removed — TypeDoc throws on
+  `PropertyDeclaration`, typescript-eslint refuses by name. 6.0.3 is the newest
+  release both accept (`typedoc@0.28.20` allows `6.0.x`; `typescript-eslint@8.70`
+  peers `<6.1.0`). Both are still the latest published versions, so this is not
+  a stale pin — no release supports TS 7 yet.
+- **`typecheck:ts6` is a CI gate**, because two compilers over one source can
+  diverge silently. It immediately found one: TS 6.0.3 rejects the `.ts` import
+  extensions in three §93 examples that 5.9 and 7.0 accept.
+
+Drop `typescript@6.0.3` when TypeDoc and typescript-eslint both ship TS 7
+support. Nothing else waits on them.
 
 ---
 

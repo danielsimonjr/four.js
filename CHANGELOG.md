@@ -6,6 +6,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — TypeScript 7 and Bun 1.4.2
+
+The release gate that said *"wait for TypeDoc"* is gone. It was never the compiler's gate.
+
+### Changed
+
+- **The library now builds and type-checks with `typescript@7.0.2`.** Verified from a clean
+  tree, not from an exit code: 24 packages, **315 `.js` + 315 `.d.ts`** emitted, and **7,246
+  tests across 282 files** passing against artifacts TS 7 produced. TS 7 was also proved to be
+  really checking — an injected `TS2322` is caught at the right line, so the green is not a
+  compiler that looked at nothing.
+
+- **`typescript@6.0.3` stays installed, for TypeDoc and typescript-eslint only.** TS 7 is the Go
+  port; its package exports `.` as `lib/version.cjs` plus `unstable/*`, so the legacy
+  `import ts from "typescript"` compiler API no longer exists. Measured rather than inferred:
+  TypeDoc dies with `Cannot read properties of undefined (reading 'PropertyDeclaration')` and
+  typescript-eslint refuses with `typescript-eslint does not support TS 7.0`. 6.0.3 is the newest
+  release both accept, and both are still the latest published versions — this is not a stale pin.
+
+- **Every `tsc` call now names its compiler by path.** Both packages ship a binary called `tsc`,
+  so `node_modules/.bin/tsc` is decided by install order — it was pointing at TS 7 while
+  `typescript` resolved to 6.0.3, meaning the build had already switched compilers by accident.
+  The 24 package builds run `node ../../node_modules/ts7/bin/tsc`; nothing uses the shim.
+
+- **Bun 1.4.2** locally (was 1.4.0 while CI ran 1.4.2 — every local gate this week ran on a
+  different runtime than CI), and `engines.bun` raised `>=1.2.0` → `>=1.4.2` to match the
+  `packageManager` pin and the workflows.
+
+### Added
+
+- **`typecheck:ts6` — a CI gate for the two compilers disagreeing.** It earned itself
+  immediately: TS 6.0.3 rejects the `.ts` import extensions in three §93 examples that 5.9 and
+  7.0 both accept (`TS5097`). Without the gate the examples would have quietly become
+  TS7-only. Fixed with `allowImportingTsExtensions` on the examples project, which is `noEmit`
+  and bundled by Vite.
+
+- **`tsconfig.json` at the root, and `typecheck:config`.** `playwright.config.ts` and the two
+  vitest configs belonged to **no project at all**, so nothing type-checked them and type-aware
+  lint read them through typescript-eslint's inferred default project. That worked by luck: the
+  inferred project happened to supply `@types/node` under TS 5.9 and stopped under 6.0, turning
+  `process` into an unresolved type and producing **24 `no-unsafe-*` errors** in
+  `playwright.config.ts` alone. They have a real project now, `allowDefaultProject` no longer
+  claims `*.ts`, and type-aware linting on that file is verified by mutation.
+
+### Fixed
+
+- **Stale `node_modules/four` and `node_modules/@four`** from before the rebrand — declared by no
+  manifest, so a leftover `@four/*` import would have resolved locally and failed on CI's fresh
+  install. No such import exists (checked); the debris is gone and the build still passes.
+
+- Two false claims in `examples/tsconfig.json`'s own comment: the umbrella specifier is `fourJS/`,
+  not `four/`, and this repo runs `bun`, not `pnpm`.
 ## Unreleased — a red gate nobody was reading, and two docs that had gone false
 
 Closes (D) and (E1) of the four decisions delegated on 2026-09-07, and fixes a failing test
