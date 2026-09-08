@@ -19,6 +19,28 @@ specification; until then, entries are grouped by date under **Unreleased**.
 The migration to TypeScript-on-Bun is complete for the workspace root. `typescript@6.0.3` had
 exactly **two** consumers, so neither could be removed alone; both were addressed together.
 
+### Added
+
+- **Recorded what Bun does and does not offer for docs** (`docs/MIGRATION.md` 3.1b), so nobody
+  re-researches it. **Bun ships no documentation generator** — verified three ways: `bun --help`
+  (24 commands), `bun pm --help` (11 subcommands), and Bun's own documentation. The docgen work
+  in the Bun repo makes Bun's *own types consumable by* an external generator; it is not a
+  generator.
+
+  **A check that lied, worth knowing:** `bun docs` did **not** error — it ran this repo's `docs`
+  **script**, because Bun falls back to `package.json` scripts for unknown commands. The absence
+  of an error proved nothing.
+
+  **`bunx typedoc@<version>` is a real alternative to the tools package**, and an earlier draft
+  of this entry was wrong to call it unpinnable. A bare `bunx typedoc` crashes in-repo (Bun
+  resolves a locally installed binary first, and the workspace TypeDoc is hoisted to the root
+  where it meets TypeScript 7); an explicit version bypasses that and resolves TypeScript 6.0.3
+  in its own temp install. It stays unsuitable for the **gate** for three reasons: it is outside
+  `bun.lock`, it needs the network on a cold cache, and the peer resolution that makes it work is
+  **undocumented** — an observation, not a contract.
+
+  Footgun documented: `bunx typedoc` at the repo root fails with `Cannot read properties of
+  undefined (reading 'PropertyDeclaration')`. Nothing is broken; use `bun run docs`.
 ### Changed
 
 - **ESLint and typescript-eslint are gone; linting is Oxlint.** typescript-eslint refuses

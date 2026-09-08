@@ -167,6 +167,68 @@ Two options exist, and one is already proven by a shipping package:
    emitted `.d.ts` rather than the source graph, and bundle their own TypeScript by
    construction — so they are immune to the root compiler version.
 
+**What about `bunx`, and does Bun have its own docs generator?** Both asked and both
+answered by measurement on 2026-09-08.
+
+**Bun ships no documentation generator.** Checked three ways: `bun --help` on 1.4.2
+lists 24 commands and none generates docs; `bun pm --help` has 11 subcommands and none
+is doc-related; [Bun's own documentation](https://bun.com/docs) covers runtime, package
+manager, test runner and bundler, and no docgen. The doc-generation work in the Bun repo
+([#18024](https://github.com/oven-sh/bun/pull/18024),
+[#19024](https://github.com/oven-sh/bun/pull/19024)) points the other way — it makes
+Bun's own types *consumable by* an external generator. **Bun is not in this race**, so
+the isolation below is not a stopgap waiting for it to catch up.
+
+> ⚠ **A test that lied.** Running `bun docs` did **not** error — it ran this repo's own
+> `docs` **script**, because Bun falls back to `package.json` scripts for unknown
+> commands. That "success" said nothing about a built-in. Use `bun --help`, not the
+> absence of an error.
+
+**`bunx` genuinely can isolate — but not here, and not for a gate.** In a clean
+directory it resolves the peer correctly, auto-installing a satisfying compiler:
+
+```
+$ bunx typedoc --version
+TypeDoc 0.28.20
+Using TypeScript 6.0.3 from .../bunx-74065123-typedoc@latest/node_modules/typescript
+```
+
+Inside this repository the bare command **crashes** on `PropertyDeclaration`. Bun's docs
+state the rule — `bunx` *"checks for a locally installed package first, then falls back
+to auto-installing it from npm"* — and Bun hoists the `tools/docs` TypeDoc to the root
+`node_modules`, where it resolves the root's TypeScript 7.
+
+**An explicit version bypasses that, and it works.** Measured in this repository:
+
+```
+$ bunx typedoc@0.28.20 --version
+TypeDoc 0.28.20
+Using TypeScript 6.0.3 from .../bunx-74065123-typedoc@0.28.20/node_modules/typescript
+```
+
+So `bunx typedoc@<version>` is a **real alternative** to the `tools/docs` package, not a
+dead end — an earlier draft of this section said the version was unpinnable, which was
+wrong. Three reasons `tools/docs` is still the better instrument for a **gate**:
+
+1. **Not covered by `bun.lock`.** The gate's compiler would be resolved outside the
+   lockfile, so `--frozen-lockfile` proves nothing about it.
+2. **Needs the network on a cold cache.** CI would fetch TypeDoc and a TypeScript on
+   every fresh runner.
+3. **The peer resolution that makes it work is undocumented.** Bun's `bunx` page
+   describes local-first resolution, pinning and caching, but says nothing about peer
+   dependencies. That it picks 6.0.3 is an observation, not a contract — and a silent
+   change there would break docs with no version bump to point at.
+
+`tools/docs` is pinned, lockfile-covered, offline-reproducible and auditable. `bunx
+typedoc@0.28.20` is the right tool for a **one-off local run** when you want the docs
+without the repo's own wiring.
+
+> **Footgun, recorded because the error message does not explain itself:** typing
+> `bunx typedoc` at the repository root fails with
+> `Cannot read properties of undefined (reading 'PropertyDeclaration')`. Nothing is
+> broken — it is the hoisted TypeDoc meeting the root's TS 7. **Use `bun run docs`**,
+> which runs in the `tools/docs` working directory and resolves the nested 6.0.3.
+
 **Option 1 was tested on this repository on 2026-09-08, and it works.** This is no
 longer a sketch:
 
