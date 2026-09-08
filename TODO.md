@@ -223,7 +223,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       2 packages. Highest value of the four: it is the only one that produces a WRONG
       message at runtime in a shipped build, with no compiler help. Source the name from
       the registry's own type names or a `static readonly nodeType`.
-- [ ] **(B) Default `createGltfLoader`'s transport to `globalThis.fetch`.** Mirrors
+- [x] **(B) Default `createGltfLoader`'s transport to `globalThis.fetch`.** **DONE 2026-09-07.** `createGltfLoader()` with no options now
+      fetches external buffers. Implemented by EXPORTING `AssetManager`'s existing
+      `resolveGlobalFetch` package-internally rather than writing a second copy of the same
+      WP-11.2 decision — two copies would be the drift defect. Resolved per load, not at
+      construction, so a stubbed or late-installed global is still seen. The refusal survives
+      for the case it was written for: a runtime with NO global transport still refuses loudly
+      and names `{ fetch }`. 144/144 assets tests, and the browser gate passes with the example
+      simplified to `createGltfLoader()`. Mirrors
       `AssetManager`'s own WP-11.2 decision, made for exactly this reason. Removes the
       single most likely first-use failure. §96 bounds are unchanged — they are enforced
       after the bytes arrive, not by withholding a transport.
@@ -346,7 +353,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       10,080 lit pixels.
 
 
-- [ ] **The first glTF a consumer loads fails, and nothing demonstrates the right way.**
+- [x] **The first glTF a consumer loads fails, and nothing demonstrates the right way.** **CLOSED 2026-09-07** — both halves. The
+      example landed in `977074d`; the transport default landed with (B), so the call the
+      finding said fails is now the call that works.
       Dogfooding cycle 3: `assets.load("/quad.gltf", createGltfLoader({}))` — the obvious call
       — fails at runtime with
 

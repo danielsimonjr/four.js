@@ -11,12 +11,12 @@
  * 1. **The entry point is `createGltfLoader`, not a `loadGltf`.** The loader is
  *    built once and handed to `AssetManager.load`, which owns the cache, the
  *    refcount and the single fetch per URL (§76).
- * 2. **A `.gltf` with an external buffer needs a transport.** `AssetManager`
- *    resolves `globalThis.fetch` for the document itself, but the loader fetches
- *    the `.bin` beside it and is built without one unless you pass `{ fetch }`.
- *    Omit it and the load fails with
- *    *"the document names external buffer "quad.bin" but this loader was built
- *    without a transport"* — accurate, and easier to read here than to meet.
+ * 2. **A `.gltf` with an external buffer just works now.** The loader defaults
+ *    its transport to `globalThis.fetch`, the same default `AssetManager` makes,
+ *    so `createGltfLoader()` fetches the `.bin` beside the document. It did not
+ *    until 2026-09-07: this example was written because that first attempt
+ *    failed, and the fix came out of writing it. A runtime with no global fetch
+ *    still refuses loudly and names `{ fetch }` as the way in.
  *
  * The model is the same `quad.gltf` fixture the browser gate uses: one mesh, one
  * material, one external buffer, no images — the smallest file that still
@@ -52,9 +52,7 @@ app.scene.add(camera);
  * needs its own transport for the buffers the document names.
  */
 const assets = new AssetManager();
-const gltfLoader = createGltfLoader({
-  fetch: (input, init) => globalThis.fetch(input, init),
-});
+const gltfLoader = createGltfLoader();
 
 let meshCount = 0;
 

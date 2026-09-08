@@ -19,8 +19,10 @@
  *
  * - **Containers**: `.gltf` JSON and the GLB binary container; buffers from
  *   the GLB `BIN` chunk, base64 `data:` URIs, and external URIs through an
- *   injected {@link FetchLike} (presence is the capability — no transport, no
- *   external buffer, refused loudly).
+ *   {@link FetchLike} — the injected one, or `globalThis.fetch` when none is
+ *   passed, the same default {@link AssetManager} makes (WP-11.2). A runtime
+ *   with no transport at all still refuses loudly: presence is still the
+ *   capability, the loader just looks for one before giving up.
  * - **Geometry**: every attribute the engine's geometry layer has — positions,
  *   normals, uvs, colors, joints, weights — plus indices, `triangles` and
  *   `lines` modes, interleaved and strided accessors.
@@ -113,6 +115,7 @@ import {
 
 import {
   DEFAULT_MAXIMUM_BYTES,
+  resolveGlobalFetch,
   type AssetLoader,
   type FetchLike,
   type FetchResponse,
@@ -1195,7 +1198,13 @@ export function createGltfLoader(
     async load(response: FetchResponse, url: string): Promise<GltfAsset> {
       const body = new Uint8Array(await response.arrayBuffer());
       return parseGltf(body, url, {
-        fetch: options.fetch,
+        // Default to the platform transport, exactly as `AssetManager` does
+        // (WP-11.2). Without this the manager fetches the .gltf and the loader
+        // cannot fetch the .bin beside it -- the commonest glTF shape failing on
+        // a first attempt, found by building a consumer app on 2026-09-07.
+        // Resolved per load rather than at construction so a stubbed or
+        // late-installed global is still seen.
+        fetch: options.fetch ?? resolveGlobalFetch<never>(),
         decodeTexture: options.decodeTexture,
         probeTexture: options.probeTexture,
         maximumBytes,

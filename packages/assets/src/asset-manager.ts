@@ -814,7 +814,13 @@ function isDisposable(value: unknown): value is Disposable {
  * manager constructed in a bare runtime is still usable via injection and only
  * complains if someone actually asks it to fetch.
  */
-function resolveGlobalFetch<TSignal>(): FetchLike<TSignal> | undefined {
+/**
+ * Exported for `gltf.ts`, which needs the SAME default this manager already
+ * makes (WP-11.2). Package-internal: it is not re-exported from `index.ts`,
+ * because a consumer wanting a transport should pass one, not reach for our
+ * resolver. Two copies of this decision would be the drift defect.
+ */
+export function resolveGlobalFetch<TSignal>(): FetchLike<TSignal> | undefined {
   const scope = globalThis as Partial<{ fetch: FetchLike<TSignal> }>;
   const globalFetch = scope.fetch;
   if (typeof globalFetch !== "function") {

@@ -697,15 +697,51 @@ describe("buffers (§96)", () => {
     expect(seen).toEqual(["../up.bin"]);
   });
 
-  it("refuses an external uri when the loader has no transport", async () => {
-    await expectRefusal(
-      load(
+  it("falls back to globalThis.fetch when no transport is injected", async () => {
+    // WP-11.2 already decided this for `AssetManager`: a no-options constructor
+    // resolves `globalThis.fetch`, so the common case works. The loader did not,
+    // and the asymmetry was the single most likely first-use failure -- the
+    // manager fetched the .gltf and then the loader could not fetch the .bin
+    // beside it. Found by building a consumer app, 2026-09-07.
+    const { bytes } = pack(TRI_POSITIONS, TRI_INDICES);
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", (url: string) => {
+      calls.push(url);
+      return Promise.resolve(bytesResponse(bytes));
+    });
+    try {
+      const asset = await load(
         corrupt(triangleDocument(), (c) => {
           (c["buffers"] as { uri: string }[])[0].uri = "data.bin";
         }),
-      ),
-      /without a transport/,
-    );
+      );
+      expect(calls, "the global transport was not used").toHaveLength(1);
+      expect(calls[0]).toMatch(/data\.bin$/);
+      expect([...asset.meshes[0].primitives[0].positions]).toEqual([
+        ...TRI_POSITIONS,
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("still refuses an external uri when the runtime has no fetch at all", async () => {
+    // The refusal stays for the case it was written for: a runtime with no
+    // global transport. Presence is still the capability -- what changed is
+    // that the loader now looks for one before giving up.
+    vi.stubGlobal("fetch", undefined);
+    try {
+      await expectRefusal(
+        load(
+          corrupt(triangleDocument(), (c) => {
+            (c["buffers"] as { uri: string }[])[0].uri = "data.bin";
+          }),
+        ),
+        /without a transport/,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("refuses a non-ok subresource response with its status", async () => {
