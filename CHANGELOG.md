@@ -6,6 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — Stage 2: the packages are `fourJS` / `@fourjs`, and it broke twice first
+
+Authorised by Daniel: *"Stage 2 @fourjs"*, *"All imports from four/* need to change to
+fourJS/*"*, *"We can't use four as a name or tag or handler for a library."* Nothing in the
+workspace is called `four` any more.
+
+| | | |
+|---|---|---|
+| `@four/<pkg>` | `@fourjs/<pkg>` | 7,378 replacements, 848 files |
+| `four` | **`fourJS`** | umbrella package + every module specifier |
+| `packages/four` | `packages/fourjs` | directory (lowercase — see below) |
+| `four.js-monorepo` | `fourjs-monorepo` | root workspace |
+
+The case split is deliberate: the SCOPE is lowercase `@fourjs/*`, the package NAME is
+`fourJS`, and the DIRECTORY is lowercase. Published identity is untouched —
+`@danielsimonjr/fourjs`, because npm forbids capitals.
+
+Done surgically, not by blanket replace: bare `four` is a WORD here (`assert.equal(count,
+"four")`, `"four": 52`), so only module specifiers, package names, dependency keys and
+paths moved.
+
+**It broke twice, and each break is worth keeping.**
+
+**1. Bun's path filter cannot match a capitalised directory.** CI died on Linux with a bare
+`error: FileNotFound` from `bun run --filter './packages/*'`. Isolated:
+
+```
+bun run --filter 'fourJS' build             -> exit 0
+bun run --filter './packages/fourJS' build  -> "No workspace packages matched"
+```
+
+Resolving a workspace by NAME with a capital is fine; filtering by PATH is not. So the
+directory is lowercase and the name keeps its capital — they need not agree, and none of the
+others do (`@fourjs/render-webgl` has always lived in `packages/render-webgl`). It passed
+locally because Windows is case-insensitive: only a case-sensitive runner could show it.
+
+**2. A rename can miss a regex precisely because the regex escapes the thing being renamed.**
+`apply-publish-names.mjs` matches with regex literals where the scope is written `@four\/`
+— with an escaping backslash — so the literal `@four/` never appears and a string-level
+rename walks straight past it. `rewriteCode` then matched NOTHING: the test expected 5
+substitutions and got 0. Its fixture also used an UNQUOTED `four:` key, invisible to a
+quoted-key pattern. The test now pins the capitalisation by asserting lowercase `fourjs` is
+NOT the umbrella.
+
+**Three gates caught what no search could**, because their paths are BUILT rather than
+written: §33's `GATED` map (`join("packages", "four", …)`), §96's bare-name package
+allowlist, and the publish-mapping test. Each failed loudly and named the cause.
+
+Verified on the runner, not just locally: CI, Docs and Release all green.
+
 ## Unreleased — a directory-scoped `git stash` ate part of the rebrand
 
 Asked whether the rebrand was finished, I measured instead of recalling — and found 11

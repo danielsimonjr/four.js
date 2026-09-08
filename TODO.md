@@ -184,7 +184,12 @@ and only the first is unambiguous.
       · Stray `-visual-win32/-darwin.png` files are now gitignored, so a local visual run on
         Windows cannot leak goldens that could never match CI.
 
-- [ ] **Stage 2 — PACKAGE IDENTIFIERS (needs Daniel's call, not mine).** `four` → `fourjs`
+- [x] **Stage 2 — PACKAGE IDENTIFIERS (needs Daniel's call, not mine).** **DONE 2026-09-07** — authorised
+      ("Stage 2 @fourjs", "All imports from four/* need to change to fourJS/*", "We can't use
+      four as a name or tag or handler"). Landed in three commits because it broke twice:
+      `a0073e1` the rename (7,378 `@four/` → `@fourjs/`, umbrella → `fourJS`, 336 paths;
+      symmetric 7,800/7,800 diff), `9280365` the Linux-only build break, `9a3d122` the
+      publish mapping. All three workflows green. `four` → `fourjs`
       and `@fourjs/*` → `@fourjs/*`. Both are npm-legal (lowercase) and would match the
       already-chosen publish target `@danielsimonjr/fourjs`. **Why this is not a drive-by:**
       it rewrites every import specifier in the repo, the workspace map, the lockfile and
