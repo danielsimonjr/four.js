@@ -47,24 +47,31 @@ export const DEFAULT_MAXIMUM_SUB_STEPS = 5;
 /**
  * The §9 time record, verbatim in field set and order.
  *
+ * **Every duration in this record is in SECONDS, never milliseconds.** That is
+ * the one unit mistake worth guarding against: `performance.now()` and
+ * `requestAnimationFrame` both hand you milliseconds, so feeding one straight
+ * into `step` is the natural error, it type-checks, and it produces motion
+ * 1000x too fast rather than an exception. Each field repeats the unit because
+ * a reader meets the field, not this paragraph.
+ *
  * The fields are writable because exactly one owner — the {@link Scheduler} —
  * advances them. Everyone else receives the value as {@link ReadonlyTimeState}.
  */
 export interface TimeState {
-  /** Wall-clock time accumulated from the injected elapsed values. Unscaled. */
+  /** Wall-clock time in SECONDS, accumulated from the injected elapsed values. Unscaled. */
   realTime: number;
   /**
-   * Presentation clock: advances by `deltaTime`, so it slows under
+   * Presentation clock, in SECONDS: advances by `deltaTime`, so it slows under
    * `timeScale` and freezes while `paused` (§9, scaled-time domain).
    */
   renderTime: number;
-  /** Deterministic physics clock: advances by `fixedDeltaTime` per fixed step. */
+  /** Deterministic physics clock, in SECONDS: advances by `fixedDeltaTime` per fixed step. */
   simulationTime: number;
-  /** Scaled frame delta: `unscaledDeltaTime * timeScale`, or 0 while paused. */
+  /** Scaled frame delta in SECONDS: `unscaledDeltaTime * timeScale`, or 0 while paused. */
   deltaTime: number;
-  /** Unscaled frame delta: exactly the elapsed value injected into `step`. */
+  /** Unscaled frame delta in SECONDS: exactly the elapsed value injected into `step`. */
   unscaledDeltaTime: number;
-  /** Constant simulation step size (Appendix A default 1/60 s). */
+  /** Constant simulation step size in SECONDS (Appendix A default 1/60). */
   fixedDeltaTime: number;
   /** Simulation time scale. Preserved across pause and resume (§10). */
   timeScale: number;
@@ -76,7 +83,7 @@ export interface TimeState {
   frame: number;
   /** Number of completed fixed simulation steps. */
   simulationStep: number;
-  /** Simulation time discarded by the substep clamp (§9, §10). */
+  /** Simulation time in SECONDS discarded by the substep clamp (§9, §10). */
   droppedTime: number;
 }
 
