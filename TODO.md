@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06 (fourth landing): **~22 open** (owner secrets, typedoc/TS 7, RFC §6 residues, lighting/shadow remainder, R-33 hardware), 176 done.
+Counts as of **2026-09-07**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **19 open**, 243 closed. The four dogfooding decisions (B)/(C)/(D)/(E1) are all closed, which retired two source findings with them. Of the 19, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and **1 is externally blocked** (the typedoc/TS 7 pin) — so the burndown target is 16.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -428,7 +428,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       exactly what the row above shows people get wrong. One small example would close both.
 
 
-- [ ] **`KeyboardInput` is a naming trap, and the DEV message did not fix it — I fell in twice.**
+- [x] **`KeyboardInput` is a naming trap, and the DEV message did not fix it — I fell in twice.**
       Dogfooding cycle 3 (2026-09-07, `.dogfood/charselect`): writing a character-select screen
       from the README's shape, I wrote `new KeyboardInput({ target: window })` and then
       `keys.isDown("ArrowRight")`. Both wrong. The constructor is
@@ -452,7 +452,23 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
         consumer writing game input reimplements that. It is ~20 lines, which is exactly the
         size of thing a library should own.
 
-- [ ] **`TimeState` breaks the `*Seconds` convention the rest of the library teaches.**
+      · **RESOLVED 2026-09-07, and the two halves resolved DIFFERENTLY.** The *gap* was real
+        and is closed: `KeyboardState` ships in `@fourjs/input` (polled `isDown` / `held`,
+        releases every key on blur, idempotent `dispose`), and `examples/character-controller`
+        now uses it instead of its hand-rolled `Set`. The *name* was NOT changed, on purpose —
+        `PointerInput` and `KeyboardInput` are a symmetric pair of §72 event sources, so the
+        name is accurate in that frame, and the thing that actually trapped me was that the
+        package offered no polled option at all. With `KeyboardState` present, the wrong class
+        is no longer the only keyboard-shaped thing to reach for. What WAS false and is fixed:
+        the DEV error still said "listen to the DOM directly, as `examples/character-controller`
+        does" — untrue in both halves once the above landed.
+
+- [x] **`TimeState` breaks the `*Seconds` convention the rest of the library teaches.**
+      · **RESOLVED 2026-09-07 by (E)/(E1): documented, not renamed.** Renaming the fields
+        would break every `app.on("update")` handler in existence to buy a suffix. All six
+        duration fields now name SECONDS in their own docstring, and the type's header says
+        why it matters: `performance.now()` and `requestAnimationFrame` both hand out
+        milliseconds, so the wrong guess type-checks and runs 1000x too fast.
       Same cycle: I wrote `time.deltaSeconds` in the update loop without hesitating, because
       that is what four taught me everywhere else. The field is `deltaTime`.
 
