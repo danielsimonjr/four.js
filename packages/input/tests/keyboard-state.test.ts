@@ -43,7 +43,7 @@ class FakeSurface implements KeySurface {
         shiftKey: false,
         repeat: false,
         preventDefault: () => undefined,
-      } as never);
+      });
     }
   }
 
