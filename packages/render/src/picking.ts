@@ -279,8 +279,9 @@ export function assertEncodableCandidateCount(count: number): void {
  * per-particle geometry, so the table stores **one id for the whole
  * system**, joined through the emitter's `transform.worldMatrix` exactly as
  * for a `Renderable`. The id pass draws that index through the instanced
- * billboard (`@fourjs/render-webgl`'s `ParticleIdProgram`); it is not a
- * per-particle id.
+ * billboard (`@fourjs/render-webgl`'s `ParticleIdProgram`; WebGPU's private
+ * particle id pipeline — one colour per emitter on both). It is not a
+ * per-particle id. Trails are not drawn. Skinned items stay skipped.
  *
  * Both containers are cleared first, so a caller can reuse them per pass —
  * which is also what "rebuilt per pass" means: no index survives into the

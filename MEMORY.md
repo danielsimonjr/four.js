@@ -30,6 +30,18 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — WebGPU particle id arm (RFC 0005 residue).** One id per
+  emitter, mirroring WebGL's `ParticleIdProgram` without exporting that
+  class name (`graph:duplicates`). `PickingRendererHost.particles()` is
+  the live `WgpuParticleCache` accessor. Mesh `IdUniforms` stay 144
+  bytes; the particle id block is 208 bytes (`PARTICLE_ID_PROJECTION_
+  OFFSET` 0 / `VIEW` 64 / `MODEL` 128 / `PICK` 192) in the 256-byte
+  stride. Billboard vertex math is `PARTICLE_SHADER_SOURCE`'s (view·
+  model, view-space corner, projection, depth remap). Default 8-float
+  CPU stream only; trails, GPU-sim layouts, and the R-32 wide stream
+  skip. Skinned id pass remains open on both backends. RFC 0005 is not
+  closed.
+
 - **2026-09-09 — Dogfood cycle 6: §43 interpolated skin palettes.**
   Read from a consumer seat. `Skeleton.update(skinRoot, worldOf?)` and
   `buildInterpolatedRenderList` compose interpolated local poses, then

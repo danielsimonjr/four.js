@@ -59,6 +59,12 @@ stay on the tracker.
 
 ### Changed
 
+- **WebGPU particle id pass (RFC 0005).** Emitters pick by GPU id — one
+  colour per system — through a private billboard pipeline (CPU 8-float
+  instance stream, 208-byte `PARTICLE_ID_*` block). Trails stay undrawn;
+  GPU-sim / R-32 wide streams skip; skinned items still bounds-only on
+  both backends. RFC 0005 stays open.
+
 - **§43 interpolated skin palettes.** `Skeleton.update` takes an optional
   `worldOf` provider. The interpolated render list composes bone local
   poses at `interpolationAlpha` then runs the palette product. Palettes
@@ -72,8 +78,8 @@ stay on the tracker.
 
 - **WebGPU `PickingService` (RFC 0005).** `registerPickingPipeline()` from
   `@fourjs/render-webgpu`, then `createPickingService()`. `pick` copies
-  one texel through `mapAsync`. Particles and skinned items are skipped
-  (no `ParticleIdProgram`, no skinned pipelines).
+  one texel through `mapAsync`. Particle emitters now have their own id
+  arm (see the particle id-pass bullet); skinned items stay skipped.
 
 - **WebGPU lit/standard read `draw.normalMatrix`.** `DRAW_UNIFORM_BYTES`
   is 192; `STANDARD_UNIFORM_BYTES` is 224 (`emissive` 192, `surface` 208).

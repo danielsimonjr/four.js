@@ -51,8 +51,9 @@
  * material is skipped on the same terms. §71 picking is **opt-in**:
  * `createPickingService()` is declared (presence is the capability, matching
  * WebGL) and throws until `registerPickingPipeline()` links `wgpu-picking.ts`.
- * Particle systems are skipped in the id pass (no `ParticleIdProgram` on
- * this backend yet). The one exception is deliberate and
+ * The id pass draws particle systems with one colour per emitter (the §36
+ * billboard, CPU 8-float instance stream); trails stay undrawn and skinned
+ * items stay skipped. The one exception is deliberate and
  * narrow: a §67 **mask** is coverage, not shading, so a clip node of any
  * material family masks correctly today through the flat unlit pipeline with
  * colour writes off.
@@ -2274,12 +2275,12 @@ export class WebgpuRenderer implements Renderer {
    * bundles that opted in (the pipeline-cost law; `wgpu-picking-registry.ts`).
    *
    * What the service receives is a **live window** onto exactly the renderer
-   * state an id pass needs — device, the two shared caches (geometry, render
-   * targets), the surface size, and the two lifecycle flags — as accessors,
-   * so a §61 loss's dropped caches are seen rather than captured stale
-   * (`PickingRendererHost`). Each call builds an independent service; the
-   * caller owns and disposes it (§83). No GPU call is issued here — the id
-   * pipeline compiles on the service's first pass.
+   * state an id pass needs — device, the three shared caches (geometry,
+   * particles, render targets), the surface size, and the two lifecycle
+   * flags — as accessors, so a §61 loss's dropped caches are seen rather
+   * than captured stale (`PickingRendererHost`). Each call builds an
+   * independent service; the caller owns and disposes it (§83). No GPU call
+   * is issued here — the id pipeline compiles on the service's first pass.
    *
    * @throws FourError `INVALID_APPLICATION_STATE` on a disposed renderer, or
    * when no picking pipeline is registered.
@@ -2298,6 +2299,7 @@ export class WebgpuRenderer implements Renderer {
     const host: PickingRendererHost = {
       device: () => this.#device,
       geometries: () => this.#geometries,
+      particles: () => this.#particles,
       renderTargets: () => this.#renderTargets,
       surfaceWidth: () => Math.round(this.#width * this.#resolution),
       surfaceHeight: () => Math.round(this.#height * this.#resolution),
