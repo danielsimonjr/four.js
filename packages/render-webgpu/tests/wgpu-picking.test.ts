@@ -339,7 +339,11 @@ function uniformWritesBeforePass(gpu: RecordingGpu): number[][] {
       continue;
     }
     const data = call.args[2];
-    if (Array.isArray(data) && data.length % strideFloats === 0 && data.length >= strideFloats) {
+    if (
+      Array.isArray(data) &&
+      data.length % strideFloats === 0 &&
+      data.length >= strideFloats
+    ) {
       writes.push(data);
     }
   }

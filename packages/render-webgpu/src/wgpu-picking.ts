@@ -1040,9 +1040,7 @@ export class WebgpuPickingService implements PickingService {
           continue;
         }
         particleCache.upload(draw.batch, draw.item, this.#updateCount);
-        pass.setBindGroup(0, particleBindGroup, [
-          index * UNIFORM_STRIDE_BYTES,
-        ]);
+        pass.setBindGroup(0, particleBindGroup, [index * UNIFORM_STRIDE_BYTES]);
         pass.setVertexBuffer(0, draw.geometry.positionBuffer);
         pass.setVertexBuffer(1, draw.batch.buffer);
         pass.draw(6, draw.item.count);
