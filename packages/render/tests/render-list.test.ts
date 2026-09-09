@@ -770,16 +770,23 @@ describe("buildInterpolatedRenderList", () => {
     }));
 
     const out: RenderItem[] = [];
+    const paletteOf = (item: RenderItem): number[] => {
+      // TypeDoc's isolated TS 6 pass does not narrow through `expect(...)`.
+      if (!isSkinnedUnlitItem(item)) {
+        throw new Error("expected skinned-unlit item");
+      }
+      return Array.from(item.jointMatrices);
+    };
+
     const at0 = buildInterpolatedRenderList(scene, poses, 0, out);
     expect(at0).toHaveLength(1);
-    expect(isSkinnedUnlitItem(at0[0])).toBe(true);
-    const palette0 = Array.from(at0[0].jointMatrices);
+    const palette0 = paletteOf(at0[0]);
 
     const atHalf = buildInterpolatedRenderList(scene, poses, 0.5, out);
-    const paletteHalf = Array.from(atHalf[0].jointMatrices);
+    const paletteHalf = paletteOf(atHalf[0]);
 
     const at1 = buildInterpolatedRenderList(scene, poses, 1, out);
-    const palette1 = Array.from(at1[0].jointMatrices);
+    const palette1 = paletteOf(at1[0]);
 
     for (const snapshot of before) {
       expect(snapshot.node.transform.version).toBe(snapshot.version);
