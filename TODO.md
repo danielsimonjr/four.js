@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm** + **WebGL `SkinnedIdProgram`**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster**; lighting leftover **WebGPU `metalRoughnessMap`**; R-33 simulate/present split; dogfood cycles 4–6. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the **WebGPU** skinned id pass (needs RFC 0003 skinned pipelines).
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm** + **WebGL `SkinnedIdProgram`**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster**; lighting leftover **WebGPU `metalRoughnessMap`**; R-30c **map roles**; R-33 simulate/present split; dogfood cycles 4–6. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the **WebGPU** skinned id pass (needs RFC 0003 skinned pipelines).
 
 ### 0 · Blocked on an event, not on effort
 
@@ -133,7 +133,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - §27 field torque and field-driven waking — DONE 2026-09-06 (`sampleTorque` + per-entry `wakesSleepingBodies`).
 - Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22`); texture-atlas grouping; making batching the default (A-4). Idle-cache + glyph batching already shipped.
 - `buildRenderList` optimization — DONE 2026-09-06 (homogeneous sort skip + sprite fast path; benchmark re-recorded).
-- R-30c — the rest of §77, scoped by why each is not ordinary work:
+- R-30c — the rest of §77, scoped by why each is not ordinary work: map roles DONE 2026-09-09; still cube/array/3D, compressed, video/`ImageBitmap`, async upload.
 - §12 character controllers + first-person look — DONE (PH-11/PH-11b 2026-08-21; `examples/character-controller` browser gate 2026-08-29).
 - Staged rigs (R-36/R-37 residue, 2026-08-09):
 - §44/§47 camera rigs residue
@@ -1617,8 +1617,12 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 - [ ] **R-30c — the rest of §77, scoped by why each is not ordinary work:**
       ~~`capabilities.maxAnisotropy` / texture-format report~~ **DONE 2026-09-06**
       (lazy after init; `textureFormats` already shipped). `TextureSource.dimension`
-      refuses non-2d. Still open: cube/array/3D uploads, compressed containers,
-      video/`ImageBitmap`, map roles, async upload.
+      refuses non-2d. ~~map roles~~ **DONE 2026-09-09** (`TextureMapRole`
+      `"color"` | `"data"`; omitted role keeps R-15 `"linear"` so goldens
+      do not move; `role: "color"` defaults omitted `colorSpace` to `"srgb"`;
+      authored `colorSpace` always wins; backends still read `colorSpace`
+      only). Still open: cube/array/3D uploads, compressed containers,
+      video/`ImageBitmap`, async upload.
 
       · **OVERLAP, closed 2026-09-09:** "A-19 remainder" described the SAME remaining
         work. A-19 is now marked merged; this is the surviving item. GlTF residue

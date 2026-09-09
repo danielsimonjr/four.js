@@ -278,6 +278,10 @@ const GATED: ReadonlyMap<string, string> = new Map([
     "§71's id-program compile-failure notice (RFC 0005, 2026-08-28). Message only: the failure is latched per context era in both builds — picking passes are skipped identically, and `pick` refuses identically for want of an id buffer — and only the console.warn carrying §89's log moves with the flag. Picking is outside the §33 envelope regardless: a pick is a §34 *input*, its result never enters a checksum, and nothing an id pass draws re-enters simulation state (§42/§43)",
   ],
   [
+    join("packages", "render-webgpu", "src", "wgpu-picking.ts"),
+    "§71's id-pipeline compile-failure notices (RFC 0005, 2026-09-09) — the WebGPU twin of gl-picking.ts's entry: mesh and particle id pipelines each latch a per-device failure in both builds, picking passes are skipped identically, and only the console.warn carrying §89's log moves with the flag. Picking is outside the §33 envelope regardless: a pick is a §34 *input*, its result never enters a checksum, and nothing an id pass draws re-enters simulation state (§42/§43)",
+  ],
+  [
     join("packages", "assets", "src", "asset-manager.ts"),
     "§83's settled-slot duplicate-load warning (2026-09-06). Message only: a second load of a decoded (url, loader) slot still returns the same cached promise in both builds — in-flight coalescing is silent and unconditional — and only the console.warn naming the pair moves with the flag. `@fourjs/assets` is IO, not a simulation package: no number a replay reproduces passes through it (§33)",
   ],

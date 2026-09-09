@@ -14,6 +14,12 @@ stay on the tracker.
 
 ### Fixed
 
+- **`dev-build-mode` GATED list includes `wgpu-picking.ts`.** Wave 5's
+  WebGPU picking id pipelines wrap compile-failure notices in `if (DEV)`
+  (mesh + particle), matching `gl-picking.ts`, but the §33 gate only
+  listed the WebGL twin. Cross-package suites failed on #87 until the
+  WebGPU file was recorded with the same picking-is-input argument.
+
 - **Size budgets after #86.** CI `bun run size` failed with the browser
   gate green (107/107): particles-demo 43.04/43 kB (+38 B), ui-demo
   49.51/49.5 kB (+11 B). Limits 43.5 / 50 kB. first-3d 42.74/43 kB holds.
@@ -63,6 +69,15 @@ stay on the tracker.
   `*IsMinifiable` flags are gone.
 
 ### Changed
+
+- **Texture map roles (R-30c).** Optional `TextureSource.role` /
+  `Texture.role` (`"color"` | `"data"`). Omitting the field invents no
+  default and leaves `colorSpace` at R-15's `"linear"`, so already-
+  authored textures and goldens stay byte-identical. `role: "color"`
+  with no `colorSpace` resolves to `"srgb"`; `"data"` stays linear;
+  an authored `colorSpace` always wins. Backends still read
+  `colorSpace` only. Cube/array/3D, compressed, video/`ImageBitmap`,
+  and async upload remain. R-30c stays open.
 
 - **WebGL skinned id pass (RFC 0005).** `SkinnedIdProgram` draws a
   deformed silhouette into the picking buffer (`SKINNING_GLSL` spliced

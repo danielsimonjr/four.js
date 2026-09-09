@@ -30,6 +30,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — R-30c map roles.** Optional `TextureMapRole` `"color"` |
+  `"data"` on `TextureSource` / `Texture.role`. Omitting `role` invents
+  **no** default and leaves `colorSpace` at R-15's `"linear"` — that is
+  the golden-stability rule, not a missing default. `role: "color"` with
+  no `colorSpace` resolves to `"srgb"`; `"data"` stays linear; an
+  authored `colorSpace` always wins. Backends still sample
+  `texture.colorSpace` only; glTF already passes `"linear"` for
+  metallic-roughness. Invalid role is `RangeError` via `validateEnum`
+  (same as filter/wrap). R-30c checkbox stays `[ ]` (cube/array/3D,
+  compressed, video/`ImageBitmap`, async upload).
+
+- **2026-09-09 — `wgpu-picking.ts` on the `GATED` list.** Wave 5's WebGPU
+  picking id pipelines wrap compile-failure notices in `if (DEV)` (mesh
+  + particle). `gl-picking.ts` was already listed; the WebGPU twin was
+  not, so `tests/integration/dev-build-mode.test.ts` failed on #87.
+  Argument matches the WebGL entry: failure latched in both builds,
+  picking is a §34 input, nothing an id pass draws re-enters simulation
+  (§42/§43).
+
 - **2026-09-09 — RFC 0005 WebGL `SkinnedIdProgram`.** The id pass draws
   skinned-unlit / skinned-lit items through a deformed silhouette
   (`SKINNING_GLSL` in `gl-skinning-glsl.ts`, spliced into the id
