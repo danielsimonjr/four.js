@@ -10,7 +10,12 @@
  */
 
 import { isFourError } from "@fourjs/core";
-import { Matrix4, Vector3 } from "@fourjs/math";
+import {
+  Matrix4,
+  Vector3,
+  constructionCount,
+  resetConstructionCount,
+} from "@fourjs/math";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -20,6 +25,7 @@ import {
   MorphWeights,
   Node,
   Skeleton,
+  resolveWorldTransform,
   resolveWorldTransforms,
 } from "../src/index.js";
 
@@ -224,6 +230,131 @@ describe("Skeleton.update — the palette (§33, §42)", () => {
     for (const value of skeleton.jointMatrices) {
       expect(Number.isFinite(value)).toBe(true);
     }
+  });
+});
+
+describe("Skeleton.update — worldOf (§43 interpolated palettes)", () => {
+  /** Translation matrix; bind-pose identity plus a translation column. */
+  function translation(x: number, y: number, z: number): Matrix4 {
+    const matrix = new Matrix4();
+    matrix.elements[12] = x;
+    matrix.elements[13] = y;
+    matrix.elements[14] = z;
+    return matrix;
+  }
+
+  it("uses worldOf for the skin root and every bone when provided", () => {
+    const root = new Group();
+    root.transform.position.set(10, 0, 0);
+    const hip = new Bone();
+    hip.transform.position.set(0, 5, 0);
+    const knee = new Bone();
+    knee.transform.position.set(0, -1, 0);
+    hip.add(knee);
+    root.add(hip);
+    const skeleton = new Skeleton([hip, knee]);
+    resolveWorldTransforms(root);
+
+    // Resolved palettes would be inv(T(10,0,0)) · T(10,5,0) and
+    // inv(T(10,0,0)) · T(10,4,0). The provider supplies different worlds
+    // for the root and each bone, so a read of only one side cannot match.
+    const rootWorld = translation(1, 0, 0);
+    const hipWorld = translation(3, 0, 0);
+    const kneeWorld = translation(3, 2, 0);
+    const seen: Node[] = [];
+    skeleton.update(root, (node) => {
+      seen.push(node);
+      if (node === root) {
+        return rootWorld;
+      }
+      if (node === hip) {
+        return hipWorld;
+      }
+      return kneeWorld;
+    });
+
+    expect(seen).toEqual([root, hip, knee]);
+    // inv(T(1,0,0)) · T(3,0,0) = T(2,0,0)
+    expect(jointOf(skeleton, 0).slice(12, 15)).toEqual([2, 0, 0]);
+    // inv(T(1,0,0)) · T(3,2,0) = T(2,2,0)
+    expect(jointOf(skeleton, 1).slice(12, 15)).toEqual([2, 2, 0]);
+  });
+
+  it("matches resolveWorldTransform when worldOf is omitted", () => {
+    const root = new Group();
+    root.transform.position.set(1, 0, 0);
+    const bone = new Bone();
+    bone.transform.position.set(0, 2, 0);
+    root.add(bone);
+    const skeleton = new Skeleton([bone]);
+    resolveWorldTransforms(root);
+
+    skeleton.update(root);
+    const omitted = Array.from(skeleton.jointMatrices);
+
+    skeleton.update(root, (node) => resolveWorldTransform(node));
+    expect(Array.from(skeleton.jointMatrices)).toEqual(omitted);
+
+    skeleton.update(root);
+    expect(Array.from(skeleton.jointMatrices)).toEqual(omitted);
+  });
+
+  it("produces the identity-root formula when the provider returns identity", () => {
+    const root = new Group();
+    const bone = new Bone();
+    bone.transform.position.set(0, 4, 0);
+    root.add(bone);
+    // Non-identity bind so the result is not the trivial identity palette.
+    const binds = new Float32Array(16);
+    binds.set(IDENTITY);
+    binds[13] = -3;
+    const skeleton = new Skeleton([bone], binds);
+    resolveWorldTransforms(root);
+
+    const identity = new Matrix4();
+    skeleton.update(root, () => identity);
+
+    // palette = inv(I) · I · inverseBind = inverseBind
+    expect(jointOf(skeleton, 0)).toEqual(Array.from(binds));
+    // And not the resolved picture inv(I) · T(0,4,0) · T(0,-3,0) = T(0,1,0).
+    expect(jointOf(skeleton, 0).slice(12, 15)).not.toEqual([0, 1, 0]);
+  });
+
+  it("allocates no math objects or per-call arrays (existing scratch)", () => {
+    const root = new Group();
+    const bone = new Bone();
+    bone.transform.position.set(1, 2, 3);
+    root.add(bone);
+    const skeleton = new Skeleton([bone]);
+    resolveWorldTransforms(root);
+    const identity = new Matrix4();
+    const palette = skeleton.jointMatrices;
+    const bones = skeleton.bones;
+    skeleton.update(root);
+    skeleton.update(root, () => identity);
+
+    resetConstructionCount();
+    skeleton.update(root);
+    skeleton.update(root, () => identity);
+    expect(constructionCount()).toBe(0);
+    expect(skeleton.jointMatrices).toBe(palette);
+    expect(skeleton.bones).toBe(bones);
+  });
+
+  it("writes only into jointMatrices when worldOf is provided (§42)", () => {
+    const root = new Group();
+    const bone = new Bone();
+    bone.transform.position.set(2, 0, 0);
+    root.add(bone);
+    const skeleton = new Skeleton([bone]);
+    resolveWorldTransforms(root);
+    const versionBefore = bone.transform.version;
+    const identity = new Matrix4();
+    skeleton.update(root, () => identity);
+    expect(bone.transform.version).toBe(versionBefore);
+    expect(bone.transform.position.equalsApprox(new Vector3(2, 0, 0), 0)).toBe(
+      true,
+    );
   });
 });
 

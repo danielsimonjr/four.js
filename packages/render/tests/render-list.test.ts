@@ -14,6 +14,7 @@ import {
 } from "@fourjs/materials";
 import {
   ALL_LAYERS,
+  Bone,
   DEFAULT_LAYER_MASK,
   DEFAULT_LAYER_NAME,
   Group,
@@ -21,6 +22,7 @@ import {
   PerspectiveCamera,
   PoseBuffer,
   Scene,
+  Skeleton,
   createFullscreenViewport,
   layerMask,
   resolveWorldTransforms,
@@ -30,12 +32,14 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  Mesh,
   PARTICLE_INSTANCE_FLOATS,
   Renderable,
   buildInterpolatedRenderList,
   buildRenderList,
   groupRenderListByPipeline,
   isLitItem,
+  isSkinnedUnlitItem,
   isStandardItem,
   isUnlitItem,
   viewLayerMask,
@@ -731,6 +735,69 @@ describe("buildInterpolatedRenderList", () => {
 
     expect(second).toBe(first);
     expect(second.worldMatrix).toBe(matrix);
+  });
+
+  it("interpolates the joint palette from bone local poses, not last resolved world (§43)", () => {
+    const geometry = planeGeometry();
+    const vertexCount = geometry.vertexCount;
+    geometry.joints = new Uint16Array(vertexCount * 4);
+    const weights = new Float32Array(vertexCount * 4);
+    for (let i = 0; i < vertexCount; i += 1) {
+      weights[i * 4] = 1;
+    }
+    geometry.weights = weights;
+
+    const scene = new Scene();
+    const mesh = new Mesh(geometry, new UnlitMaterial());
+    const bone = new Bone();
+    const skeleton = new Skeleton([bone]);
+    mesh.skeleton = skeleton;
+    scene.add(mesh, bone);
+
+    const poses = new PoseBuffer();
+    poses.track(bone);
+    poses.track(mesh);
+    poses.capture();
+    bone.transform.position.set(0, 4, 0);
+    poses.capture();
+
+    resolveWorldTransforms(scene);
+    const before = [scene, mesh, bone].map((node) => ({
+      node,
+      version: node.transform.version,
+      worldVersion: node.transform.worldVersion,
+      world: node.transform.worldMatrix.clone(),
+    }));
+
+    const out: RenderItem[] = [];
+    const at0 = buildInterpolatedRenderList(scene, poses, 0, out);
+    expect(at0).toHaveLength(1);
+    expect(isSkinnedUnlitItem(at0[0])).toBe(true);
+    const palette0 = Array.from(at0[0].jointMatrices);
+
+    const atHalf = buildInterpolatedRenderList(scene, poses, 0.5, out);
+    const paletteHalf = Array.from(atHalf[0].jointMatrices);
+
+    const at1 = buildInterpolatedRenderList(scene, poses, 1, out);
+    const palette1 = Array.from(at1[0].jointMatrices);
+
+    for (const snapshot of before) {
+      expect(snapshot.node.transform.version).toBe(snapshot.version);
+      expect(snapshot.node.transform.worldVersion).toBe(snapshot.worldVersion);
+      expectMatrix(snapshot.node.transform.worldMatrix, snapshot.world, 15);
+    }
+
+    skeleton.update(mesh);
+    expect(palette1).toEqual(Array.from(skeleton.jointMatrices));
+
+    expect(paletteHalf).not.toEqual(palette1);
+    expect(palette0).not.toEqual(palette1);
+    expect(paletteHalf.slice(12, 15)).toEqual([0, 2, 0]);
+
+    bone.transform.position.set(0, 0, 0);
+    resolveWorldTransforms(scene);
+    skeleton.update(mesh);
+    expect(palette0).toEqual(Array.from(skeleton.jointMatrices));
   });
 });
 
