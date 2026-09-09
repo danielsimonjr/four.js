@@ -1102,7 +1102,7 @@ describe("PointerInput — PickProvider (RFC 0005)", () => {
     const box = boxAt(0, 0, -5);
     box.node.hitTestMode = "bounds";
     const { surface } = harness([box], {
-      pickProvider: { pick: async () => box.node.id },
+      pickProvider: { pick: () => Promise.resolve(box.node.id) },
     });
     let point: Vector3 | undefined;
     box.node.on("pointerdown", (event) => {
@@ -1251,7 +1251,7 @@ describe("PointerInput — PickProvider (RFC 0005)", () => {
 
   it("does not consult the provider while the pointer is captured", async () => {
     const gpu = gpuBoxAt(0, 0);
-    const pickFn = vi.fn(async () => gpu.node.id);
+    const pickFn = vi.fn(() => Promise.resolve(gpu.node.id));
     const { surface, input } = harness([gpu], {
       pickProvider: { pick: pickFn },
     });
@@ -1390,7 +1390,7 @@ describe("PointerInput — PickProvider (RFC 0005)", () => {
     "does not consult the provider if disposed before %s runs",
     async (type) => {
       const gpu = gpuBoxAt(0, 0);
-      const pickFn = vi.fn(async () => gpu.node.id);
+      const pickFn = vi.fn(() => Promise.resolve(gpu.node.id));
       const { surface, input } = harness([gpu], {
         pickProvider: { pick: pickFn },
       });
@@ -1438,7 +1438,7 @@ describe("PointerInput — PickProvider (RFC 0005)", () => {
   it("still suppresses click when a provider-backed pointer drags past the threshold", async () => {
     const gpu = gpuBoxAt(0, 0);
     const { surface } = harness([gpu], {
-      pickProvider: { pick: async () => gpu.node.id },
+      pickProvider: { pick: () => Promise.resolve(gpu.node.id) },
     });
     const order: string[] = [];
     gpu.node.on("pointerdown", () => order.push("down"));
@@ -1458,7 +1458,7 @@ describe("PointerInput — PickProvider (RFC 0005)", () => {
   it("still clicks when a provider-backed pointer wobbles inside the tolerance", async () => {
     const gpu = gpuBoxAt(0, 0);
     const { surface } = harness([gpu], {
-      pickProvider: { pick: async () => gpu.node.id },
+      pickProvider: { pick: () => Promise.resolve(gpu.node.id) },
     });
     const order: string[] = [];
     gpu.node.on("pointerdown", () => order.push("down"));

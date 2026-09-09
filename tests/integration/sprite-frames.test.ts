@@ -236,7 +236,7 @@ describe("R-29 — a frame costs a frameless sprite nothing (§55)", () => {
     ).toHaveLength(1);
   });
 
-  it("authors the identical uv rectangle, not merely the same call", async () => {
+  it("authors the identical uv rectangle, not merely the same call", () => {
     const framed = new Sprite(
       new SpriteMaterial({ texture: atlasTexture() }),
       QUAD,
