@@ -208,7 +208,9 @@ uniform sampler2D s_source;
 out vec4 fragColor;
 
 void main() {
+  // node 0 attribute
   vec2 n0 = v_uv;
+  // node 1 texture
   vec4 n1 = texture(s_source, n0);
   fragColor = n1;
 }
@@ -227,9 +229,13 @@ uniform mat4 model;
 uniform float time;
 
 void main() {
+  // node 0 attribute
   vec3 n0 = normal;
+  // node 1 time
   float n1 = time;
+  // node 2 unary
   float n2 = sin(n1);
+  // node 3 binary
   vec3 n3 = (n0 * n2);
   gl_Position = viewProjection * model * vec4(position + n3, 1.0);
 }
@@ -242,6 +248,7 @@ uniform float opacity;
 out vec4 fragColor;
 
 void main() {
+  // node 4 constant
   vec4 n4 = vec4(1.0, 0.5, 0.0, 1.0);
   vec4 c = n4;
   fragColor = vec4(c.rgb, c.a * opacity);
@@ -343,7 +350,31 @@ void main() {
     const emitted = emitShaderGraphGlsl(graph);
     expect(emitted.fragment).not.toContain("u_dead");
     expect(emitted.fragment).not.toContain("n0");
+    expect(emitted.fragment).not.toContain("// node 0");
+    expect(emitted.fragment).toContain("// node 1 constant");
     expect(emitted.uniforms).toEqual([]);
+  });
+
+  it("prefixes each reachable local with a deterministic provenance comment", () => {
+    const graph: ShaderGraph = {
+      domain: "surface",
+      nodes: [
+        { kind: "constant", type: "float", value: [1] },
+        { kind: "constant", type: "float", value: [2] },
+        { kind: "binary", op: "add", left: 0, right: 1 },
+        { kind: "uniform", type: "float", name: "dead" },
+        { kind: "compose", type: "vec4", parts: [2, 2, 2, 2] },
+      ],
+      color: 4,
+    };
+    const fragment = emitShaderGraphGlsl(graph).fragment;
+    expect(fragment).toContain(
+      "  // node 0 constant\n  float n0 = 1.0;\n" +
+        "  // node 1 constant\n  float n1 = 2.0;\n" +
+        "  // node 2 binary\n  float n2 = (n0 + n1);\n" +
+        "  // node 4 compose\n  vec4 n4 = vec4(n2, n2, n2, n2);\n",
+    );
+    expect(fragment).not.toContain("// node 3");
   });
 
   it("declares screen-domain uniforms and time without a uv varying when unused", () => {

@@ -657,6 +657,27 @@ describe("emitShaderGraphWgsl — §33-deterministic WGSL", () => {
     );
   });
 
+  it("prefixes each reachable local with a deterministic provenance comment", () => {
+    const code = emitShaderGraphWgsl({
+      domain: "surface",
+      nodes: [
+        { kind: "constant", type: "float", value: [1] },
+        { kind: "constant", type: "float", value: [2] },
+        { kind: "binary", op: "add", left: 0, right: 1 },
+        { kind: "uniform", type: "float", name: "dead" },
+        { kind: "compose", type: "vec4", parts: [2, 2, 2, 2] },
+      ],
+      color: 4,
+    }).code;
+    expect(code).toContain(
+      "  // node 0 constant\n  let n0 : f32 = 1.0;\n" +
+        "  // node 1 constant\n  let n1 : f32 = 2.0;\n" +
+        "  // node 2 binary\n  let n2 : f32 = (n0 + n1);\n" +
+        "  // node 4 compose\n  let n4 : vec4<f32> = vec4<f32>(n2, n2, n2, n2);\n",
+    );
+    expect(code).not.toContain("// node 3");
+  });
+
   it("throws analyzeShaderGraph's RangeError for a malformed graph", () => {
     expect(() => emitShaderGraphWgsl(malformedGraph())).toThrow(RangeError);
   });

@@ -13,8 +13,12 @@
  * `@fourjs/render` re-exposes — the frozen §3.1 row is untouched), its output
  * is a pure, deterministic function of that graph (§33: nodes are visited in
  * **array order**, dead-node elimination is the only transform), and the same
- * closed operators emit the same arithmetic the GLSL emitter emits — WGSL's
- * builtins `sin`/`cos`/`abs`/`floor`/`fract`/`normalize`/`length`/`min`/
+ * closed operators emit the same arithmetic the GLSL emitter emits. Each
+ * reachable local is preceded by `// node <index> <kind>` — a pure function
+ * of those two fields, so a `SHADER_COMPILATION_FAILED` driver log can be
+ * correlated with the graph node. That is provenance, not a source map: there
+ * is no file:line table (RFC 0001 §6 still defers that). WGSL's builtins
+ * `sin`/`cos`/`abs`/`floor`/`fract`/`normalize`/`length`/`min`/
  * `max`/`dot`/`step`/`mix`/`saturate` are componentwise IEEE single-precision
  * exactly as GLSL ES 3.00's are, and the infix operators are the same
  * operators. Two spelling divergences, neither a numeric one:
@@ -431,7 +435,13 @@ function nodeExpression(
   }
 }
 
-/** One `let nK : T = expr;` line per reachable node, array order (§33). */
+/**
+ * One provenance comment plus `let nK : T = expr;` per reachable node, array
+ * order (§33). The comment is `// node <index> <kind>` — a pure function of
+ * those two fields, so `SHADER_COMPILATION_FAILED` logs can be correlated
+ * with graph nodes. This is not a source map: there is no file:line table
+ * (RFC 0001 §6 still defers that). Unreachable nodes emit nothing.
+ */
 function emitLocals(
   graph: ShaderGraph,
   context: EmissionContext,
@@ -443,7 +453,9 @@ function emitLocals(
     if (!reachable[index]) {
       continue;
     }
-    const expression = nodeExpression(graph.nodes[index], stage, context);
+    const node = graph.nodes[index];
+    const expression = nodeExpression(node, stage, context);
+    out += `  // node ${String(index)} ${node.kind}\n`;
     out += `  let n${String(index)} : ${WGSL_TYPES[context.types[index]]} = ${expression};\n`;
   }
   return out;

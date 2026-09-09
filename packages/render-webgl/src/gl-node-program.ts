@@ -18,6 +18,14 @@
  * reassociating float expressions changes pixels and §92's pixel-golden tier
  * would then be gated on a compiler's mood (RFC 0001 §3).
  *
+ * ## Provenance comments, not source maps
+ *
+ * Each reachable local is preceded by `// node <index> <kind>` — a pure
+ * function of those two fields, in array order. That is enough to correlate
+ * a `SHADER_COMPILATION_FAILED` driver log with the graph node that emitted
+ * the line. It is **not** a source map: there is no file:line table
+ * (RFC 0001 §6 still defers that). Unreachable nodes still emit nothing.
+ *
  * ## One program per graph structure, not per material
  *
  * {@link GlNodeProgramCache} keys compiled programs on the emitted source —
@@ -244,7 +252,13 @@ function nodeExpression(
   }
 }
 
-/** One `T nK = expr;` line per reachable node, in array order (§33). */
+/**
+ * One provenance comment plus `T nK = expr;` per reachable node, array order
+ * (§33). The comment is `// node <index> <kind>` — a pure function of those
+ * two fields, so `SHADER_COMPILATION_FAILED` logs can be correlated with
+ * graph nodes. This is not a source map: there is no file:line table
+ * (RFC 0001 §6 still defers that). Unreachable nodes emit nothing.
+ */
 function emitLocals(
   graph: ShaderGraph,
   analysis: ShaderGraphAnalysis,
@@ -256,7 +270,9 @@ function emitLocals(
     if (!reachable[index]) {
       continue;
     }
-    const expression = nodeExpression(graph.nodes[index], stage);
+    const node = graph.nodes[index];
+    const expression = nodeExpression(node, stage);
+    out += `  // node ${String(index)} ${node.kind}\n`;
     out += `  ${analysis.nodeTypes[index]} n${String(index)} = ${expression};\n`;
   }
   return out;
