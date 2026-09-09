@@ -10,7 +10,9 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 Closed the remaining *contained* open items. Feature packets, RFC residues, the
 standing dogfooding map, first publish, and R-33 (needs non-SwiftShader hardware)
-stay on the tracker.
+stay on the tracker. A same-day audit recounts **12 open / 257 closed**
+(header had 249) and strikes leftover “remaining” prose on closed rows.
+No packet closed.
 
 ### Fixed
 
@@ -69,6 +71,13 @@ stay on the tracker.
   `*IsMinifiable` flags are gone.
 
 ### Changed
+
+- **TODO tracker audit.** Recounted **12 open / 257 closed** (header said
+  249). No open packet closed — each remaining `[ ]` still has named
+  work or is standing/owner-gated. Struck leftover “remaining” prose on
+  closed rows (rigs, PH-11c, scissor, `recording-gl` adopt, flagship §46
+  layers, WebGPU `maximumSkinningJoints`) and Priority-index leftovers
+  (A-4/A-5/A-19, R-32, camera-rig residue, particle-trail spatial-hash).
 
 - **WebGPU skinned colour pair (RFC 0003).** `registerSkinningPipeline()`
   from `@fourjs/render-webgpu` compiles unlit + lit on first skinned

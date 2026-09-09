@@ -30,6 +30,20 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — Open-TODO audit: 12 still open, 257 closed.** A
+  subagent-team review of every `- [ ]` row against source. None of the 12
+  packets can close: dogfood is standing; first publish is owner-gated
+  (no git tag, nothing on npm); R-33 still needs non-SwiftShader; RFC
+  0001/0003/0004/0005, lighting, R-1 deferred, batching, R-30c, and §96
+  each still have named remaining slices (WebGPU skinned id/shadow skip;
+  GPU morph / CPU skinning / bone-texture absent; cube/array/3D and
+  compressed/video/async absent). Header closed-count was 249 — seven
+  `[x]` rows had never been added. Hygiene only: stale “remaining”
+  sentences on closed rows (rigs, PH-11c, scissor, `recording-gl` adopt,
+  flagship §46 layers, WebGPU `maximumSkinningJoints`) and Priority-index
+  leftovers (A-4/A-5/A-19, R-32, camera-rig residue, particle-trail
+  spatial-hash). Do not re-triage the 12 as quick wins.
+
 - **2026-09-09 — WebGPU skinned colour pair (RFC 0003).** Opt-in
   `registerSkinningPipeline()` from `@fourjs/render-webgpu`. `WebgpuRenderer`
   imports only `wgpu-skinning-registry.ts` (pipeline-cost law). Palette is
