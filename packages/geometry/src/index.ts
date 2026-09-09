@@ -7,6 +7,7 @@ export type {
   GeometryIndexArray,
 } from "./buffer-geometry.js";
 export { BufferGeometry } from "./buffer-geometry.js";
+export { computeSkinnedBounds } from "./skinned-bounds.js";
 // --- R-21: §53 geometry base + bounding volume (begin) ---
 export type { BoundingVolume } from "./geometry.js";
 export { Geometry } from "./geometry.js";
@@ -64,10 +65,7 @@ export {
   DEFAULT_MAXIMUM_SVG_DOCUMENT_LENGTH,
   parseSvgDocument,
 } from "./svg-document.js";
-export type {
-  SvgPathFormatOptions,
-  SvgPathParseOptions,
-} from "./svg-path.js";
+export type { SvgPathFormatOptions, SvgPathParseOptions } from "./svg-path.js";
 export {
   DEFAULT_MAXIMUM_PATH_DATA_LENGTH,
   formatSvgPathData,

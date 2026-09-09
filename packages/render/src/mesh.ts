@@ -57,6 +57,10 @@
  *   skipped rather than casting a bind-pose shadow. WebGPU draws the
  *   skinned colour pair behind the same registration; its caster and id
  *   pass still skip (never a bind-pose shadow or pick).
+ *
+ * `@fourjs/geometry` exports `computeSkinnedBounds` as an opt-in posed local
+ * volume; culling and picking still use bind-pose bounds unless a future
+ * packet consumes it.
  */
 
 import { FourError } from "@fourjs/core";
