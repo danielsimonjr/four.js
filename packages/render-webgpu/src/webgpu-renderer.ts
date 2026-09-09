@@ -46,15 +46,17 @@
  * **opt-in** behind `registerSkinningPipeline()` — the pipeline-cost law's
  * registration seam, matching WebGL: the renderer imports only the registry
  * slot, and an unregistered (or failed) skinned draw is skipped, never
- * shown in bind pose. The §69 skinned caster and the RFC 0005 skinned id
- * pass stay *absent*: those items skip, and an invisible surface must not
- * cast or pick as its bind pose. An *unregistered* node material is skipped
- * on the same terms. §71 picking is **opt-in**: `createPickingService()` is
- * declared (presence is the capability, matching WebGL) and throws until
- * `registerPickingPipeline()` links `wgpu-picking.ts`. The id pass draws
- * particle systems with one colour per emitter (the §36 billboard, CPU
- * 8-float instance stream); trails stay undrawn and skinned items stay
- * skipped. The one exception is deliberate and narrow: a §67 **mask** is
+ * shown in bind pose. Registered skinned casters deform in the §69 pass
+ * through `acquireShadow()`; the RFC 0005 skinned id pass lives in
+ * `wgpu-picking.ts` and is independent of this registration. An
+ * *unregistered* node material is skipped on the same terms. §71 picking is
+ * **opt-in**: `createPickingService()` is declared (presence is the
+ * capability, matching WebGL) and throws until `registerPickingPipeline()`
+ * links `wgpu-picking.ts`. The id pass draws particle systems with one
+ * colour per emitter (the §36 billboard, CPU 8-float instance stream);
+ * trails stay undrawn. Skinned items draw a deformed silhouette through a
+ * private id pipeline compiled on the first skinned pick item. The one
+ * exception is deliberate and narrow: a §67 **mask** is
  * coverage, not shading, so a clip node of any material family masks
  * correctly today through the flat unlit pipeline with colour writes off.
  *
@@ -148,6 +150,7 @@ import {
   type GpuCommandEncoder,
   type GpuDevice,
   type GpuRenderPassEncoder,
+  type GpuRenderPipeline,
   type GpuSampler,
   type GpuTexture,
   type GpuTextureView,
@@ -795,6 +798,13 @@ export class WebgpuRenderer implements Renderer {
   #skinnedProgramsFailed = false;
 
   /**
+   * Set when `acquireShadow` throws. A later skinned caster on this device
+   * must not retry — a refusing driver asked once per caster would otherwise
+   * succeed on a subsequent call. Colour skinning is left alone.
+   */
+  #skinnedShadowFailed = false;
+
+  /**
    * The pooled per-draw state handed to node draws (plan D7: the frame loop
    * allocates nothing) — rewritten per draw, read synchronously, never
    * retained by the store (`WgpuNodeFrameState`'s contract).
@@ -1310,10 +1320,27 @@ export class WebgpuRenderer implements Renderer {
     // and a factory failure is a skip for every skinned item, never a
     // bind pose. Unregistered: warned once inside `#acquireSkinnedPrograms`
     // and `skinnedPrograms` stays null — the draw arm continues past.
+    // §69 casters run *before* the colour pass, so `prepare` is sized for
+    // caster palettes plus later colour draws; packing continues across
+    // both, one `upload` after the frame.
     const skinnedPrograms =
       skinnedCount > 0 ? this.#acquireSkinnedPrograms() : null;
+    let skinnedCasterCount = 0;
+    if (frameShadow && skinnedPrograms !== null) {
+      for (const item of items) {
+        if (
+          item.castShadow &&
+          (item.kind === "skinned-unlit" || item.kind === "skinned-lit")
+        ) {
+          skinnedCasterCount += 1;
+        }
+      }
+    }
     if (skinnedPrograms !== null) {
-      skinnedPrograms.prepare(device, skinnedCount * views.length);
+      skinnedPrograms.prepare(
+        device,
+        skinnedCasterCount + skinnedCount * views.length,
+      );
     }
 
     // Sized before recording: one clear block per view plus, at worst, one
@@ -1391,6 +1418,7 @@ export class WebgpuRenderer implements Renderer {
         items,
         block,
         statistics,
+        skinnedPrograms,
       );
       shadowRecord = shadow.record;
       block = shadow.block;
@@ -1706,8 +1734,7 @@ export class WebgpuRenderer implements Renderer {
         ) {
           // Remaining kinds this colour pass does not draw. Skinned items
           // continued above when registered; unregistered ones fell through
-          // the `skinnedPrograms === null` skip. The §69 caster and RFC 0005
-          // id pass still absent — skipped, never bind-pose.
+          // the `skinnedPrograms === null` skip.
           continue;
         }
         if (!maskPass && item.kind === "node") {
@@ -2849,6 +2876,111 @@ export class WebgpuRenderer implements Renderer {
   }
 
   /**
+   * The registered skinning pipeline's depth-only caster for this device,
+   * compiled on the first skinned caster, or `null` when there is nothing to
+   * draw a deformed silhouette with (§54, §69; RFC 0003 residue).
+   *
+   * Separate from `#acquireSkinnedPrograms`: the colour pair compiles on the
+   * first skinned colour draw, and this pipeline must not ride along — a
+   * skinned mesh that does not cast must not add a caster pipeline. A
+   * colour-pair failure (unregistered, or a refusing driver) skips skinned
+   * casters the way it skips skinned colour draws: a bind-pose shadow is a
+   * different picture. A caster-only compile failure latches here and leaves
+   * colour skinning alone.
+   */
+  #acquireSkinnedShadowPipeline(
+    programs: SkinnedPrograms,
+    topology: "triangle-list" | "line-list",
+  ): GpuRenderPipeline | null {
+    if (this.#skinnedShadowFailed) {
+      return null;
+    }
+    try {
+      return programs.acquireShadow(topology);
+    } catch (error: unknown) {
+      this.#skinnedShadowFailed = true;
+      if (DEV) {
+        devWarnOnce(
+          "webgpu-skinned-shadow-compile-failed",
+          "§69: the skinned shadow pipeline failed to compile on this " +
+            `device; skinned casters are skipped (§61, §89). ${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Draws one skinned caster through the registered pair's lazy shadow
+   * pipeline. Returns whether a uniform block was consumed.
+   */
+  #drawSkinnedShadow(
+    pass: GpuRenderPassEncoder,
+    programs: SkinnedPrograms,
+    bindGroup: GpuBindGroup,
+    geometries: WgpuGeometryCache,
+    item: RenderItem,
+    block: number,
+    statistics: RenderStatistics | null,
+  ): boolean {
+    if (!(isSkinnedUnlitItem(item) || isSkinnedLitItem(item))) {
+      return false;
+    }
+    const jointsAttr = item.geometry.joints;
+    const weightsAttr = item.geometry.weights;
+    if (
+      jointsAttr === undefined ||
+      weightsAttr === undefined ||
+      jointsAttr.length === 0 ||
+      weightsAttr.length === 0
+    ) {
+      return false;
+    }
+    const record = geometries.acquire(item.geometry, false, true);
+    if (
+      record === null ||
+      record.jointBuffer === null ||
+      record.weightBuffer === null
+    ) {
+      return false;
+    }
+    const pipeline = this.#acquireSkinnedShadowPipeline(
+      programs,
+      record.topology,
+    );
+    const paletteGroup = programs.paletteBindGroup();
+    if (pipeline === null || paletteGroup === null) {
+      return false;
+    }
+    this.#writeBlock(
+      block,
+      sceneLights.shadowMatrix,
+      item.worldMatrix,
+      0,
+      0,
+      0,
+      0,
+    );
+    const paletteOffset = programs.packPalette(item.jointMatrices);
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup, [block * UNIFORM_STRIDE_BYTES]);
+    pass.setBindGroup(1, paletteGroup, [paletteOffset]);
+    pass.setVertexBuffer(0, record.positionBuffer);
+    pass.setVertexBuffer(1, record.jointBuffer);
+    pass.setVertexBuffer(2, record.weightBuffer);
+    if (record.indexBuffer !== null && record.indexFormat !== null) {
+      pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
+      pass.drawIndexed(record.count);
+    } else {
+      pass.draw(record.count);
+    }
+    if (statistics !== null) {
+      countDraw(statistics, record.topology, record.count, 1);
+    }
+    return true;
+  }
+
+  /**
    * Draws one skinned colour item through the registered pair. Returns
    * whether a uniform block was consumed so the caller can keep `block`
    * honest — a skip must not increment it, or the next draw's offset would
@@ -3124,6 +3256,7 @@ export class WebgpuRenderer implements Renderer {
     this.#skinnedPrograms?.dispose();
     this.#skinnedPrograms = null;
     this.#skinnedProgramsFailed = false;
+    this.#skinnedShadowFailed = false;
     // §69's target is engine-side state this renderer owns (R-18): disposed
     // on both branches — its GPU rows were released (or died) with the cache
     // above, and the §83 accounting closes with the object.
@@ -3742,6 +3875,7 @@ export class WebgpuRenderer implements Renderer {
     items: readonly RenderItem[],
     blockStart: number,
     statistics: RenderStatistics | null,
+    skinnedPrograms: SkinnedPrograms | null,
   ): { record: WgpuRenderTargetRecord | null; block: number } {
     let block = blockStart;
     const size = sceneLights.shadowMapSize;
@@ -3777,9 +3911,9 @@ export class WebgpuRenderer implements Renderer {
     for (const item of items) {
       // The caster filter — `wgpu-shadow.ts`'s header owns the list: §49's
       // opt-out, sprites (a quad would cast its rectangle), and every kind
-      // this backend has no caster pipeline for (skinned — colour pair behind
-      // `registerSkinningPipeline()`; shadow caster and id pass still absent,
-      // and an invisible surface must not cast). Masks and particle items carry `castShadow: false`
+      // this backend has no caster pipeline for. Registered skinned casters
+      // deform through `acquireShadow()`; unregistered ones skip (never a
+      // bind-pose silhouette). Masks and particle items carry `castShadow: false`
       // from the list builder — a §36 billboard has no surface to project,
       // drawn (WP-R1.8) or not. §60 (WP-R1.9): a node material with **no**
       // displacement casts its geometry exactly — depth ignores colour, so
@@ -3787,15 +3921,36 @@ export class WebgpuRenderer implements Renderer {
       // would cast its *undisplaced* silhouette, a different picture, so
       // those casters skip: GL's node-caster rule, verbatim (and like GL's,
       // registration-independent — the caster module is this backend's own).
+      const skinnedKind =
+        item.kind === "skinned-unlit" || item.kind === "skinned-lit";
       if (
         !item.castShadow ||
         (item.kind !== "unlit" &&
           item.kind !== "lit" &&
           item.kind !== "standard" &&
-          item.kind !== "node") ||
+          item.kind !== "node" &&
+          !skinnedKind) ||
         (item.kind === "node" &&
           item.material.graph.positionOffset !== undefined)
       ) {
+        continue;
+      }
+      if (skinnedKind) {
+        if (skinnedPrograms === null) {
+          continue;
+        }
+        const drawn = this.#drawSkinnedShadow(
+          pass,
+          skinnedPrograms,
+          bindGroup,
+          geometries,
+          item,
+          block,
+          statistics,
+        );
+        if (drawn) {
+          block += 1;
+        }
         continue;
       }
       const geometry = geometries.acquire(item.geometry);
@@ -4083,6 +4238,7 @@ export class WebgpuRenderer implements Renderer {
       this.#skinnedPrograms?.forget();
       this.#skinnedPrograms = null;
       this.#skinnedProgramsFailed = false;
+      this.#skinnedShadowFailed = false;
       this.#spriteLayout = null;
       this.#spriteBindGroup = null;
       this.#particleLayout = null;

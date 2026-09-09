@@ -1206,7 +1206,7 @@ describe("WebgpuRenderer.render", () => {
     // (this test) the draw is skipped, never approximated as a bind pose —
     // and skipped before the geometry cache uploads buffers nothing will bind
     // (WP-R1.4's pinned rule; before WP-R1.5 this test pinned the `"lit"`
-    // kind, which now draws). Shadow caster and id pass stay absent.
+    // kind, which now draws). Unregistered skinned casters still skip.
     const geometry = triangle();
     geometry.joints = new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     geometry.weights = new Float32Array(12).fill(0.25);
@@ -3253,8 +3253,8 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
     optOut.castShadow = false;
     root.add(optOut);
     root.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
-    // A skinned item — transcript-invisible on this backend (WP-R1.4), and
-    // its shadow with it (an invisible surface must not cast).
+    // A skinned item — unregistered on this backend, so colour and caster
+    // both skip (an invisible surface must not cast a bind pose).
     const skinnedGeometry = litTriangle();
     skinnedGeometry.joints = new Uint16Array(12);
     skinnedGeometry.weights = new Float32Array(12).fill(0.25);
@@ -4318,8 +4318,138 @@ describe("registerSkinningPipeline — WebgpuRenderer colour pair (RFC 0003)", (
     expect(bufferLabelsOf(harness.gpu, "fourJS:joints:")).toHaveLength(0);
   });
 
-  it("still excludes a registered skinned mesh from the shadow caster pass", () => {
+  it("draws a registered skinned mesh as a deformed shadow caster", () => {
     registerSkinningPipeline();
+    const { root } = shadowedScene();
+    const geometry = skinnedTriangle(litTriangle());
+    geometry.indices = new Uint16Array([0, 1, 2]);
+    const skinned = new Renderable(
+      geometry.asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    withSkeleton(skinned);
+    root.add(skinned);
+
+    harness.renderer.render(root, [createView()]);
+
+    const names = harness.gpu.calls.map((call) => call.name);
+    const shadowStart = names.indexOf("encoder.beginRenderPass");
+    const viewsStart = names.indexOf(
+      "encoder.beginRenderPass",
+      shadowStart + 1,
+    );
+    const casterDraws = names
+      .slice(shadowStart, viewsStart)
+      .filter((name) => name === "pass.draw" || name === "pass.drawIndexed");
+    expect(casterDraws).toHaveLength(2);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("fourJS:skinned-shadow|"),
+      ),
+    ).toBe(true);
+    const codes = harness.gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => (call.args[0] as { code: string }).code);
+    expect(codes.some((code) => code.includes("skinMatrix"))).toBe(true);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("fourJS:skinned-lit|"),
+      ),
+    ).toBe(true);
+  });
+
+  it("compiles the skinned caster lazily on the first caster, not with the colour pair", () => {
+    registerSkinningPipeline();
+    const node = renderable(skinnedTriangle());
+    withSkeleton(node);
+    harness.renderer.render(node, [createView()]);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("fourJS:skinned-shadow|"),
+      ),
+    ).toBe(false);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("fourJS:skinned-unlit|"),
+      ),
+    ).toBe(true);
+
+    harness.gpu.reset();
+    const { root } = shadowedScene();
+    const skinned = new Renderable(
+      skinnedTriangle(litTriangle()).asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    withSkeleton(skinned);
+    root.add(skinned);
+    harness.renderer.render(root, [createView()]);
+    expect(
+      pipelineLabels(harness.gpu).filter((label) =>
+        label.startsWith("fourJS:skinned-shadow|"),
+      ),
+    ).toHaveLength(1);
+
+    harness.gpu.reset();
+    harness.renderer.render(root, [createView()]);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("fourJS:skinned-shadow|"),
+      ),
+    ).toBe(false);
+  });
+
+  it("skips skinned casters when acquireShadow throws, and still draws colour", () => {
+    registerSkinningPipeline();
+    const raw = harness.gpu.device.createRenderPipeline.bind(
+      harness.gpu.device,
+    );
+    harness.gpu.device.createRenderPipeline = (descriptor) => {
+      const label = (descriptor as { label?: string }).label ?? "";
+      if (label.startsWith("fourJS:skinned-shadow|")) {
+        throw new Error("caster refused");
+      }
+      return raw(descriptor);
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { root } = shadowedScene();
+      const skinned = new Renderable(
+        skinnedTriangle(litTriangle()).asGeometry,
+        new TestLitMaterial().asMaterial,
+      );
+      withSkeleton(skinned);
+      root.add(skinned);
+      harness.renderer.render(root, [createView()]);
+      harness.renderer.render(root, [createView()]);
+
+      const names = harness.gpu.calls.map((call) => call.name);
+      const shadowStart = names.indexOf("encoder.beginRenderPass");
+      const viewsStart = names.indexOf(
+        "encoder.beginRenderPass",
+        shadowStart + 1,
+      );
+      const casterDraws = names
+        .slice(shadowStart, viewsStart)
+        .filter((name) => name === "pass.draw" || name === "pass.drawIndexed");
+      expect(casterDraws).toHaveLength(1);
+      expect(
+        pipelineLabels(harness.gpu).some((label) =>
+          label.startsWith("fourJS:skinned-lit|"),
+        ),
+      ).toBe(true);
+      expect(
+        pipelineLabels(harness.gpu).some((label) =>
+          label.startsWith("fourJS:skinned-shadow|"),
+        ),
+      ).toBe(false);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain("skinned shadow");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("still excludes an unregistered skinned mesh from the shadow caster pass", () => {
     const { root } = shadowedScene();
     const skinned = new Renderable(
       skinnedTriangle(litTriangle()).asGeometry,
@@ -4342,9 +4472,9 @@ describe("registerSkinningPipeline — WebgpuRenderer colour pair (RFC 0003)", (
     expect(casterDraws).toHaveLength(1);
     expect(
       pipelineLabels(harness.gpu).some((label) =>
-        label.startsWith("fourJS:skinned-lit|"),
+        label.startsWith("fourJS:skinned-"),
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("disposes the palette with the renderer and forgets it on device loss", async () => {

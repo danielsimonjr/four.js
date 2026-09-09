@@ -31,8 +31,10 @@ import {
   GPU_BUFFER_USAGE,
   ID_PICK_OFFSET,
   ID_SHADER_SOURCE,
+  JOINT_PALETTE_FLOATS,
   PARTICLE_ID_PICK_OFFSET,
   PARTICLE_ID_SHADER_SOURCE,
+  SKINNED_ID_SHADER_SOURCE,
   UNIFORM_STRIDE_BYTES,
   WebgpuPickingService,
   WebgpuRenderer,
@@ -129,6 +131,25 @@ function drawable(
   material: PickMaterial | PickSpriteMaterial = new PickMaterial(),
 ): Renderable {
   return new Renderable(geometry.asGeometry, material.asMaterial);
+}
+
+function skinnedDrawable(
+  palette = new Float32Array(16),
+  geometry: PickGeometry = triangleGeometry(),
+): Renderable {
+  geometry.joints = new Uint16Array(12);
+  geometry.weights = new Float32Array(12).fill(0.25);
+  const node = drawable(geometry);
+  Object.assign(node, {
+    skeleton: {
+      bones: [{}],
+      jointMatrices: palette,
+      update(): void {
+        // palette refreshed elsewhere
+      },
+    },
+  });
+  return node;
 }
 
 /**
@@ -553,22 +574,12 @@ describe("WebgpuPickingService.update — the id pass", () => {
     expect(gpu.countOf("pass.draw")).toBe(1);
   });
 
-  it("skips skinned items and draws particles with one id per emitter", () => {
+  it("draws a skinned mesh through the deformed id pipeline, and still draws particles", () => {
     const { gpu, service, view } = createRig();
     const emitter = particleEmitter(3);
-    const skinnedGeometry = triangleGeometry();
-    skinnedGeometry.joints = new Uint16Array(12);
-    skinnedGeometry.weights = new Float32Array(12);
-    const skinned = drawable(skinnedGeometry);
-    Object.assign(skinned, {
-      skeleton: {
-        bones: [{}],
-        jointMatrices: new Float32Array(16),
-        update(): void {
-          // palette refreshed elsewhere
-        },
-      },
-    });
+    const palette = new Float32Array(16);
+    palette[5] = 3;
+    const skinned = skinnedDrawable(palette);
     const plain = drawable();
     const root = {
       visible: true,
@@ -579,13 +590,204 @@ describe("WebgpuPickingService.update — the id pass", () => {
 
     service.update(root as unknown as PickRoot, view);
     // Traversal table: emitter 0, skinned 1, plain 2. Skinned stays in the
-    // table but is never drawn. Particles instance the live quads; the
-    // plain drawable is the one non-instanced `pass.draw`.
+    // table and now draws through the deformed pipeline. Particles instance
+    // the live quads; the plain drawable is the other non-instanced draw.
     expect(particleDrawCount(gpu)).toBe(1);
-    expect(meshDrawCount(gpu)).toBe(1);
+    expect(meshDrawCount(gpu)).toBe(2);
     expect(gpu.countOf("pass.drawIndexed")).toBe(0);
     expect(particleIdUploads(gpu)).toEqual([expectedIdUpload(0)]);
+    expect(idUploads(gpu)).toEqual([
+      expectedIdUpload(2),
+      expectedIdUpload(1),
+    ]);
+
+    const codes = gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => (call.args[0] as { code: string }).code);
+    expect(codes).toContain(SKINNED_ID_SHADER_SOURCE);
+    const skinnedCode = codes.find((code) => code === SKINNED_ID_SHADER_SOURCE);
+    expect(skinnedCode).toBeDefined();
+    expect(skinnedCode).toContain("skinMatrix");
+    expect(skinnedCode).toContain("@location(4)");
+    expect(skinnedCode).toContain("@location(5)");
+    expect(skinnedCode).toContain("@group(1)");
+    expect(skinnedCode).toContain("pickId");
+
+    const paletteWrites = gpu
+      .callsOf("queue.writeBuffer")
+      .filter((call) => call.args[4] === JOINT_PALETTE_FLOATS);
+    expect(paletteWrites).toHaveLength(1);
+    expect((paletteWrites[0]?.args[2] as number[])[5]).toBe(3);
+
+    const layouts = gpu
+      .callsOf("device.createRenderPipeline")
+      .map(
+        (call) =>
+          call.args[0] as {
+            label?: string;
+            vertex: { buffers: { attributes: { shaderLocation: number }[] }[] };
+          },
+      );
+    const skinnedPipeline = layouts.find(
+      (descriptor) => descriptor.label === "fourJS:pick-skinned-id",
+    );
+    expect(skinnedPipeline).toBeDefined();
+    const locations = skinnedPipeline?.vertex.buffers.flatMap((buffer) =>
+      buffer.attributes.map((attribute) => attribute.shaderLocation),
+    );
+    expect(locations).toEqual(expect.arrayContaining([0, 4, 5]));
+  });
+
+  it("latches a skinned-pipeline compile failure and still draws meshes, never bind-pose", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {
+      // silenced
+    });
+    try {
+      const { gpu, service, state, view } = createRig();
+      const raw = state.device as GpuDevice;
+      state.device = {
+        ...raw,
+        createRenderPipeline(descriptor) {
+          const label = (descriptor as { label?: string }).label;
+          if (label === "fourJS:pick-skinned-id") {
+            throw new Error("skinned pipeline refused");
+          }
+          return raw.createRenderPipeline(descriptor);
+        },
+      };
+      type PickRoot = Parameters<PickingService["update"]>[0];
+      const skinned = skinnedDrawable();
+      const plain = drawable();
+      const root = {
+        visible: true,
+        enabled: true,
+        children: [skinned, plain] as unknown[],
+      };
+      service.update(root as unknown as PickRoot, view);
+      service.update(root as unknown as PickRoot, view);
+      expect(meshDrawCount(gpu)).toBe(2);
+      expect(
+        gpu
+          .callsOf("device.createRenderPipeline")
+          .some(
+            (call) =>
+              (call.args[0] as { label?: string }).label ===
+              "fourJS:pick-skinned-id",
+          ),
+      ).toBe(false);
+      expect(
+        gpu
+          .callsOf("queue.writeBuffer")
+          .filter((call) => call.args[4] === JOINT_PALETTE_FLOATS),
+      ).toHaveLength(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("skips zero-count and missing joints/weights without a palette upload", () => {
+    const { gpu, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const empty = triangleGeometry();
+    empty.positions = new Float32Array(0);
+    const zero = skinnedDrawable(new Float32Array(16), empty);
+    const missing = triangleGeometry();
+    missing.joints = new Uint16Array(0);
+    missing.weights = new Float32Array(0);
+    const noInfluences = drawable(missing);
+    Object.assign(noInfluences, {
+      skeleton: {
+        bones: [{}],
+        jointMatrices: new Float32Array(16),
+        update(): void {
+          // unused
+        },
+      },
+    });
+    const plain = drawable();
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [zero, noInfluences, plain] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(meshDrawCount(gpu)).toBe(1);
     expect(idUploads(gpu)).toEqual([expectedIdUpload(2)]);
+    expect(
+      gpu
+        .callsOf("device.createBuffer")
+        .some(
+          (call) =>
+            (call.args[0] as { label?: string }).label ===
+            "fourJS:pick-joint-palette",
+        ),
+    ).toBe(false);
+    expect(
+      gpu
+        .callsOf("queue.writeBuffer")
+        .filter((call) => call.args[4] === JOINT_PALETTE_FLOATS),
+    ).toHaveLength(0);
+  });
+
+  it("does not compile the skinned id pipeline until the first skinned item", () => {
+    const { gpu, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    service.update(drawable(), view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(1);
+    expect(
+      gpu
+        .callsOf("device.createRenderPipeline")
+        .some(
+          (call) =>
+            (call.args[0] as { label?: string }).label ===
+            "fourJS:pick-skinned-id",
+        ),
+    ).toBe(false);
+
+    const skinnedRoot = {
+      visible: true,
+      enabled: true,
+      children: [skinnedDrawable()] as unknown[],
+    };
+    service.update(skinnedRoot as unknown as PickRoot, view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(2);
+    expect(meshDrawCount(gpu)).toBe(2);
+
+    service.update(skinnedRoot as unknown as PickRoot, view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(2);
+    expect(meshDrawCount(gpu)).toBe(3);
+  });
+
+  it("recompiles the skinned id pipeline after a new geometry-cache era", () => {
+    const { gpu, service, state, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [skinnedDrawable()] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(2);
+
+    state.geometries = new WgpuGeometryCache(state.device as GpuDevice);
+    service.update(root as unknown as PickRoot, view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(4);
+    expect(meshDrawCount(gpu)).toBe(2);
+  });
+
+  it("draws an indexed skinned mesh through drawIndexed", () => {
+    const { gpu, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const geometry = indexedTriangleGeometry();
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [skinnedDrawable(new Float32Array(16), geometry)] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(gpu.countOf("pass.drawIndexed")).toBe(1);
+    expect(idUploads(gpu)).toEqual([expectedIdUpload(0)]);
   });
 
   it("instances a particle system with one id for the whole emitter", () => {

@@ -20,9 +20,10 @@
  * different picture, and the recorded rule is that a value must not become
  * one.
  *
- * This slice ships the **colour pair** only (skinned unlit + skinned lit).
- * The §69 caster and the RFC 0005 id pass stay absent — skipped, never
- * drawn in bind pose.
+ * This slice ships the **colour pair** (skinned unlit + skinned lit) plus
+ * {@link SkinnedPrograms.acquireShadow} for the §69 caster, compiled on the
+ * first skinned caster, never with the colour pair. The RFC 0005 id pass
+ * lives in `wgpu-picking.ts` and does **not** import this module.
  */
 
 import type {
@@ -124,6 +125,19 @@ export interface SkinnedPrograms {
   readonly unlit: SkinnedUnlitPipeline;
   readonly lit: SkinnedLitPipeline;
   /**
+   * Compiles the skinned caster on first call for `topology` and returns it.
+   * Subsequent calls reuse the compiled pipeline. May throw on the first
+   * failure; the renderer catches it — §61 forbids a frame from throwing —
+   * and skips skinned casters on that device. A later call after a failure
+   * must not retry the compile.
+   *
+   * Not compiled with the colour pair and never at initialize: a skinned
+   * mesh that does not cast must not add a caster pipeline.
+   */
+  acquireShadow(
+    topology?: "triangle-list" | "line-list",
+  ): GpuRenderPipeline;
+  /**
    * Bind-group index the palette occupies for this variant: group 1 on
    * untextured unlit, group 2 on textured unlit and untextured lit, group 3
    * on textured lit — always the slot after the family's existing groups.
@@ -165,7 +179,8 @@ export interface SkinnedPrograms {
  * `create` constructs the colour pair (unlit + lit). It compiles nothing
  * itself — pipelines compile lazily on the first draw of each variant — but
  * it may throw; the renderer catches it (§61 forbids a frame from throwing),
- * warns once, and skins nothing on that device.
+ * warns once, and skins nothing on that device. The caster compiles later
+ * from the returned pair, if a skinned mesh actually casts.
  */
 export interface SkinningPipelineFactory {
   /** Builds one colour pair over `host`. */

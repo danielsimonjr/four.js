@@ -332,15 +332,17 @@ export {
   PARTICLE_ID_SHADER_SOURCE,
   PARTICLE_ID_UNIFORM_BYTES,
   PARTICLE_ID_VIEW_OFFSET,
+  SKINNED_ID_SHADER_SOURCE,
   WebgpuPickingService,
   registerPickingPipeline,
 } from "./wgpu-picking.js";
 // §54's skinning pipeline (RFC 0003). Deliberately — like the picking
 // pipeline above — a module `WebgpuRenderer` never reaches statically:
 // importing `registerSkinningPipeline` is what links the two skinned colour
-// pipelines and the palette uploader into a bundle, and a barrel re-export
-// does not (it tree-shakes like every other unused export) —
-// see `wgpu-skinning-registry.ts` for the whole seam.
+// pipelines, the lazy caster, and the palette uploader into a bundle, and a
+// barrel re-export does not (it tree-shakes like every other unused export) —
+// see `wgpu-skinning-registry.ts` for the whole seam. The id pass lives in
+// `wgpu-picking.ts` and imports only `wgpu-skinning-shared.ts`.
 export type {
   SkinningPipelineFactory,
   SkinningPipelineHost,
@@ -366,6 +368,7 @@ export {
   skinnedLitShaderSource,
   skinnedLitVertexBufferLayouts,
   skinnedPaletteBindGroupIndex,
+  skinnedShadowShaderSource,
   skinnedUnlitShaderSource,
   skinnedUnlitVertexBufferLayouts,
   skinningWgsl,

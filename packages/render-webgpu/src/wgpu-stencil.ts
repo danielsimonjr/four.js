@@ -156,8 +156,8 @@ export function applyStencilReference(
  * `"skinned-unlit"` / `"skinned-lit"` items are scanned **exactly when
  * `scanSkinned` is true** (RFC 0003): colour pair behind
  * `registerSkinningPipeline()`; an unregistered skinned item stays
- * format-invisible the way an unregistered node item does. The shadow
- * caster and id pass still absent — those skips do not re-key the frame.
+ * format-invisible the way an unregistered node item does. The §69
+ * caster and RFC 0005 id pass do not re-key the frame.
  */
 export function frameWantsStencil(
   items: readonly RenderItem[],

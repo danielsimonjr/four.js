@@ -6,21 +6,21 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 826
+**Total files**: 829
 
 ## Disposition counts
 
 | Disposition | Count | Meaning |
 | --- | --: | --- |
-| `reachable` | 271 | A `src/` file in the module graph, reachable from a root. |
+| `reachable` | 273 | A `src/` file in the module graph, reachable from a root. |
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 1 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 474 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 475 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
 | `config` | 17 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 14 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **826** | |
+| **Total** | **829** | |
 
 ## Per-area counts
 
@@ -28,8 +28,8 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | --- | --: |
 | `config` | 17 |
 | `examples` | 14 |
-| `src` | 320 |
-| `tests` | 474 |
+| `src` | 322 |
+| `tests` | 475 |
 | `tools` | 1 |
 
 ## Per-package counts
@@ -41,7 +41,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@fourjs/assets` | 20 |
 | `@fourjs/core` | 26 |
 | `@fourjs/diagnostics` | 27 |
-| `@fourjs/geometry` | 23 |
+| `@fourjs/geometry` | 25 |
 | `@fourjs/input` | 17 |
 | `@fourjs/materials` | 22 |
 | `@fourjs/math` | 18 |
@@ -55,7 +55,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@fourjs/render-canvas` | 2 |
 | `@fourjs/render-svg` | 2 |
 | `@fourjs/render-webgl` | 28 |
-| `@fourjs/render-webgpu` | 48 |
+| `@fourjs/render-webgpu` | 49 |
 | `@fourjs/scene` | 35 |
 | `@fourjs/serialization` | 11 |
 | `@fourjs/text` | 6 |
@@ -260,6 +260,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/geometry/src/primitives-3d.ts` | @fourjs/geometry | src | reachable |
 | `packages/geometry/src/primitives.ts` | @fourjs/geometry | src | reachable |
 | `packages/geometry/src/resource-memory.ts` | @fourjs/geometry | src | reachable |
+| `packages/geometry/src/skinned-bounds.ts` | @fourjs/geometry | src | reachable |
 | `packages/geometry/src/svg-document.ts` | @fourjs/geometry | src | reachable |
 | `packages/geometry/src/svg-path.ts` | @fourjs/geometry | src | reachable |
 | `packages/geometry/src/tessellation.ts` | @fourjs/geometry | src | reachable |
@@ -269,6 +270,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/geometry/tests/path.test.ts` | @fourjs/geometry | tests | test |
 | `packages/geometry/tests/primitives-3d.test.ts` | @fourjs/geometry | tests | test |
 | `packages/geometry/tests/resource-memory.test.ts` | @fourjs/geometry | tests | test |
+| `packages/geometry/tests/skinned-bounds.test.ts` | @fourjs/geometry | tests | test |
 | `packages/geometry/tests/smoke.test.ts` | @fourjs/geometry | tests | test |
 | `packages/geometry/tests/stroke.test.ts` | @fourjs/geometry | tests | test |
 | `packages/geometry/tests/svg-document.test.ts` | @fourjs/geometry | tests | test |
@@ -530,6 +532,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgpu/src/wgpu-render-target.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-shadow.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-skinning-registry.ts` | @fourjs/render-webgpu | src | reachable |
+| `packages/render-webgpu/src/wgpu-skinning-shared.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-skinning.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-sprite.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-standard.ts` | @fourjs/render-webgpu | src | reachable |

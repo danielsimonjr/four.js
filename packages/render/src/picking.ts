@@ -282,8 +282,9 @@ export function assertEncodableCandidateCount(count: number): void {
  * billboard (`@fourjs/render-webgl`'s `ParticleIdProgram`; WebGPU's private
  * particle id pipeline — one colour per emitter on both). It is not a
  * per-particle id. Trails are not drawn. WebGL draws skinned items through
- * `SkinnedIdProgram`; WebGPU still skips them (no RFC 0003 skinned
- * pipelines).
+ * `SkinnedIdProgram`; WebGPU draws them through a private skinned id
+ * pipeline compiled on the first skinned pick item (independent of
+ * `registerSkinningPipeline()`).
  *
  * Both containers are cleared first, so a caller can reuse them per pass —
  * which is also what "rebuilt per pass" means: no index survives into the

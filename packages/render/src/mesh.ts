@@ -55,8 +55,8 @@
  *   bind-pose shape). The §69 WebGL caster pass deforms skinned casters
  *   when `registerSkinningPipeline()` is linked; without it the draw is
  *   skipped rather than casting a bind-pose shadow. WebGPU draws the
- *   skinned colour pair behind the same registration; its caster and id
- *   pass still skip (never a bind-pose shadow or pick).
+ *   skinned colour pair and the §69 caster behind the same registration;
+ *   the RFC 0005 id pass deforms independently of it.
  *
  * `@fourjs/geometry` exports `computeSkinnedBounds` as an opt-in posed local
  * volume; culling and picking still use bind-pose bounds unless a future

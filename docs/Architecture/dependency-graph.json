@@ -3,9 +3,9 @@
     "name": "fourjs-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-09-09",
-    "totalFiles": 319,
+    "totalFiles": 321,
     "totalModules": 24,
-    "totalExports": 3266
+    "totalExports": 3282
   },
   "entryPoints": [
     {
@@ -10546,6 +10546,42 @@
           "nextGeometryIdentifier"
         ]
       },
+      "packages/geometry/src/skinned-bounds.ts": {
+        "description": "CPU linear-blend skinning **as skinned bounds only** (RFC 0003 residue).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./buffer-geometry.js",
+            "imports": [
+              "BufferGeometry"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./geometry.js",
+            "imports": [
+              "BoundingVolume"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@fourjs/math",
+            "directory": "packages/math",
+            "imports": [
+              "Vector3"
+            ]
+          }
+        ],
+        "exports": [
+          "computeSkinnedBounds"
+        ],
+        "functions": [
+          "computeSkinnedBounds"
+        ]
+      },
       "packages/geometry/src/path-boolean.ts": {
         "description": "§51 Boolean operations on flattened closed contours.",
         "externalDependencies": [],
@@ -10612,6 +10648,13 @@
             "file": "./buffer-geometry.js",
             "imports": [
               "BufferGeometry"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./skinned-bounds.js",
+            "imports": [
+              "computeSkinnedBounds"
             ],
             "reExport": true
           },
@@ -10797,6 +10840,7 @@
         "workspaceDependencies": [],
         "exports": [
           "BufferGeometry",
+          "computeSkinnedBounds",
           "Geometry",
           "capsuleGeometry",
           "coneGeometry",
@@ -10875,6 +10919,7 @@
         ],
         "reExported": [
           "BufferGeometry",
+          "computeSkinnedBounds",
           "Geometry",
           "capsuleGeometry",
           "coneGeometry",
@@ -15724,6 +15769,20 @@
             ]
           },
           {
+            "file": "./wgpu-skinning-shared.js",
+            "imports": [
+              "createJointPaletteBindGroupLayout",
+              "JOINTS_BUFFER_LAYOUT",
+              "JOINTS_SHADER_LOCATION",
+              "JOINT_PALETTE_BINDING",
+              "JOINT_PALETTE_BYTES",
+              "JOINT_PALETTE_FLOATS",
+              "WEIGHTS_BUFFER_LAYOUT",
+              "WEIGHTS_SHADER_LOCATION",
+              "skinningWgsl"
+            ]
+          },
+          {
             "file": "./wgpu-unlit.js",
             "imports": [
               "FRAGMENT_ENTRY_POINT",
@@ -15763,6 +15822,8 @@
               "collectPickCandidates",
               "decodePickId",
               "encodePickId",
+              "isSkinnedLitItem",
+              "isSkinnedUnlitItem",
               "ParticleRenderItem",
               "PickRequest",
               "PickResult",
@@ -15782,6 +15843,7 @@
           "PARTICLE_ID_PICK_OFFSET",
           "PARTICLE_ID_UNIFORM_BYTES",
           "ID_SHADER_SOURCE",
+          "SKINNED_ID_SHADER_SOURCE",
           "PARTICLE_ID_SHADER_SOURCE",
           "registerPickingPipeline",
           "WebgpuPickingService"
@@ -15803,6 +15865,7 @@
           "PARTICLE_ID_PICK_OFFSET",
           "PARTICLE_ID_UNIFORM_BYTES",
           "ID_SHADER_SOURCE",
+          "SKINNED_ID_SHADER_SOURCE",
           "PARTICLE_ID_SHADER_SOURCE"
         ]
       },
@@ -16352,6 +16415,7 @@
               "GpuCommandEncoder",
               "GpuDevice",
               "GpuRenderPassEncoder",
+              "GpuRenderPipeline",
               "GpuSampler",
               "GpuTexture",
               "GpuTextureView",
@@ -16755,7 +16819,6 @@
             "file": "./webgpu-device.js",
             "imports": [
               "GPU_BUFFER_USAGE",
-              "GPU_SHADER_STAGE",
               "GpuBindGroup",
               "GpuBindGroupLayout",
               "GpuBuffer",
@@ -16797,6 +16860,13 @@
             ]
           },
           {
+            "file": "./wgpu-render-target.js",
+            "imports": [
+              "RENDER_TARGET_COLOR_FORMAT",
+              "RENDER_TARGET_DEPTH_TEXTURE_FORMAT"
+            ]
+          },
+          {
             "file": "./wgpu-shadow.js",
             "imports": [
               "SHADOW_FACTOR_WGSL",
@@ -16815,59 +16885,86 @@
             ]
           },
           {
+            "file": "./wgpu-skinning-shared.js",
+            "imports": [
+              "createJointPaletteBindGroupLayout",
+              "JOINTS_BUFFER_LAYOUT",
+              "JOINTS_SHADER_LOCATION",
+              "JOINT_PALETTE_BINDING",
+              "JOINT_PALETTE_BYTES",
+              "JOINT_PALETTE_FLOATS",
+              "WEIGHTS_BUFFER_LAYOUT",
+              "WEIGHTS_SHADER_LOCATION",
+              "skinnedPaletteBindGroupIndex",
+              "skinningWgsl"
+            ]
+          },
+          {
             "file": "./wgpu-unlit.js",
             "imports": [
               "FRAGMENT_ENTRY_POINT",
+              "POSITION_BUFFER_LAYOUT",
+              "POSITION_SHADER_LOCATION",
               "VERTEX_ENTRY_POINT",
               "unlitFragmentStageWgsl",
               "unlitVertexBufferLayouts"
             ]
-          }
-        ],
-        "workspaceDependencies": [
+          },
           {
-            "package": "@fourjs/render",
-            "directory": "packages/render",
+            "file": "./wgpu-skinning-shared.js",
             "imports": [
-              "MAX_SKINNING_JOINTS"
-            ]
+              "JOINTS_BUFFER_LAYOUT",
+              "JOINTS_SHADER_LOCATION",
+              "JOINT_PALETTE_BINDING",
+              "JOINT_PALETTE_BYTES",
+              "JOINT_PALETTE_FLOATS",
+              "WEIGHTS_BUFFER_LAYOUT",
+              "WEIGHTS_SHADER_LOCATION",
+              "createJointPaletteBindGroupLayout",
+              "skinnedPaletteBindGroupIndex",
+              "skinningWgsl"
+            ],
+            "reExport": true
           }
         ],
+        "workspaceDependencies": [],
         "exports": [
-          "JOINTS_SHADER_LOCATION",
-          "WEIGHTS_SHADER_LOCATION",
           "JOINTS_BUFFER_LAYOUT",
-          "WEIGHTS_BUFFER_LAYOUT",
+          "JOINTS_SHADER_LOCATION",
+          "JOINT_PALETTE_BINDING",
           "JOINT_PALETTE_BYTES",
           "JOINT_PALETTE_FLOATS",
-          "JOINT_PALETTE_BINDING",
-          "skinnedPaletteBindGroupIndex",
+          "WEIGHTS_BUFFER_LAYOUT",
+          "WEIGHTS_SHADER_LOCATION",
           "createJointPaletteBindGroupLayout",
+          "skinnedPaletteBindGroupIndex",
           "skinningWgsl",
           "skinnedUnlitVertexBufferLayouts",
           "skinnedLitVertexBufferLayouts",
           "skinnedUnlitShaderSource",
           "skinnedLitShaderSource",
+          "skinnedShadowShaderSource",
           "registerSkinningPipeline"
+        ],
+        "reExported": [
+          "JOINTS_BUFFER_LAYOUT",
+          "JOINTS_SHADER_LOCATION",
+          "JOINT_PALETTE_BINDING",
+          "JOINT_PALETTE_BYTES",
+          "JOINT_PALETTE_FLOATS",
+          "WEIGHTS_BUFFER_LAYOUT",
+          "WEIGHTS_SHADER_LOCATION",
+          "createJointPaletteBindGroupLayout",
+          "skinnedPaletteBindGroupIndex",
+          "skinningWgsl"
         ],
         "functions": [
-          "skinnedPaletteBindGroupIndex",
-          "createJointPaletteBindGroupLayout",
-          "skinningWgsl",
           "skinnedUnlitVertexBufferLayouts",
           "skinnedLitVertexBufferLayouts",
           "skinnedUnlitShaderSource",
           "skinnedLitShaderSource",
+          "skinnedShadowShaderSource",
           "registerSkinningPipeline"
-        ],
-        "constants": [
-          "JOINTS_SHADER_LOCATION",
-          "WEIGHTS_SHADER_LOCATION",
-          "JOINTS_BUFFER_LAYOUT",
-          "WEIGHTS_BUFFER_LAYOUT",
-          "JOINT_PALETTE_BYTES",
-          "JOINT_PALETTE_FLOATS",
-          "JOINT_PALETTE_BINDING"
         ]
       },
       "packages/render-webgpu/src/wgpu-pipeline-cache.ts": {
@@ -17430,6 +17527,7 @@
               "PARTICLE_ID_SHADER_SOURCE",
               "PARTICLE_ID_UNIFORM_BYTES",
               "PARTICLE_ID_VIEW_OFFSET",
+              "SKINNED_ID_SHADER_SOURCE",
               "WebgpuPickingService",
               "registerPickingPipeline"
             ],
@@ -17458,6 +17556,7 @@
               "skinnedLitShaderSource",
               "skinnedLitVertexBufferLayouts",
               "skinnedPaletteBindGroupIndex",
+              "skinnedShadowShaderSource",
               "skinnedUnlitShaderSource",
               "skinnedUnlitVertexBufferLayouts",
               "skinningWgsl"
@@ -17834,6 +17933,7 @@
           "PARTICLE_ID_SHADER_SOURCE",
           "PARTICLE_ID_UNIFORM_BYTES",
           "PARTICLE_ID_VIEW_OFFSET",
+          "SKINNED_ID_SHADER_SOURCE",
           "WebgpuPickingService",
           "registerPickingPipeline",
           "clearRegisteredSkinningPipeline",
@@ -17850,6 +17950,7 @@
           "skinnedLitShaderSource",
           "skinnedLitVertexBufferLayouts",
           "skinnedPaletteBindGroupIndex",
+          "skinnedShadowShaderSource",
           "skinnedUnlitShaderSource",
           "skinnedUnlitVertexBufferLayouts",
           "skinningWgsl",
@@ -18111,6 +18212,7 @@
           "PARTICLE_ID_SHADER_SOURCE",
           "PARTICLE_ID_UNIFORM_BYTES",
           "PARTICLE_ID_VIEW_OFFSET",
+          "SKINNED_ID_SHADER_SOURCE",
           "WebgpuPickingService",
           "registerPickingPipeline",
           "clearRegisteredSkinningPipeline",
@@ -18127,6 +18229,7 @@
           "skinnedLitShaderSource",
           "skinnedLitVertexBufferLayouts",
           "skinnedPaletteBindGroupIndex",
+          "skinnedShadowShaderSource",
           "skinnedUnlitShaderSource",
           "skinnedUnlitVertexBufferLayouts",
           "skinningWgsl",
@@ -18269,6 +18372,57 @@
           "RENDER_TARGET_DEPTH_FORMAT",
           "RENDER_TARGET_DEPTH_TEXTURE_FORMAT",
           "RENDER_TARGET_DEPTH_STENCIL_FORMAT"
+        ]
+      },
+      "packages/render-webgpu/src/wgpu-skinning-shared.ts": {
+        "description": "The vertex-stage skinning chunk both the colour/caster pipelines",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GPU_SHADER_STAGE",
+              "GpuBindGroupLayout",
+              "GpuDevice",
+              "GpuVertexBufferLayout"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@fourjs/render",
+            "directory": "packages/render",
+            "imports": [
+              "MAX_SKINNING_JOINTS"
+            ]
+          }
+        ],
+        "exports": [
+          "JOINTS_SHADER_LOCATION",
+          "WEIGHTS_SHADER_LOCATION",
+          "JOINTS_BUFFER_LAYOUT",
+          "WEIGHTS_BUFFER_LAYOUT",
+          "JOINT_PALETTE_BYTES",
+          "JOINT_PALETTE_FLOATS",
+          "JOINT_PALETTE_BINDING",
+          "skinnedPaletteBindGroupIndex",
+          "createJointPaletteBindGroupLayout",
+          "skinningWgsl"
+        ],
+        "functions": [
+          "skinnedPaletteBindGroupIndex",
+          "createJointPaletteBindGroupLayout",
+          "skinningWgsl"
+        ],
+        "constants": [
+          "JOINTS_SHADER_LOCATION",
+          "WEIGHTS_SHADER_LOCATION",
+          "JOINTS_BUFFER_LAYOUT",
+          "WEIGHTS_BUFFER_LAYOUT",
+          "JOINT_PALETTE_BYTES",
+          "JOINT_PALETTE_FLOATS",
+          "JOINT_PALETTE_BINDING"
         ]
       },
       "packages/render-webgpu/src/wgpu-lights.ts": {
@@ -25222,6 +25376,7 @@
           "packages/geometry/src/svg-path.ts",
           "packages/geometry/src/path.ts",
           "packages/geometry/src/geometry.ts",
+          "packages/geometry/src/skinned-bounds.ts",
           "packages/geometry/src/path-boolean.ts",
           "packages/geometry/src/primitive-support.ts",
           "packages/geometry/src/index.ts",
@@ -25353,6 +25508,7 @@
           "packages/render-webgpu/src/wgpu-geometry.ts",
           "packages/render-webgpu/src/index.ts",
           "packages/render-webgpu/src/wgpu-render-target.ts",
+          "packages/render-webgpu/src/wgpu-skinning-shared.ts",
           "packages/render-webgpu/src/wgpu-lights.ts",
           "packages/render-webgpu/src/wgpu-unlit.ts"
         ]
@@ -25498,18 +25654,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 319,
+    "totalTypeScriptFiles": 321,
     "totalModules": 24,
-    "totalLinesOfCode": 155533,
-    "totalExports": 3266,
+    "totalLinesOfCode": 156461,
+    "totalExports": 3282,
     "totalClasses": 199,
     "totalInterfaces": 599,
-    "totalFunctions": 534,
+    "totalFunctions": 536,
     "totalTypeGuards": 26,
     "totalEnums": 0,
-    "totalConstants": 481,
-    "totalReExports": 2074,
-    "totalTypeOnlyImports": 410,
+    "totalConstants": 482,
+    "totalReExports": 2087,
+    "totalTypeOnlyImports": 412,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 6,
     "unusedFilesCount": 0,

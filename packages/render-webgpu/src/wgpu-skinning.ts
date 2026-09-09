@@ -20,6 +20,9 @@
  * - a factory failure inside the frame is caught by the renderer (§61
  *   forbids throwing there), warned once, and skinning is off for that
  *   device. A bind pose is never drawn.
+ * - the §69 caster compiles on {@link SkinnedPrograms.acquireShadow}, never
+ *   with the colour pair and never at initialize. The RFC 0005 id pass
+ *   lives in `wgpu-picking.ts` and imports only `wgpu-skinning-shared.ts`.
  *
  * ## The palette, and why it is not in `DrawUniforms`
  *
@@ -41,11 +44,8 @@
  * {@link registerSkinningPipeline}.
  */
 
-import { MAX_SKINNING_JOINTS } from "@fourjs/render";
-
 import {
   GPU_BUFFER_USAGE,
-  GPU_SHADER_STAGE,
   type GpuBindGroup,
   type GpuBindGroupLayout,
   type GpuBuffer,
@@ -68,6 +68,10 @@ import {
 } from "./wgpu-lit.js";
 import { blendStateFor, stencilStateFor } from "./wgpu-pipeline-cache.js";
 import {
+  RENDER_TARGET_COLOR_FORMAT,
+  RENDER_TARGET_DEPTH_TEXTURE_FORMAT,
+} from "./wgpu-render-target.js";
+import {
   SHADOW_FACTOR_WGSL,
   SHADOW_LIGHT_UNIFORM_WGSL,
 } from "./wgpu-shadow.js";
@@ -80,120 +84,41 @@ import {
   type WgpuSkinnedDrawDescriptor,
 } from "./wgpu-skinning-registry.js";
 import {
+  createJointPaletteBindGroupLayout,
+  JOINTS_BUFFER_LAYOUT,
+  JOINTS_SHADER_LOCATION,
+  JOINT_PALETTE_BINDING,
+  JOINT_PALETTE_BYTES,
+  JOINT_PALETTE_FLOATS,
+  WEIGHTS_BUFFER_LAYOUT,
+  WEIGHTS_SHADER_LOCATION,
+  skinnedPaletteBindGroupIndex,
+  skinningWgsl,
+} from "./wgpu-skinning-shared.js";
+import {
   FRAGMENT_ENTRY_POINT,
+  POSITION_BUFFER_LAYOUT,
+  POSITION_SHADER_LOCATION,
   VERTEX_ENTRY_POINT,
   unlitFragmentStageWgsl,
   unlitVertexBufferLayouts,
 } from "./wgpu-unlit.js";
 
-/** `@location(4)` — four joint indices per vertex (§54, RFC 0003). */
-export const JOINTS_SHADER_LOCATION = 4;
-
-/** `@location(5)` — four influence weights per vertex, not renormalised. */
-export const WEIGHTS_SHADER_LOCATION = 5;
-
-/** Vertex layout for the joint stream: one tightly packed `uint16x4`. */
-export const JOINTS_BUFFER_LAYOUT: GpuVertexBufferLayout = Object.freeze({
-  arrayStride: 8,
-  stepMode: "vertex",
-  attributes: Object.freeze([
-    Object.freeze({
-      format: "uint16x4",
-      offset: 0,
-      shaderLocation: JOINTS_SHADER_LOCATION,
-    }),
-  ]),
-});
-
-/** Vertex layout for the weight stream: one tightly packed `vec4<f32>`. */
-export const WEIGHTS_BUFFER_LAYOUT: GpuVertexBufferLayout = Object.freeze({
-  arrayStride: 16,
-  stepMode: "vertex",
-  attributes: Object.freeze([
-    Object.freeze({
-      format: "float32x4",
-      offset: 0,
-      shaderLocation: WEIGHTS_SHADER_LOCATION,
-    }),
-  ]),
-});
-
-/**
- * Size of one joint-palette uniform block in bytes — `MAX_SKINNING_JOINTS`
- * × a std140 `mat4` (64 bytes). Already a multiple of the 256-byte dynamic
- * offset alignment, so the slot *is* the stride.
- */
-export const JOINT_PALETTE_BYTES = MAX_SKINNING_JOINTS * 64;
-
-/** `JOINT_PALETTE_BYTES` in `Float32Array` elements. */
-export const JOINT_PALETTE_FLOATS = JOINT_PALETTE_BYTES / 4;
-
-/** `@binding(0)` of the palette group — the `mat4` array. */
-export const JOINT_PALETTE_BINDING = 0;
+export {
+  JOINTS_BUFFER_LAYOUT,
+  JOINTS_SHADER_LOCATION,
+  JOINT_PALETTE_BINDING,
+  JOINT_PALETTE_BYTES,
+  JOINT_PALETTE_FLOATS,
+  WEIGHTS_BUFFER_LAYOUT,
+  WEIGHTS_SHADER_LOCATION,
+  createJointPaletteBindGroupLayout,
+  skinnedPaletteBindGroupIndex,
+  skinningWgsl,
+} from "./wgpu-skinning-shared.js";
 
 /** All four colour channels writable (`GPUColorWrite.ALL`). */
 const COLOR_WRITE_ALL = 0xf;
-
-/**
- * Bind-group index the palette occupies for one variant — always the slot
- * after the family's existing groups, so unlit untextured is group 1,
- * textured unlit and untextured lit are group 2, and textured lit is
- * group 3 (WebGPU's last slot).
- */
-export function skinnedPaletteBindGroupIndex(
-  lit: boolean,
-  map: boolean,
-): number {
-  if (lit) {
-    return map ? 3 : 2;
-  }
-  return map ? 2 : 1;
-}
-
-/**
- * The palette bind-group layout: group N, binding 0, a dynamically-offset
- * uniform buffer visible to the **vertex** stage alone (the fragment never
- * reads a joint).
- */
-export function createJointPaletteBindGroupLayout(
-  device: GpuDevice,
-): GpuBindGroupLayout {
-  return device.createBindGroupLayout({
-    label: "fourJS:joint-palette",
-    entries: [
-      {
-        binding: JOINT_PALETTE_BINDING,
-        visibility: GPU_SHADER_STAGE.VERTEX,
-        buffer: {
-          type: "uniform",
-          hasDynamicOffset: true,
-          minBindingSize: JOINT_PALETTE_BYTES,
-        },
-      },
-    ],
-  });
-}
-
-/**
- * Linear-blend skinning chunk spliced into every skinned vertex stage —
- * four influences, weights as authored (not renormalised), matching
- * WebGL's `SKINNING_GLSL`. Joint indices arrive as `uint16x4` at location
- * 4 (WGSL `vec4<u32>`) and weights as `float32x4` at location 5.
- */
-export function skinningWgsl(paletteGroup: number): string {
-  return `struct JointPalette {
-  jointMatrices : array<mat4x4<f32>, ${String(MAX_SKINNING_JOINTS)}>,
-};
-
-@group(${String(paletteGroup)}) @binding(${String(JOINT_PALETTE_BINDING)}) var<uniform> palette : JointPalette;
-
-fn skinMatrix() -> mat4x4<f32> {
-  return weights.x * palette.jointMatrices[joints.x]
-       + weights.y * palette.jointMatrices[joints.y]
-       + weights.z * palette.jointMatrices[joints.z]
-       + weights.w * palette.jointMatrices[joints.w];
-}`;
-}
 
 /**
  * Vertex layouts for a skinned unlit pipeline, **in slot order**: the
@@ -363,6 +288,37 @@ ${SHADOW_FACTOR_WGSL}`
 ${litFragmentStageWgsl(map, shadow)}`;
 }
 
+/**
+ * The depth-only skinned caster module — `SHADOW_SHADER_SOURCE`'s
+ * vertex product with the position run through `skinMatrix()` first, so a
+ * `castShadow` skinned mesh writes its **deformed** silhouette rather than
+ * the bind pose. Palette is group 1 after `DrawUniforms`. Not named
+ * `SkinnedShadowProgram` (`graph:duplicates`).
+ */
+export function skinnedShadowShaderSource(): string {
+  return `${DRAW_UNIFORM_WGSL}
+
+${skinningWgsl(1)}
+
+@vertex
+fn ${VERTEX_ENTRY_POINT}(
+  @location(${String(POSITION_SHADER_LOCATION)}) position : vec3<f32>,
+  @location(${String(JOINTS_SHADER_LOCATION)}) joints : vec4<u32>,
+  @location(${String(WEIGHTS_SHADER_LOCATION)}) weights : vec4<f32>,
+) -> @builtin(position) vec4<f32> {
+  let world = draw.model * (skinMatrix() * vec4<f32>(position, 1.0));
+  let clip = draw.viewProjection * world;
+  // WebGL clip depth [-w, w] onto WebGPU's [0, w]; see wgpu-unlit.ts.
+  return vec4<f32>(clip.x, clip.y, (clip.z + clip.w) * 0.5, clip.w);
+}
+
+@fragment
+fn ${FRAGMENT_ENTRY_POINT}() -> @location(0) vec4<f32> {
+  return vec4<f32>(1.0, 1.0, 1.0, 1.0);
+}
+`;
+}
+
 function descriptorKey(
   family: "unlit" | "lit",
   descriptor: WgpuSkinnedDrawDescriptor,
@@ -409,6 +365,14 @@ class WgpuSkinnedProgramPair implements SkinnedPrograms {
   readonly #modules = new Map<string, GpuShaderModule>();
 
   readonly #pipelineLayouts = new Map<string, GpuPipelineLayout>();
+
+  readonly #shadowPipelines = new Map<string, GpuRenderPipeline>();
+
+  #shadowModule: GpuShaderModule | null = null;
+
+  #shadowLayout: GpuPipelineLayout | null = null;
+
+  #shadowFailed = false;
 
   #paletteBuffer: GpuBuffer | null = null;
 
@@ -483,6 +447,35 @@ class WgpuSkinnedProgramPair implements SkinnedPrograms {
     return this.#paletteBindGroup;
   }
 
+  /**
+   * Compiles the skinned caster on first call for `topology` and returns it.
+   * Subsequent calls reuse the compiled pipeline. Throws on compile failure
+   * (and on a later retry after a failure) so the renderer can latch and
+   * skip — never a bind-pose shadow.
+   */
+  acquireShadow(
+    topology: "triangle-list" | "line-list" = "triangle-list",
+  ): GpuRenderPipeline {
+    if (this.#disposed) {
+      throw new Error("skinned-shadow: pair is disposed");
+    }
+    const existing = this.#shadowPipelines.get(topology);
+    if (existing !== undefined) {
+      return existing;
+    }
+    if (this.#shadowFailed) {
+      throw new Error("skinned-shadow previously failed to compile");
+    }
+    try {
+      const pipeline = this.#compileShadow(topology);
+      this.#shadowPipelines.set(topology, pipeline);
+      return pipeline;
+    } catch (error: unknown) {
+      this.#shadowFailed = true;
+      throw error;
+    }
+  }
+
   upload(device: GpuDevice): void {
     const buffer = this.#paletteBuffer;
     if (buffer === null || this.#packed === 0 || this.#disposed) {
@@ -515,11 +508,70 @@ class WgpuSkinnedProgramPair implements SkinnedPrograms {
     this.#pipelines.clear();
     this.#modules.clear();
     this.#pipelineLayouts.clear();
+    this.#shadowPipelines.clear();
+    this.#shadowModule = null;
+    this.#shadowLayout = null;
+    this.#shadowFailed = false;
     this.#paletteBuffer = null;
     this.#paletteBindGroup = null;
     this.#paletteStaging = new Float32Array(0);
     this.#paletteCapacity = 0;
     this.#packed = 0;
+  }
+
+  #compileShadow(
+    topology: "triangle-list" | "line-list",
+  ): GpuRenderPipeline {
+    const draw = this.#host.drawLayout();
+    const device = this.#host.device();
+    if (draw === null || device === null) {
+      throw new Error("skinned-shadow: no device or draw layout");
+    }
+    let layout = this.#shadowLayout;
+    if (layout === null) {
+      layout = device.createPipelineLayout({
+        label: "fourJS:pipeline-layout:skinned:shadow",
+        bindGroupLayouts: [draw, this.#paletteLayout],
+      });
+      this.#shadowLayout = layout;
+    }
+    let module = this.#shadowModule;
+    if (module === null) {
+      module = device.createShaderModule({
+        label: "fourJS:skinned-shadow",
+        code: skinnedShadowShaderSource(),
+      });
+      this.#shadowModule = module;
+    }
+    return device.createRenderPipeline({
+      label: `fourJS:skinned-shadow|${topology}`,
+      layout,
+      vertex: {
+        module,
+        entryPoint: VERTEX_ENTRY_POINT,
+        buffers: [
+          POSITION_BUFFER_LAYOUT,
+          JOINTS_BUFFER_LAYOUT,
+          WEIGHTS_BUFFER_LAYOUT,
+        ],
+      },
+      fragment: {
+        module,
+        entryPoint: FRAGMENT_ENTRY_POINT,
+        targets: [
+          {
+            format: RENDER_TARGET_COLOR_FORMAT,
+            writeMask: COLOR_WRITE_ALL,
+          },
+        ],
+      },
+      primitive: { topology },
+      depthStencil: {
+        format: RENDER_TARGET_DEPTH_TEXTURE_FORMAT,
+        depthWriteEnabled: true,
+        depthCompare: "less",
+      },
+    });
   }
 
   #acquire(
@@ -672,8 +724,9 @@ class WgpuSkinnedProgramPair implements SkinnedPrograms {
  * initialize, so registration alone changes no GPU transcript. Idempotent;
  * calling it twice re-installs the same factory.
  *
- * This slice does **not** compile a skinned shadow caster or a skinned id
- * pass; those stay skipped (honest absence, never a bind-pose silhouette).
+ * The §69 caster compiles on {@link SkinnedPrograms.acquireShadow}, never
+ * with the colour pair and never at initialize. The RFC 0005 id pass lives
+ * in `wgpu-picking.ts` and imports only `wgpu-skinning-shared.ts`.
  */
 export function registerSkinningPipeline(): void {
   setSkinningPipelineFactory({

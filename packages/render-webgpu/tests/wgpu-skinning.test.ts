@@ -32,6 +32,7 @@ import {
   skinnedLitShaderSource,
   skinnedLitVertexBufferLayouts,
   skinnedPaletteBindGroupIndex,
+  skinnedShadowShaderSource,
   skinnedUnlitShaderSource,
   skinnedUnlitVertexBufferLayouts,
   skinningWgsl,
@@ -458,6 +459,54 @@ describe("WgpuSkinnedProgramPair", () => {
     lost.forget();
     expect(gpu.countOf("buffer.destroy")).toBe(0);
     expect(lost.lit.acquire({ ...UNLIT, normals: true })).toBeNull();
+    expect(() => lost.acquireShadow()).toThrow(/disposed/);
+  });
+
+  it("compiles the caster on acquireShadow, not with the colour pair", () => {
+    const { device: gpuDevice, gpu } = device();
+    const programs = pair(gpuDevice);
+    gpu.reset();
+    expect(programs.unlit.acquire(UNLIT)).not.toBeNull();
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(1);
+    const shadow = programs.acquireShadow();
+    expect(shadow).not.toBeNull();
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(2);
+    expect(programs.acquireShadow()).toBe(shadow);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(2);
+    const codes = gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => (call.args[0] as { code: string }).code);
+    expect(codes).toContain(skinnedShadowShaderSource());
+    expect(skinnedShadowShaderSource()).toContain("skinMatrix");
+    expect(skinnedShadowShaderSource()).toContain("@group(1)");
+    expect(programs.acquireShadow("line-list")).not.toBe(shadow);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(3);
+  });
+
+  it("latches a failed caster compile and never retries", () => {
+    const { device: gpuDevice, gpu } = device();
+    const programs = pair(gpuDevice);
+    const raw = gpuDevice.createRenderPipeline.bind(gpuDevice);
+    gpuDevice.createRenderPipeline = (descriptor) => {
+      const label = (descriptor as { label?: string }).label ?? "";
+      if (label.startsWith("fourJS:skinned-shadow|")) {
+        throw new Error("caster refused");
+      }
+      return raw(descriptor);
+    };
+    expect(programs.unlit.acquire(UNLIT)).not.toBeNull();
+    expect(() => programs.acquireShadow()).toThrow(/caster refused/);
+    expect(() => programs.acquireShadow()).toThrow(
+      /skinned-shadow previously failed/,
+    );
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(1);
+    expect(programs.unlit.acquire({ ...UNLIT, blend: "additive" })).not.toBeNull();
+  });
+
+  it("throws from acquireShadow when the host cannot name a draw layout", () => {
+    const { device: gpuDevice } = device();
+    const programs = pair(gpuDevice, createHost(gpuDevice, { draw: null }));
+    expect(() => programs.acquireShadow()).toThrow(/no device or draw layout/);
   });
 
   it("refuses a new variant when the host's device drops out", () => {
