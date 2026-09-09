@@ -58,7 +58,7 @@ The codebase is organized into the following modules:
 - **packages/math**: 11 files
 - **packages/ui**: 16 files
 - **packages/core**: 14 files
-- **packages/render-webgpu**: 25 files
+- **packages/render-webgpu**: 27 files
 - **packages/animation**: 14 files
 - **packages/assets**: 9 files
 - **packages/render-webgl**: 19 files
@@ -90,7 +90,7 @@ The codebase is organized into the following modules:
 | `@fourjs/math` (`packages/math/`) | (none) | 11 | 0 |
 | `@fourjs/ui` (`packages/ui/`) | `@fourjs/math`, `@fourjs/core`, `@fourjs/input`, `@fourjs/scene`, `@fourjs/text` | 16 | 0 |
 | `@fourjs/core` (`packages/core/`) | (none) | 14 | 0 |
-| `@fourjs/render-webgpu` (`packages/render-webgpu/`) | `@fourjs/core`, `@fourjs/render`, `@fourjs/math`, `@fourjs/scene` | 25 | 0 |
+| `@fourjs/render-webgpu` (`packages/render-webgpu/`) | `@fourjs/core`, `@fourjs/render`, `@fourjs/math`, `@fourjs/scene` | 27 | 0 |
 | `@fourjs/animation` (`packages/animation/`) | `@fourjs/core`, `@fourjs/scene`, `@fourjs/math`, `@fourjs/motion` | 14 | 0 |
 | `@fourjs/assets` (`packages/assets/`) | `@fourjs/core` | 9 | 0 |
 | `@fourjs/render-webgl` (`packages/render-webgl/`) | `@fourjs/core`, `@fourjs/math`, `@fourjs/render` | 19 | 0 |
@@ -4021,6 +4021,26 @@ graph LR
 
 ---
 
+### `packages/render-webgpu/src/wgpu-picking-registry.ts` - The picking pipeline's registration slot (§71, §62; RFC 0005) — the
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@fourjs/render` | `PickingService` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./webgpu-device.js` | `GpuDevice` | Import (type-only) |
+| `./wgpu-geometry.js` | `WgpuGeometryCache` | Import (type-only) |
+| `./wgpu-render-target.js` | `WgpuRenderTargetCache` | Import (type-only) |
+
+**Exports:**
+- Interfaces: `PickingRendererHost`, `PickingServiceFactory`
+- Functions: `setPickingServiceFactory`, `resolvePickingServiceFactory`, `clearRegisteredPickingPipeline`
+
+---
+
 ### `packages/render-webgpu/src/wgpu-particle-simulation.ts` - `WgpuParticleSimulation` — the device side of §36's `simulation: "gpu"`
 
 **Workspace Dependencies:**
@@ -4038,6 +4058,32 @@ graph LR
 - Classes: `WgpuParticleSimulation`
 - Interfaces: `WgpuParticleSimulationOptions`
 - Constants: `PARTICLE_SIMULATION_VECTOR_BYTES`, `PARTICLE_SIMULATION_SCRATCH_BYTES`
+
+---
+
+### `packages/render-webgpu/src/wgpu-picking.ts` - The WebGPU picking service (§71, §62; RFC 0005) — the id-buffer pass and
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@fourjs/core` | `DEV, FourError, devWarnOnce` |
+| `@fourjs/math` | `Frustum, Matrix4, Rectangle2` |
+| `@fourjs/render` | `RenderTarget, assertEncodableCandidateCount, buildRenderList, buildViewRenderList, collectPickCandidates, decodePickId, encodePickId, PickRequest, PickResult, PickingService, RenderItem` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./webgpu-device.js` | `GPU_BUFFER_USAGE, GPU_SHADER_STAGE, UNIFORM_STRIDE_BYTES, GpuBindGroup, GpuBindGroupLayout, GpuBuffer, GpuDevice, GpuRenderPipeline, GpuTextureView` | Import |
+| `./wgpu-geometry.js` | `WgpuGeometryCache, WgpuGeometryRecord` | Import (type-only) |
+| `./wgpu-picking-registry.js` | `setPickingServiceFactory, PickingRendererHost` | Import |
+| `./wgpu-readback.js` | `readTexturePixels` | Import |
+| `./wgpu-render-target.js` | `RENDER_TARGET_COLOR_FORMAT, RENDER_TARGET_DEPTH_FORMAT, WgpuRenderTargetRecord` | Import |
+| `./wgpu-unlit.js` | `FRAGMENT_ENTRY_POINT, POSITION_BUFFER_LAYOUT, VERTEX_ENTRY_POINT` | Import |
+
+**Exports:**
+- Classes: `WebgpuPickingService`
+- Functions: `registerPickingPipeline`
+- Constants: `ID_VIEW_PROJECTION_OFFSET`, `ID_MODEL_OFFSET`, `ID_PICK_OFFSET`, `ID_UNIFORM_BYTES`, `ID_SHADER_SOURCE`
 
 ---
 
@@ -4210,7 +4256,7 @@ graph LR
 |---------|--------|
 | `@fourjs/core` | `DEV, EventEmitter, FourError, devWarnOnce` |
 | `@fourjs/math` | `Frustum, Matrix3, Matrix4, Rectangle2` |
-| `@fourjs/render` | `COLOR_GRADE_DEFAULTS, RenderTarget, buildInterpolatedRenderList, buildRenderList, buildViewRenderList, collectSceneLights, createSceneLights, isRenderTargetTexture, intersectScissor, validateReadbackRegion, EffectRenderPass, RenderBatch, RenderInterpolation, RenderItem, RenderStatistics, Renderer, RendererCapabilities, RendererEventMap, RendererOptions, ScissorRect` |
+| `@fourjs/render` | `COLOR_GRADE_DEFAULTS, RenderTarget, buildInterpolatedRenderList, buildRenderList, buildViewRenderList, collectSceneLights, createSceneLights, isRenderTargetTexture, intersectScissor, validateReadbackRegion, EffectRenderPass, RenderBatch, PickingService, RenderInterpolation, RenderItem, RenderStatistics, Renderer, RendererCapabilities, RendererEventMap, RendererOptions, ScissorRect` |
 | `@fourjs/scene` | `Node, Viewport` |
 
 **Internal Dependencies:**
@@ -4235,6 +4281,7 @@ graph LR
 | `./wgpu-stencil.js` | `CLEAR_STENCIL, applyStencilReference, frameWantsStencil, stencilDescriptor` | Import |
 | `./wgpu-texture.js` | `WgpuTextureCache, WgpuCacheableTexture` | Import |
 | `./wgpu-node-registry.js` | `resolveWebgpuNodeMaterialPipelineFactory, WgpuNodeFrameState, WgpuNodeMaterialPipelines` | Import |
+| `./wgpu-picking-registry.js` | `resolvePickingServiceFactory, PickingRendererHost` | Import |
 | `./wgpu-unlit.js` | `CLEAR_VERTEX_COUNT` | Import |
 
 **Exports:**
@@ -4374,6 +4421,8 @@ graph LR
 | `./wgpu-standard.js` | `STANDARD_BASE_COLOR_OFFSET, STANDARD_EMISSIVE_OFFSET, STANDARD_MODEL_OFFSET, STANDARD_NORMAL_OFFSET, STANDARD_SURFACE_OFFSET, STANDARD_UNIFORM_BYTES, STANDARD_UNIFORM_WGSL, STANDARD_VIEW_PROJECTION_OFFSET, createStandardBindGroupLayout, standardShaderSource` | Re-export |
 | `./wgpu-node-registry.js` | `clearRegisteredWebgpuNodeMaterialPipeline, resolveWebgpuNodeMaterialPipelineFactory, setWebgpuNodeMaterialPipelineFactory` | Re-export |
 | `./wgpu-node-program.js` | `NODE_SCREEN_BLOCK_BASE_BYTES, NODE_SCREEN_TEXTURE_GROUP, NODE_SURFACE_BLOCK_BASE_BYTES, NODE_SURFACE_BLOCK_GROUP, NODE_SURFACE_TEXTURE_GROUP, WgpuNodePipelineStore, emitShaderGraphWgsl, registerWebgpuNodeMaterialPipeline` | Re-export |
+| `./wgpu-picking-registry.js` | `clearRegisteredPickingPipeline, resolvePickingServiceFactory` | Re-export |
+| `./wgpu-picking.js` | `ID_MODEL_OFFSET, ID_PICK_OFFSET, ID_SHADER_SOURCE, ID_UNIFORM_BYTES, ID_VIEW_PROJECTION_OFFSET, WebgpuPickingService, registerPickingPipeline` | Re-export |
 | `./webgpu-device.js` | `Gpu, GpuAdapter, GpuStencilFaceState, GpuBindGroup, GpuBindGroupEntry, GpuBindGroupLayout, GpuBindGroupLayoutEntry, GpuBlendComponent, GpuBlendState, GpuBuffer, GpuBufferDescriptor, GpuCanvasContext, GpuCommandBuffer, GpuCommandEncoder, GpuComputePassEncoder, GpuComputePipeline, GpuComputePipelineDescriptor, GpuDevice, GpuDeviceLostInfo, GpuPipelineLayout, GpuQuerySet, GpuQueue, GpuRenderPassDescriptor, GpuRenderPassEncoder, GpuRenderPipeline, GpuBufferBinding, GpuRenderPipelineDescriptor, GpuSampler, GpuSamplerDescriptor, GpuShaderModule, GpuTexture, GpuTextureDescriptor, GpuTextureView, GpuTextureViewDescriptor, GpuVertexBufferLayout, WebgpuCanvas` | Re-export (type-only) |
 | `./wgpu-geometry.js` | `CacheableGeometry, WgpuGeometryRecord` | Re-export (type-only) |
 | `./wgpu-pipeline-cache.js` | `WgpuBatchStream, WgpuPipelineDescriptor, WgpuPipelineKind, WgpuStencilDescriptor` | Re-export (type-only) |
@@ -4388,10 +4437,11 @@ graph LR
 | `./wgpu-stencil.js` | `WgpuStencilSource` | Re-export (type-only) |
 | `./wgpu-node-registry.js` | `WgpuNodeFrameState, WgpuNodeItemMaterial, WgpuNodeMaterialPipelineFactory, WgpuNodeMaterialPipelines, WgpuNodePipelineHost` | Re-export (type-only) |
 | `./wgpu-node-program.js` | `EmittedWgslNodeShader` | Re-export (type-only) |
+| `./wgpu-picking-registry.js` | `PickingRendererHost, PickingServiceFactory` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `GPU_BUFFER_USAGE`, `GPU_MAP_MODE`, `GPU_SHADER_STAGE`, `GPU_TEXTURE_USAGE`, `UNIFORM_STRIDE_BYTES`, `hostGpu`, `WebgpuRenderer`, `isWebgpuSupported`, `registerWebgpuRenderer`, `DRAW_COLOR_OFFSET`, `DRAW_MODEL_OFFSET`, `DRAW_NORMAL_OFFSET`, `DRAW_UNIFORM_BYTES`, `DRAW_UNIFORM_FLOATS`, `DRAW_UNIFORM_WGSL`, `DRAW_VIEW_PROJECTION_OFFSET`, `MAP_BINDING_WGSL`, `MAP_BIND_GROUP_INDEX`, `MAP_SAMPLER_BINDING`, `MAP_TEXTURE_BINDING`, `createDrawBindGroupLayout`, `createTextureBindGroupLayout`, `WgpuGeometryCache`, `blendStateFor`, `pipelineKey`, `stencilStateFor`, `WgpuPipelineCache`, `WgpuBatching`, `batchVertexBufferLayout`, `createWgpuBatching`, `SPRITE_MODEL_OFFSET`, `SPRITE_SHADER_SOURCE`, `SPRITE_TINT_OFFSET`, `SPRITE_UNIFORM_BYTES`, `SPRITE_UNIFORM_WGSL`, `SPRITE_VIEW_PROJECTION_OFFSET`, `createSpriteBindGroupLayout`, `MIPMAP_SHADER_SOURCE`, `WgpuTextureCache`, `mipLevelCount`, `samplerKey`, `textureByteLength`, `CLEAR_SHADER_SOURCE`, `CLEAR_VERTEX_COUNT`, `COLOR_BUFFER_LAYOUT`, `COLOR_SHADER_LOCATION`, `FRAGMENT_ENTRY_POINT`, `POSITION_BUFFER_LAYOUT`, `POSITION_SHADER_LOCATION`, `UV_BUFFER_LAYOUT`, `UV_SHADER_LOCATION`, `VERTEX_ENTRY_POINT`, `unlitShaderSource`, `unlitVertexBufferLayouts`, `LIGHTS_BIND_GROUP_INDEX`, `LIGHT_AMBIENT_OFFSET`, `LIGHT_CAMERA_OFFSET`, `LIGHT_COLOR_OFFSET`, `LIGHT_COUNTS_OFFSET`, `LIGHT_DIRECTION_OFFSET`, `LIGHT_PUNCTUAL_COLOR_OFFSET`, `LIGHT_PUNCTUAL_DIRECTION_OFFSET`, `LIGHT_PUNCTUAL_PARAMS_OFFSET`, `LIGHT_PUNCTUAL_POSITION_OFFSET`, `LIGHT_UNIFORM_BYTES`, `LIGHT_UNIFORM_FLOATS`, `LIGHT_UNIFORM_MEMBERS_WGSL`, `LIGHT_UNIFORM_STRIDE_BYTES`, `LIGHT_UNIFORM_STRIDE_FLOATS`, `LIGHT_UNIFORM_WGSL`, `PUNCTUAL_LIGHT_WGSL`, `SHADED_MAP_BINDING_WGSL`, `SHADED_MAP_BIND_GROUP_INDEX`, `createLightsBindGroupLayout`, `writeLightUniforms`, `NORMAL_BUFFER_LAYOUT`, `NORMAL_MATRIX_WGSL`, `NORMAL_SHADER_LOCATION`, `litShaderSource`, `shadedVertexBufferLayouts`, `shadedVertexStageWgsl`, `RENDER_TARGET_COLOR_FORMAT`, `RENDER_TARGET_DEPTH_FORMAT`, `RENDER_TARGET_DEPTH_STENCIL_FORMAT`, `RENDER_TARGET_DEPTH_TEXTURE_FORMAT`, `WgpuRenderTargetCache`, `renderTargetDepthFormat`, `EFFECT_BIND_GROUP_INDEX`, `EFFECT_GRADE_OFFSET`, `EFFECT_PASS_VERTEX_COUNT`, `EFFECT_UNIFORM_BYTES`, `EFFECT_UNIFORM_WGSL`, `createEffectBindGroupLayout`, `effectShaderSource`, `READBACK_ROW_ALIGNMENT`, `readTexturePixels`, `readbackBytesPerRow`, `COMPUTE_ENTRY_POINT`, `PARTICLE_INTEGRATOR_SHADER_SOURCE`, `PARTICLE_INTEGRATOR_WORKGROUP_SIZE`, `PARTICLE_SIMULATION_PARAMS_FLOATS`, `WgpuComputeBuffer`, `WgpuComputeCache`, `createComputeBuffer`, `particleIntegratorWorkgroups`, `readComputeBufferBytes`, `writeComputeBuffer`, `writeParticleSimulationParams`, `PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_GPU_POSITION_BUFFER_LAYOUT`, `PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS`, `PARTICLE_APPEARANCE_SHADER_SOURCE`, `PARTICLE_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_INSTANCE_STRIDE_BYTES`, `PARTICLE_MODEL_OFFSET`, `PARTICLE_PROJECTION_OFFSET`, `PARTICLE_SHADER_SOURCE`, `PARTICLE_WIDE_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_WIDE_INSTANCE_STRIDE_BYTES`, `PARTICLE_UNIFORM_BYTES`, `PARTICLE_UNIFORM_WGSL`, `PARTICLE_VERTEX_BUFFER_LAYOUTS`, `PARTICLE_VIEW_OFFSET`, `WgpuParticleCache`, `createParticleBindGroupLayout`, `PARTICLE_SIMULATION_SCRATCH_BYTES`, `PARTICLE_SIMULATION_VECTOR_BYTES`, `WgpuParticleSimulation`, `SHADOW_FACTOR_WGSL`, `SHADOW_LIGHT_UNIFORM_BYTES`, `SHADOW_LIGHT_UNIFORM_WGSL`, `SHADOW_MAP_BINDING`, `SHADOW_MATRIX_OFFSET`, `SHADOW_PARAMS_OFFSET`, `SHADOW_SAMPLER_BINDING`, `SHADOW_SHADER_SOURCE`, `SHADOW_UNIFORM_SPARE_BYTES`, `createShadowLightsBindGroupLayout`, `createShadowSampler`, `writeShadowUniforms`, `CLEAR_STENCIL`, `STENCIL_ALL_BITS`, `applyStencilReference`, `frameWantsStencil`, `stencilDescriptor`, `STANDARD_BASE_COLOR_OFFSET`, `STANDARD_EMISSIVE_OFFSET`, `STANDARD_MODEL_OFFSET`, `STANDARD_NORMAL_OFFSET`, `STANDARD_SURFACE_OFFSET`, `STANDARD_UNIFORM_BYTES`, `STANDARD_UNIFORM_WGSL`, `STANDARD_VIEW_PROJECTION_OFFSET`, `createStandardBindGroupLayout`, `standardShaderSource`, `clearRegisteredWebgpuNodeMaterialPipeline`, `resolveWebgpuNodeMaterialPipelineFactory`, `setWebgpuNodeMaterialPipelineFactory`, `NODE_SCREEN_BLOCK_BASE_BYTES`, `NODE_SCREEN_TEXTURE_GROUP`, `NODE_SURFACE_BLOCK_BASE_BYTES`, `NODE_SURFACE_BLOCK_GROUP`, `NODE_SURFACE_TEXTURE_GROUP`, `WgpuNodePipelineStore`, `emitShaderGraphWgsl`, `registerWebgpuNodeMaterialPipeline`, `Gpu`, `GpuAdapter`, `GpuStencilFaceState`, `GpuBindGroup`, `GpuBindGroupEntry`, `GpuBindGroupLayout`, `GpuBindGroupLayoutEntry`, `GpuBlendComponent`, `GpuBlendState`, `GpuBuffer`, `GpuBufferDescriptor`, `GpuCanvasContext`, `GpuCommandBuffer`, `GpuCommandEncoder`, `GpuComputePassEncoder`, `GpuComputePipeline`, `GpuComputePipelineDescriptor`, `GpuDevice`, `GpuDeviceLostInfo`, `GpuPipelineLayout`, `GpuQuerySet`, `GpuQueue`, `GpuRenderPassDescriptor`, `GpuRenderPassEncoder`, `GpuRenderPipeline`, `GpuBufferBinding`, `GpuRenderPipelineDescriptor`, `GpuSampler`, `GpuSamplerDescriptor`, `GpuShaderModule`, `GpuTexture`, `GpuTextureDescriptor`, `GpuTextureView`, `GpuTextureViewDescriptor`, `GpuVertexBufferLayout`, `WebgpuCanvas`, `CacheableGeometry`, `WgpuGeometryRecord`, `WgpuBatchStream`, `WgpuPipelineDescriptor`, `WgpuPipelineKind`, `WgpuStencilDescriptor`, `WgpuRenderBatching`, `ResolvedSamplerState`, `WgpuCacheableTexture`, `WgpuTextureRecord`, `WgpuCacheableRenderTarget`, `WgpuRenderTargetRecord`, `WgpuEffectKind`, `ComputeBinding`, `ComputeBindingAccess`, `ComputeBufferOptions`, `ComputePassDescriptor`, `ParticleSimulationFieldParams`, `WgpuParticleRecord`, `WgpuParticleSimulationOptions`, `WgpuStencilSource`, `WgpuNodeFrameState`, `WgpuNodeItemMaterial`, `WgpuNodeMaterialPipelineFactory`, `WgpuNodeMaterialPipelines`, `WgpuNodePipelineHost`, `EmittedWgslNodeShader`
+- Re-exports: `GPU_BUFFER_USAGE`, `GPU_MAP_MODE`, `GPU_SHADER_STAGE`, `GPU_TEXTURE_USAGE`, `UNIFORM_STRIDE_BYTES`, `hostGpu`, `WebgpuRenderer`, `isWebgpuSupported`, `registerWebgpuRenderer`, `DRAW_COLOR_OFFSET`, `DRAW_MODEL_OFFSET`, `DRAW_NORMAL_OFFSET`, `DRAW_UNIFORM_BYTES`, `DRAW_UNIFORM_FLOATS`, `DRAW_UNIFORM_WGSL`, `DRAW_VIEW_PROJECTION_OFFSET`, `MAP_BINDING_WGSL`, `MAP_BIND_GROUP_INDEX`, `MAP_SAMPLER_BINDING`, `MAP_TEXTURE_BINDING`, `createDrawBindGroupLayout`, `createTextureBindGroupLayout`, `WgpuGeometryCache`, `blendStateFor`, `pipelineKey`, `stencilStateFor`, `WgpuPipelineCache`, `WgpuBatching`, `batchVertexBufferLayout`, `createWgpuBatching`, `SPRITE_MODEL_OFFSET`, `SPRITE_SHADER_SOURCE`, `SPRITE_TINT_OFFSET`, `SPRITE_UNIFORM_BYTES`, `SPRITE_UNIFORM_WGSL`, `SPRITE_VIEW_PROJECTION_OFFSET`, `createSpriteBindGroupLayout`, `MIPMAP_SHADER_SOURCE`, `WgpuTextureCache`, `mipLevelCount`, `samplerKey`, `textureByteLength`, `CLEAR_SHADER_SOURCE`, `CLEAR_VERTEX_COUNT`, `COLOR_BUFFER_LAYOUT`, `COLOR_SHADER_LOCATION`, `FRAGMENT_ENTRY_POINT`, `POSITION_BUFFER_LAYOUT`, `POSITION_SHADER_LOCATION`, `UV_BUFFER_LAYOUT`, `UV_SHADER_LOCATION`, `VERTEX_ENTRY_POINT`, `unlitShaderSource`, `unlitVertexBufferLayouts`, `LIGHTS_BIND_GROUP_INDEX`, `LIGHT_AMBIENT_OFFSET`, `LIGHT_CAMERA_OFFSET`, `LIGHT_COLOR_OFFSET`, `LIGHT_COUNTS_OFFSET`, `LIGHT_DIRECTION_OFFSET`, `LIGHT_PUNCTUAL_COLOR_OFFSET`, `LIGHT_PUNCTUAL_DIRECTION_OFFSET`, `LIGHT_PUNCTUAL_PARAMS_OFFSET`, `LIGHT_PUNCTUAL_POSITION_OFFSET`, `LIGHT_UNIFORM_BYTES`, `LIGHT_UNIFORM_FLOATS`, `LIGHT_UNIFORM_MEMBERS_WGSL`, `LIGHT_UNIFORM_STRIDE_BYTES`, `LIGHT_UNIFORM_STRIDE_FLOATS`, `LIGHT_UNIFORM_WGSL`, `PUNCTUAL_LIGHT_WGSL`, `SHADED_MAP_BINDING_WGSL`, `SHADED_MAP_BIND_GROUP_INDEX`, `createLightsBindGroupLayout`, `writeLightUniforms`, `NORMAL_BUFFER_LAYOUT`, `NORMAL_MATRIX_WGSL`, `NORMAL_SHADER_LOCATION`, `litShaderSource`, `shadedVertexBufferLayouts`, `shadedVertexStageWgsl`, `RENDER_TARGET_COLOR_FORMAT`, `RENDER_TARGET_DEPTH_FORMAT`, `RENDER_TARGET_DEPTH_STENCIL_FORMAT`, `RENDER_TARGET_DEPTH_TEXTURE_FORMAT`, `WgpuRenderTargetCache`, `renderTargetDepthFormat`, `EFFECT_BIND_GROUP_INDEX`, `EFFECT_GRADE_OFFSET`, `EFFECT_PASS_VERTEX_COUNT`, `EFFECT_UNIFORM_BYTES`, `EFFECT_UNIFORM_WGSL`, `createEffectBindGroupLayout`, `effectShaderSource`, `READBACK_ROW_ALIGNMENT`, `readTexturePixels`, `readbackBytesPerRow`, `COMPUTE_ENTRY_POINT`, `PARTICLE_INTEGRATOR_SHADER_SOURCE`, `PARTICLE_INTEGRATOR_WORKGROUP_SIZE`, `PARTICLE_SIMULATION_PARAMS_FLOATS`, `WgpuComputeBuffer`, `WgpuComputeCache`, `createComputeBuffer`, `particleIntegratorWorkgroups`, `readComputeBufferBytes`, `writeComputeBuffer`, `writeParticleSimulationParams`, `PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_GPU_POSITION_BUFFER_LAYOUT`, `PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS`, `PARTICLE_APPEARANCE_SHADER_SOURCE`, `PARTICLE_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_INSTANCE_STRIDE_BYTES`, `PARTICLE_MODEL_OFFSET`, `PARTICLE_PROJECTION_OFFSET`, `PARTICLE_SHADER_SOURCE`, `PARTICLE_WIDE_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_WIDE_INSTANCE_STRIDE_BYTES`, `PARTICLE_UNIFORM_BYTES`, `PARTICLE_UNIFORM_WGSL`, `PARTICLE_VERTEX_BUFFER_LAYOUTS`, `PARTICLE_VIEW_OFFSET`, `WgpuParticleCache`, `createParticleBindGroupLayout`, `PARTICLE_SIMULATION_SCRATCH_BYTES`, `PARTICLE_SIMULATION_VECTOR_BYTES`, `WgpuParticleSimulation`, `SHADOW_FACTOR_WGSL`, `SHADOW_LIGHT_UNIFORM_BYTES`, `SHADOW_LIGHT_UNIFORM_WGSL`, `SHADOW_MAP_BINDING`, `SHADOW_MATRIX_OFFSET`, `SHADOW_PARAMS_OFFSET`, `SHADOW_SAMPLER_BINDING`, `SHADOW_SHADER_SOURCE`, `SHADOW_UNIFORM_SPARE_BYTES`, `createShadowLightsBindGroupLayout`, `createShadowSampler`, `writeShadowUniforms`, `CLEAR_STENCIL`, `STENCIL_ALL_BITS`, `applyStencilReference`, `frameWantsStencil`, `stencilDescriptor`, `STANDARD_BASE_COLOR_OFFSET`, `STANDARD_EMISSIVE_OFFSET`, `STANDARD_MODEL_OFFSET`, `STANDARD_NORMAL_OFFSET`, `STANDARD_SURFACE_OFFSET`, `STANDARD_UNIFORM_BYTES`, `STANDARD_UNIFORM_WGSL`, `STANDARD_VIEW_PROJECTION_OFFSET`, `createStandardBindGroupLayout`, `standardShaderSource`, `clearRegisteredWebgpuNodeMaterialPipeline`, `resolveWebgpuNodeMaterialPipelineFactory`, `setWebgpuNodeMaterialPipelineFactory`, `NODE_SCREEN_BLOCK_BASE_BYTES`, `NODE_SCREEN_TEXTURE_GROUP`, `NODE_SURFACE_BLOCK_BASE_BYTES`, `NODE_SURFACE_BLOCK_GROUP`, `NODE_SURFACE_TEXTURE_GROUP`, `WgpuNodePipelineStore`, `emitShaderGraphWgsl`, `registerWebgpuNodeMaterialPipeline`, `clearRegisteredPickingPipeline`, `resolvePickingServiceFactory`, `ID_MODEL_OFFSET`, `ID_PICK_OFFSET`, `ID_SHADER_SOURCE`, `ID_UNIFORM_BYTES`, `ID_VIEW_PROJECTION_OFFSET`, `WebgpuPickingService`, `registerPickingPipeline`, `Gpu`, `GpuAdapter`, `GpuStencilFaceState`, `GpuBindGroup`, `GpuBindGroupEntry`, `GpuBindGroupLayout`, `GpuBindGroupLayoutEntry`, `GpuBlendComponent`, `GpuBlendState`, `GpuBuffer`, `GpuBufferDescriptor`, `GpuCanvasContext`, `GpuCommandBuffer`, `GpuCommandEncoder`, `GpuComputePassEncoder`, `GpuComputePipeline`, `GpuComputePipelineDescriptor`, `GpuDevice`, `GpuDeviceLostInfo`, `GpuPipelineLayout`, `GpuQuerySet`, `GpuQueue`, `GpuRenderPassDescriptor`, `GpuRenderPassEncoder`, `GpuRenderPipeline`, `GpuBufferBinding`, `GpuRenderPipelineDescriptor`, `GpuSampler`, `GpuSamplerDescriptor`, `GpuShaderModule`, `GpuTexture`, `GpuTextureDescriptor`, `GpuTextureView`, `GpuTextureViewDescriptor`, `GpuVertexBufferLayout`, `WebgpuCanvas`, `CacheableGeometry`, `WgpuGeometryRecord`, `WgpuBatchStream`, `WgpuPipelineDescriptor`, `WgpuPipelineKind`, `WgpuStencilDescriptor`, `WgpuRenderBatching`, `ResolvedSamplerState`, `WgpuCacheableTexture`, `WgpuTextureRecord`, `WgpuCacheableRenderTarget`, `WgpuRenderTargetRecord`, `WgpuEffectKind`, `ComputeBinding`, `ComputeBindingAccess`, `ComputeBufferOptions`, `ComputePassDescriptor`, `ParticleSimulationFieldParams`, `WgpuParticleRecord`, `WgpuParticleSimulationOptions`, `WgpuStencilSource`, `WgpuNodeFrameState`, `WgpuNodeItemMaterial`, `WgpuNodeMaterialPipelineFactory`, `WgpuNodeMaterialPipelines`, `WgpuNodePipelineHost`, `EmittedWgslNodeShader`, `PickingRendererHost`, `PickingServiceFactory`
 
 ---
 
@@ -4988,7 +5038,7 @@ graph LR
 | `./gl-program.js` | `GL, LitProgram, MAP_TEXTURE_UNIT, METAL_ROUGHNESS_TEXTURE_UNIT, SHADOW_TEXTURE_UNIT, SpriteProgram, UnlitProgram, GlTexture` | Import |
 | `./gl-picking-registry.js` | `resolvePickingServiceFactory, PickingRendererHost` | Import |
 | `./gl-render-target.js` | `RenderTargetCache, RenderTargetRecord` | Import |
-| `./gl-skinning-registry.js` | `resolveSkinningPipelineFactory, SkinnedPrograms` | Import |
+| `./gl-skinning-registry.js` | `resolveSkinningPipelineFactory, SkinnedPrograms, SkinnedShadowPipeline` | Import |
 | `./node-pipeline-registry.js` | `NODE_SURFACE_TEXTURE_UNIT_BASE, resolveNodeMaterialPipelineFactory, NodeMaterialProgram, NodeMaterialPrograms` | Import |
 | `./gl-shadow.js` | `ShadowProgram` | Import |
 | `./gl-standard.js` | `StandardProgram` | Import |
@@ -5058,7 +5108,7 @@ graph LR
 | `./gl-program.js` | `WebglContext` | Import (type-only) |
 
 **Exports:**
-- Interfaces: `SkinnedUnlitPipeline`, `SkinnedLitPipeline`, `SkinnedPrograms`, `SkinningPipelineFactory`
+- Interfaces: `SkinnedUnlitPipeline`, `SkinnedLitPipeline`, `SkinnedShadowPipeline`, `SkinnedPrograms`, `SkinningPipelineFactory`
 - Functions: `setSkinningPipelineFactory`, `resolveSkinningPipelineFactory`, `clearRegisteredSkinningPipeline`
 
 ---
@@ -5233,11 +5283,12 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./gl-program.js` | `FRAGMENT_SHADER_SOURCE, LIT_FRAGMENT_SHADER_SOURCE, MAP_TEXTURE_UNIT, PunctualLightUniforms, ShadowUniforms, createLinkedProgram, matrixScratch, requireUniform, GlProgramHandle, GlUniformLocation, WebglContext` | Import |
-| `./gl-skinning-registry.js` | `setSkinningPipelineFactory, SkinnedLitPipeline, SkinnedPrograms, SkinnedUnlitPipeline` | Import |
+| `./gl-skinning-registry.js` | `setSkinningPipelineFactory, SkinnedLitPipeline, SkinnedPrograms, SkinnedShadowPipeline, SkinnedUnlitPipeline` | Import |
 
 **Exports:**
-- Classes: `SkinnedUnlitProgram`, `SkinnedLitProgram`
+- Classes: `SkinnedUnlitProgram`, `SkinnedLitProgram`, `SkinnedShadowProgram`
 - Functions: `registerSkinningPipeline`
+- Constants: `SKINNING_GLSL`
 
 ---
 
@@ -5294,7 +5345,7 @@ graph LR
 | `./gl-render-target.js` | `RenderTargetCache` | Re-export |
 | `./gl-program.js` | `JOINTS_ATTRIBUTE_LOCATION, WEIGHTS_ATTRIBUTE_LOCATION` | Re-export |
 | `./gl-skinning-registry.js` | `clearRegisteredSkinningPipeline, resolveSkinningPipelineFactory` | Re-export |
-| `./gl-skinning.js` | `SkinnedLitProgram, SkinnedUnlitProgram, registerSkinningPipeline` | Re-export |
+| `./gl-skinning.js` | `SKINNING_GLSL, SkinnedLitProgram, SkinnedShadowProgram, SkinnedUnlitProgram, registerSkinningPipeline` | Re-export |
 | `./node-pipeline-registry.js` | `NODE_SURFACE_TEXTURE_UNIT_BASE, clearRegisteredNodeMaterialPipeline, resolveNodeMaterialPipelineFactory` | Re-export |
 | `./gl-node-program.js` | `GlNodeProgram, GlNodeProgramCache, emitShaderGraphGlsl, registerNodeMaterialPipeline` | Re-export |
 | `./gl-shadow.js` | `ShadowProgram` | Re-export |
@@ -5309,7 +5360,7 @@ graph LR
 | `./gl-program.js` | `GlFramebuffer, GlRenderbuffer` | Re-export (type-only) |
 | `./gl-picking-registry.js` | `PickingRendererHost, PickingServiceFactory` | Re-export (type-only) |
 | `./gl-render-target.js` | `CacheableRenderTarget, RenderTargetRecord` | Re-export (type-only) |
-| `./gl-skinning-registry.js` | `SkinnedLitPipeline, SkinnedPrograms, SkinnedUnlitPipeline, SkinningPipelineFactory` | Re-export (type-only) |
+| `./gl-skinning-registry.js` | `SkinnedLitPipeline, SkinnedPrograms, SkinnedShadowPipeline, SkinnedUnlitPipeline, SkinningPipelineFactory` | Re-export (type-only) |
 | `./node-pipeline-registry.js` | `NodeItemMaterial, NodeMaterialPipelineFactory, NodeMaterialProgram, NodeMaterialPrograms` | Re-export (type-only) |
 | `./gl-node-program.js` | `EmittedNodeShader` | Re-export (type-only) |
 | `./gl-texture.js` | `CacheableTexture, TextureRecord` | Re-export (type-only) |
@@ -5317,7 +5368,7 @@ graph LR
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `GlBatching`, `createGlBatching`, `EFFECT_TEXTURE_UNIT`, `EFFECT_VERTEX_COUNT`, `EffectProgram`, `GeometryCache`, `PARTICLE_ATTRIBUTE_LOCATIONS`, `PARTICLE_DEPTH_TEXTURE_UNIT`, `PARTICLE_GL`, `PARTICLE_VERTEX_SHADER_SOURCE`, `ParticleAppearanceProgram`, `ParticleBatchCache`, `ParticleProgram`, `ParticleTrailBatchCache`, `ParticleTrailProgram`, `particleItemFloats`, `COLOR_ATTRIBUTE_LOCATION`, `GL`, `LitProgram`, `MAP_TEXTURE_UNIT`, `METAL_ROUGHNESS_TEXTURE_UNIT`, `NORMAL_ATTRIBUTE_LOCATION`, `POSITION_ATTRIBUTE_LOCATION`, `PUNCTUAL_LIGHT_GLSL`, `PunctualLightUniforms`, `SHADOW_GLSL`, `SHADOW_TEXTURE_UNIT`, `ShadowUniforms`, `SpriteProgram`, `UV_ATTRIBUTE_LOCATION`, `UnlitProgram`, `clearRegisteredPickingPipeline`, `resolvePickingServiceFactory`, `IdPassProgram`, `PICKING_GL`, `ParticleIdProgram`, `WebglPickingService`, `registerPickingPipeline`, `RenderTargetCache`, `JOINTS_ATTRIBUTE_LOCATION`, `WEIGHTS_ATTRIBUTE_LOCATION`, `clearRegisteredSkinningPipeline`, `resolveSkinningPipelineFactory`, `SkinnedLitProgram`, `SkinnedUnlitProgram`, `registerSkinningPipeline`, `NODE_SURFACE_TEXTURE_UNIT_BASE`, `clearRegisteredNodeMaterialPipeline`, `resolveNodeMaterialPipelineFactory`, `GlNodeProgram`, `GlNodeProgramCache`, `emitShaderGraphGlsl`, `registerNodeMaterialPipeline`, `ShadowProgram`, `StandardProgram`, `TextureCache`, `isWebgl2Supported`, `registerWebglRenderer`, `WebglRenderer`, `BatchGlContext`, `RenderBatching`, `CacheableGeometry`, `GeometryRecord`, `ParticleBatchRecord`, `ParticleGlContext`, `ParticleTrailBatchRecord`, `GlBuffer`, `GlProgramHandle`, `GlShader`, `GlQuery`, `GlSync`, `GlTexture`, `GlUniformLocation`, `GlVertexArray`, `WebglContext`, `GlFramebuffer`, `GlRenderbuffer`, `PickingRendererHost`, `PickingServiceFactory`, `CacheableRenderTarget`, `RenderTargetRecord`, `SkinnedLitPipeline`, `SkinnedPrograms`, `SkinnedUnlitPipeline`, `SkinningPipelineFactory`, `NodeItemMaterial`, `NodeMaterialPipelineFactory`, `NodeMaterialProgram`, `NodeMaterialPrograms`, `EmittedNodeShader`, `CacheableTexture`, `TextureRecord`, `WebglCanvas`, `WebglContextAttributes`, `WebglContextEventLike`
+- Re-exports: `GlBatching`, `createGlBatching`, `EFFECT_TEXTURE_UNIT`, `EFFECT_VERTEX_COUNT`, `EffectProgram`, `GeometryCache`, `PARTICLE_ATTRIBUTE_LOCATIONS`, `PARTICLE_DEPTH_TEXTURE_UNIT`, `PARTICLE_GL`, `PARTICLE_VERTEX_SHADER_SOURCE`, `ParticleAppearanceProgram`, `ParticleBatchCache`, `ParticleProgram`, `ParticleTrailBatchCache`, `ParticleTrailProgram`, `particleItemFloats`, `COLOR_ATTRIBUTE_LOCATION`, `GL`, `LitProgram`, `MAP_TEXTURE_UNIT`, `METAL_ROUGHNESS_TEXTURE_UNIT`, `NORMAL_ATTRIBUTE_LOCATION`, `POSITION_ATTRIBUTE_LOCATION`, `PUNCTUAL_LIGHT_GLSL`, `PunctualLightUniforms`, `SHADOW_GLSL`, `SHADOW_TEXTURE_UNIT`, `ShadowUniforms`, `SpriteProgram`, `UV_ATTRIBUTE_LOCATION`, `UnlitProgram`, `clearRegisteredPickingPipeline`, `resolvePickingServiceFactory`, `IdPassProgram`, `PICKING_GL`, `ParticleIdProgram`, `WebglPickingService`, `registerPickingPipeline`, `RenderTargetCache`, `JOINTS_ATTRIBUTE_LOCATION`, `WEIGHTS_ATTRIBUTE_LOCATION`, `clearRegisteredSkinningPipeline`, `resolveSkinningPipelineFactory`, `SKINNING_GLSL`, `SkinnedLitProgram`, `SkinnedShadowProgram`, `SkinnedUnlitProgram`, `registerSkinningPipeline`, `NODE_SURFACE_TEXTURE_UNIT_BASE`, `clearRegisteredNodeMaterialPipeline`, `resolveNodeMaterialPipelineFactory`, `GlNodeProgram`, `GlNodeProgramCache`, `emitShaderGraphGlsl`, `registerNodeMaterialPipeline`, `ShadowProgram`, `StandardProgram`, `TextureCache`, `isWebgl2Supported`, `registerWebglRenderer`, `WebglRenderer`, `BatchGlContext`, `RenderBatching`, `CacheableGeometry`, `GeometryRecord`, `ParticleBatchRecord`, `ParticleGlContext`, `ParticleTrailBatchRecord`, `GlBuffer`, `GlProgramHandle`, `GlShader`, `GlQuery`, `GlSync`, `GlTexture`, `GlUniformLocation`, `GlVertexArray`, `WebglContext`, `GlFramebuffer`, `GlRenderbuffer`, `PickingRendererHost`, `PickingServiceFactory`, `CacheableRenderTarget`, `RenderTargetRecord`, `SkinnedLitPipeline`, `SkinnedPrograms`, `SkinnedShadowPipeline`, `SkinnedUnlitPipeline`, `SkinningPipelineFactory`, `NodeItemMaterial`, `NodeMaterialPipelineFactory`, `NodeMaterialProgram`, `NodeMaterialPrograms`, `EmittedNodeShader`, `CacheableTexture`, `TextureRecord`, `WebglCanvas`, `WebglContextAttributes`, `WebglContextEventLike`
 
 ---
 
@@ -6112,20 +6163,20 @@ graph LR
 | File | Imports From | Exports To |
 |------|--------------|------------|
 | `packages/render/src/index` | 29 files | 0 files |
+| `packages/render-webgpu/src/webgpu-device` | 0 files | 25 files |
+| `packages/render-webgpu/src/index` | 25 files | 0 files |
 | `packages/physics/src/index` | 24 files | 0 files |
-| `packages/render-webgpu/src/webgpu-device` | 0 files | 23 files |
-| `packages/render-webgpu/src/index` | 23 files | 0 files |
-| `packages/render-webgpu/src/webgpu-renderer` | 20 files | 2 files |
+| `packages/render-webgpu/src/webgpu-renderer` | 21 files | 2 files |
 | `packages/physics/src/world` | 15 files | 6 files |
 | `packages/motion/src/index` | 21 files | 0 files |
 | `packages/render-webgl/src/gl-program` | 0 files | 17 files |
 | `packages/render-webgl/src/index` | 17 files | 0 files |
 | `packages/scene/src/index` | 16 files | 0 files |
 | `packages/physics/src/types` | 0 files | 16 files |
+| `packages/render-webgpu/src/wgpu-unlit` | 2 files | 13 files |
 | `packages/render-webgl/src/webgl-renderer` | 13 files | 2 files |
 | `packages/physics/src/descriptors` | 4 files | 10 files |
 | `packages/ui/src/index` | 14 files | 0 files |
-| `packages/render-webgpu/src/wgpu-unlit` | 2 files | 12 files |
 | `packages/scene/src/node` | 4 files | 9 files |
 | `packages/core/src/index` | 13 files | 0 files |
 | `packages/render-webgpu/src/wgpu-pipeline-cache` | 9 files | 4 files |
@@ -6345,12 +6396,12 @@ graph TD
         N125[wgpu-lit]
         N126[wgpu-standard]
         N127[wgpu-effect]
-        N128[wgpu-particle-simulation]
-        N129[wgpu-texture]
-        N130[wgpu-compute]
-        N131[wgpu-gpu-timer]
-        N132[webgpu-device]
-        N133[...15 more]
+        N128[wgpu-picking-registry]
+        N129[wgpu-particle-simulation]
+        N130[wgpu-picking]
+        N131[wgpu-texture]
+        N132[wgpu-compute]
+        N133[...17 more]
     end
 
     subgraph Packages/animation
@@ -6538,17 +6589,17 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 314 |
+| Total TypeScript Files | 316 |
 | Total Modules | 24 |
-| Total Lines of Code | 151819 |
-| Total Exports | 3171 |
-| Total Re-exports | 2023 |
-| Total Classes | 196 |
-| Total Interfaces | 590 |
-| Total Functions | 516 |
+| Total Lines of Code | 153139 |
+| Total Exports | 3197 |
+| Total Re-exports | 2037 |
+| Total Classes | 198 |
+| Total Interfaces | 593 |
+| Total Functions | 520 |
 | Total Type Guards | 26 |
 | Total Enums | 0 |
-| Type-only Imports | 401 |
+| Type-only Imports | 406 |
 | Runtime Circular Deps | 0 |
 | Type-only Circular Deps | 6 |
 

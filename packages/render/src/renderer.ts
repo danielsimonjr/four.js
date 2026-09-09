@@ -713,12 +713,14 @@ export interface Renderer extends Disposable {
    * result *quality* vary by backend, and the owner's decision on RFC 0005 Q6
    * is that the tier is declared absent there instead.
    *
-   * The WebGL 2 backend declares it, gated on its `registerPickingPipeline()`
-   * (the skinning seam's shape): the member says what the backend *can* do,
-   * registration is the application opting in to paying for it, and calling
-   * this without registering is refused with `INVALID_APPLICATION_STATE`
-   * (§85) naming the fix. Each call builds an independent service with its
-   * own id buffer; the caller owns it and disposes it (§83).
+   * The WebGL 2 and WebGPU backends declare it, gated on each package's
+   * `registerPickingPipeline()` (the skinning seam's shape): the member says
+   * what the backend *can* do, registration is the application opting in to
+   * paying for it, and calling this without registering is refused with
+   * `INVALID_APPLICATION_STATE` (§85) naming the fix. Each call builds an
+   * independent service with its own id buffer; the caller owns it and
+   * disposes it (§83). WebGPU's pass still skips particles and skinned
+   * items (no `ParticleIdProgram`, no skinned pipelines).
    */
   createPickingService?(): PickingService;
 

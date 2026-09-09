@@ -6,21 +6,21 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 817
+**Total files**: 820
 
 ## Disposition counts
 
 | Disposition | Count | Meaning |
 | --- | --: | --- |
-| `reachable` | 266 | A `src/` file in the module graph, reachable from a root. |
+| `reachable` | 268 | A `src/` file in the module graph, reachable from a root. |
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 1 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 470 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 471 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
 | `config` | 17 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 14 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **817** | |
+| **Total** | **820** | |
 
 ## Per-area counts
 
@@ -28,8 +28,8 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | --- | --: |
 | `config` | 17 |
 | `examples` | 14 |
-| `src` | 315 |
-| `tests` | 470 |
+| `src` | 317 |
+| `tests` | 471 |
 | `tools` | 1 |
 
 ## Per-package counts
@@ -55,7 +55,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@fourjs/render-canvas` | 2 |
 | `@fourjs/render-svg` | 2 |
 | `@fourjs/render-webgl` | 27 |
-| `@fourjs/render-webgpu` | 42 |
+| `@fourjs/render-webgpu` | 45 |
 | `@fourjs/scene` | 35 |
 | `@fourjs/serialization` | 11 |
 | `@fourjs/text` | 6 |
@@ -522,6 +522,8 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgpu/src/wgpu-node-registry.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-particle-simulation.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-particles.ts` | @fourjs/render-webgpu | src | reachable |
+| `packages/render-webgpu/src/wgpu-picking-registry.ts` | @fourjs/render-webgpu | src | reachable |
+| `packages/render-webgpu/src/wgpu-picking.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-pipeline-cache.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-readback.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-render-target.ts` | @fourjs/render-webgpu | src | reachable |
@@ -543,6 +545,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgpu/tests/wgpu-node-program.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-particle-simulation.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-particles.test.ts` | @fourjs/render-webgpu | tests | test |
+| `packages/render-webgpu/tests/wgpu-picking.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-readback-region.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-readback.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-render-target.test.ts` | @fourjs/render-webgpu | tests | test |

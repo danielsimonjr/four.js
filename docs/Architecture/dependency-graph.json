@@ -3,9 +3,9 @@
     "name": "fourjs-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-09-09",
-    "totalFiles": 314,
+    "totalFiles": 316,
     "totalModules": 24,
-    "totalExports": 3171
+    "totalExports": 3197
   },
   "entryPoints": [
     {
@@ -15548,6 +15548,57 @@
           "EFFECT_UNIFORM_WGSL"
         ]
       },
+      "packages/render-webgpu/src/wgpu-picking-registry.ts": {
+        "description": "The picking pipeline's registration slot (§71, §62; RFC 0005) — the",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GpuDevice"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./wgpu-geometry.js",
+            "imports": [
+              "WgpuGeometryCache"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./wgpu-render-target.js",
+            "imports": [
+              "WgpuRenderTargetCache"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@fourjs/render",
+            "directory": "packages/render",
+            "imports": [
+              "PickingService"
+            ]
+          }
+        ],
+        "exports": [
+          "setPickingServiceFactory",
+          "resolvePickingServiceFactory",
+          "clearRegisteredPickingPipeline"
+        ],
+        "interfaces": [
+          "PickingRendererHost",
+          "PickingServiceFactory"
+        ],
+        "functions": [
+          "setPickingServiceFactory",
+          "resolvePickingServiceFactory",
+          "clearRegisteredPickingPipeline"
+        ]
+      },
       "packages/render-webgpu/src/wgpu-particle-simulation.ts": {
         "description": "`WgpuParticleSimulation` — the device side of §36's `simulation: \"gpu\"`",
         "externalDependencies": [],
@@ -15599,6 +15650,123 @@
         "constants": [
           "PARTICLE_SIMULATION_VECTOR_BYTES",
           "PARTICLE_SIMULATION_SCRATCH_BYTES"
+        ]
+      },
+      "packages/render-webgpu/src/wgpu-picking.ts": {
+        "description": "The WebGPU picking service (§71, §62; RFC 0005) — the id-buffer pass and",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GPU_BUFFER_USAGE",
+              "GPU_SHADER_STAGE",
+              "UNIFORM_STRIDE_BYTES",
+              "GpuBindGroup",
+              "GpuBindGroupLayout",
+              "GpuBuffer",
+              "GpuDevice",
+              "GpuRenderPipeline",
+              "GpuTextureView"
+            ]
+          },
+          {
+            "file": "./wgpu-geometry.js",
+            "imports": [
+              "WgpuGeometryCache",
+              "WgpuGeometryRecord"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./wgpu-picking-registry.js",
+            "imports": [
+              "setPickingServiceFactory",
+              "PickingRendererHost"
+            ]
+          },
+          {
+            "file": "./wgpu-readback.js",
+            "imports": [
+              "readTexturePixels"
+            ]
+          },
+          {
+            "file": "./wgpu-render-target.js",
+            "imports": [
+              "RENDER_TARGET_COLOR_FORMAT",
+              "RENDER_TARGET_DEPTH_FORMAT",
+              "WgpuRenderTargetRecord"
+            ]
+          },
+          {
+            "file": "./wgpu-unlit.js",
+            "imports": [
+              "FRAGMENT_ENTRY_POINT",
+              "POSITION_BUFFER_LAYOUT",
+              "VERTEX_ENTRY_POINT"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@fourjs/core",
+            "directory": "packages/core",
+            "imports": [
+              "DEV",
+              "FourError",
+              "devWarnOnce"
+            ]
+          },
+          {
+            "package": "@fourjs/math",
+            "directory": "packages/math",
+            "imports": [
+              "Frustum",
+              "Matrix4",
+              "Rectangle2"
+            ]
+          },
+          {
+            "package": "@fourjs/render",
+            "directory": "packages/render",
+            "imports": [
+              "RenderTarget",
+              "assertEncodableCandidateCount",
+              "buildRenderList",
+              "buildViewRenderList",
+              "collectPickCandidates",
+              "decodePickId",
+              "encodePickId",
+              "PickRequest",
+              "PickResult",
+              "PickingService",
+              "RenderItem"
+            ]
+          }
+        ],
+        "exports": [
+          "ID_VIEW_PROJECTION_OFFSET",
+          "ID_MODEL_OFFSET",
+          "ID_PICK_OFFSET",
+          "ID_UNIFORM_BYTES",
+          "ID_SHADER_SOURCE",
+          "registerPickingPipeline",
+          "WebgpuPickingService"
+        ],
+        "classes": [
+          "WebgpuPickingService"
+        ],
+        "functions": [
+          "registerPickingPipeline"
+        ],
+        "constants": [
+          "ID_VIEW_PROJECTION_OFFSET",
+          "ID_MODEL_OFFSET",
+          "ID_PICK_OFFSET",
+          "ID_UNIFORM_BYTES",
+          "ID_SHADER_SOURCE"
         ]
       },
       "packages/render-webgpu/src/wgpu-texture.ts": {
@@ -16269,6 +16437,13 @@
             ]
           },
           {
+            "file": "./wgpu-picking-registry.js",
+            "imports": [
+              "resolvePickingServiceFactory",
+              "PickingRendererHost"
+            ]
+          },
+          {
             "file": "./wgpu-unlit.js",
             "imports": [
               "CLEAR_VERTEX_COUNT"
@@ -16312,6 +16487,7 @@
               "validateReadbackRegion",
               "EffectRenderPass",
               "RenderBatch",
+              "PickingService",
               "RenderInterpolation",
               "RenderItem",
               "RenderStatistics",
@@ -17011,6 +17187,27 @@
             "reExport": true
           },
           {
+            "file": "./wgpu-picking-registry.js",
+            "imports": [
+              "clearRegisteredPickingPipeline",
+              "resolvePickingServiceFactory"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./wgpu-picking.js",
+            "imports": [
+              "ID_MODEL_OFFSET",
+              "ID_PICK_OFFSET",
+              "ID_SHADER_SOURCE",
+              "ID_UNIFORM_BYTES",
+              "ID_VIEW_PROJECTION_OFFSET",
+              "WebgpuPickingService",
+              "registerPickingPipeline"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./webgpu-device.js",
             "imports": [
               "Gpu",
@@ -17167,6 +17364,15 @@
             "file": "./wgpu-node-program.js",
             "imports": [
               "EmittedWgslNodeShader"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./wgpu-picking-registry.js",
+            "imports": [
+              "PickingRendererHost",
+              "PickingServiceFactory"
             ],
             "reExport": true,
             "typeOnly": true
@@ -17340,6 +17546,15 @@
           "WgpuNodePipelineStore",
           "emitShaderGraphWgsl",
           "registerWebgpuNodeMaterialPipeline",
+          "clearRegisteredPickingPipeline",
+          "resolvePickingServiceFactory",
+          "ID_MODEL_OFFSET",
+          "ID_PICK_OFFSET",
+          "ID_SHADER_SOURCE",
+          "ID_UNIFORM_BYTES",
+          "ID_VIEW_PROJECTION_OFFSET",
+          "WebgpuPickingService",
+          "registerPickingPipeline",
           "PACKAGE_NAME",
           "Gpu",
           "GpuAdapter",
@@ -17403,7 +17618,9 @@
           "WgpuNodeMaterialPipelineFactory",
           "WgpuNodeMaterialPipelines",
           "WgpuNodePipelineHost",
-          "EmittedWgslNodeShader"
+          "EmittedWgslNodeShader",
+          "PickingRendererHost",
+          "PickingServiceFactory"
         ],
         "reExported": [
           "GPU_BUFFER_USAGE",
@@ -17572,6 +17789,15 @@
           "WgpuNodePipelineStore",
           "emitShaderGraphWgsl",
           "registerWebgpuNodeMaterialPipeline",
+          "clearRegisteredPickingPipeline",
+          "resolvePickingServiceFactory",
+          "ID_MODEL_OFFSET",
+          "ID_PICK_OFFSET",
+          "ID_SHADER_SOURCE",
+          "ID_UNIFORM_BYTES",
+          "ID_VIEW_PROJECTION_OFFSET",
+          "WebgpuPickingService",
+          "registerPickingPipeline",
           "Gpu",
           "GpuAdapter",
           "GpuStencilFaceState",
@@ -17634,7 +17860,9 @@
           "WgpuNodeMaterialPipelineFactory",
           "WgpuNodeMaterialPipelines",
           "WgpuNodePipelineHost",
-          "EmittedWgslNodeShader"
+          "EmittedWgslNodeShader",
+          "PickingRendererHost",
+          "PickingServiceFactory"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -20033,7 +20261,8 @@
             "file": "./gl-skinning-registry.js",
             "imports": [
               "resolveSkinningPipelineFactory",
-              "SkinnedPrograms"
+              "SkinnedPrograms",
+              "SkinnedShadowPipeline"
             ]
           },
           {
@@ -20330,6 +20559,7 @@
         "interfaces": [
           "SkinnedUnlitPipeline",
           "SkinnedLitPipeline",
+          "SkinnedShadowPipeline",
           "SkinnedPrograms",
           "SkinningPipelineFactory"
         ],
@@ -20768,6 +20998,7 @@
               "setSkinningPipelineFactory",
               "SkinnedLitPipeline",
               "SkinnedPrograms",
+              "SkinnedShadowPipeline",
               "SkinnedUnlitPipeline"
             ]
           }
@@ -20797,16 +21028,22 @@
           }
         ],
         "exports": [
+          "SKINNING_GLSL",
           "registerSkinningPipeline",
           "SkinnedUnlitProgram",
-          "SkinnedLitProgram"
+          "SkinnedLitProgram",
+          "SkinnedShadowProgram"
         ],
         "classes": [
           "SkinnedUnlitProgram",
-          "SkinnedLitProgram"
+          "SkinnedLitProgram",
+          "SkinnedShadowProgram"
         ],
         "functions": [
           "registerSkinningPipeline"
+        ],
+        "constants": [
+          "SKINNING_GLSL"
         ]
       },
       "packages/render-webgl/src/gl-texture.ts": {
@@ -21050,7 +21287,9 @@
           {
             "file": "./gl-skinning.js",
             "imports": [
+              "SKINNING_GLSL",
               "SkinnedLitProgram",
+              "SkinnedShadowProgram",
               "SkinnedUnlitProgram",
               "registerSkinningPipeline"
             ],
@@ -21187,6 +21426,7 @@
             "imports": [
               "SkinnedLitPipeline",
               "SkinnedPrograms",
+              "SkinnedShadowPipeline",
               "SkinnedUnlitPipeline",
               "SkinningPipelineFactory"
             ],
@@ -21277,7 +21517,9 @@
           "WEIGHTS_ATTRIBUTE_LOCATION",
           "clearRegisteredSkinningPipeline",
           "resolveSkinningPipelineFactory",
+          "SKINNING_GLSL",
           "SkinnedLitProgram",
+          "SkinnedShadowProgram",
           "SkinnedUnlitProgram",
           "registerSkinningPipeline",
           "NODE_SURFACE_TEXTURE_UNIT_BASE",
@@ -21318,6 +21560,7 @@
           "RenderTargetRecord",
           "SkinnedLitPipeline",
           "SkinnedPrograms",
+          "SkinnedShadowPipeline",
           "SkinnedUnlitPipeline",
           "SkinningPipelineFactory",
           "NodeItemMaterial",
@@ -21375,7 +21618,9 @@
           "WEIGHTS_ATTRIBUTE_LOCATION",
           "clearRegisteredSkinningPipeline",
           "resolveSkinningPipelineFactory",
+          "SKINNING_GLSL",
           "SkinnedLitProgram",
+          "SkinnedShadowProgram",
           "SkinnedUnlitProgram",
           "registerSkinningPipeline",
           "NODE_SURFACE_TEXTURE_UNIT_BASE",
@@ -21415,6 +21660,7 @@
           "RenderTargetRecord",
           "SkinnedLitPipeline",
           "SkinnedPrograms",
+          "SkinnedShadowPipeline",
           "SkinnedUnlitPipeline",
           "SkinningPipelineFactory",
           "NodeItemMaterial",
@@ -24698,7 +24944,9 @@
           "packages/render-webgpu/src/wgpu-lit.ts",
           "packages/render-webgpu/src/wgpu-standard.ts",
           "packages/render-webgpu/src/wgpu-effect.ts",
+          "packages/render-webgpu/src/wgpu-picking-registry.ts",
           "packages/render-webgpu/src/wgpu-particle-simulation.ts",
+          "packages/render-webgpu/src/wgpu-picking.ts",
           "packages/render-webgpu/src/wgpu-texture.ts",
           "packages/render-webgpu/src/wgpu-compute.ts",
           "packages/render-webgpu/src/wgpu-gpu-timer.ts",
@@ -24860,18 +25108,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 314,
+    "totalTypeScriptFiles": 316,
     "totalModules": 24,
-    "totalLinesOfCode": 151819,
-    "totalExports": 3171,
-    "totalClasses": 196,
-    "totalInterfaces": 590,
-    "totalFunctions": 516,
+    "totalLinesOfCode": 153139,
+    "totalExports": 3197,
+    "totalClasses": 198,
+    "totalInterfaces": 593,
+    "totalFunctions": 520,
     "totalTypeGuards": 26,
     "totalEnums": 0,
-    "totalConstants": 459,
-    "totalReExports": 2023,
-    "totalTypeOnlyImports": 401,
+    "totalConstants": 465,
+    "totalReExports": 2037,
+    "totalTypeOnlyImports": 406,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 6,
     "unusedFilesCount": 0,

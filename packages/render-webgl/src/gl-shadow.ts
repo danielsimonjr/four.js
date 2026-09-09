@@ -19,10 +19,12 @@
  * colour. Drawing casters through the lit or unlit pipeline would mean
  * uploading uniforms nothing reads — per caster, per frame — and would make the
  * caster pass's GL sequence depend on which surface family the caster happens
- * to belong to. One program draws every caster instead, whatever shades it on
- * screen, and `gl-geometry.ts`'s vertex arrays serve it unchanged: position is
- * always at `POSITION_ATTRIBUTE_LOCATION`, and the streams this stage does not
- * declare are simply ignored.
+ * to belong to. One program draws every **unskinned** caster instead, whatever
+ * shades it on screen, and `gl-geometry.ts`'s vertex arrays serve it unchanged:
+ * position is always at `POSITION_ATTRIBUTE_LOCATION`, and the streams this
+ * stage does not declare are simply ignored. Skinned casters use a sibling
+ * program behind `registerSkinningPipeline` — this module never names it, so a
+ * bundle that never skins does not carry GPU skinning GLSL.
  *
  * ## Determinism (§33)
  *

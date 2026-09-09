@@ -143,8 +143,10 @@ emitter's table index). That is not a per-particle id; trails are not
 drawn; a zero-count system issues no instanced draw and still has no
 bounds (`ParticleRenderable.computeBounds` returns `false` when nothing
 is alive). `hitTestMode = "bounds"` keeps the AABB path for a live
-system; `"gpu"` is what selects the id pass. WebGPU does not declare
-`createPickingService` yet (RFC 0005 residue).
+system; `"gpu"` is what selects the id pass. WebGPU declares the same
+`registerPickingPipeline` / `createPickingService` seam
+(`fourJS/render-webgpu`); its id pass still skips particles and
+skinned items.
 
 ## Dragging: pixels to world deltas
 

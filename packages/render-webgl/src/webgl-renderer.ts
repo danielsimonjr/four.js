@@ -114,6 +114,7 @@ import {
 import {
   resolveSkinningPipelineFactory,
   type SkinnedPrograms,
+  type SkinnedShadowPipeline,
 } from "./gl-skinning-registry.js";
 import {
   NODE_SURFACE_TEXTURE_UNIT_BASE,
@@ -1443,7 +1444,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   #shadowTarget: RenderTarget | null = null;
 
   /**
-   * The registered skinning pipeline's two programs (§54; RFC 0003), or
+   * The registered skinning pipeline's colour programs (§54; RFC 0003), or
    * `null` — before the first skinned draw, while the context is lost, when
    * nothing registered, and forever in a scene that never skins. **Compiled
    * lazily by {@link WebglRenderer.render}**, never at initialize: the other
@@ -1452,6 +1453,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * so the frame compiles inside a `try` and a driver refusal costs skinning,
    * not the frame. A skinless scene therefore issues the byte-identical GL
    * sequence it always did — the RFC's acceptance gate.
+   *
+   * The depth-only skinned caster lives on the same pair and compiles later,
+   * on the first skinned caster — see `#acquireSkinnedShadowProgram`.
    */
   #skinnedPrograms: SkinnedPrograms | null = null;
 
@@ -1462,6 +1466,14 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * compile.
    */
   #skinnedProgramsFailed = false;
+
+  /**
+   * Whether the skinned caster compile failed on the current context — a
+   * separate latch from `#skinnedProgramsFailed`, so a driver that can shade
+   * a skinned mesh but cannot compile the depth-only sibling still draws the
+   * colour pass and only skips the deformed shadow.
+   */
+  #skinnedShadowFailed = false;
 
   /**
    * The registered node-material pipeline's per-context program cache (§60;
@@ -1616,6 +1628,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // other handle; the next skinned draw recompiles.
     this.#skinnedPrograms = null;
     this.#skinnedProgramsFailed = false;
+    this.#skinnedShadowFailed = false;
     // §60's node-program cache (RFC 0001) died with the context too; the
     // next node-material draw re-creates it and recompiles per graph.
     this.#nodePrograms = null;
@@ -3602,6 +3615,44 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   }
 
   /**
+   * The registered skinning pipeline's depth-only caster for this context,
+   * compiled on the first skinned caster, or `null` when there is nothing to
+   * draw a deformed silhouette with (§54, §69; RFC 0003 residue).
+   *
+   * Separate from `#acquireSkinnedPrograms`: the colour pair compiles on the
+   * first skinned colour draw, and this program must not ride along — a
+   * skinned mesh that does not cast must not add a third `createProgram`. A
+   * colour-pair failure (unregistered, or a refusing driver) skips skinned
+   * casters the way it skips skinned colour draws: a bind-pose shadow is a
+   * different picture. A caster-only compile failure latches here and leaves
+   * colour skinning alone.
+   */
+  #acquireSkinnedShadowProgram(
+    gl: ParticleGlContext,
+  ): SkinnedShadowPipeline | null {
+    if (this.#skinnedShadowFailed) {
+      return null;
+    }
+    const programs = this.#acquireSkinnedPrograms(gl);
+    if (programs === null) {
+      return null;
+    }
+    try {
+      return programs.acquireShadow();
+    } catch (error: unknown) {
+      this.#skinnedShadowFailed = true;
+      if (DEV) {
+        devWarnOnce(
+          "webgl-skinned-shadow-compile-failed",
+          "§69: the skinned shadow pipeline failed to compile on this " +
+            `context; skinned casters are skipped (§61, §89). ${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
    * The registered node-material program cache for this context, created on
    * first need, or `null` when nothing registered (§60; RFC 0001).
    *
@@ -3762,11 +3813,17 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * ## What it draws
    *
    * The frame's own render list, filtered twice: to the items whose node set
-   * §49's `castShadow`, and to the three *surface* kinds. Sprites are excluded
-   * because a depth-only pass writes geometry rather than alpha, so a §55 quad
-   * would cast its rectangle instead of its texture — §69's transparent shadow
-   * masks are what fix that, and they are staged. Particle items carry
-   * `castShadow: false` from the list builder and are excluded by that.
+   * §49's `castShadow`, and to the *surface* kinds a depth-only pass can
+   * honestly draw. Sprites are excluded because a depth-only pass writes
+   * geometry rather than alpha, so a §55 quad would cast its rectangle instead
+   * of its texture — §69's transparent shadow masks are what fix that, and they
+   * are staged. Particle items carry `castShadow: false` from the list builder
+   * and are excluded by that; their trails are never drawn here.
+   *
+   * Skinned casters (`skinned-unlit` / `skinned-lit`) draw through the lazy
+   * skinned shadow program when the skinning pipeline is registered, so the
+   * map holds the **deformed** silhouette. Unregistered or failed skinning
+   * skips them — a bind-pose shadow is a different picture (RFC 0003 §5).
    *
    * Drawing from the *list* rather than re-walking the scene is what makes the
    * caster pass and the colour pass agree by construction: same items, same
@@ -3841,6 +3898,14 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
 
     shadowProgram.use();
     shadowProgram.setViewProjection(sceneLights.shadowMatrix);
+    // `"shadow"` / `"skinned-shadow"` rather than `RenderItemKind`: the caster
+    // pass has two programs for what the colour pass splits across families,
+    // and switching when the kind changes is the colour loop's `activeKind`
+    // rule applied to that pair. View-projection is per-program, so the
+    // unskinned upload above stays valid across a switch away and back; the
+    // skinned program gets its own copy the first time it is current.
+    let activeKind: "shadow" | "skinned-shadow" = "shadow";
+    let skinnedShadowViewUploaded = false;
     for (const item of items) {
       // §67's clip is deliberately not consulted here (R-23). A stencil clip
       // is a per-view, screen-space construct and this framebuffer carries no
@@ -3851,11 +3916,6 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       // depth-only pass writes geometry, not visibility. Mask draws never
       // reach this loop at all; the list builder writes `castShadow: false`
       // on every one, because a mask is not content.
-      // §54 (RFC 0003): skinned draws are excluded beside sprites, and for
-      // the analogous reason — this depth-only program does not skin, so a
-      // skinned caster would cast its **bind pose**, which is a different
-      // picture. A skinned caster program is deferred with CPU skinning;
-      // until it lands, a skinned mesh casts no shadow, documented on `Mesh`.
       // §60 (RFC 0001): a node material with **no** displacement casts its
       // geometry exactly — depth ignores colour, so the caster program is
       // right for it — but one whose graph displaces vertices would cast its
@@ -3864,16 +3924,48 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       if (
         !item.castShadow ||
         item.kind === "sprite" ||
-        item.kind === "skinned-unlit" ||
-        item.kind === "skinned-lit" ||
         (item.kind === "node" &&
           item.material.graph.positionOffset !== undefined)
       ) {
         continue;
       }
+      if (isSkinnedUnlitItem(item) || isSkinnedLitItem(item)) {
+        const skinnedShadow = this.#acquireSkinnedShadowProgram(gl);
+        if (skinnedShadow === null) {
+          continue;
+        }
+        const geometry = geometries.acquire(item.geometry);
+        if (geometry === null) {
+          continue;
+        }
+        if (activeKind !== "skinned-shadow") {
+          skinnedShadow.use();
+          activeKind = "skinned-shadow";
+        }
+        if (!skinnedShadowViewUploaded) {
+          skinnedShadow.setViewProjection(sceneLights.shadowMatrix);
+          skinnedShadowViewUploaded = true;
+        }
+        skinnedShadow.setModel(item.worldMatrix);
+        skinnedShadow.setJointMatrices(item.jointMatrices);
+        gl.bindVertexArray(geometry.vertexArray);
+        if (geometry.indexType === null) {
+          gl.drawArrays(geometry.mode, 0, geometry.count);
+        } else {
+          gl.drawElements(geometry.mode, geometry.count, geometry.indexType, 0);
+        }
+        if (statistics !== null) {
+          countDraw(statistics, geometry.mode, geometry.count, 1);
+        }
+        continue;
+      }
       const geometry = geometries.acquire(item.geometry);
       if (geometry === null) {
         continue;
+      }
+      if (activeKind !== "shadow") {
+        shadowProgram.use();
+        activeKind = "shadow";
       }
       shadowProgram.setModel(item.worldMatrix);
       gl.bindVertexArray(geometry.vertexArray);

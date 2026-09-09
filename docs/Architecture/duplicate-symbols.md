@@ -10,27 +10,32 @@ Names that are OWN-DEFINED (not merely re-exported) by >= 2 distinct files acros
 
 | Category | Count |
 | --- | --: |
-| **TRUE_DUPLICATE** (actionable) | 0 |
+| **TRUE_DUPLICATE** (actionable) | 4 |
 | DISPATCH_VARIANT | 0 |
 | ALIAS_DELEGATION | 0 |
 | ALLOWLISTED | 7 |
-| _Total flagged names_ | 7 |
+| _Total flagged names_ | 11 |
 
 ## Summary — types (interface/type/enum)
 
 | Category | Count |
 | --- | --: |
-| **TRUE_DUPLICATE** (actionable) | 0 |
+| **TRUE_DUPLICATE** (actionable) | 2 |
 | DISPATCH_VARIANT | 0 |
 | ALIAS_DELEGATION | 0 |
 | ALLOWLISTED | 1 |
-| _Total flagged names_ | 1 |
+| _Total flagged names_ | 3 |
 
 ## Runtime duplicates
 
 ### TRUE_DUPLICATE — actionable merge targets
 
-_None._
+| Name | Category | Defining files (package, public?, sub-tag) | Canonical hint |
+| --- | --- | --- | --- |
+| `clearRegisteredPickingPipeline` | function | `packages/render-webgl/src/gl-picking-registry.ts` (@fourjs/render-webgl, public, PLAIN)<br>`packages/render-webgpu/src/wgpu-picking-registry.ts` (@fourjs/render-webgpu, public, PLAIN) | **AMBIGUOUS** |
+| `registerPickingPipeline` | function | `packages/render-webgl/src/gl-picking.ts` (@fourjs/render-webgl, public, PLAIN)<br>`packages/render-webgpu/src/wgpu-picking.ts` (@fourjs/render-webgpu, public, PLAIN) | **AMBIGUOUS** |
+| `resolvePickingServiceFactory` | function | `packages/render-webgl/src/gl-picking-registry.ts` (@fourjs/render-webgl, public, PLAIN)<br>`packages/render-webgpu/src/wgpu-picking-registry.ts` (@fourjs/render-webgpu, public, PLAIN) | **AMBIGUOUS** |
+| `setPickingServiceFactory` | function | `packages/render-webgl/src/gl-picking-registry.ts` (@fourjs/render-webgl, internal, PLAIN)<br>`packages/render-webgpu/src/wgpu-picking-registry.ts` (@fourjs/render-webgpu, internal, PLAIN) | `internal-only` |
 
 ### DISPATCH_VARIANT — distinct public typed-dispatch surfaces (Bucket C candidates)
 
@@ -56,7 +61,10 @@ _None._
 
 ### TRUE_DUPLICATE
 
-_None._
+| Name | Category | Defining files (package, public?, sub-tag) | Canonical hint |
+| --- | --- | --- | --- |
+| `PickingRendererHost` | interface | `packages/render-webgl/src/gl-picking-registry.ts` (@fourjs/render-webgl, public, PLAIN)<br>`packages/render-webgpu/src/wgpu-picking-registry.ts` (@fourjs/render-webgpu, public, PLAIN) | **AMBIGUOUS** |
+| `PickingServiceFactory` | interface | `packages/render-webgl/src/gl-picking-registry.ts` (@fourjs/render-webgl, public, PLAIN)<br>`packages/render-webgpu/src/wgpu-picking-registry.ts` (@fourjs/render-webgpu, public, PLAIN) | **AMBIGUOUS** |
 
 ### DISPATCH_VARIANT
 

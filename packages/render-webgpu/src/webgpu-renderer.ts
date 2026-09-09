@@ -48,7 +48,11 @@
  * as a draw with no geometry record is, because a pipeline that silently
  * draws the wrong thing is worse than one that does not exist yet (the
  * recorded WP-9.1 rule, applied to a backend) — and an *unregistered* node
- * material is skipped on the same terms. The one exception is deliberate and
+ * material is skipped on the same terms. §71 picking is **opt-in**:
+ * `createPickingService()` is declared (presence is the capability, matching
+ * WebGL) and throws until `registerPickingPipeline()` links `wgpu-picking.ts`.
+ * Particle systems are skipped in the id pass (no `ParticleIdProgram` on
+ * this backend yet). The one exception is deliberate and
  * narrow: a §67 **mask** is coverage, not shading, so a clip node of any
  * material family masks correctly today through the flat unlit pipeline with
  * colour writes off.
@@ -116,6 +120,7 @@ import {
   validateReadbackRegion,
   type EffectRenderPass,
   type RenderBatch,
+  type PickingService,
   type RenderInterpolation,
   type RenderItem,
   type RenderStatistics,
@@ -245,6 +250,10 @@ import {
   type WgpuNodeFrameState,
   type WgpuNodeMaterialPipelines,
 } from "./wgpu-node-registry.js";
+import {
+  resolvePickingServiceFactory,
+  type PickingRendererHost,
+} from "./wgpu-picking-registry.js";
 import { CLEAR_VERTEX_COUNT } from "./wgpu-unlit.js";
 
 /** Error code for use-after-dispose, mirroring the other two backends (§83, §89). */
@@ -944,8 +953,7 @@ export class WebgpuRenderer implements Renderer {
       );
     }
 
-    const timestampQueries =
-      adapter.features?.has("timestamp-query") === true;
+    const timestampQueries = adapter.features?.has("timestamp-query") === true;
     const device = timestampQueries
       ? await adapter.requestDevice({
           requiredFeatures: ["timestamp-query"],
@@ -1478,7 +1486,12 @@ export class WebgpuRenderer implements Renderer {
       for (let index = 0; index < viewItems.length; index += 1) {
         const item = viewItems[index];
         if (itemScissorActive) {
-          pass.setScissorRect(viewScissor.x, top, viewScissor.width, viewScissor.height);
+          pass.setScissorRect(
+            viewScissor.x,
+            top,
+            viewScissor.width,
+            viewScissor.height,
+          );
           itemScissorActive = false;
         }
 
@@ -2250,6 +2263,48 @@ export class WebgpuRenderer implements Renderer {
       // was submitted, exactly as a scene draw is.
       countDraw(statistics, "triangle-list", EFFECT_PASS_VERTEX_COUNT, 1);
     }
+  }
+
+  /**
+   * Builds a `PickingService` over this renderer — §71's `"gpu"` tier
+   * (RFC 0005), gated on `registerPickingPipeline()` exactly as node-material
+   * draws are gated on `registerWebgpuNodeMaterialPipeline()`: this method
+   * resolves the registry slot and refuses (§85) when nothing registered, so
+   * the id pipeline, the service, and its `mapAsync` read-back live only in
+   * bundles that opted in (the pipeline-cost law; `wgpu-picking-registry.ts`).
+   *
+   * What the service receives is a **live window** onto exactly the renderer
+   * state an id pass needs — device, the two shared caches (geometry, render
+   * targets), the surface size, and the two lifecycle flags — as accessors,
+   * so a §61 loss's dropped caches are seen rather than captured stale
+   * (`PickingRendererHost`). Each call builds an independent service; the
+   * caller owns and disposes it (§83). No GPU call is issued here — the id
+   * pipeline compiles on the service's first pass.
+   *
+   * @throws FourError `INVALID_APPLICATION_STATE` on a disposed renderer, or
+   * when no picking pipeline is registered.
+   */
+  createPickingService(): PickingService {
+    this.#assertUsable("createPickingService");
+    const factory = resolvePickingServiceFactory();
+    if (factory === null) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "§71: call registerPickingPipeline() from @fourjs/render-webgpu " +
+          "before createPickingService() (§85).",
+        { context: { registered: false } },
+      );
+    }
+    const host: PickingRendererHost = {
+      device: () => this.#device,
+      geometries: () => this.#geometries,
+      renderTargets: () => this.#renderTargets,
+      surfaceWidth: () => Math.round(this.#width * this.#resolution),
+      surfaceHeight: () => Math.round(this.#height * this.#resolution),
+      deviceLost: () => this.#deviceLost,
+      disposed: () => this.#disposed,
+    };
+    return factory.create(host);
   }
 
   /**

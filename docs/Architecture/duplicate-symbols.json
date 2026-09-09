@@ -2,22 +2,102 @@
   "generated": "2026-09-09",
   "note": "This report groups names by OWN definition, not by call graph, then classifies each flagged name (see DupEntryTag): TRUE_DUPLICATE (the actionable merge targets), DISPATCH_VARIANT (>=2 mathTyped(...) registrations of the same public name — distinct dispatch surfaces, Bucket C delegation candidates, not copy-paste bodies), ALIAS_DELEGATION (a const-alias forward to an imported symbol, not an independent body — excluded once fewer than 2 real bodies remain), and ALLOWLISTED (matches duplicate-allowlist.json: hot-path is* guards, AssemblyScript mirrors, per-package VERSION strings). NOT detected: same-file typed-dispatch overload polymorphism for different argument shapes within one registration — a human still triages TRUE_DUPLICATE entries using the defining files + public flags before merging anything.",
   "summary": {
-    "runtimeDuplicates": 0,
-    "typeDuplicates": 0,
+    "runtimeDuplicates": 4,
+    "typeDuplicates": 2,
     "runtimeByTag": {
-      "TRUE_DUPLICATE": 0,
+      "TRUE_DUPLICATE": 4,
       "DISPATCH_VARIANT": 0,
       "ALIAS_DELEGATION": 0,
       "ALLOWLISTED": 7
     },
     "typeByTag": {
-      "TRUE_DUPLICATE": 0,
+      "TRUE_DUPLICATE": 2,
       "DISPATCH_VARIANT": 0,
       "ALIAS_DELEGATION": 0,
       "ALLOWLISTED": 1
     }
   },
   "runtime": [
+    {
+      "name": "clearRegisteredPickingPipeline",
+      "category": "function",
+      "definers": [
+        {
+          "file": "packages/render-webgl/src/gl-picking-registry.ts",
+          "package": "@fourjs/render-webgl",
+          "public": true,
+          "tag": "PLAIN"
+        },
+        {
+          "file": "packages/render-webgpu/src/wgpu-picking-registry.ts",
+          "package": "@fourjs/render-webgpu",
+          "public": true,
+          "tag": "PLAIN"
+        }
+      ],
+      "canonicalHint": "AMBIGUOUS",
+      "tag": "TRUE_DUPLICATE"
+    },
+    {
+      "name": "registerPickingPipeline",
+      "category": "function",
+      "definers": [
+        {
+          "file": "packages/render-webgl/src/gl-picking.ts",
+          "package": "@fourjs/render-webgl",
+          "public": true,
+          "tag": "PLAIN"
+        },
+        {
+          "file": "packages/render-webgpu/src/wgpu-picking.ts",
+          "package": "@fourjs/render-webgpu",
+          "public": true,
+          "tag": "PLAIN"
+        }
+      ],
+      "canonicalHint": "AMBIGUOUS",
+      "tag": "TRUE_DUPLICATE"
+    },
+    {
+      "name": "resolvePickingServiceFactory",
+      "category": "function",
+      "definers": [
+        {
+          "file": "packages/render-webgl/src/gl-picking-registry.ts",
+          "package": "@fourjs/render-webgl",
+          "public": true,
+          "tag": "PLAIN"
+        },
+        {
+          "file": "packages/render-webgpu/src/wgpu-picking-registry.ts",
+          "package": "@fourjs/render-webgpu",
+          "public": true,
+          "tag": "PLAIN"
+        }
+      ],
+      "canonicalHint": "AMBIGUOUS",
+      "tag": "TRUE_DUPLICATE"
+    },
+    {
+      "name": "setPickingServiceFactory",
+      "category": "function",
+      "definers": [
+        {
+          "file": "packages/render-webgl/src/gl-picking-registry.ts",
+          "package": "@fourjs/render-webgl",
+          "public": false,
+          "tag": "PLAIN"
+        },
+        {
+          "file": "packages/render-webgpu/src/wgpu-picking-registry.ts",
+          "package": "@fourjs/render-webgpu",
+          "public": false,
+          "tag": "PLAIN"
+        }
+      ],
+      "canonicalHint": "internal-only",
+      "tag": "TRUE_DUPLICATE"
+    },
     {
       "name": "PACKAGE_NAME",
       "category": "constant",
@@ -321,6 +401,46 @@
     }
   ],
   "types": [
+    {
+      "name": "PickingRendererHost",
+      "category": "interface",
+      "definers": [
+        {
+          "file": "packages/render-webgl/src/gl-picking-registry.ts",
+          "package": "@fourjs/render-webgl",
+          "public": true,
+          "tag": "PLAIN"
+        },
+        {
+          "file": "packages/render-webgpu/src/wgpu-picking-registry.ts",
+          "package": "@fourjs/render-webgpu",
+          "public": true,
+          "tag": "PLAIN"
+        }
+      ],
+      "canonicalHint": "AMBIGUOUS",
+      "tag": "TRUE_DUPLICATE"
+    },
+    {
+      "name": "PickingServiceFactory",
+      "category": "interface",
+      "definers": [
+        {
+          "file": "packages/render-webgl/src/gl-picking-registry.ts",
+          "package": "@fourjs/render-webgl",
+          "public": true,
+          "tag": "PLAIN"
+        },
+        {
+          "file": "packages/render-webgpu/src/wgpu-picking-registry.ts",
+          "package": "@fourjs/render-webgpu",
+          "public": true,
+          "tag": "PLAIN"
+        }
+      ],
+      "canonicalHint": "AMBIGUOUS",
+      "tag": "TRUE_DUPLICATE"
+    },
     {
       "name": "CacheableGeometry",
       "category": "type",

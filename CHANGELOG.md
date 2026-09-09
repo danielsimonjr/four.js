@@ -47,6 +47,22 @@ stay on the tracker.
 
 ### Changed
 
+- **§43 interpolated skin palettes.** `Skeleton.update` takes an optional
+  `worldOf` provider. The interpolated render list composes bone local
+  poses at `interpolationAlpha` then runs the palette product. Palettes
+  are never matrix-lerped. Scene transforms are unchanged.
+
+- **WebGL skinned casters write a deformed silhouette (§69).**
+  `registerSkinningPipeline()` now also exposes a lazy
+  `SkinnedShadowProgram` compiled on the first skinned `castShadow`.
+  Unregistered or failed skinning still skips rather than casting a
+  bind pose. WebGPU has no skinned pipelines.
+
+- **WebGPU `PickingService` (RFC 0005).** `registerPickingPipeline()` from
+  `@fourjs/render-webgpu`, then `createPickingService()`. `pick` copies
+  one texel through `mapAsync`. Particles and skinned items are skipped
+  (no `ParticleIdProgram`, no skinned pipelines).
+
 - **WebGPU lit/standard read `draw.normalMatrix`.** `DRAW_UNIFORM_BYTES`
   is 192; `STANDARD_UNIFORM_BYTES` is 224 (`emissive` 192, `surface` 208).
   Sprites stay 144. The per-vertex cofactor function is still exported

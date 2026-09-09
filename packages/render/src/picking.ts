@@ -205,10 +205,10 @@ export interface PickingService {
  * declare the id-buffer strategy absent rather than emulating it (RFC 0005
  * Q6's adopted disposition).
  *
- * A `true` answer says the backend *can*; the WebGL 2 backend additionally
- * requires its `registerPickingPipeline()` — the capability says what is
- * possible, registration is the application opting in to paying for it (the
- * skinning precedent).
+ * A `true` answer says the backend *can*; the WebGL 2 and WebGPU backends
+ * additionally require their `registerPickingPipeline()` — the capability
+ * says what is possible, registration is the application opting in to
+ * paying for it (the skinning precedent).
  */
 export function supportsPicking(
   renderer: Renderer,

@@ -30,6 +30,23 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — Open-TODO wave 4, simple → complex.** Twelve
+  checkboxes remain; four slices landed without pretending the packets
+  closed. (1) RFC 0003 §43: `Skeleton.update(skinRoot, worldOf?)`;
+  interpolated collect composes local poses then the palette product
+  (never matrix-lerps palettes; scene transforms unchanged). (2) RFC
+  0003 WebGL skinned shadow: `SkinnedShadowProgram` via
+  `pair.acquireShadow()` on the first caster (third `createProgram`);
+  colour pair still compiles on first colour draw; `gl-shadow.ts` does
+  not import `gl-skinning.ts`. Unregistered still skips. WebGPU has no
+  skinned pipelines. (3) RFC 0005 WebGPU `PickingService`: the same
+  `registerPickingPipeline()` seam as WebGL; `mapAsync` 1×1 readback;
+  skips particles and skinned items. (4) Dogfood cycle 5 sat on GPU
+  pick / PickProvider; engine clean; cameras guide and package READMEs
+  patched. Remaining: RFC 0005 WebGPU `ParticleIdProgram`; RFC 0003
+  GPU morph / CPU skinning / bone-texture. First publish and R-33's
+  §112 exit stay blocked.
+
 - **2026-09-09 — Open-TODO second wave, simple → complex.** Twelve
   checkboxes remain; three slices landed without pretending the packets
   closed. (1) Lighting leftover: WebGPU `DrawUniforms` is 192 bytes

@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + **WebGPU** normal-matrix hoist, RFC 0005 pick-latency record + **ParticleIdProgram** + **§72 PickProvider dispatch**, R-33 simulate/present split, dogfood cycle 4. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is WebGPU `PickingService` (`mapAsync`).
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster**; R-33 simulate/present split; dogfood cycles 4–5. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is WebGPU's missing `ParticleIdProgram` (particles still bounds-only on that backend).
 
 ### 0 · Blocked on an event, not on effort
 
@@ -858,6 +858,13 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       not export `Text` (umbrella only, §3.1); `examples/mixed-scene` is a
       playground re-export, not one graph. Guides + barrel headers corrected.
       Standing: next cycle picks a new surface, not these three.
+      **Cycle 5 (2026-09-09, `.dogfood/cycle5`) — GPU picking / PickProvider.**
+      Headless + Chrome WebGL 2: `registerPickingPipeline` →
+      `createPickingService` → `createPickProvider` → `PointerInput`
+      dispatched the front id. Engine: clean. Docs were stale (cameras
+      guide described only the sync ray path); patched. No Pages demo
+      calls `registerPickingPipeline()` (only `tests/browser/fixtures/picking-page.ts`).
+      Standing checkbox stays open.
 
 - [x] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
       one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`
@@ -1124,11 +1131,15 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       ~3–4× the list. Fence vs stall timed on the counting-GL seam only
       (no host WebGL 2 / no WebGPU `PickingService`). ~~§72
       pointer-event dispatch on a `PickProvider` result is an input packet~~
-      **DONE 2026-09-09** (`PointerInputOptions.pickProvider`; default
+      **DONE 2026-09-09** (      `PointerInputOptions.pickProvider`; default
       handlers stay synchronous; provider path serializes per `pointerId`).
-      WebGPU's `PickingService` (`mapAsync`) is WP-R1.x material and is
-      the remaining render-side residue. The analytic `"geometry"` tier +
-      `node.hitTestMode` landed 2026-08-29 — A-11 closed.
+      ~~WebGPU's `PickingService` (`mapAsync`)~~ **DONE 2026-09-09**
+      (`registerPickingPipeline()` from `@fourjs/render-webgpu`;
+      `createPickingService` throws until registered; `mapAsync` 1×1
+      readback; skinned and particle items skipped). Remaining: a WebGPU
+      `ParticleIdProgram` (emitters still bounds-only on that backend).
+      The analytic `"geometry"` tier + `node.hitTestMode` landed
+      2026-08-29 — A-11 closed.
 - [x] **docs/COMPATIBILITY.md §2 — DONE 2026-08-29** (documentation truth
       sweep): §2 rewritten to the tip — seven init pipelines + three registered
       seams, punctual lights, opt-in §65 batching, §69/§70 rows, all-eleven
@@ -1176,12 +1187,17 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 
 - [ ] **RFC 0003 residue (staged in source, 2026-08-28):** GPU morph path (the
       extra-vertex-stream layout decision, stated in `mesh.ts`/`render-list.ts`/§54);
-      skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
-      shadow is a different picture); CPU skinning (Canvas/SVG tiers + the skinned
-      bounds/picking home, with its own `same-runtime` golden); bone-texture palette
-      (unbounds `MAX_SKINNING_JOINTS = 48`; needs a render-target format union +
-      vertex texture fetch); §43-interpolated palettes (today the palette is the
-      last resolved pose).
+      ~~skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
+      shadow is a different picture)~~ **DONE 2026-09-09** (WebGL
+      `SkinnedShadowProgram` via `acquireShadow()` on the first skinned
+      caster; unregistered still skips; WebGPU has no skinned pipelines);
+      CPU skinning (Canvas/SVG tiers + the skinned bounds/picking home,
+      with its own `same-runtime` golden); bone-texture palette (unbounds
+      `MAX_SKINNING_JOINTS = 48`; needs a render-target format union +
+      vertex texture fetch); ~~§43-interpolated palettes (today the palette
+      is the last resolved pose)~~ **DONE 2026-09-09**
+      (`Skeleton.update(skinRoot, worldOf?)`; interpolated list composes
+      local poses then the palette product — palettes are never lerped).
 - [x] **RFC 0003 prototype measurements still owed:** DONE 2026-09-09.
       `benchmarks/skinning-resolve.mjs` records bones-as-nodes resolve at 60 ×1
       and ×10 versus the same Group topology, `Skeleton.update` beside that
@@ -2134,6 +2150,15 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       pre-1.0 PDF.
 
 ## Done
+
+- [x] 2026-09-09 — **Open-TODO wave 4 slices (simple → complex).**
+      Did not close any of the 12 checkboxes. Landed: RFC 0003
+      interpolated palettes (`worldOf`) and WebGL `SkinnedShadowProgram`;
+      RFC 0005 WebGPU `PickingService` (`mapAsync`); dogfood cycle 5
+      (GPU pick / PickProvider guides). Still open on those rows:
+      GPU morph / CPU skinning / bone-texture; WebGPU
+      `ParticleIdProgram`. Still owner/hardware: first publish, R-33
+      exit.
 
 - [x] 2026-09-09 — **Open-TODO second-wave slices (simple → complex).**
       Did not close any of the 12 checkboxes. Landed: WebGPU
