@@ -30,6 +30,14 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — RFC 0005 WebGL `SkinnedIdProgram`.** The id pass draws
+  skinned-unlit / skinned-lit items through a deformed silhouette
+  (`SKINNING_GLSL` in `gl-skinning-glsl.ts`, spliced into the id
+  fragment). Lives in `gl-picking.ts` so `registerPickingPipeline` does
+  not link the colour pair. Lazy compile, fail-once skip, same palette
+  upload as the colour pass. WebGPU still skips: no RFC 0003 skinned
+  pipelines there. RFC 0005 checkbox stays `[ ]`.
+
 - **2026-09-09 — Size budgets after #86.** Main CI failed at `bun run size`
   with the browser gate green (107/107). particles-demo 43.04/43 kB (+38 B),
   ui-demo 49.51/49.5 kB (+11 B). Limits 43.5 / 50 kB. first-3d holds.
@@ -40,7 +48,7 @@ readable; never delete the pointer itself.
   (1) RFC 0005 WebGPU particle id: one id per emitter, private pipeline
   (not exported as `ParticleIdProgram`); 208-byte `PARTICLE_ID_*` block;
   CPU 8-float stream; trails / GPU-sim / wide stream skip. Remaining:
-  skinned id pass on both backends. (2) Lighting leftover: WebGPU
+  WebGPU skinned id pass (needs RFC 0003 skinned pipelines). (2) Lighting leftover: WebGPU
   samples `StandardMaterial.metalRoughnessMap` (G=roughness, B=metalness);
   group 3 with albedo, group 2 without (`shadedMrBindingWgsl`). `|mr:y`
   only when true. Remaining: multi-light / cascades / PBR / §60a / light
@@ -55,8 +63,9 @@ readable; never delete the pointer itself.
   bytes; the particle id block is 208 bytes (projection 0 / view 64 /
   model 128 / pickId 192) in the 256-byte stride. Billboard vertex math
   is `PARTICLE_SHADER_SOURCE`'s. Default 8-float CPU stream only; trails,
-  GPU-sim layouts, and the R-32 wide stream skip. Skinned id pass remains
-  open on both backends. RFC 0005 is not closed.
+  GPU-sim layouts, and the R-32 wide stream skip. WebGL now draws
+  skinned ids (`SkinnedIdProgram`); WebGPU still skips (no RFC 0003
+  skinned pipelines). RFC 0005 is not closed.
 
 - **2026-09-09 — Dogfood cycle 6: §43 interpolated skin palettes.**
   Read from a consumer seat. `Skeleton.update(skinRoot, worldOf?)` and

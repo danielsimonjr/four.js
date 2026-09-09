@@ -719,9 +719,10 @@ export interface Renderer extends Disposable {
    * paying for it, and calling this without registering is refused with
    * `INVALID_APPLICATION_STATE` (§85) naming the fix. Each call builds an
    * independent service with its own id buffer; the caller owns it and
-   * disposes it (§83). WebGPU's pass draws particle systems with one id
-   * per emitter (CPU 8-float billboard); both backends still skip skinned
-   * items (no skinned id pipelines).
+   * disposes it (§83). WebGL draws particle systems (one id per emitter)
+   * and skinned meshes (deformed silhouette via `SkinnedIdProgram`).
+   * WebGPU draws particle systems the same way (CPU 8-float billboard)
+   * and still skips skinned items (no RFC 0003 skinned pipelines).
    */
   createPickingService?(): PickingService;
 

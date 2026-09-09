@@ -1,0 +1,36 @@
+/**
+ * The vertex-stage skinning chunk both the colour/caster programs
+ * (`gl-skinning.ts`) and the picking id program (`gl-picking.ts`) splice in.
+ *
+ * Isolated so {@link registerPickingPipeline} can draw a deformed silhouette
+ * without linking `gl-skinning.ts` (pipeline-cost law: that module is the
+ * `registerSkinningPipeline` seam). The two consumers interpolate the same
+ * exported string; they must not drift.
+ *
+ * Linear blend skinning, four influences summed in attribute order — a
+ * fixed association order, though the result never re-enters the §33
+ * envelope either way. Dual-quaternion skinning is deferred (RFC 0003 §8).
+ * Joint indices arrive as non-normalized `UNSIGNED_SHORT` floats at
+ * location 4 and weights at location 5 (`gl-geometry.ts`).
+ */
+
+import { MAX_SKINNING_JOINTS } from "@fourjs/render";
+
+/**
+ * The two influence attributes at their fixed locations, the palette, and
+ * the blended skin matrix. Spliced into every skinned vertex stage.
+ */
+export const SKINNING_GLSL = `const int MAX_SKINNING_JOINTS = ${String(
+  MAX_SKINNING_JOINTS,
+)};
+layout(location = 4) in vec4 joints;
+layout(location = 5) in vec4 weights;
+uniform mat4 jointMatrices[MAX_SKINNING_JOINTS];
+
+mat4 skinMatrix() {
+  return weights.x * jointMatrices[int(joints.x)]
+       + weights.y * jointMatrices[int(joints.y)]
+       + weights.z * jointMatrices[int(joints.z)]
+       + weights.w * jointMatrices[int(joints.w)];
+}
+`;

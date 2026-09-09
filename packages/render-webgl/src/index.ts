@@ -87,6 +87,7 @@ export {
   IdPassProgram,
   PICKING_GL,
   ParticleIdProgram,
+  SkinnedIdProgram,
   WebglPickingService,
   registerPickingPipeline,
 } from "./gl-picking.js";

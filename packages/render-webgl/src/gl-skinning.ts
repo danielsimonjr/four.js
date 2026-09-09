@@ -52,7 +52,11 @@
 
 import type { Disposable } from "@fourjs/core";
 import type { Matrix4 } from "@fourjs/math";
-import { MAX_SKINNING_JOINTS, type SceneLights } from "@fourjs/render";
+import type { SceneLights } from "@fourjs/render";
+
+import { SKINNING_GLSL } from "./gl-skinning-glsl.js";
+
+export { SKINNING_GLSL };
 
 import {
   FRAGMENT_SHADER_SOURCE,
@@ -74,31 +78,6 @@ import {
   type SkinnedShadowPipeline,
   type SkinnedUnlitPipeline,
 } from "./gl-skinning-registry.js";
-
-/**
- * The vertex-stage chunk the skinned colour programs and the skinned caster
- * splice in: the two influence
- * attributes at their fixed locations (4 joints, 5 weights — `gl-geometry.ts`
- * binds them), the palette, and the blended skin matrix.
- *
- * Linear blend skinning, the four influences summed in attribute order —
- * a fixed association order, though the result never re-enters the §33
- * envelope either way. Dual-quaternion skinning is deferred (RFC 0003 §8).
- */
-export const SKINNING_GLSL = `const int MAX_SKINNING_JOINTS = ${String(
-  MAX_SKINNING_JOINTS,
-)};
-layout(location = 4) in vec4 joints;
-layout(location = 5) in vec4 weights;
-uniform mat4 jointMatrices[MAX_SKINNING_JOINTS];
-
-mat4 skinMatrix() {
-  return weights.x * jointMatrices[int(joints.x)]
-       + weights.y * jointMatrices[int(joints.y)]
-       + weights.z * jointMatrices[int(joints.z)]
-       + weights.w * jointMatrices[int(joints.w)];
-}
-`;
 
 /**
  * The skinned unlit vertex stage: `gl-program.ts`'s unlit stage with the

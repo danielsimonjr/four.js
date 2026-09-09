@@ -3,9 +3,9 @@
     "name": "fourjs-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-09-09",
-    "totalFiles": 316,
+    "totalFiles": 317,
     "totalModules": 24,
-    "totalExports": 3197
+    "totalExports": 3218
   },
   "entryPoints": [
     {
@@ -15447,7 +15447,10 @@
             "imports": [
               "LIGHT_UNIFORM_WGSL",
               "PUNCTUAL_LIGHT_WGSL",
-              "SHADED_MAP_BINDING_WGSL"
+              "SHADED_MAP_BIND_GROUP_INDEX",
+              "SHADED_MAP_BINDING_WGSL",
+              "SHADED_MR_BIND_GROUP_INDEX",
+              "shadedMrBindingWgsl"
             ]
           },
           {
@@ -15568,6 +15571,13 @@
             "typeOnly": true
           },
           {
+            "file": "./wgpu-particles.js",
+            "imports": [
+              "WgpuParticleCache"
+            ],
+            "typeOnly": true
+          },
+          {
             "file": "./wgpu-render-target.js",
             "imports": [
               "WgpuRenderTargetCache"
@@ -15680,6 +15690,14 @@
             "typeOnly": true
           },
           {
+            "file": "./wgpu-particles.js",
+            "imports": [
+              "PARTICLE_VERTEX_BUFFER_LAYOUTS",
+              "WgpuParticleCache",
+              "WgpuParticleRecord"
+            ]
+          },
+          {
             "file": "./wgpu-picking-registry.js",
             "imports": [
               "setPickingServiceFactory",
@@ -15732,6 +15750,7 @@
             "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
+              "PARTICLE_INSTANCE_FLOATS",
               "RenderTarget",
               "assertEncodableCandidateCount",
               "buildRenderList",
@@ -15739,6 +15758,7 @@
               "collectPickCandidates",
               "decodePickId",
               "encodePickId",
+              "ParticleRenderItem",
               "PickRequest",
               "PickResult",
               "PickingService",
@@ -15751,7 +15771,13 @@
           "ID_MODEL_OFFSET",
           "ID_PICK_OFFSET",
           "ID_UNIFORM_BYTES",
+          "PARTICLE_ID_PROJECTION_OFFSET",
+          "PARTICLE_ID_VIEW_OFFSET",
+          "PARTICLE_ID_MODEL_OFFSET",
+          "PARTICLE_ID_PICK_OFFSET",
+          "PARTICLE_ID_UNIFORM_BYTES",
           "ID_SHADER_SOURCE",
+          "PARTICLE_ID_SHADER_SOURCE",
           "registerPickingPipeline",
           "WebgpuPickingService"
         ],
@@ -15766,7 +15792,13 @@
           "ID_MODEL_OFFSET",
           "ID_PICK_OFFSET",
           "ID_UNIFORM_BYTES",
-          "ID_SHADER_SOURCE"
+          "PARTICLE_ID_PROJECTION_OFFSET",
+          "PARTICLE_ID_VIEW_OFFSET",
+          "PARTICLE_ID_MODEL_OFFSET",
+          "PARTICLE_ID_PICK_OFFSET",
+          "PARTICLE_ID_UNIFORM_BYTES",
+          "ID_SHADER_SOURCE",
+          "PARTICLE_ID_SHADER_SOURCE"
         ]
       },
       "packages/render-webgpu/src/wgpu-texture.ts": {
@@ -16328,6 +16360,7 @@
               "LIGHT_UNIFORM_STRIDE_BYTES",
               "LIGHT_UNIFORM_STRIDE_FLOATS",
               "SHADED_MAP_BIND_GROUP_INDEX",
+              "SHADED_MR_BIND_GROUP_INDEX",
               "createLightsBindGroupLayout",
               "writeLightUniforms"
             ]
@@ -17018,7 +17051,10 @@
               "PUNCTUAL_LIGHT_WGSL",
               "SHADED_MAP_BINDING_WGSL",
               "SHADED_MAP_BIND_GROUP_INDEX",
+              "SHADED_MR_BINDING_WGSL",
+              "SHADED_MR_BIND_GROUP_INDEX",
               "createLightsBindGroupLayout",
+              "shadedMrBindingWgsl",
               "writeLightUniforms"
             ],
             "reExport": true
@@ -17202,6 +17238,12 @@
               "ID_SHADER_SOURCE",
               "ID_UNIFORM_BYTES",
               "ID_VIEW_PROJECTION_OFFSET",
+              "PARTICLE_ID_MODEL_OFFSET",
+              "PARTICLE_ID_PICK_OFFSET",
+              "PARTICLE_ID_PROJECTION_OFFSET",
+              "PARTICLE_ID_SHADER_SOURCE",
+              "PARTICLE_ID_UNIFORM_BYTES",
+              "PARTICLE_ID_VIEW_OFFSET",
               "WebgpuPickingService",
               "registerPickingPipeline"
             ],
@@ -17453,7 +17495,10 @@
           "PUNCTUAL_LIGHT_WGSL",
           "SHADED_MAP_BINDING_WGSL",
           "SHADED_MAP_BIND_GROUP_INDEX",
+          "SHADED_MR_BINDING_WGSL",
+          "SHADED_MR_BIND_GROUP_INDEX",
           "createLightsBindGroupLayout",
+          "shadedMrBindingWgsl",
           "writeLightUniforms",
           "NORMAL_BUFFER_LAYOUT",
           "NORMAL_MATRIX_WGSL",
@@ -17553,6 +17598,12 @@
           "ID_SHADER_SOURCE",
           "ID_UNIFORM_BYTES",
           "ID_VIEW_PROJECTION_OFFSET",
+          "PARTICLE_ID_MODEL_OFFSET",
+          "PARTICLE_ID_PICK_OFFSET",
+          "PARTICLE_ID_PROJECTION_OFFSET",
+          "PARTICLE_ID_SHADER_SOURCE",
+          "PARTICLE_ID_UNIFORM_BYTES",
+          "PARTICLE_ID_VIEW_OFFSET",
           "WebgpuPickingService",
           "registerPickingPipeline",
           "PACKAGE_NAME",
@@ -17696,7 +17747,10 @@
           "PUNCTUAL_LIGHT_WGSL",
           "SHADED_MAP_BINDING_WGSL",
           "SHADED_MAP_BIND_GROUP_INDEX",
+          "SHADED_MR_BINDING_WGSL",
+          "SHADED_MR_BIND_GROUP_INDEX",
           "createLightsBindGroupLayout",
+          "shadedMrBindingWgsl",
           "writeLightUniforms",
           "NORMAL_BUFFER_LAYOUT",
           "NORMAL_MATRIX_WGSL",
@@ -17796,6 +17850,12 @@
           "ID_SHADER_SOURCE",
           "ID_UNIFORM_BYTES",
           "ID_VIEW_PROJECTION_OFFSET",
+          "PARTICLE_ID_MODEL_OFFSET",
+          "PARTICLE_ID_PICK_OFFSET",
+          "PARTICLE_ID_PROJECTION_OFFSET",
+          "PARTICLE_ID_SHADER_SOURCE",
+          "PARTICLE_ID_UNIFORM_BYTES",
+          "PARTICLE_ID_VIEW_OFFSET",
           "WebgpuPickingService",
           "registerPickingPipeline",
           "Gpu",
@@ -17967,6 +18027,7 @@
         "exports": [
           "LIGHTS_BIND_GROUP_INDEX",
           "SHADED_MAP_BIND_GROUP_INDEX",
+          "SHADED_MR_BIND_GROUP_INDEX",
           "LIGHT_AMBIENT_OFFSET",
           "LIGHT_DIRECTION_OFFSET",
           "LIGHT_COLOR_OFFSET",
@@ -17984,16 +18045,20 @@
           "LIGHT_UNIFORM_WGSL",
           "PUNCTUAL_LIGHT_WGSL",
           "SHADED_MAP_BINDING_WGSL",
+          "SHADED_MR_BINDING_WGSL",
           "createLightsBindGroupLayout",
+          "shadedMrBindingWgsl",
           "writeLightUniforms"
         ],
         "functions": [
           "createLightsBindGroupLayout",
+          "shadedMrBindingWgsl",
           "writeLightUniforms"
         ],
         "constants": [
           "LIGHTS_BIND_GROUP_INDEX",
           "SHADED_MAP_BIND_GROUP_INDEX",
+          "SHADED_MR_BIND_GROUP_INDEX",
           "LIGHT_AMBIENT_OFFSET",
           "LIGHT_DIRECTION_OFFSET",
           "LIGHT_COLOR_OFFSET",
@@ -18010,7 +18075,8 @@
           "LIGHT_UNIFORM_MEMBERS_WGSL",
           "LIGHT_UNIFORM_WGSL",
           "PUNCTUAL_LIGHT_WGSL",
-          "SHADED_MAP_BINDING_WGSL"
+          "SHADED_MAP_BINDING_WGSL",
+          "SHADED_MR_BINDING_WGSL"
         ]
       },
       "packages/render-webgpu/src/wgpu-unlit.ts": {
@@ -20463,6 +20529,12 @@
               "RenderTargetRecord"
             ],
             "typeOnly": true
+          },
+          {
+            "file": "./gl-skinning-glsl.js",
+            "imports": [
+              "SKINNING_GLSL"
+            ]
           }
         ],
         "workspaceDependencies": [
@@ -20508,11 +20580,13 @@
           "registerPickingPipeline",
           "IdPassProgram",
           "ParticleIdProgram",
+          "SkinnedIdProgram",
           "WebglPickingService"
         ],
         "classes": [
           "IdPassProgram",
           "ParticleIdProgram",
+          "SkinnedIdProgram",
           "WebglPickingService"
         ],
         "functions": [
@@ -20790,6 +20864,27 @@
           "clearRegisteredPickingPipeline"
         ]
       },
+      "packages/render-webgl/src/gl-skinning-glsl.ts": {
+        "description": "The vertex-stage skinning chunk both the colour/caster programs",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@fourjs/render",
+            "directory": "packages/render",
+            "imports": [
+              "MAX_SKINNING_JOINTS"
+            ]
+          }
+        ],
+        "exports": [
+          "SKINNING_GLSL"
+        ],
+        "constants": [
+          "SKINNING_GLSL"
+        ]
+      },
       "packages/render-webgl/src/node-pipeline-registry.ts": {
         "description": "The node-material pipeline's registration slot (§60, §62; RFC 0001, gap",
         "externalDependencies": [],
@@ -20977,6 +21072,12 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./gl-skinning-glsl.js",
+            "imports": [
+              "SKINNING_GLSL"
+            ]
+          },
+          {
             "file": "./gl-program.js",
             "imports": [
               "FRAGMENT_SHADER_SOURCE",
@@ -21022,7 +21123,6 @@
             "package": "@fourjs/render",
             "directory": "packages/render",
             "imports": [
-              "MAX_SKINNING_JOINTS",
               "SceneLights"
             ]
           }
@@ -21041,9 +21141,6 @@
         ],
         "functions": [
           "registerSkinningPipeline"
-        ],
-        "constants": [
-          "SKINNING_GLSL"
         ]
       },
       "packages/render-webgl/src/gl-texture.ts": {
@@ -21256,6 +21353,7 @@
               "IdPassProgram",
               "PICKING_GL",
               "ParticleIdProgram",
+              "SkinnedIdProgram",
               "WebglPickingService",
               "registerPickingPipeline"
             ],
@@ -21510,6 +21608,7 @@
           "IdPassProgram",
           "PICKING_GL",
           "ParticleIdProgram",
+          "SkinnedIdProgram",
           "WebglPickingService",
           "registerPickingPipeline",
           "RenderTargetCache",
@@ -21611,6 +21710,7 @@
           "IdPassProgram",
           "PICKING_GL",
           "ParticleIdProgram",
+          "SkinnedIdProgram",
           "WebglPickingService",
           "registerPickingPipeline",
           "RenderTargetCache",
@@ -25014,6 +25114,7 @@
           "packages/render-webgl/src/register.ts",
           "packages/render-webgl/src/gl-particles.ts",
           "packages/render-webgl/src/gl-picking-registry.ts",
+          "packages/render-webgl/src/gl-skinning-glsl.ts",
           "packages/render-webgl/src/node-pipeline-registry.ts",
           "packages/render-webgl/src/gl-effect.ts",
           "packages/render-webgl/src/gl-shadow.ts",
@@ -25108,18 +25209,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 316,
+    "totalTypeScriptFiles": 317,
     "totalModules": 24,
-    "totalLinesOfCode": 153139,
-    "totalExports": 3197,
-    "totalClasses": 198,
+    "totalLinesOfCode": 153923,
+    "totalExports": 3218,
+    "totalClasses": 199,
     "totalInterfaces": 593,
-    "totalFunctions": 520,
+    "totalFunctions": 521,
     "totalTypeGuards": 26,
     "totalEnums": 0,
-    "totalConstants": 465,
-    "totalReExports": 2037,
-    "totalTypeOnlyImports": 406,
+    "totalConstants": 473,
+    "totalReExports": 2047,
+    "totalTypeOnlyImports": 407,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 6,
     "unusedFilesCount": 0,

@@ -31,6 +31,8 @@ import {
   ParticleBatchCache,
   ParticleIdProgram,
   RenderTargetCache,
+  SKINNING_GLSL,
+  SkinnedIdProgram,
   WebglPickingService,
   clearRegisteredPickingPipeline,
   registerPickingPipeline,
@@ -464,6 +466,31 @@ function drawable(
   material: PickMaterial = new PickMaterial(),
 ): Renderable {
   return new Renderable(geometry.asGeometry, material.asMaterial);
+}
+
+/**
+ * A structural skinned mesh — a `Renderable` whose skeleton and
+ * joints/weights streams make `collect` emit a `skinned-unlit` item.
+ * The palette is the object's own `Float32Array`, so a test can pin
+ * the upload by reference.
+ */
+function skinnedDrawable(palette = new Float32Array(16)): Renderable {
+  const geometry = triangleGeometry();
+  Object.assign(geometry, {
+    joints: new Uint16Array(12),
+    weights: new Float32Array(12),
+  });
+  const mesh = drawable(geometry);
+  Object.assign(mesh, {
+    skeleton: {
+      bones: [{}],
+      jointMatrices: palette,
+      update(): void {
+        // palette refreshed elsewhere
+      },
+    },
+  });
+  return mesh;
 }
 
 /**
@@ -963,29 +990,15 @@ describe("WebglPickingService.update — the id pass", () => {
     expect(gl.callsOf("viewport")[1].args).toEqual([0, 0, 128, 32]);
   });
 
-  it("skips particle and skinned items — absence, never a wrong picture", () => {
+  it("draws particles and skinned meshes through their own id programs", () => {
     const { gl, service, view } = createRig();
     // A container double (`webgl-renderer.test.ts`'s pattern): a structural
     // node whose children mix a particle drawable — which must NOT be a
     // `Renderable`, or the renderable arm would claim it — with real ones.
     const emitter = particleEmitter(1);
-    // A skinned mesh, structurally: a drawable whose skeleton and streams
-    // make `collect` emit a skinned item.
-    const skinnedGeometry = triangleGeometry();
-    Object.assign(skinnedGeometry, {
-      joints: new Uint16Array(12),
-      weights: new Float32Array(12),
-    });
-    const skinned = drawable(skinnedGeometry);
-    Object.assign(skinned, {
-      skeleton: {
-        bones: [{}],
-        jointMatrices: new Float32Array(16),
-        update(): void {
-          // palette refreshed elsewhere
-        },
-      },
-    });
+    const palette = new Float32Array(16);
+    palette[0] = 2;
+    const skinned = skinnedDrawable(palette);
     const plain = drawable();
     const root = {
       visible: true,
@@ -995,14 +1008,24 @@ describe("WebglPickingService.update — the id pass", () => {
     type PickRoot = Parameters<PickingService["update"]>[0];
 
     service.update(root as unknown as PickRoot, view);
-    // Traversal table: emitter 0, skinned 1, plain 2. Skinned stays in the
-    // table but is never drawn (bind-pose ids are a different picture).
-    // Particles instance the live quads; the plain drawable is the one
-    // `drawArrays`. Drawing the shared unit quad via `drawArrays` would be
-    // the wrong picture this test exists to refuse.
+    // Traversal table: emitter 0, skinned 1, plain 2. Particles instance
+    // the live quads; the skinned mesh deforms through `SkinnedIdProgram`;
+    // the plain drawable is the remaining `drawArrays`. Drawing the
+    // skinned mesh through the bind-pose id program would be the wrong
+    // picture this test exists to refuse.
     expect(gl.countOf("drawArraysInstanced")).toBe(1);
-    expect(gl.countOf("drawArrays")).toBe(1);
-    expect(idUploads(gl)).toEqual([expectedIdUpload(0), expectedIdUpload(2)]);
+    expect(gl.countOf("drawArrays")).toBe(2);
+    expect(idUploads(gl)).toEqual([
+      expectedIdUpload(0),
+      expectedIdUpload(1),
+      expectedIdUpload(2),
+    ]);
+    const jointLocation = gl.uniforms.get("jointMatrices[0]");
+    const palettes = gl
+      .callsOf("uniformMatrix4fv")
+      .filter((call) => call.args[0] === jointLocation)
+      .map((call) => Array.from(call.args[2] as ArrayLike<number>));
+    expect(palettes).toEqual([Array.from(palette)]);
   });
 
   it("instances a particle system with one id for the whole emitter", () => {
@@ -1133,6 +1156,79 @@ describe("WebglPickingService.update — the id pass", () => {
     }
   });
 
+  it("draws a skinned mesh through SkinnedIdProgram, not the bind-pose id", () => {
+    const { gl, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const palette = new Float32Array(16);
+    palette[5] = 3;
+    const skinned = skinnedDrawable(palette);
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [skinned] as unknown[],
+    };
+
+    service.update(root as unknown as PickRoot, view);
+
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(idUploads(gl)).toEqual([expectedIdUpload(0)]);
+
+    const sources = gl
+      .callsOf("shaderSource")
+      .map((call) => call.args[1] as string);
+    const skinnedVertex = sources.find(
+      (source) =>
+        source.includes("skinMatrix()") && source.includes("viewProjection"),
+    );
+    expect(skinnedVertex).toBeDefined();
+    expect(skinnedVertex).toContain(SKINNING_GLSL);
+    const skinnedIndex = sources.indexOf(skinnedVertex!);
+    expect(sources[skinnedIndex + 1]).toContain("pickId");
+
+    const jointLocation = gl.uniforms.get("jointMatrices[0]");
+    const palettes = gl
+      .callsOf("uniformMatrix4fv")
+      .filter((call) => call.args[0] === jointLocation)
+      .map((call) => Array.from(call.args[2] as ArrayLike<number>));
+    expect(palettes).toEqual([Array.from(palette)]);
+
+    // Second pass reuses the compiled skinned id program (no recompile).
+    service.update(root as unknown as PickRoot, view);
+    expect(gl.countOf("linkProgram")).toBe(2);
+    expect(gl.countOf("drawArrays")).toBe(2);
+  });
+
+  it("latches a skinned-program compile failure and still draws meshes", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {
+      // silenced
+    });
+    try {
+      const { gl, service, view } = createRig();
+      const original = gl.getUniformLocation.bind(gl);
+      gl.getUniformLocation = (program, name) => {
+        if (name === "jointMatrices[0]") {
+          return null;
+        }
+        return original(program, name);
+      };
+      type PickRoot = Parameters<PickingService["update"]>[0];
+      const skinned = skinnedDrawable();
+      const plain = drawable();
+      const root = {
+        visible: true,
+        enabled: true,
+        children: [skinned, plain] as unknown[],
+      };
+      service.update(root as unknown as PickRoot, view);
+      service.update(root as unknown as PickRoot, view);
+      expect(gl.countOf("drawArrays")).toBe(2);
+      expect(idUploads(gl)).toEqual([expectedIdUpload(1), expectedIdUpload(1)]);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("recompiles the particle id program after a context restore", () => {
     const { gl, service, state, view } = createRig();
     type PickRoot = Parameters<PickingService["update"]>[0];
@@ -1149,6 +1245,24 @@ describe("WebglPickingService.update — the id pass", () => {
     service.update(root as unknown as PickRoot, view);
     expect(gl.countOf("linkProgram")).toBe(4);
     expect(gl.countOf("drawArraysInstanced")).toBe(2);
+  });
+
+  it("recompiles the skinned id program after a context restore", () => {
+    const { gl, service, state, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [skinnedDrawable()] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(gl.countOf("linkProgram")).toBe(2);
+
+    state.contextLost = true;
+    restoreContext(state);
+    service.update(root as unknown as PickRoot, view);
+    expect(gl.countOf("linkProgram")).toBe(4);
+    expect(gl.countOf("drawArrays")).toBe(2);
   });
 
   it("refuses a zero-area viewport and a zero-size surface (§85)", () => {
@@ -1617,5 +1731,26 @@ describe("ParticleIdProgram", () => {
       getUniformLocation: () => null,
     } as unknown as WebglContext;
     expect(() => ParticleIdProgram.create(broken)).toThrow();
+  });
+});
+
+describe("SkinnedIdProgram", () => {
+  it("is disposable directly, and idempotently", () => {
+    const gl = createFakePickGl();
+    const program = SkinnedIdProgram.create(gl);
+    expect(program.disposed).toBe(false);
+    program.dispose();
+    program.dispose();
+    expect(program.disposed).toBe(true);
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("deletes the program when a uniform is missing", () => {
+    const gl = createFakePickGl();
+    const broken = {
+      ...gl,
+      getUniformLocation: () => null,
+    } as unknown as WebglContext;
+    expect(() => SkinnedIdProgram.create(broken)).toThrow();
   });
 });

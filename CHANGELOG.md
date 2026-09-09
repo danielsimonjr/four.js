@@ -64,6 +64,14 @@ stay on the tracker.
 
 ### Changed
 
+- **WebGL skinned id pass (RFC 0005).** `SkinnedIdProgram` draws a
+  deformed silhouette into the picking buffer (`SKINNING_GLSL` spliced
+  into the id fragment). Compiled on the first skinned item; a compile
+  failure skips (bounds). Isolated from `gl-skinning.ts` so
+  `registerPickingPipeline` does not link the colour pair. WebGPU still
+  skips skinned items (no RFC 0003 skinned pipelines). RFC 0005 stays
+  open.
+
 - **WebGPU particle id pass (RFC 0005).** Emitters pick by GPU id — one
   colour per system — through a private billboard pipeline (CPU 8-float
   instance stream, 208-byte `PARTICLE_ID_*` block). Trails stay undrawn;
