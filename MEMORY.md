@@ -35,6 +35,18 @@ readable; never delete the pointer itself.
   on `PropertyDeclaration`. Isolation is a version pin, not a directory.
   `check-compiler.mjs` refuses anything else. Root 7.x is free to move.
 
+- **2026-09-09 — RFC 0003 prototype measurements recorded.** Bones-as-nodes
+  at 60 ×1/×10 is within noise of ordinary Groups at ×10; alternative A does
+  not return. 180-channel controller is ~0.03 ms/step on the recording host,
+  within 0.002 ms of the mixer. Proposed §86: 227 independent 60-bone
+  characters inside one 60 Hz step (host-specific, not a gate).
+
+- **2026-09-09 — Vitest 5 coverage campaign, second measurement.** After
+  executing the previously-unrun Rapier init reject path, stale-handle
+  context, and R-32 particle appearance/wide-stream/trail branches, four of
+  the five failing packages clear 95% under Vitest 5. Remaining: physics-rapier
+  global branches 92.1% (adapter defensive paths). Bump still waits.
+
 - **2026-09-09 — Browser-gate follow-up on the open-TODO PR.** Pause-during-
   grab was not enough: `waitForVirtualFrameCount` pumped the patched rAF and
   aliased even frames only. Host rAF (`__fourHostRaf`) is the pump. Character

@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **14 open**, 247 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), and A-19 (merged into R-30c). Of the 14, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked — the typedoc/TS 7 pin is no longer a release gate.
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **13 open**, 248 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), and RFC 0003's owed prototype measurements. Of the 13, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -63,8 +63,14 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
     a red build with no owner.
   · Written up with the rest of the toolchain reasoning in `docs/MIGRATION.md` section 5.
   · **PARTIAL 2026-09-09:** `resource-warnings.ts` now has a `__FOUR_DEV__ = false`
-    test (the file that proved Vitest 3 was over-reporting). The other five
-    honest-coverage gaps remain; the bump still waits on that campaign.
+    test (the file that proved Vitest 3 was over-reporting). Re-measured under
+    Vitest 5.0.0 after adding the Rapier init reject path, stale-handle
+    context, and R-32 particle appearance / wide-stream / trail tests:
+    **physics 97.27%, render-webgl 95.57%, text 100%, render 97.59%** all
+    clear the 95% gate; `init.ts` and `gl-particles.ts` are off the per-file
+    floor. **What remains is physics-rapier global branches at 92.1%**
+    (700/760) — almost all defensive `never` / stale-handle paths in the two
+    adapters. The bump still waits on that last package.
 
 - **Triage the 42 Oxlint warnings the ESLint config never surfaced.** DONE 2026-09-09.
   Count on this tree was **40** (two `no-misused-spread` hits had already gone).
@@ -117,7 +123,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - RFC 0005 residue (staged in source, 2026-08-29):
 - RFC 0001 residue (staged in source, 2026-08-28):
 - RFC 0003 residue (staged in source, 2026-08-28):
-- RFC 0003 prototype measurements still owed:
+- RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
 - Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color strings on lights, light layers; hoist the lit shader's per-vertex inverse-transpose to a per-draw normal-matrix uniform when @fourjs/math grows a Matrix3 utility (dated note in gl-program.ts)
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
@@ -1165,10 +1171,15 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       (unbounds `MAX_SKINNING_JOINTS = 48`; needs a render-target format union +
       vertex texture fetch); §43-interpolated palettes (today the palette is the
       last resolved pose).
-- [ ] **RFC 0003 prototype measurements still owed:** bones-as-nodes resolve cost at
-      60 bones ×1/×10 (the number that decides whether alternative A ever returns)
-      and controller channel cost at 180 channels. §86 has no skinned-mesh
-      performance target yet — propose one from those measurements.
+- [x] **RFC 0003 prototype measurements still owed:** DONE 2026-09-09.
+      `benchmarks/skinning-resolve.mjs` records bones-as-nodes resolve at 60 ×1
+      and ×10 versus the same Group topology, `Skeleton.update` beside that
+      walk, and the 180-channel clip through both `AnimationMixer` and
+      `AnimationController`. Alternative A does **not** return: at ×10 a Bone
+      chain is within noise of Groups. Proposed §86 sentence (not a spec
+      amendment, not a gate): *227 independently animated 60-bone characters
+      inside one 60 Hz fixed step on the recording host (resolve + palette +
+      controller)*. Record: `benchmarks/results/skinning-resolve.json`.
 - [x] **glTF loader (§78) shipped 2026-08-29** — `createGltfLoader`/`GltfAsset`
       (`@fourjs/assets`) + `instantiateGltf` (`four`), glTF 2.0 core tier: both
       containers, all six §53 attributes, §59 factors + base-colour texture,

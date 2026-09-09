@@ -1,0 +1,117 @@
+{
+  "_note": "Recorded measurement, not a gate. Nothing in CI asserts on these timings; see benchmarks/README.md for how the numbers are to be read and why this host is not 'suitable hardware'.",
+  "benchmark": "skinning-resolve",
+  "specification": "RFC 0003 prototype: bones-as-nodes resolve (60 ×1 / ×10) and 180-channel controller vs mixer; §54, §17, §18, §86",
+  "recordedAt": "2026-09-09T01:02:32.411Z",
+  "bonesPerRig": 60,
+  "channelsPerRig": 180,
+  "fixedDeltaTimeSeconds": 0.016666667,
+  "fixedStepBudgetMs": 16.6667,
+  "measuredPasses": 120,
+  "warmupPasses": 30,
+  "resolve": [
+    {
+      "rigs": 1,
+      "bones": 60,
+      "nodes": 62,
+      "boneResolve": {
+        "warmupMeanMsPerPass": 0.1345,
+        "meanMsPerPass": 0.0392,
+        "medianMsPerPass": 0.0039,
+        "p95MsPerPass": 0.1297,
+        "p99MsPerPass": 0.3618,
+        "minMsPerPass": 0.0038,
+        "maxMsPerPass": 0.3859
+      },
+      "boneResolvePlusPalette": {
+        "warmupMeanMsPerPass": 0.0958,
+        "meanMsPerPass": 0.0421,
+        "medianMsPerPass": 0.0466,
+        "p95MsPerPass": 0.0621,
+        "p99MsPerPass": 0.1089,
+        "minMsPerPass": 0.0288,
+        "maxMsPerPass": 0.1735
+      },
+      "groupResolve": {
+        "warmupMeanMsPerPass": 0.0051,
+        "meanMsPerPass": 0.0038,
+        "medianMsPerPass": 0.0038,
+        "p95MsPerPass": 0.0038,
+        "p99MsPerPass": 0.0039,
+        "minMsPerPass": 0.0037,
+        "maxMsPerPass": 0.0039
+      },
+      "boneOverGroupMs": 0.0354,
+      "paletteMs": 0.0029
+    },
+    {
+      "rigs": 10,
+      "bones": 60,
+      "nodes": 611,
+      "boneResolve": {
+        "warmupMeanMsPerPass": 0.0433,
+        "meanMsPerPass": 0.0323,
+        "medianMsPerPass": 0.0315,
+        "p95MsPerPass": 0.0402,
+        "p99MsPerPass": 0.0436,
+        "minMsPerPass": 0.031,
+        "maxMsPerPass": 0.0473
+      },
+      "boneResolvePlusPalette": {
+        "warmupMeanMsPerPass": 0.3688,
+        "meanMsPerPass": 0.3555,
+        "medianMsPerPass": 0.3303,
+        "p95MsPerPass": 0.3927,
+        "p99MsPerPass": 0.5012,
+        "minMsPerPass": 0.325,
+        "maxMsPerPass": 1.8989
+      },
+      "groupResolve": {
+        "warmupMeanMsPerPass": 0.0423,
+        "meanMsPerPass": 0.0337,
+        "medianMsPerPass": 0.0328,
+        "p95MsPerPass": 0.0357,
+        "p99MsPerPass": 0.0436,
+        "minMsPerPass": 0.0325,
+        "maxMsPerPass": 0.0439
+      },
+      "boneOverGroupMs": -0.0014,
+      "paletteMs": 0.3232
+    }
+  ],
+  "channels": {
+    "clipTracks": 180,
+    "mixer": {
+      "path": "mixer",
+      "warmupMeanMsPerStep": 0.1477,
+      "meanMsPerStep": 0.0297,
+      "medianMsPerStep": 0.0183,
+      "p95MsPerStep": 0.0677,
+      "p99MsPerStep": 0.1588,
+      "minMsPerStep": 0.008,
+      "maxMsPerStep": 0.6624,
+      "meanFractionOfFixedStepBudget": 0.0018
+    },
+    "controller": {
+      "path": "controller",
+      "warmupMeanMsPerStep": 0.0429,
+      "meanMsPerStep": 0.0312,
+      "medianMsPerStep": 0.0336,
+      "p95MsPerStep": 0.0432,
+      "p99MsPerStep": 0.1013,
+      "minMsPerStep": 0.012,
+      "maxMsPerStep": 0.1126,
+      "meanFractionOfFixedStepBudget": 0.0019
+    },
+    "controllerOverMixerMs": 0.0015
+  },
+  "proposedSection86": "227 independently animated 60-bone characters inside one 60 Hz fixed step on this host (resolve + palette + controller). Not a gate — this host is not §86's \"suitable hardware\".",
+  "alternativeA": "A 60-bone Bone chain is within noise of the same Group chain at ×10 (-0.0014 ms). The ×1 gap (0.0354 ms) does not grow with rig count. Alternative A (a private transform array) does not return on cost.",
+  "keepAliveTotal": 126.32086119335374,
+  "hostNode": "v22.14.0",
+  "hostPlatform": "linux x64",
+  "hostCpuModel": "Intel(R) Xeon(R) Processor",
+  "hostCpuCount": 4,
+  "hostTotalMemoryGb": 15.6,
+  "hostCaveat": "CI container, no GPU, shared host. §86 has no skinned-mesh row yet; the proposal above is from this measurement, not a verdict."
+}

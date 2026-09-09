@@ -48,6 +48,13 @@ stay on the tracker.
   `no-unsafe-optional-chaining` off under `**/tests/**`). `bun run lint` prints
   nothing.
 
+### Added
+
+- **RFC 0003 prototype measurements.** `benchmarks/skinning-resolve.mjs` records
+  the 60-bone ×1/×10 resolve (Bone vs Group) and the 180-channel controller vs
+  mixer path. Alternative A does not return on cost. The record proposes a
+  skinned-mesh §86 sentence from those numbers; it is not a spec amendment.
+
 ### Documented
 
 - **12.8s barrels test vs 5s default timeout.** The suite sets `{ timeout: 30_000 }`;

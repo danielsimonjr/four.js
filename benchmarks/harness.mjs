@@ -139,6 +139,11 @@ export const SUITE = Object.freeze(
       record: "view-culling",
       what: "§64's per-view lists and §87's frustum cull, preparation half",
     },
+    {
+      file: "skinning-resolve.mjs",
+      record: "skinning-resolve",
+      what: "RFC 0003 bones-as-nodes resolve (60 ×1/×10) and 180-channel controller vs mixer",
+    },
   ].map((entry) => Object.freeze(entry)),
 );
 
