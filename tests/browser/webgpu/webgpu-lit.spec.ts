@@ -25,6 +25,7 @@
  */
 
 import {
+  DRAW_UNIFORM_BYTES,
   LIGHT_UNIFORM_BYTES,
   STANDARD_UNIFORM_BYTES,
   litShaderSource,
@@ -127,18 +128,20 @@ const PAGE_PRELUDE = `
     device.queue.writeBuffer(buffer, 0, floats);
     return buffer;
   };
-  // viewProjection = model = identity, colour opaque white; the standard
-  // block widens with emissive (0.05s) and surface (metalness 0, rough 1).
+  // viewProjection = model = identity, colour opaque white,
+  // normalMatrix identity (std140 mat3 at 144); the standard block then
+  // widens with emissive (192) and surface (208).
   const drawBlock = (standard) => {
-    const floats = new Float32Array(standard ? 44 : 36);
+    const floats = new Float32Array(standard ? 56 : 48);
     for (let i = 0; i < 4; i += 1) {
       floats[i * 5] = 1;
       floats[16 + i * 5] = 1;
     }
     floats[32] = 1; floats[33] = 1; floats[34] = 1; floats[35] = 1;
+    floats[36] = 1; floats[41] = 1; floats[46] = 1;
     if (standard) {
-      floats[36] = 0.05; floats[37] = 0.05; floats[38] = 0.05;
-      floats[40] = 0; floats[41] = 1;
+      floats[48] = 0.05; floats[49] = 0.05; floats[50] = 0.05;
+      floats[52] = 0; floats[53] = 1;
     }
     return floats;
   };
@@ -199,7 +202,7 @@ const PAGE_PRELUDE = `
  * broken variant whichever axis broke it.
  */
 const VARIANTS_SCRIPT = `async (options) => {
-  const { size, variants, lightBytes, standardBytes } = options;
+  const { size, variants, lightBytes, standardBytes, drawBytes } = options;
   if (navigator.gpu === undefined) return { adapter: false, variants: [] };
   const adapter = await navigator.gpu.requestAdapter();
   if (adapter === null) return { adapter: false, variants: [] };
@@ -247,7 +250,7 @@ const VARIANTS_SCRIPT = `async (options) => {
 
   const results = [];
   for (const variant of variants) {
-    const blockBytes = variant.standard ? standardBytes : 144;
+    const blockBytes = variant.standard ? standardBytes : drawBytes;
     const draw = drawLayout(device, blockBytes);
     const drawGroup = device.createBindGroup({
       layout: draw,
@@ -333,7 +336,7 @@ const VARIANTS_SCRIPT = `async (options) => {
  * limb faces the lamp and the −X limb sees only ambient.
  */
 const SPHERE_SCRIPT = `async (options) => {
-  const { size, shader, lightBytes } = options;
+  const { size, shader, lightBytes, drawBytes } = options;
   if (navigator.gpu === undefined) return { adapter: false };
   const adapter = await navigator.gpu.requestAdapter();
   if (adapter === null) return { adapter: false };
@@ -382,7 +385,7 @@ const SPHERE_SCRIPT = `async (options) => {
   });
   device.queue.writeBuffer(indexBuffer, 0, indexData);
 
-  const draw = drawLayout(device, 144);
+  const draw = drawLayout(device, drawBytes);
   const drawGroup = device.createBindGroup({
     layout: draw,
     entries: [{ binding: 0, resource: {
@@ -518,6 +521,7 @@ test.describe("WebGPU shaded pipelines, on a real adapter", () => {
       variants: variantCases(),
       lightBytes: LIGHT_UNIFORM_BYTES,
       standardBytes: STANDARD_UNIFORM_BYTES,
+      drawBytes: DRAW_UNIFORM_BYTES,
     });
     test.skip(
       !result.adapter,
@@ -547,6 +551,7 @@ test.describe("WebGPU shaded pipelines, on a real adapter", () => {
       size: SIZE,
       shader: litShaderSource(true, false),
       lightBytes: LIGHT_UNIFORM_BYTES,
+      drawBytes: DRAW_UNIFORM_BYTES,
     });
     test.skip(
       !result.adapter,

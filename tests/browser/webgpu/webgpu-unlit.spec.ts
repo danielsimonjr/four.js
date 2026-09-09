@@ -44,7 +44,7 @@
  * clear colour), never a pixel comparison against a committed image.
  */
 
-import { unlitShaderSource } from "@fourjs/render-webgpu";
+import { DRAW_UNIFORM_BYTES, unlitShaderSource } from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */
@@ -85,7 +85,7 @@ interface TriangleResult {
  * where those globals exist, and a string is how they get there.
  */
 const PAGE_SCRIPT = `async (options) => {
-  const { size, shader, red } = options;
+  const { size, shader, red, drawBytes } = options;
   if (navigator.gpu === undefined) return { adapter: false };
   const adapter = await navigator.gpu.requestAdapter();
   if (adapter === null) return { adapter: false };
@@ -107,7 +107,7 @@ const PAGE_SCRIPT = `async (options) => {
       {
         binding: 0,
         visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-        buffer: { type: "uniform", hasDynamicOffset: true, minBindingSize: 144 },
+        buffer: { type: "uniform", hasDynamicOffset: true, minBindingSize: drawBytes },
       },
     ],
   });
@@ -117,17 +117,21 @@ const PAGE_SCRIPT = `async (options) => {
   });
   const bindGroup = device.createBindGroup({
     layout,
-    entries: [{ binding: 0, resource: { buffer: uniforms, offset: 0, size: 144 } }],
+    entries: [{ binding: 0, resource: { buffer: uniforms, offset: 0, size: drawBytes } }],
   });
 
-  // viewProjection = identity, model = identity, color = opaque red.
-  const block = new Float32Array(36);
+  // viewProjection = identity, model = identity, color = opaque red,
+  // normalMatrix = identity (std140 mat3 at offset 144).
+  const block = new Float32Array(drawBytes / 4);
   for (let i = 0; i < 4; i += 1) {
     block[i * 5] = 1;
     block[16 + i * 5] = 1;
   }
   block[32] = 1;
   block[35] = 1;
+  block[36] = 1;
+  block[41] = 1;
+  block[46] = 1;
   device.queue.writeBuffer(uniforms, 0, block);
 
   const positions = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0, 0.5, 0]);
@@ -301,6 +305,7 @@ test.describe("WebGPU, on a real adapter", () => {
       // The real thing, imported rather than retyped.
       shader: unlitShaderSource(false),
       red: RED,
+      drawBytes: DRAW_UNIFORM_BYTES,
     });
     test.skip(
       !result.adapter,

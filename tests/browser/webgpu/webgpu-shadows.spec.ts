@@ -35,6 +35,7 @@
  */
 
 import {
+  DRAW_UNIFORM_BYTES,
   SHADOW_LIGHT_UNIFORM_BYTES,
   SHADOW_MATRIX_OFFSET,
   SHADOW_PARAMS_OFFSET,
@@ -145,18 +146,20 @@ const PAGE_PRELUDE = `
     device.queue.writeBuffer(buffer, 0, floats);
     return buffer;
   };
-  // viewProjection = model = identity, colour opaque white; the standard
-  // block widens with emissive (0.05s) and surface (metalness 0, rough 1).
+  // viewProjection = model = identity, colour opaque white,
+  // normalMatrix identity (std140 mat3 at 144); the standard block then
+  // widens with emissive (192) and surface (208).
   const drawBlock = (standard) => {
-    const floats = new Float32Array(standard ? 44 : 36);
+    const floats = new Float32Array(standard ? 56 : 48);
     for (let i = 0; i < 4; i += 1) {
       floats[i * 5] = 1;
       floats[16 + i * 5] = 1;
     }
     floats[32] = 1; floats[33] = 1; floats[34] = 1; floats[35] = 1;
+    floats[36] = 1; floats[41] = 1; floats[46] = 1;
     if (standard) {
-      floats[36] = 0.05; floats[37] = 0.05; floats[38] = 0.05;
-      floats[40] = 0; floats[41] = 1;
+      floats[48] = 0.05; floats[49] = 0.05; floats[50] = 0.05;
+      floats[52] = 0; floats[53] = 1;
     }
     return floats;
   };
@@ -226,11 +229,14 @@ const PAGE_PRELUDE = `
       },
     });
     if (casterModule !== null) {
-      // draw.viewProjection = the light's matrix (z flipped), model = identity.
-      const casterFloats = new Float32Array(36);
+      // draw.viewProjection = the light's matrix (z flipped), model = identity,
+      // normalMatrix identity (std140 mat3 at 144). The caster WGSL still
+      // declares the full DrawUniforms struct.
+      const casterFloats = new Float32Array(drawBytes / 4);
       casterFloats[0] = 1; casterFloats[5] = 1; casterFloats[10] = -1; casterFloats[15] = 1;
       casterFloats[16] = 1; casterFloats[21] = 1; casterFloats[26] = 1; casterFloats[31] = 1;
-      const draw = drawLayout(device, 144);
+      casterFloats[36] = 1; casterFloats[41] = 1; casterFloats[46] = 1;
+      const draw = drawLayout(device, drawBytes);
       const group = device.createBindGroup({
         layout: draw,
         entries: [{ binding: 0, resource: {
@@ -300,7 +306,7 @@ const PAGE_PRELUDE = `
  * centre names a broken variant.
  */
 const VARIANTS_SCRIPT = `async (options) => {
-  const { size, variants, casterShader, shadowBytes, matrixOffset, paramsOffset, standardBytes } = options;
+  const { size, variants, casterShader, shadowBytes, matrixOffset, paramsOffset, standardBytes, drawBytes } = options;
   if (navigator.gpu === undefined) return { adapter: false, variants: [] };
   const adapter = await navigator.gpu.requestAdapter();
   if (adapter === null) return { adapter: false, variants: [] };
@@ -369,7 +375,7 @@ const VARIANTS_SCRIPT = `async (options) => {
   });
 
   for (const variant of variants) {
-    const blockBytes = variant.standard ? standardBytes : 144;
+    const blockBytes = variant.standard ? standardBytes : drawBytes;
     const draw = drawLayout(device, blockBytes);
     const drawGroup = device.createBindGroup({
       layout: draw,
@@ -452,7 +458,7 @@ const VARIANTS_SCRIPT = `async (options) => {
  * shadow; the corners see the sun.
  */
 const SHADOW_SCRIPT = `async (options) => {
-  const { size, mapSize, planeShader, casterShader, shadowBytes, matrixOffset, paramsOffset } = options;
+  const { size, mapSize, planeShader, casterShader, shadowBytes, matrixOffset, paramsOffset, drawBytes } = options;
   if (navigator.gpu === undefined) return { adapter: false };
   const adapter = await navigator.gpu.requestAdapter();
   if (adapter === null) return { adapter: false };
@@ -490,7 +496,7 @@ const SHADOW_SCRIPT = `async (options) => {
       { binding: 2, resource: comparisonSampler(device) },
     ],
   });
-  const draw = drawLayout(device, 144);
+  const draw = drawLayout(device, drawBytes);
   const drawGroup = device.createBindGroup({
     layout: draw,
     entries: [{ binding: 0, resource: {
@@ -610,6 +616,7 @@ test.describe("WebGPU shadows, on a real adapter (§69, WP-R1.7)", () => {
       matrixOffset: SHADOW_MATRIX_OFFSET,
       paramsOffset: SHADOW_PARAMS_OFFSET,
       standardBytes: STANDARD_UNIFORM_BYTES,
+      drawBytes: DRAW_UNIFORM_BYTES,
     });
     test.skip(
       !result.adapter,
@@ -651,6 +658,7 @@ test.describe("WebGPU shadows, on a real adapter (§69, WP-R1.7)", () => {
       shadowBytes: SHADOW_LIGHT_UNIFORM_BYTES,
       matrixOffset: SHADOW_MATRIX_OFFSET,
       paramsOffset: SHADOW_PARAMS_OFFSET,
+      drawBytes: DRAW_UNIFORM_BYTES,
     });
     test.skip(
       !result.adapter,

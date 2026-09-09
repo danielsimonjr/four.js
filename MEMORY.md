@@ -30,6 +30,17 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — WebGPU browser gates follow `DRAW_UNIFORM_BYTES`.** The
+  Playwright page programs are not the renderer: they bind their own
+  layouts. After `DrawUniforms` grew to 192 bytes (`normalMatrix` at 144)
+  and sprites dropped `quad` (R-19/R-20), six `[webgpu]` specs still
+  declared `minBindingSize: 144` and the sprite gate still used a 160-byte
+  quad uniform with position-only vertices. Validation: "shader uses more
+  bytes than minBindingSize" and "vertex attribute slot 2 not present".
+  Harnesses now import `DRAW_UNIFORM_BYTES` / `SPRITE_UNIFORM_BYTES` and
+  authored uv at `@location(2)`. Node-material 144-byte prefixes are a
+  different block — leave them.
+
 - **2026-09-09 — Open-TODO wave 4, simple → complex.** Twelve
   checkboxes remain; four slices landed without pretending the packets
   closed. (1) RFC 0003 §43: `Skeleton.update(skinRoot, worldOf?)`;

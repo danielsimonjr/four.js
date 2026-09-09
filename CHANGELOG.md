@@ -14,6 +14,13 @@ stay on the tracker.
 
 ### Fixed
 
+- **WebGPU Playwright gates match the 192-byte `DrawUniforms` block.** After
+  the `normalMatrix` hoist, six `[webgpu]` specs still bound
+  `minBindingSize: 144` (shader reads 192). Sprites still packed a retired
+  `quad` uniform into a 160-byte block with position-only vertices. Harnesses
+  now import `DRAW_UNIFORM_BYTES` / `SPRITE_UNIFORM_BYTES`, write the identity
+  std140 mat3 at float 36, and feed authored uv at `@location(2)`.
+
 - **`graph:duplicates` allowlists the parallel picking seams.** WebGL and
   WebGPU each own `registerPickingPipeline` / `PickingServiceFactory` /
   `PickingRendererHost`. The names match on purpose; the backends cannot

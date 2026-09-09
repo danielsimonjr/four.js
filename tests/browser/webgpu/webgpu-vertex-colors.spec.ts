@@ -19,7 +19,7 @@
  * plan §5.
  */
 
-import { unlitShaderSource } from "@fourjs/render-webgpu";
+import { DRAW_UNIFORM_BYTES, unlitShaderSource } from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */
@@ -49,7 +49,7 @@ interface VertexColorResult {
  * interpolation, multiply.
  */
 const PAGE_SCRIPT = `async (options) => {
-  const { size, shader } = options;
+  const { size, shader, drawBytes } = options;
   if (navigator.gpu === undefined) return { adapter: false };
   const adapter = await navigator.gpu.requestAdapter();
   if (adapter === null) return { adapter: false };
@@ -71,7 +71,7 @@ const PAGE_SCRIPT = `async (options) => {
       {
         binding: 0,
         visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-        buffer: { type: "uniform", hasDynamicOffset: true, minBindingSize: 144 },
+        buffer: { type: "uniform", hasDynamicOffset: true, minBindingSize: drawBytes },
       },
     ],
   });
@@ -81,11 +81,12 @@ const PAGE_SCRIPT = `async (options) => {
   });
   const bindGroup = device.createBindGroup({
     layout,
-    entries: [{ binding: 0, resource: { buffer: uniforms, offset: 0, size: 144 } }],
+    entries: [{ binding: 0, resource: { buffer: uniforms, offset: 0, size: drawBytes } }],
   });
 
-  // viewProjection = identity, model = identity, color = opaque white.
-  const block = new Float32Array(36);
+  // viewProjection = identity, model = identity, color = opaque white,
+  // normalMatrix = identity (std140 mat3 at offset 144).
+  const block = new Float32Array(drawBytes / 4);
   for (let i = 0; i < 4; i += 1) {
     block[i * 5] = 1;
     block[16 + i * 5] = 1;
@@ -94,6 +95,9 @@ const PAGE_SCRIPT = `async (options) => {
   block[33] = 1;
   block[34] = 1;
   block[35] = 1;
+  block[36] = 1;
+  block[41] = 1;
+  block[46] = 1;
   device.queue.writeBuffer(uniforms, 0, block);
 
   const positions = new Float32Array([-0.8, -0.8, 0, 0.8, -0.8, 0, 0, 0.8, 0]);
@@ -224,6 +228,7 @@ test.describe("WebGPU vertex colours, on a real adapter", () => {
       size: SIZE,
       // The real thing, imported rather than retyped.
       shader: unlitShaderSource(true),
+      drawBytes: DRAW_UNIFORM_BYTES,
     });
     test.skip(
       !result.adapter,
