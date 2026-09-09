@@ -2110,6 +2110,12 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ## Done
 
+- [x] 2026-09-09 — **Vitest 5 particles follow-up.** CI `bun run coverage`
+      after the bump failed `@fourjs/particles` at 92.1% branches. Honest
+      tests for ramp-stop validation, empty/NaN lifetime ramps, trail
+      store guards, and `computeBounds` non-positive lifetime. Re-measured
+      97.16% (480/494). Gate unchanged.
+
 - [x] 2026-09-07 — **CI after #76.** Allowlisted R-32 wide particle offsets
       (particles↔render duck-type); TypeDoc fixtures for NodeSpace,
       PH-11c shape-cast `body`, and widget accessibility. Browser-gate
