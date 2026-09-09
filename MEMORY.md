@@ -30,6 +30,14 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — Stale-item honesty on two follow-ups.** The batching
+  "still scene re-uploads every frame" sentence was false:
+  `contentVersion` + `#canSkipUpload` already skip `bufferSubData` on
+  an idle batched run (tested). §52 already caps concave extrudes;
+  `polygonGeometry2D` already takes holes. Struck both. Remaining on
+  those rows: shaded instancing, atlas grouping, default-on batching,
+  §55 authored sprite uvs.
+
 - **2026-09-09 — Open-TODO first wave, simple → complex.** Thirteen
   checkboxes remain; four slices landed without pretending the packets
   closed. (1) Lighting: `Matrix3.setNormalFromMatrix4` + WebGL

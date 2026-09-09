@@ -131,7 +131,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - §8 node-level `NodeSpace` component — DONE 2026-09-06.
 - §21 `"local-plane"` simulation frame — DONE 2026-09-06.
 - §27 field torque and field-driven waking — DONE 2026-09-06 (`sampleTorque` + per-entry `wakesSleepingBodies`).
-- Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals); glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas material batch as they are); texture-atlas _grouping_ of distinct textures (needs a packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's idle-scene row — today a batched run re-uploads every frame); making batching the default, which needs A-4's build-time pipeline-selection seam (the opt-in seam already costs every bundle +0.17 kB).
+- Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22`); texture-atlas grouping; making batching the default (A-4). Idle-cache + glyph batching already shipped.
 - `buildRenderList` optimization — DONE 2026-09-06 (homogeneous sort skip + sprite fast path; benchmark re-recorded).
 - R-30c — the rest of §77, scoped by why each is not ordinary work:
 - §12 character controllers + first-person look — DONE (PH-11/PH-11b 2026-08-21; `examples/character-controller` browser gate 2026-08-29).
@@ -153,7 +153,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - A-16 remainder (manifest half): DONE 2026-09-06 (`preloadManifestIntoCatalog`).
 - A-19 remainder:
 - §96 residue:
-- R-19/R-20 follow-ups:
+- R-19/R-20 follow-ups: §52 concave-extrude **DONE** (already on the tree); §55 atlas remains.
 - Flaky gate — DONE 2026-09-06 (smoothness parity + blending page watches).
 - A-13 — DONE 2026-09-06 (`installAccessibilityMirror` opt-in DOM mirror).
 - Particle trails — PARTIAL 2026-09-06: CPU ring buffer + ribbon path + multi-stop ramps; GPU compute, depth-buffer collision, spatial-hash neighbors still open.
@@ -1537,10 +1537,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `four/src/text-node.ts:71` repeats it, adding that the residue is grouping labels
       that do NOT share a material — which is the atlas-grouping sub-part already listed
       separately below, not a second open claim; texture-atlas _grouping_ of distinct textures (needs a
-      packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's
-      idle-scene row — today a batched run re-uploads every frame); making batching the
-      default, which needs A-4's build-time pipeline-selection seam (the opt-in seam
-      already costs every bundle +0.17 kB).
+      packer); ~~a change-detecting batch cache so a still scene re-uploads nothing (§86's
+      idle-scene row — today a batched run re-uploads every frame)~~ **DONE
+      (already on the tree):** `RenderBatch.contentVersion` +
+      `createGlBatching` `#canSkipUpload`;
+      `webgl-renderer.test.ts` asserts a still scene issues **0**
+      `bufferSubData` and a transform bump re-uploads. Making batching the
+      default still needs A-4's build-time pipeline-selection seam (the opt-in
+      seam already costs every bundle +0.17 kB).
 - [x] **`buildRenderList` is now ~40% of a 100 000-sprite frame's preparation**
       DONE 2026-09-06 — homogeneous sort skip, sprite fast path, and
       `ALL_LAYERS` layer test. `benchmarks/results/render-batching.json`
@@ -1878,9 +1882,11 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       primitives. **R-35 is now unblocked** (data path + vertexColors exist; what's left
       is wiring `DebugDrawBuffer`'s 7-float layout into a `BufferGeometry` — a
       `@fourjs/diagnostics` packet). R-9/R-13/R-22/R-30/R-32 lose their R-19 dependency
-- [ ] **R-19/R-20 follow-ups:** §52 tessellation module (lifts the concave-extrude
-      restriction); §55 atlas packet (retires the sprite `quad` uniform with authored
-      uvs); ~~qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly~~
+- [ ] **R-19/R-20 follow-ups:** ~~§52 tessellation module (lifts the concave-extrude
+      restriction)~~ **DONE** — `tessellation.ts` + `extrudeGeometry` cap
+      concave outlines (`primitives-3d.test.ts` "caps a concave outline");
+      holes live on `polygonGeometry2D`. §55 atlas packet (retires the sprite
+      `quad` uniform with authored uvs); ~~qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly~~
       **DONE 2026-09-07** — and it was wrong in the OPPOSITE direction to the one this
       row assumed. The claim was not overstated; it was UNDER-evidenced: the evidence
       column named only `boxGeometry`, while `primitives-3d.ts` ships nine more

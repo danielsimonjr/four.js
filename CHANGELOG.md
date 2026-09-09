@@ -100,6 +100,12 @@ stay on the tracker.
 
 ### Documented
 
+- **Two follow-up rows were already shipped.** The §65 idle-scene batch
+  cache (`contentVersion` / `#canSkipUpload`, 0 `bufferSubData` on a still
+  run) and §52's concave-extrude lift (`extrudeGeometry` + tessellator)
+  were on the tree with tests; TODO.md still described them as open.
+  Struck. §55 atlas and shaded-pipeline instancing remain.
+
 - **Dogfooding cycle 4.** Consumer seat (`.dogfood/cycle4`) exercised §56
   `Text`, `.four.json` + §34 snapshot round-trip, and 2D+3D in one scene.
   `digital-twin.md` no longer teaches the throwing `serializeScene` call;
