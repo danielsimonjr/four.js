@@ -24,7 +24,6 @@ import {
   createFullscreenViewport,
   layerMask,
   resolveWorldTransforms,
-  type Camera,
   type Node,
   type Viewport,
 } from "@fourjs/scene";
@@ -928,8 +927,8 @@ describe("§47/§48 — viewLayerMask (R-38)", () => {
     // A structurally typed camera built before §46 landed — the case
     // `@fourjs/render-webgl`'s own test double is, and the reason the fallback
     // is not dead code.
-    const legacy = { ...createFullscreenViewport(camera) };
-    legacy.camera = { ...camera, layers: undefined } as unknown as Camera;
+    const legacy = Object.assign({}, createFullscreenViewport(camera));
+    legacy.camera = Object.assign({}, camera, { layers: undefined });
     expect(viewLayerMask(legacy)).toBe(ALL_LAYERS);
   });
 

@@ -525,7 +525,7 @@ interface StatusData {
 async function readStatus(page: Page): Promise<StatusData> {
   return page
     .locator("#status")
-    .evaluate((element: HTMLElement) => ({ ...element.dataset }));
+    .evaluate((element: HTMLElement) => Object.assign({}, element.dataset));
 }
 
 /** A `#status` number, or `NaN` when the attribute is missing. */

@@ -30,7 +30,16 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
-## Decisions
+- **2026-09-09 — Open-TODO contained-item pass.** Smoothness flake was
+  screenshot-stride aliasing against the period-2 virtual clock, not
+  dropped-time; pause rAF during `grab()`. §79 diagnostics name authored type
+  strings only — never `constructor.name`. Oxlint correctness warnings triaged
+  to zero (fixes + test-scoped allow for `no-unsafe-optional-chaining`). The
+  12.8s barrels duration is under an explicit 30s suite timeout; application
+  9809ms is a file aggregate. A-5 `auditFinalizedLeaks` stays opt-in (finalizers
+  are nondeterministic). A-19 merged into R-30c. Still open: RFC residues,
+  lighting/batching/§77/§96/tessellation packets, R-33 (hardware), first
+  publish (owner), dogfooding map (standing), vitest 5 coverage campaign.
 
 - **2026-09-07 — Size budgets after #76.** `bun run size` sits after
   `test:browser`, so #76/#77 never measured the Rapier 0.20 wasm jump.

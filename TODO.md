@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-07**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **19 open**, 243 closed. The four dogfooding decisions (B)/(C)/(D)/(E1) are all closed, which retired two source findings with them. Of the 19, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and **1 is externally blocked** (the typedoc/TS 7 pin) — so the burndown target is 16.
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **14 open**, 247 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), and A-19 (merged into R-30c). Of the 14, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked — the typedoc/TS 7 pin is no longer a release gate.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -31,14 +31,14 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
 
 - Coverage thresholds are package-level — DONE 2026-09-06 (80% per-file floor under the 95% package gate).
 
-- **Why does a 12.8s test survive a 5s deadline?** `tests/barrels.test.ts >
-  re-exports at least one symbol from animation` reports **12802ms** and passes, and
-  `tests/application.test.ts` reports 9809ms, yet the only raised `testTimeout` in the repo
-  is `vitest.coverage.config.ts` (30s), which is not the config these run under. Either the
-  duration shown is not what the deadline measures, or a config is being picked up that I
-  did not find. **Recorded as an open question, not an explanation** — found while fixing
-  the PRNG timeout (2026-09-07), deliberately not guessed at. Until it is understood, the
-  headroom on every slow test in the suite is unknown.
+- **Why does a 12.8s test survive a 5s deadline?** DONE 2026-09-09 — it does not
+  survive a 5s deadline. `packages/fourjs/tests/barrels.test.ts` sets
+  `{ timeout: 30_000 }` on the suite (cold-start WASM / lazy dynamic imports). The
+  printed **12802ms** is wall-clock duration under that 30s budget. The **9809ms**
+  on `tests/application.test.ts` is the reporter's **file aggregate** (131 tests
+  summed); each `it()` still has Vitest 3's default 5s `testTimeout`, and no
+  hidden config raises it. `vitest.coverage.config.ts` (30s) is coverage-only.
+  Duration shown ≠ deadline. Headroom on a slow test is that test's own timeout.
 
 - **vitest 3.2.7 -> 5.0.0: ATTEMPTED 2026-09-08, reverted, and it found something.** Split out
   of the TypeScript/vitest row, which wrongly implied TypeDoc blocked it — vitest declares **no
@@ -62,17 +62,19 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
   · **Do the coverage work first, then the bump.** Bumping first turns a real quality gap into
     a red build with no owner.
   · Written up with the rest of the toolchain reasoning in `docs/MIGRATION.md` section 5.
+  · **PARTIAL 2026-09-09:** `resource-warnings.ts` now has a `__FOUR_DEV__ = false`
+    test (the file that proved Vitest 3 was over-reporting). The other five
+    honest-coverage gaps remain; the bump still waits on that campaign.
 
-- **Triage the 42 Oxlint warnings the ESLint config never surfaced.** The 2026-09-08 swap
-  reproduced `recommendedTypeChecked` exactly (47/47 rules, 16 mutation-verified), but Oxlint's
-  default `correctness` category enables rules ESLint here did not: `no-unsafe-optional-chaining`
-  (17), `no-misused-spread` (13), `no-self-assign` (4), `require-array-sort-compare` (4),
-  `no-loss-of-precision` (2), `no-irregular-whitespace` (1), `no-control-regex` (1). All are in
-  tests and tools, all are **warnings**, so `bun run lint` exits 0. A sample of three read as
-  deliberate (an optional chain on a call expected to exist; whitespace and control-char regexes
-  that are the point of their tests). **They were kept rather than silenced because they are real
-  coverage the previous linter did not have** — but a gate that prints 42 warnings every run is
-  how warnings get ignored. Each one wants a fix or an explicit allow.
+- **Triage the 42 Oxlint warnings the ESLint config never surfaced.** DONE 2026-09-09.
+  Count on this tree was **40** (two `no-misused-spread` hits had already gone).
+  Real one-line fixes: `Array.from` for string spreads, `localeCompare` on tool
+  sorts, computed quaternion `w` instead of a precision-loss literal, comment
+  rewrite so `packages/*/src` cannot close a JSDoc. Deliberate tests: `no-self-assign`
+  line-allows on the rigid-body no-op-write probe; `no-control-regex` allow on
+  NUL-delimited guide slots; `no-unsafe-optional-chaining` off under `**/tests/**`
+  (every hit was `(optional?.x).y` after an `expect` that the value exists).
+  `bun run lint` is **0 warnings / 0 errors**.
 
 ### 2 · Hours — one contained fix, already diagnosed
 
@@ -159,7 +161,16 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 ## Now
 
-- [ ] **`smoothness.spec.ts:794` is still flaky, and this time it is PROVEN, not suspected.**
+- [x] **`smoothness.spec.ts:794` is still flaky, and this time it is PROVEN, not suspected.**
+      **FIXED 2026-09-09.** The 2026-09-06 virtual-frame wait was correct; the leak was
+      `grab()` — SwiftShader PNG encode lets the patched rAF deliver 2+ extra 1.5Δ
+      frames, a stable stride of 3 aliases the period-2 alpha cycle, and every sample
+      lands on-step. Same-commit pass/fail is that encode-time jitter. The clock now
+      exposes `__fourPauseRaf`; the interpolation test screenshots with the clock
+      held. `MINIMUM_MID_STEP_FRAMES` stays 2. `#status` also publishes `data-alpha` /
+      `data-dropped` / `data-substeps` so the next failure is diagnosable. The
+      dropped-time hypothesis was measured as weaker for this test (1.5Δ/frame never
+      hits `maximumSubSteps=5`); the stride bug was sufficient.
       A controlled comparison, which is what makes this worth acting on:
 
       | commit | `smoothness.spec.ts:794` |
@@ -368,7 +379,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 > figure is quoted as the engine's accuracy.
 >
 
-- [ ] **Error messages name MINIFIED classes in exactly the builds users ship.** Dogfooding
+- [x] **Error messages name MINIFIED classes in exactly the builds users ship.** Dogfooding
       cycle 3d, §34 round-trip in the browser. `serializeScene(hero, registry)` threw:
 
       > Node node-3 is a **Ur**, which this scene format has no type name for; supply
@@ -399,12 +410,15 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       supply, but it is the same shape as the glTF-transport row above: the default path does
       not cover the common case.
 
-      · **PARTIAL 2026-09-07 — mitigated, NOT fixed.** The §79 messages now carry a caveat
-        saying the name comes from `constructor.name` and a minifier may have rewritten it,
-        and the structured context gained `nodeClassIsMinifiable` / `componentClassIsMinifiable`
-        so a tool can tell. That is the *apologise-after-the-fact* fix this very item warns
-        against. **The root fix is still open**: source the name from the registry's own type
-        names, which minification cannot touch. Keep this item open until it is.
+      · **FIXED 2026-09-09 — root cause, not another caveat.** Messages and structured
+        context now name authored document types (`"scene"`, `"group"`, registered
+        `typeName`) and the `nodeTypeOf` / `static readonly typeName` options. They
+        never interpolate `constructor.name`. A minified `Renderable` no longer
+        reports as `"Ur"`. Tests assert the class name is absent from the message.
+        The 2026-09-07 caveat and `*IsMinifiable` flags are gone — there is nothing
+        minifiable left to flag. The second-order note (default `serializeScene`
+        still refuses `Renderable` without `registerSceneNodeTypes()`) is unchanged
+        and out of scope.
 
 
 - [x] **§42 `transformAuthority` is mandatory knowledge for animating anything, and the README
@@ -1531,12 +1545,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       refuses non-2d. Still open: cube/array/3D uploads, compressed containers,
       video/`ImageBitmap`, map roles, async upload.
 
-      · **OVERLAP, found 2026-09-07:** "A-19 remainder" below describes the SAME remaining
-        work — *"renderer-side §77 only (`R-30b`: cube/array/3D, compressed containers,
-        video)"*. Two open checkboxes, one body of work, so the burndown count reads one
-        higher than the work justifies. Merge them before scheduling either; the surviving
-        item should be this one, since A-19's row is mostly the glTF residue and its
-        dependencies rather than the §77 uploads.
+      · **OVERLAP, closed 2026-09-09:** "A-19 remainder" described the SAME remaining
+        work. A-19 is now marked merged; this is the surviving item. GlTF residue
+        (morph / CUBICSPLINE / remaining texture slots) stays with those rows.
 
 - [x] **Examples onto `Text` — DONE 2026-08-21**, extended to both flagships
       (layer assignment needs one node per label). Draw calls: first-2d 30 → 1,
@@ -1733,18 +1744,16 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 - [x] **A-5 partial DONE 2026-08-07 (accounting tier):** byte + live-instance
       accounting on BufferGeometry/Texture/RenderTarget; §84's two memory counters
       live. A-1 follow-up (b) closed
-- [ ] **A-5 remainder (dev-warning tier, folded into A-4):** the six §83 development
-      warnings — leaked resources: **the mechanism now exists but nothing emits it**
-      (verified 2026-09-07). `trackDisposable` IS wired — `if (DEV) trackDisposable(…)`
-      at `geometry/materials/render` `resource-memory.ts:120/78/120` — but
-      `auditFinalizedLeaks`, which its own doc calls "the call that prints", is reached
-      only from the two `index.ts` re-export lists and from its own tests
-      (`core/tests/leak-registry.test.ts`, `diagnostics/tests/leak-registry.test.ts`) —
-      no engine code path calls it. The mechanism is therefore tested, just never
-      triggered by the runtime itself. So
-      it is an opt-in audit a consumer must invoke, not a warning the runtime raises.
-      Whether that is the intended end state is a design call, not a tick: closing it
-      needs either an engine-side caller or a line saying opt-in IS the design,
+- [x] **A-5 remainder (dev-warning tier, folded into A-4):** **CLOSED 2026-09-09 —
+      opt-in IS the design.** `leak-registry.ts` already records why: FinalizationRegistry
+      callbacks run on an unspecified turn, so warning from inside one would make tests
+      racy and interleave `[fourJS]` lines with whatever the host was doing. The
+      callback only enqueues; `auditFinalizedLeaks` is the call that prints — the same
+      shape as `auditResourceLeaks` / `auditFrameAllocations`. Application.dispose does
+      not call it, and should not: finalization is nondeterministic, so a shutdown
+      audit would miss live leaks and spuriously report ones GC happened to flush.
+      The six §83 warnings: leaked resources: **opt-in audit, by design**
+      (`trackDisposable` wired at construction; consumer calls `auditFinalizedLeaks`).
       ~~disposed-in-use~~ **DONE 2026-09-06** (`warnDisposedInUse` in
       WebGL/WebGPU backends), ~~duplicate asset loads~~ **DONE 2026-09-06**
       (`AssetManager.load` of a settled slot → `devWarnOnce`), ~~detached-node
@@ -1815,7 +1824,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       key, and returns `resourceCatalog(...)`. `get(key)` stays synchronous.
       `tests/integration/texture-manifest.test.ts` uses the helper; the
       hand-rolled walk remains as a lower-level proof.
-- [ ] **A-19 remainder:** renderer-side §77 only (`R-30b`: cube/array/3D,
+- [x] **A-19 remainder:** **MERGED 2026-09-09 into R-30c** (one body of work, two
+      checkboxes). Surviving item is R-30c. Original text: renderer-side §77 only (`R-30b`: cube/array/3D,
       compressed containers, video). §78 glTF/GLB shipped 2026-08-29 at the
       glTF 2.0-core tier; its staged residue lives with other rows: morph
       targets wait on the GPU morph path (RFC 0003 staging), CUBICSPLINE waits

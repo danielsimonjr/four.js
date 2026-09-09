@@ -279,7 +279,7 @@ export function readWorkspacePackages(root = DEFAULT_ROOT) {
       dirs.push(join(root, pattern));
     }
   }
-  return dirs.sort().map((dir) => ({
+  return dirs.sort((a, b) => a.localeCompare(b)).map((dir) => ({
     dir,
     relDir: relative(root, dir).split("\\").join("/"),
     manifest: JSON.parse(readFileSync(join(dir, "package.json"), "utf8")),

@@ -979,9 +979,13 @@ describe("RigidBody writes that reach no solver (§23, §37; 2026-08-06)", () =>
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const body = registeredBody();
 
+    // oxlint-disable-next-line no-self-assign -- the test is that a no-op write must not spend the one-shot warning
     body.mass = body.mass;
+    // oxlint-disable-next-line no-self-assign -- same: linearDamping slot stays armed
     body.linearDamping = body.linearDamping;
+    // oxlint-disable-next-line no-self-assign -- same: angularDamping slot stays armed
     body.angularDamping = body.angularDamping;
+    // oxlint-disable-next-line no-self-assign -- same: gravityScale slot stays armed
     body.gravityScale = body.gravityScale;
     expect(warn).not.toHaveBeenCalled();
 

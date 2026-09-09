@@ -727,6 +727,9 @@ function syncStatus(): void {
   status.dataset["vaneAspect"] = vaneBoundingAspect().toFixed(4);
   status.dataset["vaneRed"] = String(Math.round(vaneMaterial.color[0] * 255));
   status.dataset["sim"] = app.time.simulationTime.toFixed(4);
+  status.dataset["alpha"] = app.time.interpolationAlpha.toFixed(4);
+  status.dataset["dropped"] = app.time.droppedTime.toFixed(6);
+  status.dataset["substeps"] = String(app.scheduler.fixedStepsLastFrame);
 }
 
 // --- the frame loop ---------------------------------------------------------

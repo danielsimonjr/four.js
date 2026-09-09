@@ -429,7 +429,7 @@ async function readStatus(page: Page): Promise<Status> {
   return await page.evaluate(() => {
     const element = document.querySelector<HTMLElement>("#status");
     if (element === null) throw new Error("no #status element");
-    return { ...element.dataset } as Record<string, string>;
+    return Object.assign({}, element.dataset) as Record<string, string>;
   });
 }
 

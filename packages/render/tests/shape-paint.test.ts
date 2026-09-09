@@ -143,7 +143,7 @@ function evaluateNode(
     case "swizzle": {
       const source = values[node.source];
       const index: Record<string, number> = { x: 0, y: 1, z: 2, w: 3 };
-      return [...node.pattern].map((letter) => source[index[letter]]);
+      return Array.from(node.pattern).map((letter) => source[index[letter]]);
     }
     case "unary": {
       const source = values[node.source];

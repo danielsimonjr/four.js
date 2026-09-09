@@ -504,12 +504,12 @@ types. With it: **0 errors**. A port that had been eyeballed rather than run wou
 have shipped that.
 
 **One deliberate difference from ESLint.** Oxlint's default `correctness` category
-enables rules `recommendedTypeChecked` did not, which surface **42 warnings** —
-`no-unsafe-optional-chaining` (17), `no-misused-spread` (13), and a handful of others,
-all in tests and tools. They are warnings, not errors, so the gate passes. They are
-kept rather than silenced because they are real coverage the previous linter did not
-have; a sample was inspected and read as deliberate. **Triaging them is filed in
-TODO.md** — a permanently-warning gate is how warnings get ignored.
+enables rules `recommendedTypeChecked` did not, which originally surfaced **42
+warnings**. **Triaged 2026-09-09 to zero:** real findings were fixed (`Array.from`,
+`localeCompare`, computed quaternion `w`, a JSDoc that contained `*/`); deliberate
+test/tool probes were explicitly allowed (`no-self-assign` on the rigid-body
+no-op-write test, `no-control-regex` on NUL-delimited guide slots,
+`no-unsafe-optional-chaining` off under `**/tests/**`). `bun run lint` is clean.
 
 **The one genuine gap remains `no-restricted-syntax`**, which Oxlint does not
 implement. It was used here for exactly one thing — banning `export default` — and
@@ -550,7 +550,7 @@ The root is done. Three items remain, none of which blocks it:
 |---|---|---|
 | **Drop `typescript@6.0.3` entirely** | isolated in `tools/docs`; costs one dependency | TypeDoc ships TS 7 support ([#3098](https://github.com/TypeStrong/typedoc/issues/3098), open, no timeline) — or is replaced by API Extractor, which bundles its own compiler |
 | **Vitest 3 → 5** | blocked by a real coverage gap, not by the runner | the five-package coverage campaign in section 5 lands |
-| **Triage the 42 Oxlint warnings** | non-blocking; new coverage ESLint never had | someone reads them and either fixes or explicitly allows each |
+| **Triage the 42 Oxlint warnings** | **done 2026-09-09** — 0 warnings | — |
 | `bun build` replaces `tsc -b` | possible, ~107 `isolatedDeclarations` annotations away | not recommended — `tsc -b` on TS 7 builds a package in 211–401 ms and project references are tsc-only |
 | `bun test` replaces Vitest | blocked | three `vi.*` APIs (68 uses) exist **and** `bun test` can fail a build on a coverage threshold |
 

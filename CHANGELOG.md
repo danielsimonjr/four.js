@@ -6,6 +6,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — open-TODO burndown (2026-09-09)
+
+Closed the remaining *contained* open items. Feature packets, RFC residues, the
+standing dogfooding map, first publish, and R-33 (needs non-SwiftShader hardware)
+stay on the tracker.
+
+### Fixed
+
+- **`smoothness.spec.ts` interpolation flake.** The 2026-09-06 virtual-frame wait
+  was correct; Playwright's screenshot still let the patched rAF advance 1.5Δ
+  frames during SwiftShader PNG encode. A stable stride of 3 aliased the
+  period-2 `interpolationAlpha` cycle, so every sample landed on-step — including
+  on a same-commit re-run. The injected clock now holds on `__fourPauseRaf`; the
+  interpolation test screenshots with the clock paused. `MINIMUM_MID_STEP_FRAMES`
+  stays 2. `examples/first-2d-scene` publishes `data-alpha` / `data-dropped` /
+  `data-substeps` so the next failure is diagnosable.
+
+- **§79 diagnostics no longer interpolate `constructor.name`.** A minified
+  `Renderable` reported as `"Ur"`. Messages and context now name authored
+  document types (`"scene"`, `"group"`, registered `typeName`) and the
+  `nodeTypeOf` / `static readonly typeName` options. The 2026-09-07 caveat and
+  `*IsMinifiable` flags are gone.
+
+### Changed
+
+- **Oxlint correctness warnings triaged to zero.** The 40 remaining default-
+  category warnings (down from 42) were either one-line fixes (`Array.from`,
+  `localeCompare`, computed quaternion `w`, a JSDoc that accidentally contained
+  `*/`) or explicit allows (self-assign probes, NUL-delimited guide slots,
+  `no-unsafe-optional-chaining` off under `**/tests/**`). `bun run lint` prints
+  nothing.
+
+### Documented
+
+- **12.8s barrels test vs 5s default timeout.** The suite sets `{ timeout: 30_000 }`;
+  the 9809ms application figure is a file-aggregate, not a hidden config.
+- **A-5 leak audit is opt-in by design.** `auditFinalizedLeaks` is a drain, not a
+  runtime warning, for the same reason as `auditResourceLeaks`: finalizers run on
+  an unspecified turn.
+- **A-19 remainder merged into R-30c.** Same §77 upload work; one checkbox.
+
 ## Unreleased — the root is TypeScript 7 only
 
 > **Note on the commit split, recorded because `git log` is misleading here.** This work
