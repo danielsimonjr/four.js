@@ -6,7 +6,8 @@ Implements §71 and the MVP subset of §72 in [`docs/SPECIFICATION.md`](../../do
 
 ## What's here
 
-- **Picking (§71)** — `pick` / `createPickRay` over the `Pickable` contract (ray vs. AABB and oriented-box tests, Y-up NDC), returning `PickHit` records.
+- **Picking (§71)** — `pick` / `createPickRay` over the `Pickable` contract (ray vs. AABB and oriented-box tests, Y-up NDC), returning `PickHit` records. `node.hitTestMode` selects `"bounds"` / `"geometry"` / `"pixel"` / `"gpu"` (the last is skipped here — RFC 0005's id-buffer pass answers through `PickProvider`).
+- **`PickProvider`** — render-free GPU/pixel seam (`pick(ndcX, ndcY): Promise<string | undefined>`). A `Map` satisfies it with no GPU; `fourJS`'s `createPickProvider` adapts a `@fourjs/render` `PickingService`. Pass it as `PointerInputOptions.pickProvider`. Omit it and every handler stays fully synchronous.
 - **Propagation (§72, §6b)** — `SceneInputEvent` (target + `stopPropagation`), `buildPropagationPath`, and `dispatchThreePhase`: the DOM-mirroring capture → target → bubble walk every input event shares, with capture-phase listener keys under `CAPTURE_KEY_PREFIX`. Node event types are added to `@fourjs/scene`'s `NodeEventMap` via declaration merging.
 - **Pointer events (§72 subset)** — `ScenePointerEvent` and `dispatchPointerEvent`, plus pointer capture. Every event carries `pointerType` (`PointerDeviceType`: `"mouse" | "pen" | "touch"`, absent when the source did not say or said something the union does not name), and the engine reads it for one rule: a mouse keeps its hover across its own release, where a finger or a stylus does not.
 - **Key events (§72)** — `SceneKeyEvent` (`key`, `code`, grouped `modifiers`, `repeat`, `preventDefault`) and `dispatchKeyEvent`, over the same three phases.
@@ -17,7 +18,7 @@ Implements §71 and the MVP subset of §72 in [`docs/SPECIFICATION.md`](../../do
 ## Staged / not yet implemented
 
 - Wheel/trackpad, gamepad, and XR sources; the synthesized `double-click`, `pinch`, and `rotate` gestures; node-level `focus`/`blur` as _input_ events; `keypress` (deprecated in the DOM — see `key-events.ts`).
-- Picking strategies beyond bounding volumes (§71).
+- §71 `"custom"` hit-test callbacks (`HitTestMode` omits `"custom"` until they exist). The bounds / geometry / pixel / gpu tiers ship.
 
 Unit tests are colocated in `tests/` per §92.
 

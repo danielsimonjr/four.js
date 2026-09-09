@@ -103,6 +103,49 @@ Pointer events propagate through the scene graph with capture-phase variants
 (`"capture:pointerdown"` etc., §72). Passing `pickables` as a callback lets
 you construct the input source before the scene exists.
 
+That sample is the **synchronous ray/bounds path**. Nodes with
+`hitTestMode = "gpu"` are skipped there on purpose — the id-buffer pass
+answers them, and one pointer event must not resolve the same node twice.
+The GPU/pixel seam is RFC 0005's `PickProvider`: two NDC numbers in, a
+`Node.id` out, asynchronously. `@fourjs/input` never names a renderer;
+the umbrella's `createPickProvider` is the four-line adapter between a
+`PickingService` and that seam.
+
+```ts
+import { PointerInput, type Pickable } from "fourJS/input";
+import { registerPickingPipeline } from "fourJS/render-webgl";
+import { createPickProvider } from "fourJS";
+
+registerPickingPipeline(); // once, at setup — links the id program
+const picking = renderer.createPickingService();
+const provider = createPickProvider(picking, view);
+
+hull.hitTestMode = "gpu"; // ray tier stands aside; the id pass answers
+
+const pointerInput = new PointerInput(canvas, {
+  camera,
+  pickables: () => pickables,
+  pickProvider: provider, // omit this and every handler stays fully sync
+});
+
+// per frame that wants pixel picking (opt-in — the pass costs a frame):
+picking.update(scene, view);
+```
+
+Without `pickProvider`, `PointerInput` is byte-identical to the sample
+above: no `await`, no microtask. A provider miss (`undefined`, or an id
+not in `pickables`) falls back to the ray tier. Capture still skips
+picking.
+
+Particle systems join the id pass as **one candidate for the whole
+emitter** (`ParticleIdProgram` instances the shared unit quad with the
+emitter's table index). That is not a per-particle id; trails are not
+drawn; a zero-count system issues no instanced draw and still has no
+bounds (`ParticleRenderable.computeBounds` returns `false` when nothing
+is alive). `hitTestMode = "bounds"` keeps the AABB path for a live
+system; `"gpu"` is what selects the id pass. WebGPU does not declare
+`createPickingService` yet (RFC 0005 residue).
+
 ## Dragging: pixels to world deltas
 
 `DragManager` converts pointer motion into a **world-space displacement** —
