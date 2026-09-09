@@ -33,6 +33,12 @@ stay on the tracker.
   runner the capsule reached `WALL_REACHED_Z` while still sliding into the
   wall. The walk now waits on settled `data-pz`.
 
+- **Particle appearance/trail matrix assertions typecheck under TypeDoc/TS 6.**
+  `uploadsAt(...)[0]?.[12]` indexed `unknown[]` (TS7053). The assertions
+  now compare the full uploaded matrix, matching the existing particle
+  program case.
+
+
 - **§79 diagnostics no longer interpolate `constructor.name`.** A minified
   `Renderable` reported as `"Ur"`. Messages and context now name authored
   document types (`"scene"`, `"group"`, registered `typeName`) and the
@@ -47,6 +53,33 @@ stay on the tracker.
   `*/`) or explicit allows (self-assign probes, NUL-delimited guide slots,
   `no-unsafe-optional-chaining` off under `**/tests/**`). `bun run lint` prints
   nothing.
+
+- **Vitest 3.2.7 → 5.0.0.** `vitest` and `@vitest/coverage-v8` bumped
+  together after the five-package coverage campaign cleared the 95% gate
+  under honest v8 remapping (physics-rapier 95.26% branches). The gate
+  itself is unchanged. Oxlint's `**/tests/**` override now also turns off
+  `typescript/no-unsafe-*`: Vitest 5's `vi.spyOn` / `MockInstance` types
+  trip those rules on suites that were clean under 3.2.7. `tsc -p tests`
+  stays clean. Package `tsconfig.json` files (the ones that include
+  tests) now set `"types": ["node"]` — Vitest 3 referenced Node from its
+  own typings; 5 does not, and TypeDoc's TS 6 pass typechecks those tests.
+  Same-day CI follow-up: `@fourjs/particles` was a sixth miss (92.1%
+  branches). Ramp-stop validation, empty/NaN lifetime ramps, trail
+  store guards, and `computeBounds` non-positive lifetime lift it to
+  97.16%.
+
+### Added
+
+- **RFC 0003 prototype measurements.** `benchmarks/skinning-resolve.mjs` records
+  the 60-bone ×1/×10 resolve (Bone vs Group) and the 180-channel controller vs
+  mixer path. Alternative A does not return on cost. The record proposes a
+  skinned-mesh §86 sentence from those numbers; it is not a spec amendment.
+
+- **Rapier snapshot-envelope guards.** `rapier-defensive-branches.test.ts`
+  covers `countContacts` and the paths a rewritten §34 envelope can reach:
+  unknown mass mode, Rapier colliders the metadata dropped, a collider whose
+  body left the envelope, and collisionstay without adapter body records.
+
 
 ### Documented
 

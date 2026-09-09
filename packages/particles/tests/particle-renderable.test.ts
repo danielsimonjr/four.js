@@ -411,6 +411,39 @@ describe("ParticleRenderable.computeBounds (§87)", () => {
     expect([max.x, max.y, max.z]).toEqual([4, 5, 3]);
   });
 
+  it("clamps a negative age to the start of the ramp when expanding the box", () => {
+    const source = new ParticleEmitter({ maxParticles: 1 });
+    const node = new ParticleRenderable(source);
+    const pool = source.pool;
+    pool.spawn();
+    pool.setPosition(0, 0, 0, 0);
+    pool.setLifetime(0, 2);
+    pool.setAge(0, -1);
+    pool.setSize(0, 8, 2);
+
+    const min = new Vector3();
+    const max = new Vector3();
+    expect(node.computeBounds(min, max)).toBe(true);
+    // Age clamped to 0: drawn size is the start of the ramp (8), half-extent 4.
+    expect([min.x, max.x]).toEqual([-4, 4]);
+  });
+
+  it("treats a non-positive lifetime as fully aged when expanding the box", () => {
+    const source = new ParticleEmitter({ maxParticles: 1 });
+    const node = new ParticleRenderable(source);
+    const pool = source.pool;
+    pool.spawn();
+    pool.setPosition(0, 0, 0, 0);
+    pool.setLifetime(0, 0);
+    pool.setSize(0, 8, 2);
+
+    const min = new Vector3();
+    const max = new Vector3();
+    expect(node.computeBounds(min, max)).toBe(true);
+    // Fully aged: the drawn size is the end of the ramp (2), so half-extent 1.
+    expect([min.x, max.x]).toEqual([-1, 1]);
+  });
+
   it("uses the current, ramped size rather than the start size", () => {
     const source = new ParticleEmitter({ maxParticles: 1 });
     const node = new ParticleRenderable(source);

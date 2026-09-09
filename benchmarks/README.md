@@ -38,6 +38,7 @@ the module loads. The whole suite takes about **77 s** on the recorded host, dom
 | [`text-layout.mjs`](#text-layoutmjs--86s-20-000-animated-glyphs-cpu-half)                     | `layoutText` at 1 000–50 000 drawn glyphs per frame                          | **animated glyphs: 20 000** — the layout half                                             |
 | [`render-batching.mjs`](#render-batchingmjs--86s-batched-sprites-and-shapes-preparation-half) | render-list build plus §65 batch assembly at 5 000–100 000 nodes             | **batched sprites: 100 000** and **simple batched shapes: 50 000** — the preparation half |
 | [`view-culling.mjs`](#view-cullingmjs--64s-per-view-lists-and-87s-frustum-cull)               | per-view list derivation and §87 culling at 10 000–100 000 nodes × 1–4 views | none — §86 has no culling row; this measures a design decision                            |
+| [`skinning-resolve.mjs`](#skinning-resolvemjs--rfc-0003-bones-as-nodes-and-180-channels)     | 60-bone resolve vs Groups (×1 / ×10) and 180-channel controller vs mixer     | **none yet** — proposes a skinned-mesh row from the measurement                           |
 
 Six §86 rows have honest headless numbers today — active rigid bodies, CPU particles, and
 the CPU halves of retained UI nodes, animated glyphs, batched sprites and batched shapes.
@@ -574,6 +575,19 @@ Findings, as shapes rather than values (2026-08-09, first record):
 - **The run-to-run spread is the one this file warns about.** The `rebuild/filter` column
   moves between 0.74× and 0.95× at one view across node counts, which is noise around 1.0,
   not a trend. Read the column's growth with view count, not its absolute values.
+
+### `skinning-resolve.mjs` — RFC 0003 bones-as-nodes and 180 channels
+
+```sh
+node benchmarks/skinning-resolve.mjs
+```
+
+**Not a §86 row — it proposes one.** RFC 0003's prototype section owed the cost of
+decision (b) (bones as nodes at 60 ×1 and ×10) and the 180-channel controller versus
+the mixer path. This script is those two measurements. Alternative A (a private
+transform array) returns only if the bone walk is the expensive part; the record
+says whether that happened on the host that wrote it. The proposed §86 sentence is
+derived from resolve + palette + controller on this host, and is not a gate.
 
 ## `geometry-updates.mjs` — dynamic WebGL geometry
 

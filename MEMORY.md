@@ -35,6 +35,44 @@ readable; never delete the pointer itself.
   on `PropertyDeclaration`. Isolation is a version pin, not a directory.
   `check-compiler.mjs` refuses anything else. Root 7.x is free to move.
 
+- **2026-09-09 — RFC 0003 prototype measurements recorded.** Bones-as-nodes
+  at 60 ×1/×10 is within noise of ordinary Groups at ×10; alternative A does
+  not return. 180-channel controller is ~0.03 ms/step on the recording host,
+  within 0.002 ms of the mixer. Proposed §86: 227 independent 60-bone
+  characters inside one 60 Hz step (host-specific, not a gate).
+
+- **2026-09-09 — Vitest 5 particles follow-up.** Landing the bump on the
+  five named failures left `@fourjs/particles` at 92.1% branches
+  (455/494) under honest v8 remap — CI `bun run coverage` caught it.
+  The misses were real: `copySizeRamp` / `copyColorRamp` reject `t`
+  outside `(0, 1)` and unsorted stops; `evaluateLifetimeRamp*` empty
+  `stops` and the after-last-stop `span <= 0` guard (NaN age past a
+  stop at `t >= 1`); `ParticleTrailStore` out-of-range
+  `readSample` / `#assertSlot`; `buildTrailRibbonMesh` `sampleCount < 2`;
+  `ParticleRenderable.computeBounds` non-positive lifetime. Re-measured
+  **97.16% branches (480/494)**. Gate unchanged. Lesson: remasure every
+  package, not only the ones a local Vitest 5 probe named.
+
+- **2026-09-09 — Vitest 5.0.0 landed.** The coverage campaign closed the
+  last honest gap: physics-rapier branches 95.26% (724/760) after
+  `rapier-defensive-branches.test.ts` (countContacts + snapshot-envelope
+  guards). physics 97.27%, render-webgl 95.57%, text 100%, render 97.59%.
+  `vitest` and `@vitest/coverage-v8` bumped together. Gate unchanged at 95%.
+  Oxlint `**/tests/**` now also allows `typescript/no-unsafe-*` — Vitest 5
+  mock types trip them; `tsc -p tests` is still clean. Package test
+  tsconfigs set `"types": ["node"]` because Vitest 5 dropped the Node
+  triple-slash that 3.2.7 shipped (TypeDoc/TS 6 typechecks those tests).
+  Supersedes the same-day "second measurement / bump still waits" note.
+  **Same-day follow-up:** particles was a sixth miss — see the entry above.
+
+- **2026-09-09 — Vitest 5 coverage campaign, second measurement.** After
+  executing the previously-unrun Rapier init reject path, stale-handle
+  context, and R-32 particle appearance/wide-stream/trail branches, four of
+  the five failing packages clear 95% under Vitest 5. Remaining: physics-rapier
+  global branches 92.1% (adapter defensive paths). Bump still waits.
+  **Superseded the same day — see the 5.0.0 landing entry above.**
+
+
 - **2026-09-09 — Browser-gate follow-up on the open-TODO PR.** Pause-during-
   grab was not enough: `waitForVirtualFrameCount` pumped the patched rAF and
   aliased even frames only. Host rAF (`__fourHostRaf`) is the pump. Character

@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **14 open**, 247 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), and A-19 (merged into R-30c). Of the 14, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked — the typedoc/TS 7 pin is no longer a release gate.
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **13 open**, 248 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, and the Vitest 5 coverage campaign (bump landed; particles follow-up the same day after CI caught 92.1% branches). Of the 13, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked — the typedoc/TS 7 pin is no longer a release gate.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -40,31 +40,24 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
   hidden config raises it. `vitest.coverage.config.ts` (30s) is coverage-only.
   Duration shown ≠ deadline. Headroom on a slow test is that test's own timeout.
 
-- **vitest 3.2.7 -> 5.0.0: ATTEMPTED 2026-09-08, reverted, and it found something.** Split out
-  of the TypeScript/vitest row, which wrongly implied TypeDoc blocked it — vitest declares **no
-  `typescript` peer**. Both majors were bumped together (`vitest` + `@vitest/coverage-v8`, whose
-  peer is an exact `5.0.0`), which is the split-bump trap avoided.
-  · **The runner half is clean.** All **7,246 tests across 282 files pass** on vitest 5, plus
-    `test:suites`. No API breakage at all.
-  · **What blocks it is the COVERAGE GATE, and the gate was the thing that was wrong.** vitest 5
-    reports lower numbers because its v8 provider remaps accurately; the old numbers were
-    inflated. Proven on one file rather than asserted: `render/src/resource-warnings.ts` reports
-    **100% under vitest 3** and **66.66% statements under vitest 5** — and it contains
-    `if (!DEV) return;` which **no test exercises**, because no test sets `DEV` false. 100% was
-    impossible. vitest 3 was over-reporting; vitest 5 is right.
-  · **So the 95% gate is partly illusory today.** Under honest measurement six thresholds fail:
-    global branches in **physics (92.1%)**, **render-webgl (92.1%)** and **text (94.64%)**, plus
-    per-file `physics-rapier/src/init.ts`, `render/src/resource-warnings.ts` and
-    `render-webgl/src/gl-particles.ts`.
-  · **Reverted to 3.2.7 deliberately.** Landing the bump would mean either weakening a coverage
-    gate or running a five-package test campaign — neither belongs inside a compiler migration.
-    The campaign is the real task; the bump falls out of it for free.
-  · **Do the coverage work first, then the bump.** Bumping first turns a real quality gap into
-    a red build with no owner.
-  · Written up with the rest of the toolchain reasoning in `docs/MIGRATION.md` section 5.
-  · **PARTIAL 2026-09-09:** `resource-warnings.ts` now has a `__FOUR_DEV__ = false`
-    test (the file that proved Vitest 3 was over-reporting). The other five
-    honest-coverage gaps remain; the bump still waits on that campaign.
+- **vitest 3.2.7 -> 5.0.0: DONE 2026-09-09.** The 2026-09-08 attempt was
+  reverted because Vitest 5's honest v8 remap dropped six thresholds below
+  95%. The campaign closed those gaps without weakening the gate:
+  `resource-warnings.ts` now exercises `__FOUR_DEV__ = false`; Rapier `init`
+  reject/retry, stale-handle context, and R-32 particle appearance /
+  wide-stream / trail tests lifted physics / render-webgl / text / render;
+  `rapier-defensive-branches.test.ts` covers `countContacts` and the
+  snapshot-envelope guards (unknown mass mode, orphaned Rapier colliders,
+  collider-without-body, stay without body records). Re-measured under
+  5.0.0: **physics 97.27%, render-webgl 95.57%, text 100%, render 97.59%,
+  physics-rapier 95.26%** branches. `vitest` and `@vitest/coverage-v8`
+  bumped together to 5.0.0. Written up in `docs/MIGRATION.md` section 5.
+  Follow-up the same day: CI `bun run coverage` then failed on
+  **`@fourjs/particles` at 92.1% branches** — the original campaign only
+  re-measured the five named failures. Honest tests for ramp-stop
+  validation, empty/NaN lifetime ramps, trail store guards, and
+  `computeBounds` non-positive lifetime lifted particles to **97.16%**
+  (480/494). Gate unchanged.
 
 - **Triage the 42 Oxlint warnings the ESLint config never surfaced.** DONE 2026-09-09.
   Count on this tree was **40** (two `no-misused-spread` hits had already gone).
@@ -75,6 +68,11 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
   NUL-delimited guide slots; `no-unsafe-optional-chaining` off under `**/tests/**`
   (every hit was `(optional?.x).y` after an `expect` that the value exists).
   `bun run lint` is **0 warnings / 0 errors**.
+  Follow-up 2026-09-09: the `**/tests/**` override also turns off
+  `typescript/no-unsafe-*` so Vitest 5's `vi.spyOn` types do not fail
+  suites that were clean under 3.2.7. Package test tsconfigs set
+  `"types": ["node"]` because Vitest 5 no longer references Node from
+  its own typings (TypeDoc's TS 6 pass typechecks those tests).
 
 ### 2 · Hours — one contained fix, already diagnosed
 
@@ -103,6 +101,8 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 - rapier 0.20 adoption — DONE 2026-09-06 (0.20.0; contactPair takes bodies; goldens re-recorded from scenario helpers).
 - Lift the TypeScript/vitest pin once typedoc supports TS 7.
+  Vitest half **DONE 2026-09-09** (5.0.0). TypeDoc isolation still owns the
+  remaining `typescript@6.0.3` in `tools/docs`.
 - PoseTarget scale channel — DONE 2026-09-06 (physical side is identity).
 - Rotational root motion — DONE 2026-09-06 (quaternion track extracts local rotation).
 - A-25 owner decisions before first publish:
@@ -117,7 +117,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - RFC 0005 residue (staged in source, 2026-08-29):
 - RFC 0001 residue (staged in source, 2026-08-28):
 - RFC 0003 residue (staged in source, 2026-08-28):
-- RFC 0003 prototype measurements still owed:
+- RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
 - Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color strings on lights, light layers; hoist the lit shader's per-vertex inverse-transpose to a per-draw normal-matrix uniform when @fourjs/math grows a Matrix3 utility (dated note in gl-program.ts)
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
@@ -1165,10 +1165,15 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       (unbounds `MAX_SKINNING_JOINTS = 48`; needs a render-target format union +
       vertex texture fetch); §43-interpolated palettes (today the palette is the
       last resolved pose).
-- [ ] **RFC 0003 prototype measurements still owed:** bones-as-nodes resolve cost at
-      60 bones ×1/×10 (the number that decides whether alternative A ever returns)
-      and controller channel cost at 180 channels. §86 has no skinned-mesh
-      performance target yet — propose one from those measurements.
+- [x] **RFC 0003 prototype measurements still owed:** DONE 2026-09-09.
+      `benchmarks/skinning-resolve.mjs` records bones-as-nodes resolve at 60 ×1
+      and ×10 versus the same Group topology, `Skeleton.update` beside that
+      walk, and the 180-channel clip through both `AnimationMixer` and
+      `AnimationController`. Alternative A does **not** return: at ×10 a Bone
+      chain is within noise of Groups. Proposed §86 sentence (not a spec
+      amendment, not a gate): *227 independently animated 60-bone characters
+      inside one 60 Hz fixed step on the recording host (resolve + palette +
+      controller)*. Record: `benchmarks/results/skinning-resolve.json`.
 - [x] **glTF loader (§78) shipped 2026-08-29** — `createGltfLoader`/`GltfAsset`
       (`@fourjs/assets`) + `instantiateGltf` (`four`), glTF 2.0 core tier: both
       containers, all six §53 attributes, §59 factors + base-colour texture,
@@ -2104,6 +2109,12 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       pre-1.0 PDF.
 
 ## Done
+
+- [x] 2026-09-09 — **Vitest 5 particles follow-up.** CI `bun run coverage`
+      after the bump failed `@fourjs/particles` at 92.1% branches. Honest
+      tests for ramp-stop validation, empty/NaN lifetime ramps, trail
+      store guards, and `computeBounds` non-positive lifetime. Re-measured
+      97.16% (480/494). Gate unchanged.
 
 - [x] 2026-09-07 — **CI after #76.** Allowlisted R-32 wide particle offsets
       (particles↔render duck-type); TypeDoc fixtures for NodeSpace,
