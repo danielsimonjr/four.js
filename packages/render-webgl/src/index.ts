@@ -32,6 +32,7 @@ export {
   PARTICLE_ATTRIBUTE_LOCATIONS,
   PARTICLE_DEPTH_TEXTURE_UNIT,
   PARTICLE_GL,
+  PARTICLE_VERTEX_SHADER_SOURCE,
   ParticleAppearanceProgram,
   ParticleBatchCache,
   ParticleProgram,
@@ -85,6 +86,7 @@ export {
 export {
   IdPassProgram,
   PICKING_GL,
+  ParticleIdProgram,
   WebglPickingService,
   registerPickingPipeline,
 } from "./gl-picking.js";
@@ -100,6 +102,7 @@ export {
 export type {
   SkinnedLitPipeline,
   SkinnedPrograms,
+  SkinnedShadowPipeline,
   SkinnedUnlitPipeline,
   SkinningPipelineFactory,
 } from "./gl-skinning-registry.js";
@@ -109,11 +112,14 @@ export {
 } from "./gl-skinning-registry.js";
 // The skinned pipeline itself (§54; RFC 0003). Deliberately the **only**
 // module here that `WebglRenderer` does not reach statically: importing
-// `registerSkinningPipeline` is what links the two skinned programs into a
-// bundle, and a barrel re-export does not (it tree-shakes like every other
-// unused export) — see `gl-skinning-registry.ts` for the whole seam.
+// `registerSkinningPipeline` is what links the two skinned colour programs
+// and the lazy caster into a bundle, and a barrel re-export does not (it
+// tree-shakes like every other unused export) — see
+// `gl-skinning-registry.ts` for the whole seam.
 export {
+  SKINNING_GLSL,
   SkinnedLitProgram,
+  SkinnedShadowProgram,
   SkinnedUnlitProgram,
   registerSkinningPipeline,
 } from "./gl-skinning.js";

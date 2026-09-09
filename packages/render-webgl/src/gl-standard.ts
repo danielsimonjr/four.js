@@ -87,6 +87,7 @@ import {
   createLinkedProgram,
   matrixScratch,
   requireUniform,
+  uploadNormalMatrix,
   type GlProgramHandle,
   type GlUniformLocation,
   type WebglContext,
@@ -104,10 +105,10 @@ import {
  * world position is computed once rather than twice.
  *
  * The normal is transformed by the **inverse transpose** of the model matrix's
- * upper 3×3, the standard fix for non-uniform scale, derived in the shader for
- * the reason `LIT_VERTEX_SHADER_SOURCE` records — and staged with it: when
- * `@fourjs/math`'s `Matrix3` grows a normal-matrix utility both stages hoist it
- * to a per-draw uniform together.
+ * upper 3×3, the standard fix for non-uniform scale. That matrix is
+ * `Matrix3.setNormalFromMatrix4` on the CPU, uploaded once per draw as
+ * `uniform mat3 normalMatrix` — the same hoist `LIT_VERTEX_SHADER_SOURCE`
+ * landed (2026-09-09), so both shaded stages stay in lockstep.
  */
 const STANDARD_VERTEX_SHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 position;
@@ -116,6 +117,7 @@ layout(location = 2) in vec2 uv;
 
 uniform mat4 viewProjection;
 uniform mat4 model;
+uniform mat3 normalMatrix;
 
 out vec3 vNormal;
 out vec3 vWorldPosition;
@@ -124,7 +126,7 @@ out vec2 vUv;
 void main() {
   vec4 world = model * vec4(position, 1.0);
   vWorldPosition = world.xyz;
-  vNormal = transpose(inverse(mat3(model))) * normal;
+  vNormal = normalMatrix * normal;
   vUv = uv;
   gl_Position = viewProjection * world;
 }
@@ -329,6 +331,8 @@ export class StandardProgram implements Disposable {
 
   readonly #modelLocation: GlUniformLocation;
 
+  readonly #normalMatrixLocation: GlUniformLocation;
+
   readonly #baseColorLocation: GlUniformLocation;
 
   readonly #metalnessLocation: GlUniformLocation;
@@ -379,24 +383,25 @@ export class StandardProgram implements Disposable {
     this.#program = program;
     this.#punctual = punctual;
     this.#shadow = shadow;
-    // Positionally, from the one array `create` builds: twelve uniforms is more
+    // Positionally, from the one array `create` builds: fifteen uniforms is more
     // than a constructor parameter list can carry without every call site
     // becoming a puzzle, and the array is written once, next to the names it
     // resolves.
     this.#viewProjectionLocation = locations[0];
     this.#modelLocation = locations[1];
-    this.#baseColorLocation = locations[2];
-    this.#metalnessLocation = locations[3];
-    this.#roughnessLocation = locations[4];
-    this.#emissiveLocation = locations[5];
-    this.#ambientLightLocation = locations[6];
-    this.#lightDirectionLocation = locations[7];
-    this.#lightColorLocation = locations[8];
-    this.#cameraPositionLocation = locations[9];
-    this.#mapLocation = locations[10];
-    this.#useMapLocation = locations[11];
-    this.#metalRoughnessMapLocation = locations[12];
-    this.#useMetalRoughnessMapLocation = locations[13];
+    this.#normalMatrixLocation = locations[2];
+    this.#baseColorLocation = locations[3];
+    this.#metalnessLocation = locations[4];
+    this.#roughnessLocation = locations[5];
+    this.#emissiveLocation = locations[6];
+    this.#ambientLightLocation = locations[7];
+    this.#lightDirectionLocation = locations[8];
+    this.#lightColorLocation = locations[9];
+    this.#cameraPositionLocation = locations[10];
+    this.#mapLocation = locations[11];
+    this.#useMapLocation = locations[12];
+    this.#metalRoughnessMapLocation = locations[13];
+    this.#useMetalRoughnessMapLocation = locations[14];
   }
 
   /**
@@ -417,6 +422,7 @@ export class StandardProgram implements Disposable {
       const names = [
         "viewProjection",
         "model",
+        "normalMatrix",
         "baseColor",
         "metalness",
         "roughness",
@@ -466,10 +472,11 @@ export class StandardProgram implements Disposable {
     );
   }
 
-  /** Uploads one render item's world matrix. See {@link setViewProjection}. */
+  /** Uploads one render item's world matrix and its derived normal matrix. */
   setModel(matrix: Matrix4): void {
     matrixScratch.set(matrix.elements);
     this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
+    uploadNormalMatrix(this.#gl, this.#normalMatrixLocation, matrix);
   }
 
   /**

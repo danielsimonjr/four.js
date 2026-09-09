@@ -48,7 +48,11 @@
  * as a draw with no geometry record is, because a pipeline that silently
  * draws the wrong thing is worse than one that does not exist yet (the
  * recorded WP-9.1 rule, applied to a backend) — and an *unregistered* node
- * material is skipped on the same terms. The one exception is deliberate and
+ * material is skipped on the same terms. §71 picking is **opt-in**:
+ * `createPickingService()` is declared (presence is the capability, matching
+ * WebGL) and throws until `registerPickingPipeline()` links `wgpu-picking.ts`.
+ * Particle systems are skipped in the id pass (no `ParticleIdProgram` on
+ * this backend yet). The one exception is deliberate and
  * narrow: a §67 **mask** is coverage, not shading, so a clip node of any
  * material family masks correctly today through the flat unlit pipeline with
  * colour writes off.
@@ -102,7 +106,7 @@
  */
 
 import { DEV, EventEmitter, FourError, devWarnOnce } from "@fourjs/core";
-import { Frustum, Matrix4, type Rectangle2 } from "@fourjs/math";
+import { Frustum, Matrix3, Matrix4, type Rectangle2 } from "@fourjs/math";
 import {
   COLOR_GRADE_DEFAULTS,
   RenderTarget,
@@ -116,6 +120,7 @@ import {
   validateReadbackRegion,
   type EffectRenderPass,
   type RenderBatch,
+  type PickingService,
   type RenderInterpolation,
   type RenderItem,
   type RenderStatistics,
@@ -147,6 +152,7 @@ import {
 import {
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  DRAW_NORMAL_OFFSET,
   DRAW_UNIFORM_BYTES,
   DRAW_VIEW_PROJECTION_OFFSET,
   MAP_BIND_GROUP_INDEX,
@@ -216,7 +222,6 @@ import {
   createStandardBindGroupLayout,
 } from "./wgpu-standard.js";
 import {
-  SPRITE_QUAD_OFFSET,
   SPRITE_UNIFORM_BYTES,
   createSpriteBindGroupLayout,
 } from "./wgpu-sprite.js";
@@ -245,6 +250,10 @@ import {
   type WgpuNodeFrameState,
   type WgpuNodeMaterialPipelines,
 } from "./wgpu-node-registry.js";
+import {
+  resolvePickingServiceFactory,
+  type PickingRendererHost,
+} from "./wgpu-picking-registry.js";
 import { CLEAR_VERTEX_COUNT } from "./wgpu-unlit.js";
 
 /** Error code for use-after-dispose, mirroring the other two backends (§83, §89). */
@@ -285,6 +294,15 @@ const DEPTH_FORMAT = "depth24plus";
  */
 const DEPTH_STENCIL_FORMAT = "depth24plus-stencil8";
 
+/**
+ * Scratch for the per-draw `normalMatrix` pack in {@link WebgpuRenderer}.
+ * Constructed once; `setNormalFromMatrix4` mutates in place and allocates
+ * nothing (plan D7). Seeded to identity before each use so a singular model
+ * (invert no-op) cannot leak the previous draw's inverse-transpose — the
+ * math helper's documented policy, not a second one.
+ */
+const normalMatrixScratch = new Matrix3();
+
 /** The swap-chain format used when the host will not name a preferred one. */
 const FALLBACK_CANVAS_FORMAT = "bgra8unorm";
 
@@ -302,9 +320,6 @@ type SpriteItem = Extract<RenderItem, { kind: "sprite" }>;
 
 /** A particle render item (§36, WP-R1.8) — one instanced draw per system. */
 type ParticleItem = Extract<RenderItem, { kind: "particles" }>;
-
-/** §55's material as this backend reads it — texture, tint, §57 state. */
-type SpriteMaterialLike = SpriteItem["material"];
 
 /** A shaded render item (§68 lit or §59 standard, WP-R1.5). */
 type ShadedItem = Extract<RenderItem, { kind: "lit" | "standard" }>;
@@ -666,8 +681,9 @@ export class WebgpuRenderer implements Renderer {
   /**
    * The sprite draws' bind group over {@link WebgpuRenderer.#uniformBuffer} —
    * the same strided blocks, bound at {@link SPRITE_UNIFORM_BYTES} instead of
-   * 144. Dropped (not destroyed — bind groups have no `destroy`) whenever the
-   * buffer is regrown, and recreated by the next sprite draw.
+   * {@link DRAW_UNIFORM_BYTES}. Dropped (not destroyed — bind groups have no
+   * `destroy`) whenever the buffer is regrown, and recreated by the next
+   * sprite draw.
    */
   #spriteBindGroup: GpuBindGroup | null = null;
 
@@ -937,8 +953,7 @@ export class WebgpuRenderer implements Renderer {
       );
     }
 
-    const timestampQueries =
-      adapter.features?.has("timestamp-query") === true;
+    const timestampQueries = adapter.features?.has("timestamp-query") === true;
     const device = timestampQueries
       ? await adapter.requestDevice({
           requiredFeatures: ["timestamp-query"],
@@ -1471,7 +1486,12 @@ export class WebgpuRenderer implements Renderer {
       for (let index = 0; index < viewItems.length; index += 1) {
         const item = viewItems[index];
         if (itemScissorActive) {
-          pass.setScissorRect(viewScissor.x, top, viewScissor.width, viewScissor.height);
+          pass.setScissorRect(
+            viewScissor.x,
+            top,
+            viewScissor.width,
+            viewScissor.height,
+          );
           itemScissorActive = false;
         }
 
@@ -1724,7 +1744,7 @@ export class WebgpuRenderer implements Renderer {
                   activeTarget,
                   spriteMap,
                 );
-          if (spriteTexture !== null) {
+          if (spriteTexture !== null && record.uvBuffer !== null) {
             stencilReference = this.#drawSprite(
               device,
               pass,
@@ -2243,6 +2263,48 @@ export class WebgpuRenderer implements Renderer {
       // was submitted, exactly as a scene draw is.
       countDraw(statistics, "triangle-list", EFFECT_PASS_VERTEX_COUNT, 1);
     }
+  }
+
+  /**
+   * Builds a `PickingService` over this renderer — §71's `"gpu"` tier
+   * (RFC 0005), gated on `registerPickingPipeline()` exactly as node-material
+   * draws are gated on `registerWebgpuNodeMaterialPipeline()`: this method
+   * resolves the registry slot and refuses (§85) when nothing registered, so
+   * the id pipeline, the service, and its `mapAsync` read-back live only in
+   * bundles that opted in (the pipeline-cost law; `wgpu-picking-registry.ts`).
+   *
+   * What the service receives is a **live window** onto exactly the renderer
+   * state an id pass needs — device, the two shared caches (geometry, render
+   * targets), the surface size, and the two lifecycle flags — as accessors,
+   * so a §61 loss's dropped caches are seen rather than captured stale
+   * (`PickingRendererHost`). Each call builds an independent service; the
+   * caller owns and disposes it (§83). No GPU call is issued here — the id
+   * pipeline compiles on the service's first pass.
+   *
+   * @throws FourError `INVALID_APPLICATION_STATE` on a disposed renderer, or
+   * when no picking pipeline is registered.
+   */
+  createPickingService(): PickingService {
+    this.#assertUsable("createPickingService");
+    const factory = resolvePickingServiceFactory();
+    if (factory === null) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "§71: call registerPickingPipeline() from @fourjs/render-webgpu " +
+          "before createPickingService() (§85).",
+        { context: { registered: false } },
+      );
+    }
+    const host: PickingRendererHost = {
+      device: () => this.#device,
+      geometries: () => this.#geometries,
+      renderTargets: () => this.#renderTargets,
+      surfaceWidth: () => Math.round(this.#width * this.#resolution),
+      surfaceHeight: () => Math.round(this.#height * this.#resolution),
+      deviceLost: () => this.#deviceLost,
+      disposed: () => this.#disposed,
+    };
+    return factory.create(host);
   }
 
   /**
@@ -2782,9 +2844,9 @@ export class WebgpuRenderer implements Renderer {
 
   /**
    * Records one §55 sprite draw (WP-R1.3): the sprite pipeline over the
-   * quad's position stream, §55's uv derived in the vertex stage from the
-   * `quad` uniform, the texture at group 1, the tint and quad in the sprite's
-   * widened uniform block. Returns the stencil reference now in effect.
+   * quad's position stream and authored uv stream, the texture at group 1,
+   * the tint in the sprite uniform block. Returns the stencil reference now
+   * in effect.
    *
    * §55's pipeline blends **by construction** — it did before §57's
    * `transparent` flag existed, and a textured quad with an alpha channel has
@@ -2851,7 +2913,6 @@ export class WebgpuRenderer implements Renderer {
       tint[2],
       tint[3] * opacity,
     );
-    this.#writeQuad(block, item, material);
 
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, this.#acquireSpriteBindGroup(device, uniformBuffer), [
@@ -2867,6 +2928,9 @@ export class WebgpuRenderer implements Renderer {
       );
     }
     pass.setVertexBuffer(0, record.positionBuffer);
+    if (record.uvBuffer !== null) {
+      pass.setVertexBuffer(1, record.uvBuffer);
+    }
     if (record.indexBuffer !== null && record.indexFormat !== null) {
       pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
       pass.drawIndexed(record.count);
@@ -3398,7 +3462,7 @@ export class WebgpuRenderer implements Renderer {
   /**
    * Packs §59's two extra vec4s — the emissive term, then metalness and
    * roughness — into the spare bytes of `block`'s stride, after the
-   * `DrawUniforms`-shaped 144 `#writeBlock` wrote (`wgpu-standard.ts`'s
+   * 192-byte `DrawUniforms` `#writeBlock` wrote (`wgpu-standard.ts`'s
    * layout). The unused slots are written, not assumed: the staging array is
    * reused across frames, and an uploaded byte nobody wrote this frame is a
    * transcript that depends on history.
@@ -3458,46 +3522,6 @@ export class WebgpuRenderer implements Renderer {
     this.#shadowBindGroupView = null;
   }
 
-  /**
-   * Packs §55's `quad` — the local rectangle the whole texture maps onto —
-   * into the sprite block's last sixteen bytes: the geometry's own bounds for
-   * a frameless sprite, R-29's affine reparametrization for a framed one. The
-   * same two expressions the GL sprite path uploads through `setQuad`, over
-   * the same cached `computeBounds()` (a version comparison per draw, not a
-   * pass over the vertices).
-   */
-  #writeQuad(
-    block: number,
-    item: SpriteItem,
-    material: SpriteMaterialLike,
-  ): void {
-    const bounds = item.geometry.computeBounds();
-    const minX = bounds.min.x;
-    const minY = bounds.min.y;
-    const width = bounds.max.x - minX;
-    const height = bounds.max.y - minY;
-    const staging = this.#uniformStaging;
-    const base = block * UNIFORM_STRIDE_FLOATS + SPRITE_QUAD_OFFSET / 4;
-    // `?? null` for the render list's reason: a structurally typed sprite item
-    // built before frames existed reports `undefined`, which reads "no frame".
-    const frame = item.frame ?? null;
-    if (frame === null) {
-      staging[base] = minX;
-      staging[base + 1] = minY;
-      staging[base + 2] = width;
-      staging[base + 3] = height;
-      return;
-    }
-    // The rectangle the *whole* texture would occupy, given that the quad
-    // shows `frame` of it — `map` is the engine-side texture (its texel size),
-    // not the GPU record this draw binds.
-    const map = material.texture;
-    staging[base] = minX - (frame.x * width) / frame.width;
-    staging[base + 1] = minY - (frame.y * height) / frame.height;
-    staging[base + 2] = (width * map.width) / frame.width;
-    staging[base + 3] = (height * map.height) / frame.height;
-  }
-
   /** Packs one `DrawUniforms` block into the staging array at `block`'s stride. */
   #writeBlock(
     block: number,
@@ -3525,6 +3549,23 @@ export class WebgpuRenderer implements Renderer {
     staging[colorBase + 1] = green;
     staging[colorBase + 2] = blue;
     staging[colorBase + 3] = alpha;
+    // Inverse-transpose of the model's upper 3×3, packed as a WGSL uniform
+    // `mat3x3` (three columns padded to vec4). Identity when the mat4 upload
+    // was identity (`model === null`) or when the upper 3×3 is singular.
+    normalMatrixScratch.identity();
+    if (model !== null) {
+      normalMatrixScratch.setNormalFromMatrix4(model);
+    }
+    const n = normalMatrixScratch.elements;
+    const normalBase = base + DRAW_NORMAL_OFFSET / 4;
+    for (let column = 0; column < 3; column += 1) {
+      const dst = normalBase + column * 4;
+      const src = column * 3;
+      staging[dst] = n[src];
+      staging[dst + 1] = n[src + 1];
+      staging[dst + 2] = n[src + 2];
+      staging[dst + 3] = 0;
+    }
   }
 
   /**

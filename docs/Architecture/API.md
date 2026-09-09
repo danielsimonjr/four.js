@@ -579,7 +579,7 @@ app-supplied** through the `WidgetSkin` seam (the dependency matrix keeps
 
 ## Serialization and assets
 
-**Packages:** `four/serialization`, `four/assets` · **Guide:**
+**Packages:** `fourJS/serialization`, `fourJS/assets` · **Guide:**
 [digital-twin](../guides/digital-twin.md) · **Spec:** §76, §79–§80
 
 **Scene documents (§79):** canonical, versioned (`SCENE_FORMAT_VERSION`),
@@ -587,30 +587,40 @@ byte-stable text (§33).
 
 ```typescript
 import {
-  createDefaultComponentSerializers,
   decodeSceneDocument,
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
 } from "fourJS/serialization";
+import { registerSceneNodeTypes, resourceCatalog } from "fourJS";
 
-const registry = createDefaultComponentSerializers(); // PoseTarget built in
-registry.register(RigidBody, myRigidBodySerializer); // components YOUR app uses
-
-const document = serializeScene(app.scene, registry);
+const io = registerSceneNodeTypes({
+  atlas,
+  geometries: resourceCatalog(geometries),
+  materials: resourceCatalog(materials),
+});
+const document = serializeScene(app.scene, io.components, io.write);
 const saved = encodeSceneDocument(document); // canonical text
-const restored = instantiateScene(decodeSceneDocument(saved), registry);
+const restored = instantiateScene(
+  decodeSceneDocument(saved),
+  io.components,
+  io.read,
+);
 ```
 
-Serializers are keyed by component **class**; an unregistered component fails
-the save loudly (`unknownComponents: "throw"`, the A-15 default since
-2026-08-06 — this line said "silently unsaved (known boundary)" until
+`createDefaultComponentSerializers()` only knows `PoseTarget` and the built-in
+`"scene"` / `"group"` node types. A scene holding a `Renderable` or `Text`
+throws until `nodeTypeOf` / `nodeFactory` are supplied — `registerSceneNodeTypes()`
+is that pair. Serializers are keyed by component **class**; an unregistered
+component fails the save loudly (`unknownComponents: "throw"`, the A-15 default
+since 2026-08-06 — this line said "silently unsaved (known boundary)" until
 2026-08-07, which stopped being true with that change; `"skip"` restores the
 old tolerance, minus the silence). Versioned migrations (§80) run on load via
 `SceneMigrationRegistry` / `migrateSceneDocument`, with warnings surfaced.
 Reference `RigidBody`/`Collider` serializers live in
 `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`, shipped from `@fourjs/physics` since
-2026-08-06 (previously reference code in the test helpers). The §79/§34 boundary is
+2026-08-06 (previously reference code in the test helpers), and are registered
+by `registerSceneNodeTypes()`. The §79/§34 boundary is
 measured: a contact-free save round-trips bit-identically; resuming
 mid-contact exactly requires pairing the document with a §34 snapshot.
 
@@ -621,14 +631,14 @@ mid-contact exactly requires pairing the document with a §34 snapshot.
 | `AssetManager`                                                     | Coalescing, ref-counted cache: `load<T>(url, loader): Promise<T>`, `release`, `refCount`, `clear`, `dispose`. |
 | `jsonLoader` / `textLoader` / `binaryLoader` / `createImageLoader` | The shipped `AssetLoader<T>` implementations; `ImageAsset` is the disposal wrapper.                           |
 
-glTF loading is staged (needs §55 textures + non-unlit materials) — 3D
-geometry today is procedural (`four/geometry`) or custom-loaded.
+glTF loading ships (`createGltfLoader` + `instantiateGltf`;
+`examples/gltf-model`). Procedural geometry (`fourJS/geometry`) is the other path.
 
 ---
 
 ## Diagnostics: checksums, replay, debug draw
 
-**Package:** `four/diagnostics` · **Guide:**
+**Package:** `fourJS/diagnostics` · **Guide:**
 [digital-twin](../guides/digital-twin.md) · **Spec:** §33–§34, §113
 
 | Symbol                                                                                                                                          | Contract                                                                                                                                                                                                                              |

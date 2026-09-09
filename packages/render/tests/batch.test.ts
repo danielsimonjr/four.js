@@ -481,7 +481,7 @@ describe("RenderBatcher — §55 sprites", () => {
     return { scene, material };
   }
 
-  it("merges sprites sharing one atlas material and derives uv per vertex", () => {
+  it("merges sprites sharing one atlas material and copies authored uv per vertex", () => {
     const { scene, material } = spriteScene();
     const left = new Sprite(material, { width: 2, height: 2 });
     const right = new Sprite(material, { width: 2, height: 2 });

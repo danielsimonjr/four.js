@@ -85,6 +85,15 @@ function corners(sprite: Sprite): [number, number][] {
   return [0, 1, 2, 3].map((i) => [p[i * 3], p[i * 3 + 1]]);
 }
 
+/** The quad's authored uvs as `[u, v]` pairs, in the same vertex order. */
+function uvsOf(sprite: Sprite): [number, number][] {
+  const uvs = sprite.geometry.uvs;
+  if (uvs === undefined) {
+    throw new Error("a Sprite always authors uvs");
+  }
+  return [0, 1, 2, 3].map((i) => [uvs[i * 2], uvs[i * 2 + 1]]);
+}
+
 // ---------------------------------------------------------------------------
 // Texture (§77).
 // ---------------------------------------------------------------------------
@@ -634,7 +643,7 @@ describe("Sprite — the quad built from anchor and size (§55, §7a)", () => {
     expect(z).toEqual([0, 0, 0, 0]);
   });
 
-  it("gives the geometry bounds that are exactly the quad (the backend's uv rect)", () => {
+  it("gives the geometry bounds that are exactly the quad", () => {
     const sprite = new Sprite(spriteMaterial(), {
       width: 3,
       height: 5,
@@ -798,7 +807,18 @@ describe("Sprite — §55 frame sub-rectangles (R-29)", () => {
     expect(sprite.frame?.x).toBe(0.5);
   });
 
-  it("does not touch the quad or its version — a frame re-uploads nothing", () => {
+  it("authors whole-texture uvs when there is no frame", () => {
+    const sprite = new Sprite(atlasMaterial(), { width: 2, height: 2 });
+
+    expect(uvsOf(sprite)).toEqual([
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ]);
+  });
+
+  it("rewrites authored uvs and bumps the geometry version when the frame changes", () => {
     const sprite = new Sprite(atlasMaterial(), { width: 2, height: 2 });
     const geometry = sprite.geometry;
     const version = geometry.version;
@@ -807,8 +827,33 @@ describe("Sprite — §55 frame sub-rectangles (R-29)", () => {
     sprite.setFrame(2, 1, 4, 2);
 
     expect(sprite.geometry).toBe(geometry);
-    expect(sprite.geometry.version).toBe(version);
+    expect(sprite.geometry.version).toBeGreaterThan(version);
     expect(corners(sprite)).toEqual(before);
+    // 8 × 4 atlas, cell (2, 1, 4, 2) → u ∈ [0.25, 0.75], v ∈ [0.25, 0.75].
+    expect(uvsOf(sprite)).toEqual([
+      [0.25, 0.25],
+      [0.75, 0.25],
+      [0.75, 0.75],
+      [0.25, 0.75],
+    ]);
+  });
+
+  it("restores whole-texture uvs when the frame is cleared", () => {
+    const sprite = new Sprite(atlasMaterial(), {
+      width: 2,
+      height: 2,
+      frame: { x: 2, y: 1, width: 4, height: 2 },
+    });
+    expect(uvsOf(sprite)[0]).toEqual([0.25, 0.25]);
+
+    sprite.frame = null;
+
+    expect(uvsOf(sprite)).toEqual([
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ]);
   });
 });
 

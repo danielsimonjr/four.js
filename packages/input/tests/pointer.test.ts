@@ -15,7 +15,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { DragManager } from "../src/drag.js";
-import type { Pickable } from "../src/pick.js";
+import type { Pickable, PickProvider } from "../src/pick.js";
 import {
   ScenePointerEvent,
   buildPropagationPath,
@@ -138,6 +138,9 @@ function harness(
     ...(options.clickMoveThreshold === undefined
       ? {}
       : { clickMoveThreshold: options.clickMoveThreshold }),
+    ...(options.pickProvider === undefined
+      ? {}
+      : { pickProvider: options.pickProvider }),
   });
   return { surface, input, pickables };
 }
@@ -1028,6 +1031,448 @@ describe("PointerInput — pointer lifetime (§72, §83, A-9)", () => {
 
     surface.fire("pointerdown", clientXOf(0), clientYOf(0));
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+});
+
+function gpuBoxAt(x: number, y: number, z = -5, half = 0.5): Pickable {
+  const pickable = boxAt(x, y, z, half);
+  pickable.node.hitTestMode = "gpu";
+  return pickable;
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+function mapProvider(answers: Map<string, string>): PickProvider {
+  return {
+    pick: (ndcX, ndcY) =>
+      Promise.resolve(answers.get(`${String(ndcX)},${String(ndcY)}`)),
+  };
+}
+
+describe("PointerInput — PickProvider (RFC 0005)", () => {
+  it("without a provider, gpu-mode nodes stay skipped and dispatch is sync", () => {
+    const gpu = gpuBoxAt(0, 0);
+    const { surface } = harness([gpu]);
+    const hit = vi.fn();
+    gpu.node.on("pointerdown", hit);
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+
+    expect(hit).not.toHaveBeenCalled();
+  });
+
+  it("targets a gpu-mode node when the Map-backed provider returns its id", async () => {
+    const gpu = gpuBoxAt(0, 0);
+    const answers = new Map<string, string>([["0,0", gpu.node.id]]);
+    const { surface } = harness([gpu], {
+      pickProvider: mapProvider(answers),
+    });
+    const seen: ScenePointerEvent[] = [];
+    gpu.node.on("pointerdown", (event) => {
+      seen.push(event);
+    });
+    gpu.node.on("pointerup", (event) => {
+      seen.push(event);
+    });
+    gpu.node.on("click", (event) => {
+      seen.push(event);
+    });
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+    surface.fire("pointerup", clientXOf(0), clientYOf(0));
+
+    await vi.waitFor(() => {
+      expect(seen.map((e) => e.type)).toEqual([
+        "pointerdown",
+        "pointerup",
+        "click",
+      ]);
+    });
+    expect(seen[0].target).toBe(gpu.node);
+    expect(seen[0].worldPoint).toBeUndefined();
+  });
+
+  it("fills worldPoint from a sync pick on the same bounds node the provider named", async () => {
+    const box = boxAt(0, 0, -5);
+    box.node.hitTestMode = "bounds";
+    const { surface } = harness([box], {
+      pickProvider: { pick: () => Promise.resolve(box.node.id) },
+    });
+    let point: Vector3 | undefined;
+    box.node.on("pointerdown", (event) => {
+      point = event.worldPoint;
+    });
+
+    surface.fire("pointerdown", clientXOf(0.1), clientYOf(0.2));
+
+    await vi.waitFor(() => {
+      expect(point).toBeDefined();
+    });
+    expect(point?.x).toBeCloseTo(0.2, 12);
+    expect(point?.y).toBeCloseTo(0.4, 12);
+    expect(point?.z).toBeCloseTo(-4.5, 12);
+  });
+
+  it("falls back to ray pick for a bounds-mode node when the provider misses", async () => {
+    const box = boxAt(0, 0);
+    box.node.hitTestMode = "bounds";
+    const gpu = gpuBoxAt(1.5, 0);
+    const answers = new Map<string, string>();
+    const { surface } = harness([gpu, box], {
+      pickProvider: mapProvider(answers),
+    });
+    const hitBox = vi.fn();
+    const hitGpu = vi.fn();
+    box.node.on("pointerdown", hitBox);
+    gpu.node.on("pointerdown", hitGpu);
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+
+    await vi.waitFor(() => {
+      expect(hitBox).toHaveBeenCalledTimes(1);
+    });
+    expect(hitGpu).not.toHaveBeenCalled();
+  });
+
+  it("does not dispatch the second event on one pointer until the first pick settles", async () => {
+    const gpu = gpuBoxAt(0, 0);
+    const first = deferred<string | undefined>();
+    let calls = 0;
+    const provider: PickProvider = {
+      pick: () => {
+        calls += 1;
+        if (calls === 1) {
+          return first.promise;
+        }
+        return Promise.resolve(gpu.node.id);
+      },
+    };
+    const { surface } = harness([gpu], { pickProvider: provider });
+    const order: string[] = [];
+    gpu.node.on("pointerdown", () => order.push("down"));
+    gpu.node.on("pointerup", () => order.push("up"));
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+    surface.fire("pointerup", clientXOf(0), clientYOf(0));
+
+    await vi.waitFor(() => {
+      expect(calls).toBe(1);
+    });
+    expect(order).toEqual([]);
+
+    first.resolve(gpu.node.id);
+
+    await vi.waitFor(() => {
+      expect(order).toEqual(["down", "up"]);
+    });
+    expect(calls).toBe(2);
+  });
+
+  it("lets two pointerIds proceed without waiting on each other", async () => {
+    const left = gpuBoxAt(-1.5, 0);
+    const right = gpuBoxAt(1.5, 0);
+    const heldLeft = deferred<string | undefined>();
+    const heldRight = deferred<string | undefined>();
+    const provider: PickProvider = {
+      pick: (ndcX) => (ndcX < 0 ? heldLeft.promise : heldRight.promise),
+    };
+    const { surface } = harness([left, right], { pickProvider: provider });
+    const hitLeft = vi.fn();
+    const hitRight = vi.fn();
+    left.node.on("pointerdown", hitLeft);
+    right.node.on("pointerdown", hitRight);
+
+    surface.fire("pointerdown", clientXOf(-0.75), clientYOf(0), 1);
+    surface.fire("pointerdown", clientXOf(0.75), clientYOf(0), 2);
+
+    heldRight.resolve(right.node.id);
+    await vi.waitFor(() => {
+      expect(hitRight).toHaveBeenCalledTimes(1);
+    });
+    expect(hitLeft).not.toHaveBeenCalled();
+
+    heldLeft.resolve(left.node.id);
+    await vi.waitFor(() => {
+      expect(hitLeft).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("treats an unknown provider id as a miss and falls back to the ray tier", async () => {
+    const box = boxAt(0, 0);
+    box.node.hitTestMode = "bounds";
+    const gpu = gpuBoxAt(0, 0, -3);
+    const answers = new Map<string, string>([["0,0", "no-such-node"]]);
+    const { surface } = harness([gpu, box], {
+      pickProvider: mapProvider(answers),
+    });
+    const hitBox = vi.fn();
+    const hitGpu = vi.fn();
+    box.node.on("pointerdown", hitBox);
+    gpu.node.on("pointerdown", hitGpu);
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+
+    await vi.waitFor(() => {
+      expect(hitBox).toHaveBeenCalledTimes(1);
+    });
+    expect(hitGpu).not.toHaveBeenCalled();
+  });
+
+  it("treats an unknown provider id as a complete miss when the ray also misses", async () => {
+    const gpu = gpuBoxAt(0, 0);
+    let pickPromise: Promise<string | undefined> | undefined;
+    const { surface } = harness([gpu], {
+      pickProvider: {
+        pick: () => {
+          pickPromise = Promise.resolve("stale-id");
+          return pickPromise;
+        },
+      },
+    });
+    const hit = vi.fn();
+    gpu.node.on("pointerdown", hit);
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+    await vi.waitFor(() => {
+      expect(pickPromise).toBeDefined();
+    });
+    await pickPromise;
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(hit).not.toHaveBeenCalled();
+  });
+
+  it("does not consult the provider while the pointer is captured", async () => {
+    const gpu = gpuBoxAt(0, 0);
+    const pickFn = vi.fn(() => Promise.resolve(gpu.node.id));
+    const { surface, input } = harness([gpu], {
+      pickProvider: { pick: pickFn },
+    });
+    const move = vi.fn();
+    gpu.node.on("pointermove", move);
+
+    input.setPointerCapture(gpu.node, 1);
+    surface.fire("pointermove", clientXOf(0.95), clientYOf(0.95));
+
+    await vi.waitFor(() => {
+      expect(move).toHaveBeenCalledTimes(1);
+    });
+    expect(pickFn).not.toHaveBeenCalled();
+    expect(move.mock.calls[0][0].worldPoint).toBeUndefined();
+  });
+
+  it("does not dispatch if disposed while a provider pick is in flight", async () => {
+    const gpu = gpuBoxAt(0, 0);
+    const held = deferred<string | undefined>();
+    const { surface, input } = harness([gpu], {
+      pickProvider: { pick: () => held.promise },
+    });
+    const hit = vi.fn();
+    gpu.node.on("pointerdown", hit);
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+    await vi.waitFor(() => {
+      expect(input.trackedPointerCount).toBe(1);
+    });
+    input.dispose();
+    held.resolve(gpu.node.id);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(hit).not.toHaveBeenCalled();
+  });
+
+  it("hovers a gpu-mode node from a provider-backed move", async () => {
+    const gpu = gpuBoxAt(0, 0);
+    const answers = new Map<string, string>([["0,0", gpu.node.id]]);
+    const { surface, input } = harness([gpu], {
+      pickProvider: mapProvider(answers),
+    });
+    const entered = vi.fn();
+    gpu.node.on("pointerenter", entered);
+
+    surface.fire("pointermove", clientXOf(0), clientYOf(0));
+
+    await vi.waitFor(() => {
+      expect(entered).toHaveBeenCalledTimes(1);
+    });
+    expect(input.getHovered(1)).toBe(gpu.node);
+  });
+
+  it("cancels a provider-backed gesture without synthesizing a click", async () => {
+    const gpu = gpuBoxAt(0, 0);
+    const answers = new Map<string, string>([["0,0", gpu.node.id]]);
+    const { surface, input } = harness([gpu], {
+      pickProvider: mapProvider(answers),
+    });
+    const order: string[] = [];
+    gpu.node.on("pointerdown", () => order.push("down"));
+    gpu.node.on("pointercancel", () => order.push("cancel"));
+    gpu.node.on("click", () => order.push("click"));
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+    await vi.waitFor(() => {
+      expect(order).toEqual(["down"]);
+    });
+
+    surface.fire("pointercancel", clientXOf(0), clientYOf(0));
+    await vi.waitFor(() => {
+      expect(order).toEqual(["down", "cancel"]);
+    });
+    expect(input.trackedPointerCount).toBe(0);
+  });
+
+  it("does not steal a bounds node's worldPoint for a gpu node the provider named", async () => {
+    const behind = boxAt(0, 0, -8);
+    behind.node.hitTestMode = "bounds";
+    const gpu = gpuBoxAt(0, 0, -3);
+    const answers = new Map<string, string>([["0,0", gpu.node.id]]);
+    const { surface } = harness([behind, gpu], {
+      pickProvider: mapProvider(answers),
+    });
+    let event: ScenePointerEvent | undefined;
+    gpu.node.on("pointerdown", (e) => {
+      event = e;
+    });
+    const behindHit = vi.fn();
+    behind.node.on("pointerdown", behindHit);
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+
+    await vi.waitFor(() => {
+      expect(event).toBeDefined();
+    });
+    expect(event?.target).toBe(gpu.node);
+    expect(event?.worldPoint).toBeUndefined();
+    expect(behindHit).not.toHaveBeenCalled();
+  });
+
+  it("does not stall the per-pointer queue when a provider pick rejects", async () => {
+    const gpu = gpuBoxAt(0, 0);
+    let calls = 0;
+    const provider: PickProvider = {
+      pick: () => {
+        calls += 1;
+        if (calls === 1) {
+          return Promise.reject(new Error("gpu lost"));
+        }
+        return Promise.resolve(gpu.node.id);
+      },
+    };
+    const { surface } = harness([gpu], { pickProvider: provider });
+    const hit = vi.fn();
+    gpu.node.on("pointerdown", hit);
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+
+    await vi.waitFor(() => {
+      expect(hit).toHaveBeenCalledTimes(1);
+    });
+    expect(calls).toBe(2);
+  });
+
+  it.each([
+    "pointerdown",
+    "pointermove",
+    "pointerup",
+    "pointercancel",
+  ] as const)(
+    "does not consult the provider if disposed before %s runs",
+    async (type) => {
+      const gpu = gpuBoxAt(0, 0);
+      const pickFn = vi.fn(() => Promise.resolve(gpu.node.id));
+      const { surface, input } = harness([gpu], {
+        pickProvider: { pick: pickFn },
+      });
+      const hit = vi.fn();
+      gpu.node.on(type, hit);
+
+      surface.fire(type, clientXOf(0), clientYOf(0));
+      input.dispose();
+
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(pickFn).not.toHaveBeenCalled();
+      expect(hit).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["pointermove", "pointerup", "pointercancel"] as const)(
+    "does not dispatch %s if disposed mid-await",
+    async (type) => {
+      const gpu = gpuBoxAt(0, 0);
+      const held = deferred<string | undefined>();
+      const { surface, input } = harness([gpu], {
+        pickProvider: { pick: () => held.promise },
+      });
+      const hit = vi.fn();
+      gpu.node.on(type === "pointercancel" ? "pointercancel" : type, hit);
+
+      surface.fire(type, clientXOf(0), clientYOf(0));
+      await vi.waitFor(() => {
+        expect(input.trackedPointerCount).toBe(1);
+      });
+      input.dispose();
+      held.resolve(gpu.node.id);
+
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(hit).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still suppresses click when a provider-backed pointer drags past the threshold", async () => {
+    const gpu = gpuBoxAt(0, 0);
+    const { surface } = harness([gpu], {
+      pickProvider: { pick: () => Promise.resolve(gpu.node.id) },
+    });
+    const order: string[] = [];
+    gpu.node.on("pointerdown", () => order.push("down"));
+    gpu.node.on("pointermove", () => order.push("move"));
+    gpu.node.on("pointerup", () => order.push("up"));
+    gpu.node.on("click", () => order.push("click"));
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+    surface.fire("pointermove", clientXOf(0.5), clientYOf(0));
+    surface.fire("pointerup", clientXOf(0.5), clientYOf(0));
+
+    await vi.waitFor(() => {
+      expect(order).toEqual(["down", "move", "up"]);
+    });
+  });
+
+  it("still clicks when a provider-backed pointer wobbles inside the tolerance", async () => {
+    const gpu = gpuBoxAt(0, 0);
+    const { surface } = harness([gpu], {
+      pickProvider: { pick: () => Promise.resolve(gpu.node.id) },
+    });
+    const order: string[] = [];
+    gpu.node.on("pointerdown", () => order.push("down"));
+    gpu.node.on("pointermove", () => order.push("move"));
+    gpu.node.on("pointerup", () => order.push("up"));
+    gpu.node.on("click", () => order.push("click"));
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+    surface.fire("pointermove", clientXOf(0) + 1, clientYOf(0));
+    surface.fire("pointerup", clientXOf(0) + 1, clientYOf(0));
+
+    await vi.waitFor(() => {
+      expect(order).toEqual(["down", "move", "up", "click"]);
+    });
   });
 });
 

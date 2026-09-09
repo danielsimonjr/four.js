@@ -41,21 +41,25 @@
  * group are created lazily by the first standard draw, so an application that
  * never shades a standard material records the transcript it always did. The
  * spare stride bytes were already allocated; a standard block reads 32 more of
- * them.
+ * them. The `normalMatrix` member sits at the same offset as
+ * `DrawUniforms.normalMatrix` so `shadedVertexStageWgsl` can read
+ * `draw.normalMatrix` on both structs.
  *
  * ```text
  * offset  member          contents
  *      0  viewProjection  as DrawUniforms
  *     64  model           as DrawUniforms
  *    128  baseColor       §59 base colour × opacity   (DrawUniforms.color's slot)
- *    144  emissive        rgb (§59);                   w unused, written 0
- *    160  surface         x metalness, y roughness;    z, w unused, written 0
- *    176  = STANDARD_UNIFORM_BYTES
+ *    144  normalMatrix    as DrawUniforms             (3 columns × vec4 stride)
+ *    192  emissive        rgb (§59);                   w unused, written 0
+ *    208  surface         x metalness, y roughness;    z, w unused, written 0
+ *    224  = STANDARD_UNIFORM_BYTES
  * ```
  *
- * All-`vec4` slots for `wgpu-lights.ts`'s alignment reason: every byte named,
- * none implied. The lights, the eye position and §57's `map` bind exactly as
- * the lit family's do (`wgpu-lights.ts`).
+ * 16-byte slots for `wgpu-lights.ts`'s alignment reason: every byte named,
+ * none implied (`mat3x3` is three padded columns). The lights, the eye
+ * position and §57's `map` bind exactly as the lit family's do
+ * (`wgpu-lights.ts`).
  *
  * ## Second texture unit — staged on this backend (2026-09-06)
  *
@@ -90,17 +94,20 @@ export const STANDARD_MODEL_OFFSET = 64;
 /** Byte offset of `StandardUniforms.baseColor` — `DrawUniforms.color`'s slot, renamed. */
 export const STANDARD_BASE_COLOR_OFFSET = 128;
 
+/** Byte offset of `StandardUniforms.normalMatrix` — `DrawUniforms.normalMatrix`'s slot. */
+export const STANDARD_NORMAL_OFFSET = 144;
+
 /** Byte offset of `StandardUniforms.emissive` (rgb; w unused, written 0). */
-export const STANDARD_EMISSIVE_OFFSET = 144;
+export const STANDARD_EMISSIVE_OFFSET = 192;
 
 /** Byte offset of `StandardUniforms.surface` (x metalness, y roughness; zw 0). */
-export const STANDARD_SURFACE_OFFSET = 160;
+export const STANDARD_SURFACE_OFFSET = 208;
 
 /**
  * Size of the `StandardUniforms` block in bytes — the binding size, not the
  * 256-byte stride (`SPRITE_UNIFORM_BYTES`' distinction, restated).
  */
-export const STANDARD_UNIFORM_BYTES = 176;
+export const STANDARD_UNIFORM_BYTES = 224;
 
 /**
  * The standard draw's group-0 layout: binding 0, a dynamically-offset uniform
@@ -140,6 +147,7 @@ export const STANDARD_UNIFORM_WGSL = `struct StandardUniforms {
   viewProjection : mat4x4<f32>,
   model : mat4x4<f32>,
   baseColor : vec4<f32>,
+  normalMatrix : mat3x3<f32>,
   emissive : vec4<f32>,
   surface : vec4<f32>,
 };
@@ -151,7 +159,9 @@ export const STANDARD_UNIFORM_WGSL = `struct StandardUniforms {
  * the lit family (`normals`, `map`, WP-R1.7's `shadow`), for the same reasons
  * (`wgpu-lit.ts`'s departures 2 and 3 apply verbatim; the vertex stage *is*
  * the lit family's, over this module's own uniform block; `shadow` defaults
- * false and the default's text is byte-identical to what WP-R1.5 landed).
+ * false and the fragment arithmetic stays the WP-R1.5 expression; both
+ * structs carry `normalMatrix` at the same offset so the shared vertex stage
+ * reads `draw.normalMatrix` unchanged).
  *
  * The fragment stage is `STANDARD_FRAGMENT_SHADER_SOURCE`'s arithmetic in its
  * order: the base sample, the diffuse/F0 split, ambient into the diffuse lobe,

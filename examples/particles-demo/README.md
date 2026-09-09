@@ -19,6 +19,10 @@ A browser gate with no GPU cannot answer "100 000 particles at 60 fps"; it can a
 batched path reaches a real framebuffer, keeps moving, obeys its collision plane, and reacts
 to a click", and that is what `tests/browser/particles.spec.ts` measures here.
 
+R-33's **simulate / present split** is published on `#status` (`data-simulate` and
+`data-present`, **seconds**, §7a) so a later run on non-SwiftShader hardware can fill the
+two halves separately. The split has landed; §112's exit is **not** claimed on this host.
+
 ## Non-wasm, on purpose
 
 There is no physics package on this page and therefore no WebAssembly image. It is the
@@ -157,16 +161,22 @@ numbers instead of inferring everything from pixels:
 
 | attribute       | value                                           |
 | --------------- | ----------------------------------------------- |
-| `data-state`    | `loading` → `running`, or `error`               |
-| `data-fountain` | live particles in the fountain pool             |
-| `data-burst`    | live particles in the burst pool                |
-| `data-bursts`   | clicks handled since load                       |
-| `data-frames`   | host frames rendered                            |
-| `data-dropped`  | spawns refused by either pool — should stay `0` |
+| `data-state`     | `loading` → `running`, or `error`               |
+| `data-fountain`  | live particles in the fountain pool             |
+| `data-burst`     | live particles in the burst pool                |
+| `data-bursts`    | clicks handled since load                       |
+| `data-frames`    | host frames rendered                            |
+| `data-dropped`   | spawns refused by either pool — should stay `0` |
+| `data-simulate`  | **seconds** (§7a) — wall-clock cost of `ParticleSystem.fixedUpdate` for this host frame's fixed-step burst (R-33). `0` if the frame ran no fixed step. |
+| `data-present`   | **seconds** (§7a) — wall-clock cost of `renderer.render` (list build + instance upload + draw) for this host frame (R-33). A separate attribute from `data-simulate`; never folded into one number. |
 
-They are written from the `update` event — once per host frame, after every fixed step of that
-frame has run — because these are counts a _frame_ observes, not quantities a fixed step
-produces.
+The visible sentence shows those two durations in **milliseconds**; the attributes stay in
+seconds, matching `examples/first-2d-scene`'s `data-alpha` / `data-dropped` / `data-substeps`.
+Neither attribute is a 16.6 ms / 60 fps claim — this host is SwiftShader.
+
+They are written after `app.step` returns — once per host frame, after every fixed step *and*
+the draw of that frame have run — because these are costs and counts a _frame_ observes, not
+quantities a fixed step produces.
 
 ## Measured (WP-9.4 probe, headless Chromium + SwiftShader, 800 × 600 at DPR 1)
 

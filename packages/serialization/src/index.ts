@@ -13,6 +13,11 @@
  * const document = migrateSceneDocument(JSON.parse(text), migrations);
  * const reloaded = instantiateScene(document, registry);
  * ```
+ *
+ * That sample is enough for a `Scene` of `Group`s. A graph that holds a
+ * `Renderable`, `Text`, camera, or light needs `registerSceneNodeTypes()` from
+ * the umbrella — this package cannot name those classes (§3.1). Without that
+ * pair, `serializeScene` throws rather than dropping the node.
  */
 
 export const PACKAGE_NAME = "@fourjs/serialization";

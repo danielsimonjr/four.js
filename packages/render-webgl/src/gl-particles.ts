@@ -222,8 +222,11 @@ export interface ParticleGlContext extends WebglContext {
  * *not* a constant number of pixels. The node's own scale does **not** scale it
  * (the size never passes through `model`'s linear part); that is a documented
  * limitation, and the fix is §36's `sizeMode`, which the MVP tier does not have.
+ *
+ * Exported so the picking id pass (`ParticleIdProgram`) shares this stage
+ * rather than duplicating the billboard math.
  */
-const PARTICLE_VERTEX_SHADER_SOURCE = `#version 300 es
+export const PARTICLE_VERTEX_SHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 corner;
 layout(location = 1) in vec3 instancePosition;
 layout(location = 2) in float instanceSize;

@@ -29,14 +29,14 @@
  * The billboard offset happens **between** the view and the projection, so this
  * pipeline needs the two matrices separately rather than the premultiplied
  * `viewProjection` every other family reads — plus the system's `model`. That
- * is 192 bytes, more than `DrawUniforms`' 144, and the resolution is the §55
- * sprite decision verbatim: a **separate group-0 layout over the same strided
- * uniform buffer** (`wgpu-sprite.ts` carries the whole byte-transcript
- * argument — widening the shared block would move `minBindingSize` in every
- * landed initialization transcript). The 256-byte stride's spare bytes were
- * already allocated; a particle block reads 48 more of them, and 192 is still
- * inside the stride. The layout is `VERTEX`-only: the fragment stage reads
- * nothing but the interpolated instance colour.
+ * is 192 bytes — coincidentally the same size as `DrawUniforms` after the
+ * normal-matrix hoist, but a different layout (`view` + `projection` +
+ * `model`, not `viewProjection` + `model` + `color` + `normalMatrix`). The
+ * resolution is the §55 sprite decision verbatim: a **separate group-0 layout
+ * over the same strided uniform buffer** (`wgpu-sprite.ts` carries the whole
+ * byte-transcript argument). The 256-byte stride's spare bytes were already
+ * allocated; 192 still fits in one stride. The layout is `VERTEX`-only: the
+ * fragment stage reads nothing but the interpolated instance colour.
  *
  * ## Upload cadence — a stated deviation from GL
  *

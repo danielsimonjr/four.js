@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **13 open**, 248 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, and the Vitest 5 coverage campaign (bump landed; particles follow-up the same day after CI caught 92.1% branches). Of the 13, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked — the typedoc/TS 7 pin is no longer a release gate.
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster**; R-33 simulate/present split; dogfood cycles 4–5. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is WebGPU's missing `ParticleIdProgram` (particles still bounds-only on that backend).
 
 ### 0 · Blocked on an event, not on effort
 
@@ -114,24 +114,24 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 - Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; ~~spherical wander~~ DONE 2026-09-06; ~~CCD/FABRIK~~ DONE 2026-09-06; ~~path-planning adapters (RFC)~~ **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
-- RFC 0005 residue (staged in source, 2026-08-29):
+- RFC 0005 residue (staged in source, 2026-08-29): §86 pick measurements DONE 2026-09-09 (`benchmarks/pick-latency.mjs`); ParticleIdProgram + §72 PickProvider dispatch DONE 2026-09-09; WebGPU `PickingService` (`mapAsync`) remains.
 - RFC 0001 residue (staged in source, 2026-08-28):
 - RFC 0003 residue (staged in source, 2026-08-28):
 - RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
-- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color strings on lights, light layers; hoist the lit shader's per-vertex inverse-transpose to a per-draw normal-matrix uniform when @fourjs/math grows a Matrix3 utility (dated note in gl-program.ts)
+- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09.
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
 - Follow-ups the R-1 plan explicitly defers
 - PH-11c — character/dynamics push interaction — DONE 2026-09-06 (`pushMass` / reduced-mass impulse / wake).
 - R-32 — textured / rotated / soft particles.
-- R-33 — §112's exit, rendered as well as simulated.
+- R-33 — §112's exit, rendered as well as simulated. Split landed 2026-09-09; exit still needs non-SwiftShader.
 - R-31 — GPU particle simulation integrator tier — DONE 2026-08-29 (`simulation: "gpu"`); §27 GPU fields / depth-buffer collision / GPU snapshots remain under R-31 residue.
 - PH-22 residue (re-read 2026-08-21): PH-22f anchors DONE 2026-09-06; path-planning RFC Proposed.
 - R-8 follow-ups:
 - §8 node-level `NodeSpace` component — DONE 2026-09-06.
 - §21 `"local-plane"` simulation frame — DONE 2026-09-06.
 - §27 field torque and field-driven waking — DONE 2026-09-06 (`sampleTorque` + per-entry `wakesSleepingBodies`).
-- Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals); glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas material batch as they are); texture-atlas _grouping_ of distinct textures (needs a packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's idle-scene row — today a batched run re-uploads every frame); making batching the default, which needs A-4's build-time pipeline-selection seam (the opt-in seam already costs every bundle +0.17 kB).
+- Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22`); texture-atlas grouping; making batching the default (A-4). Idle-cache + glyph batching already shipped.
 - `buildRenderList` optimization — DONE 2026-09-06 (homogeneous sort skip + sprite fast path; benchmark re-recorded).
 - R-30c — the rest of §77, scoped by why each is not ordinary work:
 - §12 character controllers + first-person look — DONE (PH-11/PH-11b 2026-08-21; `examples/character-controller` browser gate 2026-08-29).
@@ -153,7 +153,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - A-16 remainder (manifest half): DONE 2026-09-06 (`preloadManifestIntoCatalog`).
 - A-19 remainder:
 - §96 residue:
-- R-19/R-20 follow-ups:
+- R-19/R-20 follow-ups — DONE 2026-09-09 (§52 already shipped; §55 authored sprite uvs).
 - Flaky gate — DONE 2026-09-06 (smoothness parity + blending page watches).
 - A-13 — DONE 2026-09-06 (`installAccessibilityMirror` opt-in DOM mirror).
 - Particle trails — PARTIAL 2026-09-06: CPU ring buffer + ribbon path + multi-stop ramps; GPU compute, depth-buffer collision, spatial-hash neighbors still open.
@@ -848,8 +848,23 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       message is §10's dropped-time guard on the slower first frame — *"dropped 0.0666s
       … TimeState.droppedTime is now 0.0666s"* — which is the documented behaviour and names
       the field to inspect, not a defect.
-      STILL not exercised: text/§56, serialization/§34 round-trip in the browser, and the
-      2D↔3D mixed-scene story. Those are where the next findings are.
+      **Cycle 4 (2026-09-09, `.dogfood/cycle4`) — the three remaining surfaces,
+      from a consumer seat, in one Scene, in Chrome + Node.** §56 `Text` via
+      `buildGlyphAtlas` (layout 2.240 × 0.280); `.four.json` round-trip 7→7
+      nodes, byte-stable 1939 B; §34 Rapier2D snapshot checksum restored
+      exactly; 2D disc + 3D sphere + Text under one `PerspectiveCamera`.
+      Engine: clean. Docs were the defect: `digital-twin.md` taught the
+      `serializeScene` call that throws (no `nodeTypeOf`); `fourJS/text` does
+      not export `Text` (umbrella only, §3.1); `examples/mixed-scene` is a
+      playground re-export, not one graph. Guides + barrel headers corrected.
+      Standing: next cycle picks a new surface, not these three.
+      **Cycle 5 (2026-09-09, `.dogfood/cycle5`) — GPU picking / PickProvider.**
+      Headless + Chrome WebGL 2: `registerPickingPipeline` →
+      `createPickingService` → `createPickProvider` → `PointerInput`
+      dispatched the front id. Engine: clean. Docs were stale (cameras
+      guide described only the sync ray path); patched. No Pages demo
+      calls `registerPickingPipeline()` (only `tests/browser/fixtures/picking-page.ts`).
+      Standing checkbox stays open.
 
 - [x] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
       one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`
@@ -1104,14 +1119,27 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       byte-identical), §85 refusals, §33 pure-math determinism pinned. 36 new
       tests; input/four/geometry 100×4. **A-11 is closed.** ui-demo budget
       bumped 44 → 44.5 kB at landing (A/B: the tier riding ui-demo's `pick()`).
-- [ ] **RFC 0005 residue (staged in source, 2026-08-29):** the instanced particle
+- [ ] **RFC 0005 residue (staged in source, 2026-08-29):** ~~the instanced particle
       id arm (a `ParticleIdProgram` sharing the §36 billboard vertex stage — until
-      then particle systems pick by bounds only); §86 rows still owed: id-pass
-      cost vs the flagship list and measured fence-vs-stall pick latency;
-      WebGPU's `PickingService` (`mapAsync`) is WP-R1.x material; §72
-      pointer-event dispatch on a `PickProvider` result is an input packet. The analytic
-      `"geometry"` tier + `node.hitTestMode` landed 2026-08-29 — A-11 closed;
-      only the render-side residues above remain here.
+      then particle systems pick by bounds only)~~ **DONE 2026-09-09**
+      (`ParticleIdProgram` + `collectPickCandidates` includes
+      `isParticleDrawable`; one id per emitter, trails skipped, skinned
+      still bounds-only); ~~§86 rows still owed: id-pass
+      cost vs the flagship list and measured fence-vs-stall pick latency~~
+      **DONE 2026-09-09** (`benchmarks/pick-latency.mjs`): at flagship-order
+      N=64 the id pass is within noise of the list (1.03×); at 10k–100k it is
+      ~3–4× the list. Fence vs stall timed on the counting-GL seam only
+      (no host WebGL 2 / no WebGPU `PickingService`). ~~§72
+      pointer-event dispatch on a `PickProvider` result is an input packet~~
+      **DONE 2026-09-09** (      `PointerInputOptions.pickProvider`; default
+      handlers stay synchronous; provider path serializes per `pointerId`).
+      ~~WebGPU's `PickingService` (`mapAsync`)~~ **DONE 2026-09-09**
+      (`registerPickingPipeline()` from `@fourjs/render-webgpu`;
+      `createPickingService` throws until registered; `mapAsync` 1×1
+      readback; skinned and particle items skipped). Remaining: a WebGPU
+      `ParticleIdProgram` (emitters still bounds-only on that backend).
+      The analytic `"geometry"` tier + `node.hitTestMode` landed
+      2026-08-29 — A-11 closed.
 - [x] **docs/COMPATIBILITY.md §2 — DONE 2026-08-29** (documentation truth
       sweep): §2 rewritten to the tip — seven init pipelines + three registered
       seams, punctual lights, opt-in §65 batching, §69/§70 rows, all-eleven
@@ -1159,12 +1187,17 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 
 - [ ] **RFC 0003 residue (staged in source, 2026-08-28):** GPU morph path (the
       extra-vertex-stream layout decision, stated in `mesh.ts`/`render-list.ts`/§54);
-      skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
-      shadow is a different picture); CPU skinning (Canvas/SVG tiers + the skinned
-      bounds/picking home, with its own `same-runtime` golden); bone-texture palette
-      (unbounds `MAX_SKINNING_JOINTS = 48`; needs a render-target format union +
-      vertex texture fetch); §43-interpolated palettes (today the palette is the
-      last resolved pose).
+      ~~skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
+      shadow is a different picture)~~ **DONE 2026-09-09** (WebGL
+      `SkinnedShadowProgram` via `acquireShadow()` on the first skinned
+      caster; unregistered still skips; WebGPU has no skinned pipelines);
+      CPU skinning (Canvas/SVG tiers + the skinned bounds/picking home,
+      with its own `same-runtime` golden); bone-texture palette (unbounds
+      `MAX_SKINNING_JOINTS = 48`; needs a render-target format union +
+      vertex texture fetch); ~~§43-interpolated palettes (today the palette
+      is the last resolved pose)~~ **DONE 2026-09-09**
+      (`Skeleton.update(skinRoot, worldOf?)`; interpolated list composes
+      local poses then the palette product — palettes are never lerped).
 - [x] **RFC 0003 prototype measurements still owed:** DONE 2026-09-09.
       `benchmarks/skinning-resolve.mjs` records bones-as-nodes resolve at 60 ×1
       and ×10 versus the same Group topology, `Skeleton.update` beside that
@@ -1204,10 +1237,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 —
       directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas,
       transparent masks and contact shadows remain),
-      §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color
-      strings on lights, light layers; hoist the lit shader's per-vertex
-      inverse-transpose to a per-draw normal-matrix uniform when @fourjs/math grows a
-      Matrix3 utility (dated note in gl-program.ts)
+      §59 StandardMaterial/PBR, §60a color management + tone mapping,
+      ~~CSS color strings on lights~~ **DONE** (`parseColorRGB` on `Light`),
+      light layers; ~~hoist the lit shader's per-vertex inverse-transpose to a
+      per-draw normal-matrix uniform when @fourjs/math grows a Matrix3
+      utility~~ **DONE 2026-09-09** — WebGL `uniform mat3 normalMatrix`;
+      WebGPU `DrawUniforms.normalMatrix` (192-byte block, standard extras
+      shifted to 192/208). `Matrix3.setNormalFromMatrix4` on CPU; singular
+      models upload identity.
 - [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
       family list now names `LitMaterial`
 - [ ] First publish (§94 0.1): Changesets release workflow + the
@@ -1395,8 +1432,12 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       10-float stream (`rotation` + `softness`); default 8-float stream and
       goldens unchanged. WebGL appearance program is lazy.
 - [ ] **R-33 — §112's exit, rendered as well as simulated.** Owner: the browser-gate
-      packet, on non-SwiftShader hardware. Now has headroom (see R-34). Report
-      simulate-ms and present-ms separately.
+      packet, on non-SwiftShader hardware. Now has headroom (see R-34).
+      ~~Report simulate-ms and present-ms separately~~ **DONE 2026-09-09**:
+      `examples/particles-demo` publishes `data-simulate` / `data-present`
+      (seconds, §7a) on `#status`; the browser gate asserts they exist as
+      two finite non-negative attributes. **No fps budget** — SwiftShader is
+      not suitable hardware; the exit itself is still open.
 - [x] **R-31 — GPU particle simulation integrator tier.** DONE 2026-08-29 (WP-R1.8 +
       R-31 residue) — `simulation: "gpu"` on `ParticleEmitter` with a bound
       `ParticleGpuSimulation`; CPU spawn, GPU semi-implicit Euler under constant
@@ -1518,10 +1559,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `four/src/text-node.ts:71` repeats it, adding that the residue is grouping labels
       that do NOT share a material — which is the atlas-grouping sub-part already listed
       separately below, not a second open claim; texture-atlas _grouping_ of distinct textures (needs a
-      packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's
-      idle-scene row — today a batched run re-uploads every frame); making batching the
-      default, which needs A-4's build-time pipeline-selection seam (the opt-in seam
-      already costs every bundle +0.17 kB).
+      packer); ~~a change-detecting batch cache so a still scene re-uploads nothing (§86's
+      idle-scene row — today a batched run re-uploads every frame)~~ **DONE
+      (already on the tree):** `RenderBatch.contentVersion` +
+      `createGlBatching` `#canSkipUpload`;
+      `webgl-renderer.test.ts` asserts a still scene issues **0**
+      `bufferSubData` and a transform bump re-uploads. Making batching the
+      default still needs A-4's build-time pipeline-selection seam (the opt-in
+      seam already costs every bundle +0.17 kB).
 - [x] **`buildRenderList` is now ~40% of a 100 000-sprite frame's preparation**
       DONE 2026-09-06 — homogeneous sort skip, sprite fast path, and
       `ALL_LAYERS` layer test. `benchmarks/results/render-batching.json`
@@ -1859,18 +1904,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       primitives. **R-35 is now unblocked** (data path + vertexColors exist; what's left
       is wiring `DebugDrawBuffer`'s 7-float layout into a `BufferGeometry` — a
       `@fourjs/diagnostics` packet). R-9/R-13/R-22/R-30/R-32 lose their R-19 dependency
-- [ ] **R-19/R-20 follow-ups:** §52 tessellation module (lifts the concave-extrude
-      restriction); §55 atlas packet (retires the sprite `quad` uniform with authored
-      uvs); ~~qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly~~
-      **DONE 2026-09-07** — and it was wrong in the OPPOSITE direction to the one this
-      row assumed. The claim was not overstated; it was UNDER-evidenced: the evidence
-      column named only `boxGeometry`, while `primitives-3d.ts` ships nine more
-      (sphere, cylinder, cone, capsule, torus, lathe, extrude, tube, heightField). Now
-      cites them, and says what actually remains staged (skinning/morph, §52
-      tessellation) rather than implying the primitive set is thin. Two neighbouring
-      defects fell out of reading it: the **basic colliders** row still called §24's
-      shapes "staged" a month after they shipped, and **S-2** still claimed
-      `{ type: "cylinder" }` is "deliberately a compile error". Both corrected
+- [x] **R-19/R-20 follow-ups:** DONE 2026-09-09. §52 already capped concave
+      extrudes (`tessellation.ts` + `extrudeGeometry`); holes live on
+      `polygonGeometry2D`. §55 atlas packet: sprites author `geometry.uvs`
+      from `Sprite.frame` and both backends sample that stream — `uniform vec4
+      quad` / `SPRITE_QUAD_OFFSET` are gone. Frame writes rewrite eight floats
+      in place and bump geometry version (animation clips re-upload the uv
+      buffer, not the texture). AUDIT-120 "basic 3D meshes" honesty pass
+      2026-09-07.
 - [x] **Flaky gate (pre-existing, confirmed at baseline 2026-08-07):**
       DONE 2026-09-06 — RECOVER / ANIMATED / RAGDOLL now watch `data-chain-y`
       until span/floor; smoothness samples on virtual-frame parity. The
@@ -2109,6 +2150,39 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       pre-1.0 PDF.
 
 ## Done
+
+- [x] 2026-09-09 — **Open-TODO wave 4 slices (simple → complex).**
+      Did not close any of the 12 checkboxes. Landed: RFC 0003
+      interpolated palettes (`worldOf`) and WebGL `SkinnedShadowProgram`;
+      RFC 0005 WebGPU `PickingService` (`mapAsync`); dogfood cycle 5
+      (GPU pick / PickProvider guides). Still open on those rows:
+      GPU morph / CPU skinning / bone-texture; WebGPU
+      `ParticleIdProgram`. Still owner/hardware: first publish, R-33
+      exit.
+
+- [x] 2026-09-09 — **Open-TODO second-wave slices (simple → complex).**
+      Did not close any of the 12 checkboxes. Landed: WebGPU
+      `DrawUniforms.normalMatrix` (192 bytes; standard 224);
+      RFC 0005 `ParticleIdProgram` (one id per emitter); §72
+      `PointerInputOptions.pickProvider` (sync default path). Still
+      open on those rows: WebGPU `mapAsync` picking, multi-light /
+      shadows / PBR / §60a. Still owner/hardware: first publish, R-33
+      exit.
+
+- [x] 2026-09-09 — **R-19/R-20 closed.** §52 concave-extrude was already
+      on the tree. §55 atlas: sprites author `geometry.uvs` from
+      `Sprite.frame`; WebGL/WebGPU sample that stream; `quad` uniform retired.
+      Frame changes re-upload eight uv floats (version bump), not the atlas
+      texture.
+
+- [x] 2026-09-09 — **Open-TODO first-wave slices (simple → complex).** Did
+      not close any of the 13 checkboxes. Landed: `Matrix3.setNormalFromMatrix4`
+      + WebGL lit/standard `uniform mat3 normalMatrix`; RFC 0005
+      `benchmarks/pick-latency.mjs` (id-pass vs list, fence vs stall);
+      R-33 `data-simulate` / `data-present` on particles-demo (seconds, no
+      fps budget); dogfood cycle 4 (text / `.four.json` + §34 / one-scene
+      mixed 2D+3D) with guide fixes. Still owner/hardware: first publish,
+      R-33 exit. WebGPU normal-matrix and ParticleIdProgram not this wave.
 
 - [x] 2026-09-09 — **Vitest 5 particles follow-up.** CI `bun run coverage`
       after the bump failed `@fourjs/particles` at 92.1% branches. Honest

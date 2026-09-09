@@ -5,10 +5,9 @@
  *
  * Three families of claims:
  *
- * 1. **A sprite is the sprite pipeline**: one quad over the position stream,
- *    uv derived from the `quad` uniform (frames included — R-29's affine
- *    reparametrization), the texture through the same group-1 cache the unlit
- *    `map` variant uses.
+ * 1. **A sprite is the sprite pipeline**: one quad over the position stream
+ *    and authored uv stream (`Sprite.frame` writes the atlas cell), the
+ *    texture through the same group-1 cache the unlit `map` variant uses.
  * 2. **Text needs no pipeline of its own** — `text-rendering.test.ts`'s R-28
  *    claims, restated in WebGPU vocabulary: a label is **one** draw through
  *    the textured unlit pipeline, its transcript is a textured `Renderable`'s
@@ -123,15 +122,18 @@ describe("§55 sprites on WebGPU (WP-R1.3)", () => {
     expect(statistics.drawCalls).toBe(1);
     expect(statistics.triangles).toBe(2);
 
-    // The uploaded quad uniform is the anchored rectangle: a centred 2 × 2
-    // quad spans [-1, 1] on both axes.
+    // Tint lives at the DrawUniforms color slot (128 B); there is no quad
+    // member after the atlas packet.
     const data = uniformUpload(gpu);
-    const quad = 64 + 36; // block 1 (256 B = 64 floats), quad at 144 B = 36 floats.
-    expect(data.slice(quad, quad + 4)).toEqual([-1, -1, 2, 2]);
+    const tint = 64 + 32; // block 1 (256 B = 64 floats), tint at 128 B = 32 floats.
+    expect(data.slice(tint, tint + 4)).toEqual([1, 1, 1, 1]);
+    expect(Array.from(sprite.geometry.uvs ?? [])).toEqual([
+      0, 0, 1, 0, 1, 1, 0, 1,
+    ]);
   });
 
-  it("reparametrizes the quad uniform for §55's frame", async () => {
-    const { renderer, gpu, views } = await createRig();
+  it("authors §55's frame onto the uv stream", async () => {
+    const { renderer, views } = await createRig();
     const scene = new Scene();
     const sprite = new Sprite(new SpriteMaterial({ texture: texture() }), {
       width: 2,
@@ -143,11 +145,9 @@ describe("§55 sprites on WebGPU (WP-R1.3)", () => {
     resolveWorldTransforms(scene);
     renderer.render(scene, views);
 
-    // The rectangle the whole texture would occupy so the quad shows the
-    // frame: offset by a whole cell, twice the size.
-    const data = uniformUpload(gpu);
-    const quad = 64 + 36;
-    expect(data.slice(quad, quad + 4)).toEqual([-3, -3, 4, 4]);
+    expect(Array.from(sprite.geometry.uvs ?? [])).toEqual([
+      0.5, 0.5, 1, 0.5, 1, 1, 0.5, 1,
+    ]);
   });
 
   it("merges sprites sharing a material into one draw under §65", async () => {

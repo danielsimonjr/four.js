@@ -37,6 +37,9 @@ import {
   PUNCTUAL_LIGHT_WGSL,
   SHADED_MAP_BINDING_WGSL,
   SHADED_MAP_BIND_GROUP_INDEX,
+  STANDARD_EMISSIVE_OFFSET,
+  STANDARD_NORMAL_OFFSET,
+  STANDARD_SURFACE_OFFSET,
   STANDARD_UNIFORM_BYTES,
   STANDARD_UNIFORM_WGSL,
   UV_BUFFER_LAYOUT,
@@ -211,7 +214,9 @@ describe("the shaded WGSL builders", () => {
     expect(litShaderSource(true, false)).toBe(flat);
     expect(flat).toContain(LIGHT_UNIFORM_WGSL);
     expect(flat).toContain(PUNCTUAL_LIGHT_WGSL);
-    expect(flat).toContain(NORMAL_MATRIX_WGSL);
+    expect(flat).toContain("draw.normalMatrix * normal");
+    expect(flat).not.toContain(NORMAL_MATRIX_WGSL);
+    expect(flat).not.toContain("fn normalMatrix");
     expect(flat).toContain("(clip.z + clip.w) * 0.5");
     expect(flat).not.toContain("textureSample");
     expect(flat).toContain(
@@ -219,7 +224,8 @@ describe("the shaded WGSL builders", () => {
     );
 
     const normalless = litShaderSource(false, false);
-    expect(normalless).not.toContain("normalMatrix");
+    expect(normalless).not.toContain("draw.normalMatrix *");
+    expect(normalless).not.toContain("fn normalMatrix");
     // GL's default-attribute normal, written where GL reads it.
     expect(normalless).toContain("vec3<f32>(0.0, 0.0, 0.0)");
 
@@ -240,14 +246,30 @@ describe("the shaded WGSL builders", () => {
     expect(flat).toContain("MIN_ROUGHNESS : f32 = 0.045");
     expect(flat).toContain("lights.cameraPosition.xyz");
     expect(flat).not.toContain("textureSample");
+    expect(flat).toContain("draw.normalMatrix * normal");
+    expect(flat).not.toContain("fn normalMatrix");
+    expect(flat).not.toContain(NORMAL_MATRIX_WGSL);
 
-    expect(standardShaderSource(false, false)).not.toContain("normalMatrix");
+    expect(standardShaderSource(false, false)).not.toContain(
+      "draw.normalMatrix *",
+    );
+    expect(standardShaderSource(false, false)).not.toContain("fn normalMatrix");
     expect(standardShaderSource(true, true)).toContain(
       "textureSample(mapTexture, mapSampler, input.uv)",
     );
     expect(standardShaderSource(false, true)).toContain(
       SHADED_MAP_BINDING_WGSL,
     );
+  });
+
+  it("keeps the cofactor helper exported but out of the live modules", () => {
+    expect(NORMAL_MATRIX_WGSL).toContain("fn normalMatrix(model : mat4x4<f32>)");
+    expect(STANDARD_UNIFORM_BYTES).toBe(224);
+    expect(STANDARD_NORMAL_OFFSET).toBe(144);
+    expect(STANDARD_EMISSIVE_OFFSET).toBe(192);
+    expect(STANDARD_SURFACE_OFFSET).toBe(208);
+    expect(STANDARD_UNIFORM_WGSL).toContain("normalMatrix : mat3x3<f32>");
+    expect(STANDARD_UNIFORM_WGSL).toContain("emissive : vec4<f32>");
   });
 
   it("binds the shaded map at group 2, leaving the unlit group 1 alone", () => {

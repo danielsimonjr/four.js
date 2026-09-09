@@ -1058,6 +1058,19 @@ const ancestorChain: Node[] = [];
 const scratchLocal = new Matrix4();
 const scratchPosition = new Vector3();
 const scratchRotation = new Quaternion();
+/**
+ * Interpolated world matrix for {@link Skeleton.update}'s `worldOf` provider.
+ * Distinct from {@link writeWorldMatrix}'s pooled `out`: composing a bone
+ * into the item's world matrix would clobber the mesh pose just written.
+ */
+const paletteWorldScratch = new Matrix4();
+/**
+ * Pose source for {@link interpolatedWorldOf}. Set immediately before
+ * `Skeleton.update` on the interpolated path so the provider itself is a
+ * stable function (plan D7: no per-item closure).
+ */
+let palettePoses: PoseBuffer | null = null;
+let paletteAlpha = 0;
 /** Local AABB scratch for a particle system's structural `computeBounds`. */
 const particleBoundMin = new Vector3();
 const particleBoundMax = new Vector3();
@@ -1132,6 +1145,22 @@ function composeRenderPoseMatrix(
 
   // Do not keep the walked nodes reachable between builds.
   ancestorChain.length = 0;
+}
+
+/**
+ * `worldOf` for {@link Skeleton.update} on the interpolated path: compose the
+ * node's §43 render pose into {@link paletteWorldScratch} and return it.
+ * Local poses interpolate, then the palette product runs — the palette
+ * matrices themselves are never lerped.
+ */
+function interpolatedWorldOf(node: Node): Matrix4 {
+  composeRenderPoseMatrix(
+    node,
+    palettePoses as PoseBuffer,
+    paletteAlpha,
+    paletteWorldScratch,
+  );
+  return paletteWorldScratch;
 }
 
 /**
@@ -1461,13 +1490,22 @@ function collect(
       item.morphWeights = (node as SkinnedDrawable).morphTargetWeights ?? null;
       // §54's palette (RFC 0003), refreshed in the same pass that builds the
       // item — the particle-repack precedent: the uploaded matrices can never
-      // be a step older than the item that points at them. `update` reads the
-      // bones' *resolved* world transforms (§7); interpolating the palette at
-      // §43's alpha is deferred with CPU skinning, so under the interpolated
-      // builder a skin deforms at the last fixed step's pose while the mesh's
-      // own matrix interpolates.
+      // be a step older than the item that points at them. `update` reads
+      // world matrices for the skin root and every bone. On the ordinary path
+      // those are `resolveWorldTransform` (byte-identical to the pre-§43
+      // call). On the interpolated path they are `composeRenderPoseMatrix` at
+      // §43's alpha, so a skin deforms at the same pose the mesh's own matrix
+      // interpolates to. Local poses interpolate, then the palette product
+      // runs — the palette itself is never lerped — and nothing is written
+      // back into `node.transform` (§42, §43).
       if (activeSkin !== null) {
-        activeSkin.update(node);
+        if (poses === null) {
+          activeSkin.update(node);
+        } else {
+          palettePoses = poses;
+          paletteAlpha = alpha;
+          activeSkin.update(node, interpolatedWorldOf);
+        }
         item.jointMatrices = activeSkin.jointMatrices;
         item.jointCount = activeSkin.bones.length;
       }
@@ -1886,8 +1924,8 @@ export function buildRenderList(
  * ```
  *
  * Identical to {@link buildRenderList} in traversal, filtering, sorting, and
- * pooling; the one difference is each item's `worldMatrix`, which is a pooled
- * matrix holding the world transform composed from interpolated local poses
+ * pooling; the difference is each item's `worldMatrix` (and, for a skinned
+ * mesh, its joint palette), which is composed from interpolated local poses
  * root-first (see `composeRenderPoseMatrix`) instead of a reference to
  * the node's resolved world matrix. This is §43's fix for rendering faster than
  * the simulation steps: at `alpha = 0` every item matches the previous captured

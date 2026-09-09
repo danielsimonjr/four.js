@@ -47,6 +47,7 @@ import {
 import {
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  DRAW_NORMAL_OFFSET,
   LIGHT_AMBIENT_OFFSET,
   LIGHT_CAMERA_OFFSET,
   LIGHT_COLOR_OFFSET,
@@ -67,7 +68,6 @@ import {
   SHADOW_LIGHT_UNIFORM_BYTES,
   SHADOW_MATRIX_OFFSET,
   SHADOW_PARAMS_OFFSET,
-  SPRITE_QUAD_OFFSET,
   SPRITE_TINT_OFFSET,
   STANDARD_EMISSIVE_OFFSET,
   STANDARD_SURFACE_OFFSET,
@@ -850,6 +850,16 @@ describe("WebgpuRenderer.render", () => {
     const model = stride + DRAW_MODEL_OFFSET / 4;
     expect(data[model]).toBe(1);
     expect(data[model + 5]).toBe(1);
+    // Clear (model null) and the triangle (identity mat4) both pack identity
+    // `normalMatrix` — three columns padded to vec4.
+    const clearNormal = DRAW_NORMAL_OFFSET / 4;
+    expect(data.slice(clearNormal, clearNormal + 12)).toEqual([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0,
+    ]);
+    const drawNormal = stride + DRAW_NORMAL_OFFSET / 4;
+    expect(data.slice(drawNormal, drawNormal + 12)).toEqual([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0,
+    ]);
   });
 
   it("copies retained typed arrays at record time (the recording gotcha)", () => {
@@ -1521,7 +1531,7 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
 
   it("draws a sprite through the sprite pipeline, texture at group 1", () => {
     const root = createRoot();
-    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    root.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
     harness.renderer.render(root, [createView()]);
 
     // Clear plus the sprite.
@@ -1542,14 +1552,14 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
     expect(groups).toContain(1);
   });
 
-  it("uploads tint × opacity and the quad rectangle in the sprite block", () => {
+  it("uploads tint × opacity in the sprite block; uvs are a vertex stream", () => {
     const root = createRoot();
     const material = new TestSpriteMaterial(
       new TestTexture(),
       [1, 0.5, 0.25, 0.8],
     );
     material.opacity = 0.5;
-    root.add(new SpriteNode(triangle(), material));
+    root.add(new SpriteNode(texturedTriangle(), material));
     harness.renderer.render(root, [createView()]);
 
     const data = uniformUpload(harness.gpu);
@@ -1557,29 +1567,26 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
     const tint = stride + SPRITE_TINT_OFFSET / 4;
     expect(data.slice(tint, tint + 3)).toEqual([1, 0.5, 0.25]);
     expect(data[tint + 3]).toBeCloseTo(0.4);
-    // The triangle's local bounds: x, y ∈ [-0.5, 0.5].
-    const quad = stride + SPRITE_QUAD_OFFSET / 4;
-    expect(data.slice(quad, quad + 4)).toEqual([-0.5, -0.5, 1, 1]);
+    // Two vertex buffers: position then the authored uv stream.
+    expect(harness.gpu.countOf("pass.setVertexBuffer")).toBeGreaterThanOrEqual(
+      2,
+    );
   });
 
-  it("reparametrizes the quad for §55's frame, exactly as the GL path does", () => {
+  it("binds the authored uv stream at slot 1, not a quad uniform", () => {
     const root = createRoot();
-    const material = new TestSpriteMaterial(new TestTexture(4, 4));
-    const sprite = new SpriteNode(triangle(), material);
-    sprite.frame = { x: 2, y: 2, width: 2, height: 2 };
-    root.add(sprite);
+    const geometry = texturedTriangle();
+    geometry.uvs = new Float32Array([0.5, 0.5, 1, 0.5, 1, 1]);
+    root.add(new SpriteNode(geometry, new TestSpriteMaterial(new TestTexture(4, 4))));
     harness.renderer.render(root, [createView()]);
 
-    const data = uniformUpload(harness.gpu);
-    const quad = UNIFORM_STRIDE_BYTES / 4 + SPRITE_QUAD_OFFSET / 4;
-    // The rectangle the whole 4×4 texture would occupy so that the quad shows
-    // the (2, 2, 2, 2) frame of it — R-29's affine reparametrization.
-    expect(data.slice(quad, quad + 4)).toEqual([-1.5, -1.5, 2, 2]);
+    const buffers = harness.gpu.callsOf("pass.setVertexBuffer");
+    expect(buffers.map((call) => call.args[0])).toEqual([0, 1]);
   });
 
   it("blends by construction, whatever `transparent` says (§55)", () => {
     const root = createRoot();
-    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    root.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
     harness.renderer.render(root, [createView()]);
 
     const descriptor = pipelineDescriptor(harness.gpu, "fourJS:sprite|") as {
@@ -1617,6 +1624,7 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
       ]),
       new Uint16Array([0, 1, 2, 0, 2, 3]),
     );
+    quad.uvs = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
     root.add(new SpriteNode(quad, new TestSpriteMaterial()));
     harness.renderer.render(root, [createView()]);
     expect(harness.gpu.callsOf("pass.drawIndexed")[0]?.args[0]).toBe(6);
@@ -1624,7 +1632,7 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
 
   it("reuses the sprite bind group until the uniform buffer regrows", () => {
     const root = createRoot();
-    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    root.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
     harness.renderer.render(root, [createView()]);
     harness.gpu.reset();
     harness.renderer.render(root, [createView()]);
@@ -1646,7 +1654,7 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
     const statistics = createRenderStatistics();
     harness.renderer.statistics = statistics;
     const root = createRoot();
-    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    root.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
     harness.renderer.render(root, [createView()]);
     expect(statistics.drawCalls).toBe(1);
     expect(statistics.triangles).toBe(1);
@@ -1854,7 +1862,7 @@ describe("WebgpuRenderer clipping (§67, WP-R1.3)", () => {
     const root = createRoot();
     const panel = renderable(triangle());
     panel.clip = true;
-    panel.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    panel.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
     root.add(panel);
     harness.renderer.render(root, [createView()]);
 
@@ -1867,7 +1875,7 @@ describe("WebgpuRenderer clipping (§67, WP-R1.3)", () => {
 
   it("clips a sprite subtree — the mask is coverage, not shading", () => {
     const root = createRoot();
-    const panel = new SpriteNode(triangle(), new TestSpriteMaterial());
+    const panel = new SpriteNode(texturedTriangle(), new TestSpriteMaterial());
     panel.clip = true;
     panel.add(renderable(triangle()));
     root.add(panel);
@@ -2536,6 +2544,29 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     ]);
   });
 
+  it("packs a scaled model's inverse-transpose into the padded mat3 slot", () => {
+    const root = createRoot();
+    const mesh = new Renderable(
+      litTriangle().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    // Scale (2, 4, 8): inverse-transpose is the reciprocal diagonal. Translation
+    // does not participate. Column-major, matching `Matrix3.setNormalFromMatrix4`.
+    // Culling off so the scaled triangle is not dropped by an identity frustum.
+    mesh.frustumCulled = false;
+    mesh.transform.worldMatrix.fromArray([
+      2, 0, 0, 0, 0, 4, 0, 0, 0, 0, 8, 0, 1, 2, 3, 1,
+    ]);
+    root.add(mesh);
+
+    harness.renderer.render(root, [createView()]);
+    const floats = drawUniformUpload(harness.gpu);
+    const base = UNIFORM_STRIDE_BYTES / 4;
+    expect(
+      floats.slice(base + DRAW_NORMAL_OFFSET / 4, base + DRAW_NORMAL_OFFSET / 4 + 12),
+    ).toEqual([0.5, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0.125, 0]);
+  });
+
   it("draws a standard item through the widened block and its own group 0", () => {
     const root = createRoot();
     const material = new TestStandardMaterial([0.5, 0.25, 0.125, 1]);
@@ -2573,6 +2604,13 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
         base + STANDARD_SURFACE_OFFSET / 4 + 4,
       ),
     ).toEqual([0.75, Math.fround(0.3), 0, 0]);
+    // Identity model → identity normal matrix in the padded mat3x3 slot.
+    expect(
+      floats.slice(
+        base + DRAW_NORMAL_OFFSET / 4,
+        base + DRAW_NORMAL_OFFSET / 4 + 12,
+      ),
+    ).toEqual([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
     // The eye rides the light block, for the specular lobe.
     const { floats: lightFloats } = lightsUpload(harness.gpu);
     expect(lightSlot(lightFloats, 0, LIGHT_CAMERA_OFFSET)).toEqual([

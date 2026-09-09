@@ -109,7 +109,12 @@
 import { Vector3, type DepthRange } from "@fourjs/math";
 import type { Camera, Node } from "@fourjs/scene";
 
-import { pick, type PickHit, type Pickable } from "./pick.js";
+import {
+  pick,
+  type PickHit,
+  type Pickable,
+  type PickProvider,
+} from "./pick.js";
 import {
   ScenePointerEvent,
   buildPropagationPath,
@@ -238,6 +243,23 @@ export interface PointerInputOptions {
    * {@link DEFAULT_CLICK_MOVE_THRESHOLD}.
    */
   clickMoveThreshold?: number;
+  /**
+   * Optional GPU/pixel pick seam (§71 `"gpu"`, RFC 0005). When omitted, every
+   * platform handler stays fully synchronous — the ray/bounds {@link pick}
+   * path only, which already skips `hitTestMode === "gpu"` nodes. Existing
+   * callers observe **byte-identical** timing: no `await`, no microtask.
+   *
+   * When present, each handler copies the event fields {@link PointerInput}
+   * actually reads and enqueues work **per `pointerId`**: overlapping
+   * down/move/up/cancel on one pointer cannot race or resolve the same node
+   * twice (in-flight GPU picks must not reorder), independent pointers may
+   * overlap, and a dispose that lands mid-await drops the dispatch. GPU-mode
+   * nodes resolve only through this seam; a provider miss (`undefined` or an
+   * id that is not in {@link PointerInputOptions.pickables}) falls back to
+   * the ray tier. Capture still skips picking — the provider is not consulted
+   * while a pointer is captured.
+   */
+  pickProvider?: PickProvider;
 }
 
 /** Everything remembered about one pointer between platform events. */
@@ -289,9 +311,16 @@ export class PointerInput {
   readonly #pickables: () => readonly Pickable[];
   readonly #depthRange: DepthRange | undefined;
   readonly #clickMoveThresholdSq: number;
+  readonly #pickProvider: PickProvider | undefined;
 
   /** Per-pointer state, keyed by `pointerId`; see {@link PointerState}. */
   readonly #pointers = new Map<number, PointerState>();
+
+  /**
+   * Per-`pointerId` tail of in-flight provider-backed work (RFC 0005).
+   * Independent pointers do not share a chain.
+   */
+  readonly #pickQueue = new Map<number, Promise<void>>();
 
   /** Reused picking results and NDC pair (plan D7). */
   readonly #hits: PickHit[] = [];
@@ -300,20 +329,43 @@ export class PointerInput {
   #disposed = false;
 
   // Bound once so `removeEventListener` gets the same function objects.
+  // The provider branch copies event fields and enqueues; the default path
+  // calls the synchronous bodies directly so a resolved Promise cannot insert
+  // a microtask between `fire` and the listener (RFC 0005 residue).
   readonly #onPointerDown = (event: SurfacePointerEvent): void => {
-    this.#handleDown(event);
+    if (this.#pickProvider === undefined) {
+      this.#handleDown(event);
+      return;
+    }
+    const copied = copySurfaceEvent(event);
+    this.#enqueue(copied.pointerId, () => this.#handleDownAsync(copied));
   };
 
   readonly #onPointerMove = (event: SurfacePointerEvent): void => {
-    this.#handleMove(event);
+    if (this.#pickProvider === undefined) {
+      this.#handleMove(event);
+      return;
+    }
+    const copied = copySurfaceEvent(event);
+    this.#enqueue(copied.pointerId, () => this.#handleMoveAsync(copied));
   };
 
   readonly #onPointerUp = (event: SurfacePointerEvent): void => {
-    this.#handleUp(event);
+    if (this.#pickProvider === undefined) {
+      this.#handleUp(event);
+      return;
+    }
+    const copied = copySurfaceEvent(event);
+    this.#enqueue(copied.pointerId, () => this.#handleUpAsync(copied));
   };
 
   readonly #onPointerCancel = (event: SurfacePointerEvent): void => {
-    this.#handleCancel(event);
+    if (this.#pickProvider === undefined) {
+      this.#handleCancel(event);
+      return;
+    }
+    const copied = copySurfaceEvent(event);
+    this.#enqueue(copied.pointerId, () => this.#handleCancelAsync(copied));
   };
 
   constructor(surface: PointerSurface, options: PointerInputOptions) {
@@ -321,6 +373,7 @@ export class PointerInput {
     this.camera = options.camera;
     this.#pickables = options.pickables;
     this.#depthRange = options.depthRange;
+    this.#pickProvider = options.pickProvider;
     const threshold =
       options.clickMoveThreshold ?? DEFAULT_CLICK_MOVE_THRESHOLD;
     this.#clickMoveThresholdSq = threshold * threshold;
@@ -429,6 +482,7 @@ export class PointerInput {
     this.#surface.removeEventListener("pointerup", this.#onPointerUp);
     this.#surface.removeEventListener("pointercancel", this.#onPointerCancel);
     this.#pointers.clear();
+    this.#pickQueue.clear();
   }
 
   // --- platform event handling ----------------------------------------------
@@ -509,6 +563,161 @@ export class PointerInput {
     // pointer, and the module header says why that is not second-guessed.
     this.#dispatch("pointercancel", resolved);
     this.#endPointer(state, resolved, false);
+  }
+
+  /**
+   * Chains `work` after any in-flight provider-backed handler for `pointerId`.
+   * A rejection is swallowed so it cannot stall later events on the same
+   * pointer (RFC 0005: in-flight picks must not reorder, and a failed GPU
+   * read must not freeze the pointer).
+   */
+  #enqueue(pointerId: number, work: () => Promise<void>): void {
+    const previous = this.#pickQueue.get(pointerId) ?? Promise.resolve();
+    const next = previous.then(work).catch(() => undefined);
+    this.#pickQueue.set(pointerId, next);
+    void next.finally(() => {
+      if (this.#pickQueue.get(pointerId) === next) {
+        this.#pickQueue.delete(pointerId);
+      }
+    });
+  }
+
+  async #handleDownAsync(event: SurfacePointerEvent): Promise<void> {
+    if (this.#disposed) {
+      return;
+    }
+    const state = this.#stateFor(event.pointerId);
+    const resolved = await this.#resolveWithProvider(event, state);
+    if (this.#disposed || resolved === null) {
+      return;
+    }
+
+    this.#updateHover(state, resolved);
+    state.downTarget = resolved.target;
+    state.downNdcX = resolved.ndcX;
+    state.downNdcY = resolved.ndcY;
+    state.moved = false;
+
+    this.#dispatch("pointerdown", resolved);
+  }
+
+  async #handleMoveAsync(event: SurfacePointerEvent): Promise<void> {
+    if (this.#disposed) {
+      return;
+    }
+    const state = this.#stateFor(event.pointerId);
+    const resolved = await this.#resolveWithProvider(event, state);
+    if (this.#disposed || resolved === null) {
+      return;
+    }
+
+    if (state.downTarget !== null && !state.moved) {
+      const dx = resolved.ndcX - state.downNdcX;
+      const dy = resolved.ndcY - state.downNdcY;
+      if (dx * dx + dy * dy > this.#clickMoveThresholdSq) {
+        state.moved = true;
+      }
+    }
+
+    this.#updateHover(state, resolved);
+    this.#dispatch("pointermove", resolved);
+  }
+
+  async #handleUpAsync(event: SurfacePointerEvent): Promise<void> {
+    if (this.#disposed) {
+      return;
+    }
+    const state = this.#stateFor(event.pointerId);
+    const resolved = await this.#resolveWithProvider(event, state);
+    if (this.#disposed || resolved === null) {
+      return;
+    }
+    const pressed = state.downTarget;
+    const clicked =
+      pressed !== null && resolved.target === pressed && !state.moved;
+
+    this.#updateHover(state, resolved);
+    this.#dispatch("pointerup", resolved);
+
+    if (clicked) {
+      this.#dispatch("click", resolved);
+    }
+
+    this.#endPointer(state, resolved, resolved.pointerType === "mouse");
+  }
+
+  async #handleCancelAsync(event: SurfacePointerEvent): Promise<void> {
+    if (this.#disposed) {
+      return;
+    }
+    const state = this.#stateFor(event.pointerId);
+    const resolved = await this.#resolveWithProvider(event, state);
+    if (this.#disposed || resolved === null) {
+      return;
+    }
+
+    this.#dispatch("pointercancel", resolved);
+    this.#endPointer(state, resolved, false);
+  }
+
+  /**
+   * Provider-backed resolve: capture still skips picking; a mapped provider
+   * id wins (world point from a sync {@link pick} on that same node, if any);
+   * undefined / unmapped ids fall back to the ray tier. Local NDC and hits so
+   * overlapping pointers cannot rewrite each other's scratch.
+   */
+  async #resolveWithProvider(
+    event: SurfacePointerEvent,
+    state: PointerState,
+  ): Promise<Resolution | null> {
+    const ndc: [number, number] = [0, 0];
+    this.toNdc(event.clientX, event.clientY, ndc);
+    const ndcX = ndc[0];
+    const ndcY = ndc[1];
+    const pointerType = narrowPointerType(event.pointerType);
+    if (state.captured !== null) {
+      return {
+        pointerId: event.pointerId,
+        pointerType,
+        ndcX,
+        ndcY,
+        target: state.captured,
+        point: null,
+      };
+    }
+
+    const provider = this.#pickProvider;
+    const nodeId = await provider!.pick(ndcX, ndcY);
+    if (this.#disposed) {
+      return null;
+    }
+
+    const pickables = this.#pickables();
+    const mapped =
+      nodeId === undefined ? undefined : pickableByNodeId(pickables, nodeId);
+    if (mapped !== undefined) {
+      const hits: PickHit[] = [];
+      pick(this.camera, ndcX, ndcY, [mapped], hits, this.#depthRange);
+      return {
+        pointerId: event.pointerId,
+        pointerType,
+        ndcX,
+        ndcY,
+        target: mapped.node,
+        point: hits.length === 0 ? null : new Vector3().copy(hits[0].point),
+      };
+    }
+
+    const hits: PickHit[] = [];
+    pick(this.camera, ndcX, ndcY, pickables, hits, this.#depthRange);
+    return {
+      pointerId: event.pointerId,
+      pointerType,
+      ndcX,
+      ndcY,
+      target: hits.length === 0 ? null : hits[0].node,
+      point: hits.length === 0 ? null : new Vector3().copy(hits[0].point),
+    };
   }
 
   /**
@@ -707,6 +916,32 @@ interface Resolution {
   readonly target: Node | null;
   /** World-space hit point, already copied out of the picking pool. */
   readonly point: Vector3 | null;
+}
+
+function copySurfaceEvent(event: SurfacePointerEvent): SurfacePointerEvent {
+  return {
+    clientX: event.clientX,
+    clientY: event.clientY,
+    pointerId: event.pointerId,
+    pointerType: event.pointerType,
+  };
+}
+
+/**
+ * Maps a provider `nodeId` onto the live candidate list. Unknown and stale
+ * ids are a miss — the node must still be in `pickables()` under that id.
+ */
+function pickableByNodeId(
+  pickables: readonly Pickable[],
+  nodeId: string,
+): Pickable | undefined {
+  for (let i = 0; i < pickables.length; i += 1) {
+    const pickable = pickables[i];
+    if (pickable.node.id === nodeId) {
+      return pickable;
+    }
+  }
+  return undefined;
 }
 
 /**

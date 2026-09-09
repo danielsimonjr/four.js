@@ -30,6 +30,82 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — WebGPU browser gates follow `DRAW_UNIFORM_BYTES`.** The
+  Playwright page programs are not the renderer: they bind their own
+  layouts. After `DrawUniforms` grew to 192 bytes (`normalMatrix` at 144)
+  and sprites dropped `quad` (R-19/R-20), six `[webgpu]` specs still
+  declared `minBindingSize: 144` and the sprite gate still used a 160-byte
+  quad uniform with position-only vertices. Validation: "shader uses more
+  bytes than minBindingSize" and "vertex attribute slot 2 not present".
+  Harnesses now import `DRAW_UNIFORM_BYTES` / `SPRITE_UNIFORM_BYTES` and
+  authored uv at `@location(2)`. Node-material 144-byte prefixes are a
+  different block — leave them.
+
+- **2026-09-09 — Open-TODO wave 4, simple → complex.** Twelve
+  checkboxes remain; four slices landed without pretending the packets
+  closed. (1) RFC 0003 §43: `Skeleton.update(skinRoot, worldOf?)`;
+  interpolated collect composes local poses then the palette product
+  (never matrix-lerps palettes; scene transforms unchanged). (2) RFC
+  0003 WebGL skinned shadow: `SkinnedShadowProgram` via
+  `pair.acquireShadow()` on the first caster (third `createProgram`);
+  colour pair still compiles on first colour draw; `gl-shadow.ts` does
+  not import `gl-skinning.ts`. Unregistered still skips. WebGPU has no
+  skinned pipelines. (3) RFC 0005 WebGPU `PickingService`: the same
+  `registerPickingPipeline()` seam as WebGL; `mapAsync` 1×1 readback;
+  skips particles and skinned items. (4) Dogfood cycle 5 sat on GPU
+  pick / PickProvider; engine clean; cameras guide and package READMEs
+  patched. Remaining: RFC 0005 WebGPU `ParticleIdProgram`; RFC 0003
+  GPU morph / CPU skinning / bone-texture. First publish and R-33's
+  §112 exit stay blocked.
+
+- **2026-09-09 — Open-TODO second wave, simple → complex.** Twelve
+  checkboxes remain; three slices landed without pretending the packets
+  closed. (1) Lighting leftover: WebGPU `DrawUniforms` is 192 bytes
+  (`normalMatrix` at 144, std140-padded mat3); `StandardUniforms` 224
+  (emissive 192, surface 208); sprites stay 144. Lit/standard vertex
+  stages read `draw.normalMatrix`; `NORMAL_MATRIX_WGSL` stays exported
+  and is not spliced. `#writeBlock` uses a module-level `Matrix3`
+  scratch and `setNormalFromMatrix4` (identity on null/singular).
+  (2) RFC 0005 `ParticleIdProgram`: `collectPickCandidates` includes
+  `isParticleDrawable`; WebGL id pass instances the §36 billboard with
+  one `pickId` per emitter; skinned still skipped; trails not drawn.
+  (3) §72: optional `PointerInputOptions.pickProvider`; default
+  handlers stay fully synchronous; provider path copies the event and
+  serializes per `pointerId`. Remaining on those rows: WebGPU
+  `PickingService` `mapAsync`; multi-light / cascades / PBR / §60a.
+  First publish and R-33's §112 exit stay blocked.
+
+- **2026-09-09 — R-19/R-20 closed (§55 authored sprite uvs).** `Sprite`
+  writes a 4-vertex `uvs` stream (`frame / textureSize`, or 0…1 if
+  frameless). WebGL `SpriteProgram` and WebGPU sprite WGSL sample
+  `@location(2) uv`. `uniform vec4 quad` and `SPRITE_QUAD_OFFSET` are
+  gone. `setFrame` is a no-op when unchanged; a real change
+  `markDirty()`s so GeometryCache re-uploads eight floats. Trade-off vs
+  the 2026-08-08 affine-quad design: animation clips no longer get a
+  zero-upload frame flip. Texture/material stay shared. Graph regen
+  dropped the export.
+
+- **2026-09-09 — Stale-item honesty on two follow-ups.** The batching
+  "still scene re-uploads every frame" sentence was false:
+  `contentVersion` + `#canSkipUpload` already skip `bufferSubData` on
+  an idle batched run (tested). §52 already caps concave extrudes;
+  `polygonGeometry2D` already takes holes. Struck both. Remaining on
+  those rows: shaded instancing, atlas grouping, default-on batching,
+  §55 authored sprite uvs.
+
+- **2026-09-09 — Open-TODO first wave, simple → complex.** Thirteen
+  checkboxes remain; four slices landed without pretending the packets
+  closed. (1) Lighting: `Matrix3.setNormalFromMatrix4` + WebGL
+  lit/standard hoist; singular models upload identity; WebGPU stays
+  per-vertex cofactor until `DrawUniforms` widens (144 → ~192).
+  CSS light colors were already shipped (`parseColorRGB`). (2) RFC 0005
+  §86: `benchmarks/pick-latency.mjs` — N=64 id-pass ≈ list (1.03×);
+  10k–100k ≈ 3–4×; fence vs stall is JS+seam only (no host WebGL 2).
+  (3) R-33: `data-simulate` / `data-present` seconds on particles-demo;
+  gate asserts existence, not 16.6 ms. (4) Dogfood cycle 4: the three
+  leftover surfaces work; `digital-twin.md` taught the throwing save.
+  First publish and R-33's §112 exit stay blocked.
+
 - **2026-09-09 — tools/docs must stay on typescript@6.0.3.** Dependabot #82
   bumped it to 7.0.2 with the root. TypeDoc 0.28's peer is 5.0–6.0; CI died
   on `PropertyDeclaration`. Isolation is a version pin, not a directory.

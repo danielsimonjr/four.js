@@ -25,7 +25,7 @@ step live and replayed.
 
 ## Record, replay, inspect (§34, §113)
 
-`four/diagnostics` records a live world and replays it step-exactly.
+`fourJS/diagnostics` records a live world and replays it step-exactly.
 A complete headless round trip:
 
 ```ts
@@ -104,27 +104,41 @@ components — serializes separately into a canonical `SceneDocument`:
 
 ```ts
 import {
-  createDefaultComponentSerializers,
   decodeSceneDocument,
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
 } from "fourJS/serialization";
+import { registerSceneNodeTypes, resourceCatalog } from "fourJS";
 
-const registry = createDefaultComponentSerializers(); // PoseTarget built in
-// Register serializers for the component classes YOUR twin uses —
-// unregistered components are silently unsaved (known boundary):
-registry.register(RigidBody, myRigidBodySerializer);
+// The umbrella call — not createDefaultComponentSerializers() alone.
+// @fourjs/serialization knows "scene" / "group" and PoseTarget. Every other
+// node class (Renderable, Text, cameras, lights, UI) needs nodeTypeOf /
+// nodeFactory; registerSceneNodeTypes() is that pair, plus RigidBody /
+// Collider / MotionComponent. Geometries and materials travel as catalog
+// keys, not inlined buffers; Text / Label also need the glyph atlas.
+const io = registerSceneNodeTypes({
+  atlas,
+  geometries: resourceCatalog(geometries),
+  materials: resourceCatalog(materials),
+});
 
-const document = serializeScene(app.scene, registry);
+const document = serializeScene(app.scene, io.components, io.write);
 const saved = encodeSceneDocument(document); // canonical text; §33: byte-stable
-const restored = instantiateScene(decodeSceneDocument(saved), registry);
+const restored = instantiateScene(
+  decodeSceneDocument(saved),
+  io.components,
+  io.read,
+);
 ```
 
-Reference `RigidBody`/`Collider` serializers live in
-`registerPhysicsSerializers()` from the `four` umbrella (shipped 2026-08-06; formerly
-reference code in the test helpers). Versioned migrations
-(§80) run on load via the migration registry, with warnings surfaced.
+`createDefaultComponentSerializers()` plus `serializeScene(app.scene, registry)`
+is the first save a reader of this guide used to write, and it **throws** on
+any ordinary drawable (`INVALID_APPLICATION_STATE`, naming `registerSceneNodeTypes()`).
+Unregistered *components* also throw (`unknownComponents: "throw"`, A-15 since
+2026-08-06 — this paragraph said "silently unsaved" until 2026-09-09). `"skip"`
+is opt-in. Versioned migrations (§80) run on load via the migration registry,
+with warnings surfaced.
 
 **The §79/§34 boundary, measured:** a contact-free save round-trips
 bit-identically for 200 further steps; an in-contact save diverges slightly,
@@ -134,12 +148,13 @@ pairs a scene document with a §34 snapshot.
 
 ## Loading content (§76)
 
-`AssetManager` (`four/assets`) is a coalescing, ref-counted cache over
+`AssetManager` (`fourJS/assets`) is a coalescing, ref-counted cache over
 pluggable loaders (`jsonLoader`, `textLoader`, `binaryLoader`,
-`createImageLoader`) — the natural home for a twin's configuration and
-texture data. Honest state: **glTF loading is staged** (it needs §55
-textures plus non-unlit materials), so 3D twin geometry today is procedural
-(`four/geometry`) or custom-loaded.
+`createImageLoader`, `createGltfLoader`) — the natural home for a twin's
+configuration, textures, and §78 models. glTF **ships**: pass the loader to
+`AssetManager.load` and assemble the result with `instantiateGltf` from the
+umbrella (`examples/gltf-model` is the worked page). Procedural geometry
+(`fourJS/geometry`) remains the other path.
 
 ## Honest boundaries, collected
 
@@ -156,6 +171,7 @@ textures plus non-unlit materials), so 3D twin geometry today is procedural
 
 - §33, §34, §79, §80, §76, §113, §116/§119 (the motor-twin demonstrations).
 - `tests/integration/helpers/replay-scenarios.ts` and
-  `registerPhysicsSerializers()` (`four` umbrella) — the shipped wiring;
+  `registerSceneNodeTypes()` / `registerPhysicsSerializers()` (`fourJS`
+  umbrella) — the shipped wiring;
   [fixed-step simulation](fixed-step-simulation.md) for why any of this is
   possible.

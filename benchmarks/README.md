@@ -39,6 +39,7 @@ the module loads. The whole suite takes about **77 s** on the recorded host, dom
 | [`render-batching.mjs`](#render-batchingmjs--86s-batched-sprites-and-shapes-preparation-half) | render-list build plus §65 batch assembly at 5 000–100 000 nodes             | **batched sprites: 100 000** and **simple batched shapes: 50 000** — the preparation half |
 | [`view-culling.mjs`](#view-cullingmjs--64s-per-view-lists-and-87s-frustum-cull)               | per-view list derivation and §87 culling at 10 000–100 000 nodes × 1–4 views | none — §86 has no culling row; this measures a design decision                            |
 | [`skinning-resolve.mjs`](#skinning-resolvemjs--rfc-0003-bones-as-nodes-and-180-channels)     | 60-bone resolve vs Groups (×1 / ×10) and 180-channel controller vs mixer     | **none yet** — proposes a skinned-mesh row from the measurement                           |
+| [`pick-latency.mjs`](#pick-latencymjs--rfc-0005-id-pass-and-fence-vs-stall-pick)             | id-pass vs list (flagship-order + R-8) and fence-vs-stall pick               | **none yet** — proposes the RFC 0005 §86 picking row                                      |
 
 Six §86 rows have honest headless numbers today — active rigid bodies, CPU particles, and
 the CPU halves of retained UI nodes, animated glyphs, batched sprites and batched shapes.
@@ -588,6 +589,33 @@ the mixer path. This script is those two measurements. Alternative A (a private
 transform array) returns only if the bone walk is the expensive part; the record
 says whether that happened on the host that wrote it. The proposed §86 sentence is
 derived from resolve + palette + controller on this host, and is not a gate.
+
+### `pick-latency.mjs` — RFC 0005 id-pass and fence-vs-stall pick
+
+```sh
+bun run build
+node benchmarks/pick-latency.mjs
+```
+
+**Not a CI gate, and not a §86 verdict.** RFC 0005's prototype section owed
+the id-pass cost against the flagship list (and R-8's 10 000 / 50 000 /
+100 000) and measured fence-versus-stall pick latency. This script is those
+two measurements.
+
+The §118 flagship is O(10²) id-pass candidates; the 1× row is **64**
+rectangles (that order of magnitude; particle systems are omitted so
+the ratio is not mixed with `ParticleIdProgram`). One arm is
+`PickingService.update`; the other is `buildRenderList` +
+`buildViewRenderList`, which is the list the pass itself builds.
+
+`pick()` is timed on the fence sequence (`PIXEL_PACK_BUFFER` + `fenceSync`)
+and on the stalling `readPixels` fallback when both sequences are reachable.
+This host typically has **no WebGL 2**, so both arms run on the same
+counting GL seam the unit tests use: JavaScript plus that seam, not GPU or
+driver time. `clientWaitSync` answers `ALREADY_SIGNALED`, so neither path
+waits a frame (`extraFrames` is 0). WebGPU has `mapAsync` for §61
+`readPixels` but **no** `PickingService`; that second GPU pick path is not
+invented. Recorded, never gated.
 
 ## `geometry-updates.mjs` — dynamic WebGL geometry
 

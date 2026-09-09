@@ -56,63 +56,28 @@
  * hit with a stale `version` deletes and re-uploads) instead of leaking the old
  * entry behind a new id (decision, WP-3a.3).
  *
- * ## Texture coordinates: derived from position, and that survived §55's frame
+ * ## Texture coordinates: authored on the quad (§55 atlas packet)
  *
- * When this class was written §53's `BufferGeometry` carried positions and
- * indices and nothing else, so the sprite pipeline derived uv from **position**:
- * the quad is a rectangle in the XY plane, so `uv = (position.xy - min) / size`
- * maps its corners onto `(0,0)…(1,1)` exactly, and `min`/`size` are the
- * geometry's own local bounds (`computeBounds()`, cached against the version).
- * The backend uploads them as one `vec4` per draw; see `@fourjs/render-webgl`'s
- * `SpriteProgram`.
- *
- * `BufferGeometry.uvs` exists as of R-19 (2026-08-07), and this module then
- * carried a note predicting that §55's `frame` would force the rewrite —
- * "a sub-rectangle is not a function of the quad's bounds", so the atlas packet
- * would author uv and retire the `quad` uniform. **R-29 (2026-08-08) found that
- * prediction wrong, and the note is replaced by the derivation that disproves
- * it.** A frame is not a new mapping; it is a *reparametrization of the same
- * affine one*. Write `w`/`h` for the quad's local size, `(fx, fy, fw, fh)` for
- * the frame in texels and `(tw, th)` for the texture's size. The uv the
- * fragment stage wants is
+ * The quad carries §53's `uvs` stream. A frameless sprite maps its four corners
+ * onto `(0,0)…(1,1)`. A {@link Sprite.frame} writes the cell's normalized
+ * rectangle instead:
  *
  * ```text
- * uv = (frame.xy + (position.xy - min) / size · frame.zw) / texture-size
+ * (u0, v0) = (frame.x / texture.width,  frame.y / texture.height)
+ * (u1, v1) = ((frame.x + frame.width) / texture.width,
+ *             (frame.y + frame.height) / texture.height)
  * ```
  *
- * which is affine in `position.xy` — so it is expressible by the *existing*
- * shader, `uv = (position.xy - quad.xy) / quad.zw`, at
+ * in vertex order bottom-left → bottom-right → top-right → top-left. `v = 0`
+ * is the quad's **bottom** edge, matching §7a's Y-up world and the
+ * bottom-row-first texel order `TextureSource` documents. Backends sample
+ * those attributes; there is no `quad` uniform. Changing `frame` rewrites the
+ * eight floats in place and bumps {@link Sprite.geometry}'s version so the
+ * cache re-uploads — the same `markDirty()` contract a resize already used.
  *
- * ```text
- * quad.zw = (w · tw / fw,  h · th / fh)
- * quad.xy = (minX - fx · w / fw,  minY - fy · h / fh)
- * ```
- *
- * i.e. `quad` stops meaning "the quad's own local rectangle" and starts meaning
- * **the local rectangle the whole texture maps onto** — the quad's own
- * rectangle exactly when there is no frame, since `(fx, fy, fw, fh) =
- * (0, 0, tw, th)` collapses the two lines above to `quad = (minX, minY, w, h)`.
- *
- * Three consequences, all of them the reason this is the shipped mechanism:
- *
- * - **A frameless sprite's GL transcript is unchanged, by construction.** The
- *   backend takes the same branch it always took and uploads the same four
- *   floats through the same `uniform4fv`; there is no new uniform, no new
- *   attribute, and no new call. Byte-identity is not a numerical argument here,
- *   it is a code-path argument.
- * - **Changing a frame costs no upload.** A `frame` write does not touch the
- *   geometry, so nothing is re-uploaded and no version is bumped — which is
- *   what §55's sprite animation clips and §86's glyph batching need, and what a
- *   uv *attribute* could not have given them (a per-frame buffer rewrite per
- *   quad).
- * - **The `quad` uniform survives.** Its name is load-bearing beyond taste: a
- *   uniform name is an argument of `getUniformLocation`, so renaming it would
- *   itself perturb every recorded GL sequence.
- *
- * A real uv stream is still the right answer for §65 batching, where many quads
- * with different frames share one draw and there is no per-draw uniform left to
- * vary. That is a batching decision, recorded there rather than pre-empted here
- * (2026-08-08).
+ * §65 batching copies the authored stream when `hasUvs` (it always does for a
+ * sprite). Many cells of one atlas still share one GPU texture and one
+ * material; only the per-quad uv buffer differs.
  *
  * ## Deferred from §55 (named, not dropped)
  *
@@ -508,6 +473,7 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
   constructor(material: SpriteMaterial, options: SpriteOptions = {}) {
     const quad = new BufferGeometry({
       positions: new Float32Array(QUAD_VERTEX_COUNT * 3),
+      uvs: new Float32Array(QUAD_VERTEX_COUNT * 2),
       indices: QUAD_INDICES.slice(),
       mode: "triangles",
     });
@@ -558,19 +524,11 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
    * sprite.frame = null;                                      // whole texture
    * ```
    *
-   * See {@link SpriteFrame} for the units and the bottom-left origin, and the
-   * module header for how the backend draws it without a uv attribute and
-   * without a second uniform.
-   *
-   * ## What it costs, and what it does not
-   *
-   * Nothing on the geometry: the quad is a function of the anchor and the size
-   * and is untouched by a frame, so writing one **re-uploads nothing** and
-   * leaves {@link Sprite.geometry} and its version exactly as they were. What
-   * changes is four floats of a uniform the backend already uploaded per draw.
-   * Many sprites over one atlas texture therefore share one GPU texture, one
-   * material, and one upload — which is the whole point, and what the "cut the
-   * cell into its own texture" workaround in the examples was paying to avoid.
+   * See {@link SpriteFrame} for the units and the bottom-left origin. Writing a
+   * frame rewrites the quad's authored `uvs` (eight floats, in place) and
+   * bumps the geometry version so a backend re-uploads the attribute. Positions
+   * stay a function of anchor and size. Many sprites over one atlas still share
+   * one GPU texture and one material — only the per-quad uv stream differs.
    *
    * ## Validation (§85) and the one hole in it
    *
@@ -601,7 +559,10 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
 
   set frame(value: SpriteFrame | null) {
     if (value === null) {
-      this.#frame = null;
+      if (this.#frame !== null) {
+        this.#frame = null;
+        this.markDirty();
+      }
       return;
     }
     this.setFrame(value.x, value.y, value.width, value.height);
@@ -623,6 +584,15 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
   setFrame(x: number, y: number, width: number, height: number): this {
     validateFrame({ x, y, width, height }, textureSizeOf(this.material));
     const frame = this.#frame;
+    if (
+      frame !== null &&
+      frame.x === x &&
+      frame.y === y &&
+      frame.width === width &&
+      frame.height === height
+    ) {
+      return this;
+    }
     if (frame === null) {
       this.#frame = { x, y, width, height };
     } else {
@@ -631,12 +601,13 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
       frame.width = width;
       frame.height = height;
     }
+    this.markDirty();
     return this;
   }
 
   /**
-   * The quad this sprite draws (§53), rebuilt on read whenever the anchor or the
-   * size has changed since the last one.
+   * The quad this sprite draws (§53), rebuilt on read whenever the anchor, the
+   * size, or the frame has changed since the last one.
    *
    * Owned by the sprite — do not dispose it yourself, and do not hand it to a
    * `Renderable`, which would then draw a quad that changes under it. Reading it
@@ -709,11 +680,11 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
    * winding (indices `0,1,2, 0,2,3`) is counter-clockwise seen from +Z, matching
    * `planeGeometry` and §7a.
    *
-   * `positions` is written through, then `markDirty()` bumps the geometry's
-   * version: an in-place edit is invisible to `BufferGeometry` by design (§53),
-   * and the version bump is what makes the backend re-upload. A disposed sprite
-   * never gets here — its geometry has been emptied, and `dispose()` is
-   * terminal.
+   * `positions` and `uvs` are written through (no per-rebuild allocation),
+   * then `markDirty()` bumps the geometry's version: an in-place edit is
+   * invisible to `BufferGeometry` by design (§53), and the version bump is
+   * what makes the backend re-upload. A disposed sprite never gets here —
+   * its geometry has been emptied, and `dispose()` is terminal.
    */
   #rebuildQuad(): void {
     this.#quadStale = false;
@@ -731,13 +702,55 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
     const y1 = y0 + this.#height;
 
     const positions = this.#quad.positions;
-    // prettier-ignore
-    positions.set([
-      x0, y0, 0, // 0 bottom-left
-      x1, y0, 0, // 1 bottom-right
-      x1, y1, 0, // 2 top-right
-      x0, y1, 0, // 3 top-left
-    ]);
+    positions[0] = x0;
+    positions[1] = y0;
+    positions[2] = 0;
+    positions[3] = x1;
+    positions[4] = y0;
+    positions[5] = 0;
+    positions[6] = x1;
+    positions[7] = y1;
+    positions[8] = 0;
+    positions[9] = x0;
+    positions[10] = y1;
+    positions[11] = 0;
+    const uvs = this.#quad.uvs;
+    if (uvs !== undefined) {
+      writeAtlasUvs(uvs, this.#frame, textureSizeOf(this.material));
+    }
     this.#quad.markDirty();
   }
+}
+
+/**
+ * Writes the four-corner uv rectangle for `frame` into `uvs` (8 floats, vertex
+ * order matching {@link Sprite}'s quad). No allocation — the sprite owns `uvs`.
+ *
+ * A missing texture size (structurally typed material, no `width`/`height`)
+ * falls back to the whole-texture map, the same "cannot check" defence
+ * frame validation uses.
+ */
+function writeAtlasUvs(
+  uvs: Float32Array,
+  frame: SpriteFrame | null,
+  size: { width: number; height: number } | null,
+): void {
+  let u0 = 0;
+  let v0 = 0;
+  let u1 = 1;
+  let v1 = 1;
+  if (frame !== null && size !== null) {
+    u0 = frame.x / size.width;
+    v0 = frame.y / size.height;
+    u1 = (frame.x + frame.width) / size.width;
+    v1 = (frame.y + frame.height) / size.height;
+  }
+  uvs[0] = u0;
+  uvs[1] = v0;
+  uvs[2] = u1;
+  uvs[3] = v0;
+  uvs[4] = u1;
+  uvs[5] = v1;
+  uvs[6] = u0;
+  uvs[7] = v1;
 }

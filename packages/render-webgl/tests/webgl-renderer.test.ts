@@ -95,7 +95,9 @@ import {
   SpriteProgram,
   StandardProgram,
   TextureCache,
+  SKINNING_GLSL,
   SkinnedLitProgram,
+  SkinnedShadowProgram,
   SkinnedUnlitProgram,
   UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
@@ -408,6 +410,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     },
     uniformMatrix4fv(location, transpose, data) {
       record("uniformMatrix4fv", location, transpose, data);
+    },
+    uniformMatrix3fv(location, transpose, data) {
+      record("uniformMatrix3fv", location, transpose, data);
     },
     uniform4fv(location, data) {
       record("uniform4fv", location, data);
@@ -1243,9 +1248,9 @@ function renderable(
 }
 
 /**
- * A real `Sprite` — `@fourjs/render` is a dependency, and the quad it builds from
- * its anchor and size is exactly what the `quad` uniform assertions are about.
- * Only the material and the texture are doubles.
+ * A real `Sprite` — `@fourjs/render` is a dependency, and the quad it builds
+ * from its anchor, size, and frame is exactly what the authored-uv assertions
+ * are about. Only the material and the texture are doubles.
  */
 function sprite(
   material: TestSpriteMaterial = new TestSpriteMaterial(),
@@ -2987,7 +2992,7 @@ describe("WebglRenderer — disposal (§83)", () => {
 });
 
 describe("SpriteProgram — compilation and linking (§55, §61, §89)", () => {
-  it("compiles both stages, links, and resolves the five uniforms", () => {
+  it("compiles both stages, links, and resolves the four uniforms", () => {
     const gl = createFakeGl();
 
     const program = SpriteProgram.create(gl);
@@ -2996,7 +3001,7 @@ describe("SpriteProgram — compilation and linking (§55, §61, §89)", () => {
     expect(gl.countOf("linkProgram")).toBe(1);
     expect(
       gl.callsOf("getUniformLocation").map((call) => call.args[1]),
-    ).toEqual(["viewProjection", "model", "quad", "tint", "map"]);
+    ).toEqual(["viewProjection", "model", "tint", "map"]);
     expect(program.disposed).toBe(false);
   });
 
@@ -3014,8 +3019,11 @@ describe("SpriteProgram — compilation and linking (§55, §61, §89)", () => {
     expect(String(sources[0])).toContain(
       `layout(location = ${String(POSITION_ATTRIBUTE_LOCATION)}) in vec3 position`,
     );
-    // uv is derived from the quad's local rect, not read from an attribute.
-    expect(String(sources[0])).toContain("uniform vec4 quad");
+    // Atlas UVs are an authored attribute; the retired `quad` uniform is gone.
+    expect(String(sources[0])).toContain(
+      `layout(location = ${String(UV_ATTRIBUTE_LOCATION)}) in vec2 uv`,
+    );
+    expect(String(sources[0])).not.toContain("uniform vec4 quad");
     expect(String(sources[1])).toContain("texture(map, vUv) * tint");
   });
 
@@ -3531,27 +3539,31 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
     expect(gl.countOf("uniform1i")).toBe(0);
   });
 
-  it("uploads the tint, and the quad's local rect the vertex stage maps uv from", async () => {
+  it("uploads the tint; atlas uvs ride the geometry, not a uniform", async () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
-    root.add(
-      sprite(new TestSpriteMaterial(new TestTexture(), [1, 0.5, 0, 0.25]), {
+    const node = sprite(
+      new TestSpriteMaterial(new TestTexture(), [1, 0.5, 0, 0.25]),
+      {
         width: 4,
         height: 2,
         anchor: { x: 0, y: 0 },
-      }),
+      },
     );
+    root.add(node);
     gl.reset();
 
     renderer.render(root, [createView(camera)]);
 
     const uniforms = spriteUniforms(gl);
     expect(uploadsAt(gl, uniforms.get("tint"))).toEqual([[1, 0.5, 0, 0.25]]);
-    // anchor (0, 0) and 4 × 2 ⇒ the quad spans x ∈ [0, 4], y ∈ [0, 2].
-    expect(uploadsAt(gl, uniforms.get("quad"))).toEqual([[0, 0, 4, 2]]);
+    expect(uniforms.has("quad")).toBe(false);
+    expect(Array.from(node.geometry.uvs ?? [])).toEqual([
+      0, 0, 1, 0, 1, 1, 0, 1,
+    ]);
   });
 
-  it("tracks the quad rect when the sprite is resized", async () => {
+  it("keeps whole-texture uvs when the sprite is resized", async () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
     const node = sprite(new TestSpriteMaterial(), { width: 2, height: 2 });
@@ -3562,12 +3574,13 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
     gl.reset();
     renderer.render(root, [createView(camera)]);
 
-    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
-      [-3, -1, 6, 2],
+    expect(Array.from(node.geometry.uvs ?? [])).toEqual([
+      0, 0, 1, 0, 1, 1, 0, 1,
     ]);
+    expect(spriteUniforms(gl).has("quad")).toBe(false);
   });
 
-  it("maps a §55 frame onto the same uniform, with no extra GL call (R-29)", async () => {
+  it("authors a §55 frame onto the uv stream (R-29 / atlas packet)", async () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
     // An 8 × 4 atlas, and the quad shows its top-right 4 × 2 cell.
@@ -3582,23 +3595,15 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
 
     renderer.render(root, [createView(camera)]);
 
-    const uniforms = spriteUniforms(gl);
-    // The rectangle the *whole* 8 × 4 texture maps onto: twice the quad in each
-    // axis, offset so that the quad's own [0, 4] × [0, 2] covers the far cell.
-    expect(uploadsAt(gl, uniforms.get("quad"))).toEqual([[-4, -2, 8, 4]]);
-    // uv at the quad's corners, recomputed here the way the vertex stage does,
-    // is exactly the frame in normalized coordinates — which is the claim.
-    const [minX, minY, width, height] = (
-      uploadsAt(gl, uniforms.get("quad"))[0] as number[]
-    ).map(Number);
-    expect([(0 - minX) / width, (0 - minY) / height]).toEqual([0.5, 0.5]);
-    expect([(4 - minX) / width, (2 - minY) / height]).toEqual([1, 1]);
-    // One `uniform4fv` for the quad and one for the tint, exactly as before:
-    // a frame adds no upload.
-    expect(gl.countOf("uniform4fv")).toBe(2);
+    expect(Array.from(node.geometry.uvs ?? [])).toEqual([
+      0.5, 0.5, 1, 0.5, 1, 1, 0.5, 1,
+    ]);
+    // Tint only — the retired `quad` uniform is gone.
+    expect(gl.countOf("uniform4fv")).toBe(1);
+    expect(spriteUniforms(gl).has("quad")).toBe(false);
   });
 
-  it("uploads the frameless values for an identity frame (R-29 collapse)", async () => {
+  it("authors the frameless uvs for an identity frame", async () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
     const framed = sprite(new TestSpriteMaterial(new TestTexture(8, 4)), {
@@ -3610,23 +3615,20 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
     root.add(framed);
     gl.reset();
     renderer.render(root, [createView(camera)]);
-    const withFrame = uploadsAt(gl, spriteUniforms(gl).get("quad"));
+    const withFrame = Array.from(framed.geometry.uvs ?? []);
 
+    const plain = sprite(new TestSpriteMaterial(new TestTexture(8, 4)), {
+      width: 3,
+      height: 2,
+      anchor: { x: 0.25, y: 0.75 },
+    });
     const plainRoot = createRoot();
-    plainRoot.add(
-      sprite(new TestSpriteMaterial(new TestTexture(8, 4)), {
-        width: 3,
-        height: 2,
-        anchor: { x: 0.25, y: 0.75 },
-      }),
-    );
+    plainRoot.add(plain);
     gl.reset();
     renderer.render(plainRoot, [createView(camera)]);
 
-    // The `else` branch is taken and still produces the `if` branch's numbers —
-    // which is the arithmetic half of "a frameless sprite is byte-identical".
-    expect(withFrame).toEqual(uploadsAt(gl, spriteUniforms(gl).get("quad")));
-    expect(withFrame).toEqual([[-0.75, -1.5, 3, 2]]);
+    expect(withFrame).toEqual(Array.from(plain.geometry.uvs ?? []));
+    expect(withFrame).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
   });
 
   it("maps a bottom-left frame, and a sub-texel inset", async () => {
@@ -3643,9 +3645,9 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
 
     renderer.render(root, [createView(camera)]);
 
-    // Frame at the origin ⇒ the same `min`, and a doubled extent.
-    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
-      [0, 0, 4, 4],
+    // Left half of an 8 × 4 atlas, full height of a 2-texel-tall cell.
+    expect(Array.from(node.geometry.uvs ?? [])).toEqual([
+      0, 0, 0.5, 0, 0.5, 0.5, 0, 0.5,
     ]);
   });
 
@@ -3665,8 +3667,8 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
     gl.reset();
     renderer.render(root, [createView(camera)]);
 
-    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
-      [0, 0, 2, 2],
+    expect(Array.from(node.geometry.uvs ?? [])).toEqual([
+      0, 0, 1, 0, 1, 1, 0, 1,
     ]);
   });
 
@@ -3692,9 +3694,11 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
 
     renderer.render(root, [createView(camera)]);
 
-    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
-      [0, 0, 4, 2],
-      [-2, 0, 4, 2],
+    expect(Array.from(left.geometry.uvs ?? [])).toEqual([
+      0, 0, 0.5, 0, 0.5, 1, 0, 1,
+    ]);
+    expect(Array.from(right.geometry.uvs ?? [])).toEqual([
+      0.5, 0, 1, 0, 1, 1, 0.5, 1,
     ]);
     // One upload and one GL texture for both cells — the point of an atlas.
     expect(gl.countOf("texImage2D")).toBe(1);
@@ -4953,7 +4957,7 @@ function litRenderable(
 }
 
 describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
-  it("compiles both stages, links, and resolves the nineteen uniforms", () => {
+  it("compiles both stages, links, and resolves the twenty uniforms", () => {
     const gl = createFakeGl();
 
     const program = LitProgram.create(gl);
@@ -4965,6 +4969,7 @@ describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
     ).toEqual([
       "viewProjection",
       "model",
+      "normalMatrix",
       "color",
       "ambientLight",
       "lightDirection",
@@ -5011,6 +5016,9 @@ describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
     expect(String(sources[0])).toContain(
       `layout(location = ${String(NORMAL_ATTRIBUTE_LOCATION)}) in vec3 normal;`,
     );
+    expect(String(sources[0])).toContain("uniform mat3 normalMatrix;");
+    expect(String(sources[0])).toContain("vNormal = normalMatrix * normal;");
+    expect(String(sources[0])).not.toContain("transpose(inverse");
     expect(String(sources[1])).toContain("uniform vec3 ambientLight;");
     expect(String(sources[1])).toContain("uniform vec3 lightDirection;");
     expect(String(sources[1])).toContain("uniform vec3 lightColor;");
@@ -5062,6 +5070,30 @@ describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
 
     expect(gl.countOf("deleteProgram")).toBe(1);
     expect(program.disposed).toBe(true);
+  });
+
+  it("uploads the model matrix and a 9-float normal matrix from setModel", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    program.use();
+    const uniforms = litUniforms(gl);
+
+    const model = new Matrix4().fromArray([
+      2, 0, 0, 0, 0, 4, 0, 0, 0, 0, 8, 0, 1, 2, 3, 1,
+    ]);
+    program.setModel(model);
+
+    expect(uploadsAt(gl, uniforms.get("model"))).toEqual([
+      [2, 0, 0, 0, 0, 4, 0, 0, 0, 0, 8, 0, 1, 2, 3, 1],
+    ]);
+    // Inverse-transpose of diag(2, 4, 8) is diag(1/2, 1/4, 1/8).
+    expect(uploadsAt(gl, uniforms.get("normalMatrix"))).toEqual([
+      [0.5, 0, 0, 0, 0.25, 0, 0, 0, 0.125],
+    ]);
+    const matrix3 = gl.callsOf("uniformMatrix3fv");
+    expect(matrix3).toHaveLength(1);
+    expect(matrix3[0].args[1]).toBe(false);
+    expect((matrix3[0].args[2] as number[]).length).toBe(9);
   });
 });
 
@@ -7986,7 +8018,7 @@ function standardRenderable(
 }
 
 describe("StandardProgram — compilation and linking (§59, §61, §89)", () => {
-  it("compiles both stages, links, and resolves the twenty-five uniforms", () => {
+  it("compiles both stages, links, and resolves the twenty-six uniforms", () => {
     const gl = createFakeGl();
 
     const program = StandardProgram.create(gl);
@@ -7998,6 +8030,7 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
     ).toEqual([
       "viewProjection",
       "model",
+      "normalMatrix",
       "baseColor",
       "metalness",
       "roughness",
@@ -8053,6 +8086,9 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
     expect(sources[0]).toContain(
       `layout(location = ${String(UV_ATTRIBUTE_LOCATION)}) in vec2 uv;`,
     );
+    expect(sources[0]).toContain("uniform mat3 normalMatrix;");
+    expect(sources[0]).toContain("vNormal = normalMatrix * normal;");
+    expect(sources[0]).not.toContain("transpose(inverse");
     // The world position is the one varying the lit stage does not produce.
     expect(sources[0]).toContain("out vec3 vWorldPosition;");
     // §59's parameters, and the BRDF's own constants.
@@ -8079,6 +8115,9 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
 
     expect(uploadsAt(gl, uniforms.get("viewProjection"))).toHaveLength(1);
     expect(uploadsAt(gl, uniforms.get("model"))).toHaveLength(1);
+    expect(uploadsAt(gl, uniforms.get("normalMatrix"))).toEqual([
+      [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    ]);
     // `opacity` multiplies alpha only, exactly as the unlit program does.
     expect(uploadsAt(gl, uniforms.get("baseColor"))).toEqual([
       [1, 0.5, 0.25, 0.25],
@@ -9002,14 +9041,30 @@ class TestShadowLight extends TestLight {
   }
 }
 
-/** The shadow program's uniform handles — see {@link spriteUniforms}. */
+/** The unskinned shadow program's uniform handles — see {@link spriteUniforms}. */
 function shadowUniforms(gl: FakeGl): Map<string, object> {
   for (const perProgram of gl.uniformsByProgram.values()) {
-    if (perProgram.has("shadowViewProjection")) {
+    if (
+      perProgram.has("shadowViewProjection") &&
+      !perProgram.has("jointMatrices[0]")
+    ) {
       return perProgram;
     }
   }
   throw new Error("the shadow program never resolved its uniforms");
+}
+
+/** The skinned caster's uniform handles — `shadowViewProjection` plus the palette. */
+function skinnedShadowUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (
+      perProgram.has("shadowViewProjection") &&
+      perProgram.has("jointMatrices[0]")
+    ) {
+      return perProgram;
+    }
+  }
+  throw new Error("the skinned shadow program never resolved its uniforms");
 }
 
 /** Just the call names, for asserting the shape of a pass. */
@@ -9758,9 +9813,9 @@ describe("WebglRenderer — §65 batching, opt-in (R-9)", () => {
     expect(gl.countOf("drawElements")).toBe(1);
     expect(gl.callsOf("drawElements")[0].args[1]).toBe(12);
     expect(uploadsAt(gl, uniforms.get("color"))).toEqual([[1, 0.5, 0, 1]]);
-    // uv per vertex is what a batched sprite carries instead of the `quad`
-    // uniform, so the sprite program is never used at all.
-    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([]);
+    // Batched sprites already interleave authored uvs, so the sprite program
+    // is never used — and it no longer even declares `quad`.
+    expect(spriteUniforms(gl).has("quad")).toBe(false);
     expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1]);
     expect(gl.countOf("bindTexture")).toBeGreaterThan(0);
   });
@@ -10853,6 +10908,39 @@ describe("registerSkinningPipeline — the registry slot (RFC 0003)", () => {
     // The first program was built and must not leak (§83).
     expect(gl.countOf("deleteProgram")).toBe(1);
   });
+
+  it("compiles the skinned caster lazily on acquireShadow, not with the colour pair", () => {
+    registerSkinningPipeline();
+    const gl = createFakeGl();
+    const programs = resolveSkinningPipelineFactory()?.create(gl);
+    expect(programs).toBeDefined();
+    expect(gl.countOf("linkProgram")).toBe(2);
+    const shadow = programs?.acquireShadow();
+    expect(shadow).toBeDefined();
+    expect(gl.countOf("linkProgram")).toBe(3);
+    // Reuse: a second ask compiles nothing.
+    expect(programs?.acquireShadow()).toBe(shadow);
+    expect(gl.countOf("linkProgram")).toBe(3);
+    programs?.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(3);
+  });
+
+  it("does not retry a failed skinned-caster compile (failProgramAt would otherwise succeed)", () => {
+    registerSkinningPipeline();
+    // Colour pair occupies 1 and 2; the caster is 3.
+    const gl = createFakeGl({ failProgramAt: 3 });
+    const programs = resolveSkinningPipelineFactory()?.create(gl);
+    expect(programs).toBeDefined();
+    expect(() => programs?.acquireShadow()).toThrow();
+    // `createProgram` returned null — there is no program object to delete.
+    // A retry must not issue a fourth createProgram that would miss the latch.
+    expect(gl.countOf("deleteProgram")).toBe(0);
+    expect(() => programs?.acquireShadow()).toThrow();
+    expect(gl.countOf("createProgram")).toBe(3);
+    programs?.dispose();
+    // Colour pair only — the caster never landed.
+    expect(gl.countOf("deleteProgram")).toBe(2);
+  });
 });
 
 describe("SkinnedUnlitProgram / SkinnedLitProgram (RFC 0003)", () => {
@@ -10919,7 +11007,63 @@ describe("SkinnedUnlitProgram / SkinnedLitProgram (RFC 0003)", () => {
     const gl = createFakeGl({ resolveUniforms: false });
     expect(() => SkinnedUnlitProgram.create(gl)).toThrow();
     expect(() => SkinnedLitProgram.create(gl)).toThrow();
-    expect(gl.countOf("deleteProgram")).toBe(2);
+    expect(() => SkinnedShadowProgram.create(gl)).toThrow();
+    expect(gl.countOf("deleteProgram")).toBe(3);
+  });
+});
+
+describe("SkinnedShadowProgram — the §69 skinned caster (RFC 0003 residue)", () => {
+  it("skins position before the light's clip product and writes the depth-only constant", () => {
+    const gl = createFakeGl();
+
+    const program = SkinnedShadowProgram.create(gl);
+
+    expect(
+      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
+    ).toEqual(["shadowViewProjection", "model", "jointMatrices[0]"]);
+    const sources = gl
+      .callsOf("shaderSource")
+      .map((call) => String(call.args[1]));
+    expect(sources[0]).toContain(SKINNING_GLSL);
+    expect(sources[0]).toContain(
+      "gl_Position = shadowViewProjection * model * (skinMatrix() * vec4(position, 1.0));",
+    );
+    expect(sources[1]).toContain("fragColor = vec4(1.0);");
+    expect(program.disposed).toBe(false);
+    program.dispose();
+    program.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(1);
+    expect(program.disposed).toBe(true);
+  });
+
+  it("uploads the light matrix, the caster model, and the palette", () => {
+    const gl = createFakeGl();
+    const program = SkinnedShadowProgram.create(gl);
+    const uniforms = skinnedShadowUniforms(gl);
+    gl.reset();
+
+    program.use();
+    const view = new Matrix4();
+    view.elements[0] = 3;
+    program.setViewProjection(view);
+    const model = new Matrix4();
+    model.elements[12] = 7;
+    program.setModel(model);
+    const palette = new Float32Array(16);
+    palette[13] = 5;
+    program.setJointMatrices(palette);
+
+    expect(names(gl.calls)).toEqual([
+      "useProgram",
+      "uniformMatrix4fv",
+      "uniformMatrix4fv",
+      "uniformMatrix4fv",
+    ]);
+    expect((gl.calls[1].args[2] as Float32Array)[0]).toBe(3);
+    expect(gl.calls[2].args[0]).toBe(uniforms.get("model"));
+    expect((gl.calls[2].args[2] as Float32Array)[12]).toBe(7);
+    expect(gl.calls[3].args[0]).toBe(uniforms.get("jointMatrices[0]"));
+    expect((gl.calls[3].args[2] as number[])[13]).toBe(5);
   });
 });
 
@@ -11043,7 +11187,9 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
 
     renderer.render(root, views);
 
-    // Two more programs, compiled inside the frame — the first skinned draw.
+    // Two more programs, compiled inside the frame — the first skinned colour
+    // draw. No third program: this scene has no lights, so the skinned caster
+    // stays uncompiled.
     expect(gl.countOf("createProgram")).toBe(2);
     // The render list ran the palette update in the same build (the
     // particle-repack precedent), and the draw uploaded the palette verbatim.
@@ -11140,11 +11286,84 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
 
     renderer.dispose();
 
-    // Eight eager programs plus the skinned pair.
+    // Eight eager programs plus the skinned colour pair. This scene has no
+    // shadow light, so the caster was never compiled — 10, not 11.
     expect(gl.countOf("deleteProgram")).toBe(10);
   });
 
-  it("excludes skinned casters from the §69 shadow pass (bind pose)", async () => {
+  it("casts a skinned mesh's deformed silhouette in the §69 shadow pass", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const light = new TestShadowLight(8);
+    const caster = litRenderable();
+    const skinned = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    const skeleton = new TestSkeleton();
+    skeleton.jointMatrices[13] = 5;
+    skinned.skeleton = skeleton;
+    const skinnedAgain = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    skinnedAgain.skeleton = skeleton;
+    root.add(light, caster, skinned, skinnedAgain);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Colour pair (2) plus the skinned caster (1), compiled inside the frame
+    // because this scene both skins and casts.
+    expect(gl.countOf("createProgram")).toBe(3);
+    // Two casters: unskinned ShadowProgram, then the skinned sibling.
+    expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
+    const casterUniforms = skinnedShadowUniforms(gl);
+    expect(uploadsAt(gl, casterUniforms.get("model"))).toHaveLength(2);
+    const shadowPalette = uploadsAt(
+      gl,
+      casterUniforms.get("jointMatrices[0]"),
+    );
+    expect(shadowPalette).toHaveLength(2);
+    expect((shadowPalette[0] as number[])[13]).toBe(5);
+    // The skinned colour draws still happened, on their own program.
+    expect(
+      uploadsAt(gl, skinnedLitUniforms(gl).get("jointMatrices[0]")),
+    ).toHaveLength(2);
+  });
+
+  it("skips skinned casters when nothing is registered (bind-pose guard)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, camera } = await initialized();
+      const root = new AmbientRoot([0.1, 0.1, 0.1]);
+      const light = new TestShadowLight(8);
+      const caster = litRenderable();
+      const skinned = new SkinnedTestNode(
+        skinnedGeometry().asGeometry,
+        new TestLitMaterial().asMaterial,
+      );
+      skinned.skeleton = new TestSkeleton();
+      root.add(light, caster, skinned);
+      gl.reset();
+
+      renderer.render(root, [createView(camera)]);
+
+      // Unskinned caster only — a bind-pose shadow is a different picture.
+      expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
+      expect(gl.countOf("createProgram")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain(
+        "registerSkinningPipeline",
+      );
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("does not draw a skinned mesh with castShadow: false in the shadow pass", async () => {
     registerSkinningPipeline();
     const { renderer, gl, camera } = await initialized();
     const root = new AmbientRoot([0.1, 0.1, 0.1]);
@@ -11155,19 +11374,219 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
       new TestLitMaterial().asMaterial,
     );
     skinned.skeleton = new TestSkeleton();
+    skinned.castShadow = false;
     root.add(light, caster, skinned);
     gl.reset();
 
     renderer.render(root, [createView(camera)]);
 
-    // One caster in the map — the unskinned one. A skinned caster would cast
-    // its bind pose, which is a different picture.
-    const shadowModel = shadowUniforms(gl).get("model");
-    expect(uploadsAt(gl, shadowModel)).toHaveLength(1);
-    // The skinned draw itself still happened, in the colour pass.
+    // Colour pair only — opting out of casting must not compile the caster.
+    expect(gl.countOf("createProgram")).toBe(2);
+    expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
+    expect(() => skinnedShadowUniforms(gl)).toThrow(
+      /skinned shadow program never resolved/,
+    );
     expect(
       uploadsAt(gl, skinnedLitUniforms(gl).get("jointMatrices[0]")),
     ).toHaveLength(1);
+  });
+
+  it("switches back to ShadowProgram after a skinned caster", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const light = new TestShadowLight(8);
+    const first = litRenderable();
+    const skinned = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    skinned.skeleton = new TestSkeleton();
+    const last = litRenderable();
+    root.add(light, first, skinned, last);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(2);
+    expect(
+      uploadsAt(gl, skinnedShadowUniforms(gl).get("model")),
+    ).toHaveLength(1);
+  });
+
+  it("skips skinned casters when the caster program fails to compile, and still shades", async () => {
+    registerSkinningPipeline();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      // 8 at initialize; colour pair is 9–10 (shadow pass compiles them first);
+      // the caster is 11.
+      const { renderer, gl, camera } = await initialized({
+        failProgramAt: 11,
+      });
+      const root = new AmbientRoot([0.1, 0.1, 0.1]);
+      const light = new TestShadowLight(8);
+      const caster = litRenderable();
+      const skinned = new SkinnedTestNode(
+        skinnedGeometry().asGeometry,
+        new TestLitMaterial().asMaterial,
+      );
+      skinned.skeleton = new TestSkeleton();
+      root.add(light, caster, skinned);
+      const views = [createView(camera)];
+      gl.reset();
+
+      renderer.render(root, views);
+      renderer.render(root, views);
+
+      // Asked once, refused once, never asked again. Colour pair compiled.
+      expect(gl.countOf("createProgram")).toBe(3);
+      expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(2);
+      expect(() => skinnedShadowUniforms(gl)).toThrow(
+        /skinned shadow program never resolved/,
+      );
+      expect(
+        uploadsAt(gl, skinnedLitUniforms(gl).get("jointMatrices[0]")),
+      ).toHaveLength(2);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("skinned shadow");
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("draws an indexed skinned caster through drawElements", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const light = new TestShadowLight(8);
+    const geometry = quadGeometry();
+    geometry.joints = new Uint16Array(16);
+    geometry.weights = new Float32Array(16);
+    for (let i = 0; i < 4; i += 1) {
+      geometry.weights[i * 4] = 1;
+    }
+    const skinned = new SkinnedTestNode(
+      geometry.asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    skinned.skeleton = new TestSkeleton();
+    root.add(light, skinned);
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Shadow pass + colour pass, both indexed.
+    expect(gl.countOf("drawElements")).toBe(2);
+    expect(
+      uploadsAt(gl, skinnedShadowUniforms(gl).get("jointMatrices[0]")),
+    ).toHaveLength(1);
+    // Two submissions: the caster and the colour draw.
+    expect(statistics.drawCalls).toBe(2);
+  });
+
+  it("disposes the colour pair and the caster together when both compiled", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const light = new TestShadowLight(8);
+    const skinned = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    skinned.skeleton = new TestSkeleton();
+    root.add(light, skinned);
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.dispose();
+
+    // Eight eager + colour pair + caster.
+    expect(gl.countOf("deleteProgram")).toBe(11);
+  });
+
+  it("casts a skinned-unlit mesh through the same caster program", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const light = new TestShadowLight(8);
+    const caster = litRenderable();
+    const skinned = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      new TestMaterial().asMaterial,
+    );
+    skinned.skeleton = new TestSkeleton();
+    root.add(light, caster, skinned);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
+    expect(
+      uploadsAt(gl, skinnedShadowUniforms(gl).get("jointMatrices[0]")),
+    ).toHaveLength(1);
+    expect(
+      uploadsAt(gl, skinnedUnlitUniforms(gl).get("jointMatrices[0]")),
+    ).toHaveLength(1);
+  });
+
+  it("skips a skinned caster whose geometry will not upload", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const light = new TestShadowLight(8);
+    const caster = litRenderable();
+    const geometry = new TestGeometry(new Float32Array(0));
+    geometry.joints = new Uint16Array(0);
+    geometry.weights = new Float32Array(0);
+    const skinned = new SkinnedTestNode(
+      geometry.asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    skinned.skeleton = new TestSkeleton();
+    root.add(light, caster, skinned);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // The caster compiles (the item is a skinned caster) then skips the draw,
+    // matching the colour path's pipeline-then-geometry order.
+    expect(gl.countOf("createProgram")).toBe(3);
+    expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
+    expect(
+      uploadsAt(gl, skinnedShadowUniforms(gl).get("model")),
+    ).toHaveLength(0);
+  });
+
+  it("skips skinned casters when the colour pair fails to compile", async () => {
+    registerSkinningPipeline();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, camera } = await initialized({
+        failProgramAt: 9,
+      });
+      const root = new AmbientRoot([0.1, 0.1, 0.1]);
+      const light = new TestShadowLight(8);
+      const caster = litRenderable();
+      const skinned = new SkinnedTestNode(
+        skinnedGeometry().asGeometry,
+        new TestLitMaterial().asMaterial,
+      );
+      skinned.skeleton = new TestSkeleton();
+      root.add(light, caster, skinned);
+      gl.reset();
+
+      renderer.render(root, [createView(camera)]);
+
+      expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
+      expect(gl.countOf("createProgram")).toBe(1);
+      expect(() => skinnedLitUniforms(gl)).toThrow();
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
   });
 });
 

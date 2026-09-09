@@ -9,8 +9,9 @@
  *
  * 1. **The sprite WGSL compiles and draws.** The source under test is
  *    `SPRITE_SHADER_SOURCE` imported from `@fourjs/render-webgpu` itself — the
- *    quad-uniform uv derivation, the widened 160-byte block, the
- *    `texture × tint` product — none of which a fake device ever executes.
+ *    authored uv stream at `@location(2)`, the 144-byte `SpriteUniforms`
+ *    block, the `texture × tint` product — none of which a fake device ever
+ *    executes.
  * 2. **The §65 interleaved layout draws.** `batchVertexBufferLayout` puts
  *    position and uv in one buffer against the unlit module's named locations;
  *    a slot/location mismatch validates cleanly and draws garbage (the hazard
@@ -22,7 +23,10 @@
  */
 
 import {
+  DRAW_UNIFORM_BYTES,
   SPRITE_SHADER_SOURCE,
+  SPRITE_UNIFORM_BYTES,
+  UV_SHADER_LOCATION,
   batchVertexBufferLayout,
   unlitShaderSource,
 } from "@fourjs/render-webgpu";
@@ -47,9 +51,10 @@ interface QuadResult {
 
 /**
  * Draws one textured quad and reads it back. `options.shader` is the WGSL
- * under test; `options.sprite` picks the sprite program's shape (position-only
- * vertices, 160-byte uniform block with the quad) over the batch program's
- * (interleaved position + uv, 144-byte block).
+ * under test; `options.sprite` picks the sprite program's shape (interleaved
+ * position + authored uv, {@link SPRITE_UNIFORM_BYTES} block) over the batch
+ * program's (the same interleaved stream, {@link DRAW_UNIFORM_BYTES} block
+ * with an identity `normalMatrix`).
  *
  * The texture is 2 × 2: left column green, right column blue, so a draw whose
  * uv mapping works shows both colours side by side and a draw whose mapping is
@@ -60,7 +65,7 @@ interface QuadResult {
  * `webgpu-unlit.spec.ts` on `pnpm typecheck:tests`).
  */
 const QUAD_SCRIPT = `async (options) => {
-  const { size, shader, sprite, vertexLayout, strong } = options;
+  const { size, shader, sprite, vertexLayout, strong, spriteBytes, drawBytes } = options;
   if (navigator.gpu === undefined) return { adapter: false };
   const adapter = await navigator.gpu.requestAdapter();
   if (adapter === null) return { adapter: false };
@@ -100,7 +105,7 @@ const QUAD_SCRIPT = `async (options) => {
     mipmapFilter: "nearest",
   });
 
-  const blockBytes = sprite ? 160 : 144;
+  const blockBytes = sprite ? spriteBytes : drawBytes;
   const uniformLayout = device.createBindGroupLayout({
     entries: [
       {
@@ -132,30 +137,30 @@ const QUAD_SCRIPT = `async (options) => {
     ],
   });
 
-  // viewProjection = model = identity; colour/tint = opaque white; for the
-  // sprite block, quad = the quad's own local rectangle.
+  // viewProjection = model = identity; colour/tint = opaque white. The
+  // unlit DrawUniforms block also carries an identity normalMatrix
+  // (std140 mat3 at 144); SpriteUniforms stops at tint.
   const block = new Float32Array(blockBytes / 4);
   for (let i = 0; i < 4; i += 1) {
     block[i * 5] = 1;
     block[16 + i * 5] = 1;
   }
   block[32] = 1; block[33] = 1; block[34] = 1; block[35] = 1;
-  if (sprite) {
-    block[36] = -0.5; block[37] = -0.5; block[38] = 1; block[39] = 1;
+  if (!sprite) {
+    block[36] = 1; block[41] = 1; block[46] = 1;
   }
   device.queue.writeBuffer(uniforms, 0, block);
 
-  // A quad spanning x, y ∈ [-0.5, 0.5]: two triangles, six vertices. The
-  // sprite stream is positions alone; the batch stream interleaves the uv the
-  // planner would derive.
+  // A quad spanning x, y ∈ [-0.5, 0.5]: two triangles, six vertices.
+  // Both programs now read authored uv at @location(2); u = x + 0.5,
+  // v = y + 0.5 maps the local rectangle onto the 2×2 texture.
   const corners = [
     [-0.5, -0.5], [0.5, -0.5], [0.5, 0.5],
     [-0.5, -0.5], [0.5, 0.5], [-0.5, 0.5],
   ];
   const floats = [];
   for (const [x, y] of corners) {
-    floats.push(x, y, 0);
-    if (!sprite) floats.push(x + 0.5, y + 0.5);
+    floats.push(x, y, 0, x + 0.5, y + 0.5);
   }
   const vertexData = new Float32Array(floats);
   const vertices = device.createBuffer({
@@ -236,7 +241,7 @@ function expectTwoColourQuad(result: QuadResult): void {
 }
 
 test.describe("WebGPU sprites and batching, on a real adapter", () => {
-  test("compiles the sprite WGSL and draws its textured, quad-mapped quad", async ({
+  test("compiles the sprite WGSL and draws its textured, authored-uv quad", async ({
     page,
   }) => {
     await page.goto(`http://localhost:${String(PORT)}/`);
@@ -244,14 +249,19 @@ test.describe("WebGPU sprites and batching, on a real adapter", () => {
       size: SIZE,
       shader: SPRITE_SHADER_SOURCE,
       sprite: true,
-      // The backend's own sprite vertex layout: position alone, uv derived
-      // in the vertex stage from the quad uniform.
+      // The backend's own sprite vertex layout: position + authored uv at
+      // @location(2) (R-19/R-20; Sprite.frame writes the frame onto geometry).
       vertexLayout: {
-        arrayStride: 12,
+        arrayStride: 20,
         stepMode: "vertex",
-        attributes: [{ format: "float32x3", offset: 0, shaderLocation: 0 }],
+        attributes: [
+          { format: "float32x3", offset: 0, shaderLocation: 0 },
+          { format: "float32x2", offset: 12, shaderLocation: UV_SHADER_LOCATION },
+        ],
       },
       strong: STRONG,
+      spriteBytes: SPRITE_UNIFORM_BYTES,
+      drawBytes: DRAW_UNIFORM_BYTES,
     });
     test.skip(
       !result.adapter,
@@ -272,6 +282,8 @@ test.describe("WebGPU sprites and batching, on a real adapter", () => {
       sprite: false,
       vertexLayout: batchVertexBufferLayout(true, false, true, false),
       strong: STRONG,
+      spriteBytes: SPRITE_UNIFORM_BYTES,
+      drawBytes: DRAW_UNIFORM_BYTES,
     });
     test.skip(
       !result.adapter,

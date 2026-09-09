@@ -14,6 +14,18 @@ stay on the tracker.
 
 ### Fixed
 
+- **WebGPU Playwright gates match the 192-byte `DrawUniforms` block.** After
+  the `normalMatrix` hoist, six `[webgpu]` specs still bound
+  `minBindingSize: 144` (shader reads 192). Sprites still packed a retired
+  `quad` uniform into a 160-byte block with position-only vertices. Harnesses
+  now import `DRAW_UNIFORM_BYTES` / `SPRITE_UNIFORM_BYTES`, write the identity
+  std140 mat3 at float 36, and feed authored uv at `@location(2)`.
+
+- **`graph:duplicates` allowlists the parallel picking seams.** WebGL and
+  WebGPU each own `registerPickingPipeline` / `PickingServiceFactory` /
+  `PickingRendererHost`. The names match on purpose; the backends cannot
+  share a body. Same class as `CacheableGeometry`.
+
 - **`tools/docs` TypeScript pin restored to 6.0.3.** Dependabot #82 bumped the
   isolated docs package to 7.0.2 with the root and `bun run docs` died on
   TypeDoc's `PropertyDeclaration` read — the exact failure the isolation was
@@ -47,6 +59,42 @@ stay on the tracker.
 
 ### Changed
 
+- **§43 interpolated skin palettes.** `Skeleton.update` takes an optional
+  `worldOf` provider. The interpolated render list composes bone local
+  poses at `interpolationAlpha` then runs the palette product. Palettes
+  are never matrix-lerped. Scene transforms are unchanged.
+
+- **WebGL skinned casters write a deformed silhouette (§69).**
+  `registerSkinningPipeline()` now also exposes a lazy
+  `SkinnedShadowProgram` compiled on the first skinned `castShadow`.
+  Unregistered or failed skinning still skips rather than casting a
+  bind pose. WebGPU has no skinned pipelines.
+
+- **WebGPU `PickingService` (RFC 0005).** `registerPickingPipeline()` from
+  `@fourjs/render-webgpu`, then `createPickingService()`. `pick` copies
+  one texel through `mapAsync`. Particles and skinned items are skipped
+  (no `ParticleIdProgram`, no skinned pipelines).
+
+- **WebGPU lit/standard read `draw.normalMatrix`.** `DRAW_UNIFORM_BYTES`
+  is 192; `STANDARD_UNIFORM_BYTES` is 224 (`emissive` 192, `surface` 208).
+  Sprites stay 144. The per-vertex cofactor function is still exported
+  and is no longer spliced into those shaders.
+
+- **Particle systems pick as one node (RFC 0005).** `collectPickCandidates`
+  includes `isParticleDrawable`. The WebGL id pass draws them through
+  `ParticleIdProgram` (shared §36 billboard vertex, flat `pickId`). One
+  id per emitter; trails skipped; skinned items still bounds-only.
+
+- **`PointerInput` accepts an optional `PickProvider` (§72).** GPU-mode
+  nodes resolve through that seam. The default (no provider) path stays
+  fully synchronous. The provider path copies the event and serializes
+  per `pointerId`.
+
+- **§55 sprites author UVs; `quad` uniform retired.** `Sprite.frame` writes
+  the cell into `geometry.uvs`. WebGL and WebGPU sample that attribute.
+  `SPRITE_QUAD_OFFSET` is gone. Changing a frame re-uploads eight floats
+  (geometry version), not the atlas texture. §65 batches copy the stream.
+
 - **Oxlint correctness warnings triaged to zero.** The 40 remaining default-
   category warnings (down from 42) were either one-line fixes (`Array.from`,
   `localeCompare`, computed quaternion `w`, a JSDoc that accidentally contained
@@ -70,6 +118,24 @@ stay on the tracker.
 
 ### Added
 
+- **`Matrix3` normal-matrix utility and per-draw hoist.** `transpose()`,
+  `setFromMatrix4Upper3x3()`, `setNormalFromMatrix4()` — the inverse-transpose
+  of a `Matrix4`'s upper 3×3. Lit and standard WebGL vertex stages upload
+  `uniform mat3 normalMatrix` once per draw instead of
+  `transpose(inverse(mat3(model)))` per vertex. WebGPU follows:
+  `DrawUniforms.normalMatrix` (192-byte block); standard extras shifted
+  to 192/208. Singular models upload identity on both backends.
+
+- **RFC 0005 pick-latency record.** `benchmarks/pick-latency.mjs` times
+  id-pass vs the render list (flagship-order 64 and R-8 10k/50k/100k) and
+  fence vs stall `pick()` on the counting-GL seam. Not a gate. The harness
+  still times unlit rectangles (no particle systems in those scenes).
+
+- **R-33 simulate / present split.** `examples/particles-demo` publishes
+  `data-simulate` and `data-present` in seconds on `#status`. The browser
+  gate checks they exist and stay finite; it does not assert a frame budget.
+  §112's rendered exit still needs non-SwiftShader hardware.
+
 - **RFC 0003 prototype measurements.** `benchmarks/skinning-resolve.mjs` records
   the 60-bone ×1/×10 resolve (Bone vs Group) and the 180-channel controller vs
   mixer path. Alternative A does not return on cost. The record proposes a
@@ -82,6 +148,19 @@ stay on the tracker.
 
 
 ### Documented
+
+- **Two follow-up rows were already shipped.** The §65 idle-scene batch
+  cache (`contentVersion` / `#canSkipUpload`, 0 `bufferSubData` on a still
+  run) and §52's concave-extrude lift (`extrudeGeometry` + tessellator)
+  were on the tree with tests; TODO.md still described them as open.
+  Struck. §55 atlas and shaded-pipeline instancing remain.
+
+- **Dogfooding cycle 4.** Consumer seat (`.dogfood/cycle4`) exercised §56
+  `Text`, `.four.json` + §34 snapshot round-trip, and 2D+3D in one scene.
+  `digital-twin.md` no longer teaches the throwing `serializeScene` call;
+  `fourJS/text` header states `Text` lives on the umbrella; guides README
+  distinguishes `examples/mixed-scene` (two worlds) from the one-scene
+  flagship. Architecture API/COMPONENTS samples match.
 
 - **12.8s barrels test vs 5s default timeout.** The suite sets `{ timeout: 30_000 }`;
   the 9809ms application figure is a file-aggregate, not a hidden config.

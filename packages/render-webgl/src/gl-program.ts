@@ -13,9 +13,9 @@
  *    times an optional texture sample and an optional per-vertex colour, both
  *    selected by a uniform switch (R-19, 2026-08-07).
  * 3. **{@link SpriteProgram}** — §55's textured quad: the same vertex arrays,
- *    a uv derived from the quad's local rectangle, one texture sample times a
- *    tint (WP-3a.3). Both pipelines bind the position stream at the same fixed
- *    attribute location, so `gl-geometry.ts`'s vertex arrays serve both.
+ *    authored uv at {@link UV_ATTRIBUTE_LOCATION}, one texture sample times a
+ *    tint. Both pipelines bind position at the same fixed location, so
+ *    `gl-geometry.ts`'s vertex arrays serve both.
  * 4. **{@link LitProgram}** — §68's Lambert-lit surface (§120 "lighting",
  *    2026-08-04): positions plus the optional normal stream at a second fixed
  *    location, one directional light plus the scene ambient term as uniforms.
@@ -49,7 +49,7 @@
  */
 
 import { FourError, type Disposable } from "@fourjs/core";
-import type { Matrix4, Vector3 } from "@fourjs/math";
+import { Matrix3, type Matrix4, type Vector3 } from "@fourjs/math";
 import { MAX_PUNCTUAL_LIGHTS, type SceneLights } from "@fourjs/render";
 
 /**
@@ -346,6 +346,21 @@ export interface WebglContext {
   ): GlUniformLocation | null;
   useProgram(program: GlProgramHandle | null): void;
   uniformMatrix4fv(
+    location: GlUniformLocation,
+    transpose: boolean,
+    data: Float32Array,
+  ): void;
+  /**
+   * Uploads one `mat3` uniform, column-major.
+   *
+   * Added with the lit/standard normal-matrix hoist (2026-09-09): those two
+   * vertex stages used to derive `transpose(inverse(mat3(model)))` per vertex,
+   * and now consume a per-draw 9-float upload. Growing this interface is the
+   * same explicit budget bump `uniform1f` documented when §59 landed — a new
+   * entry point rather than packing the 3×3 into a `mat4`. The node-material
+   * pipeline still pads `mat3` to `mat4` so its transcripts stay untouched.
+   */
+  uniformMatrix3fv(
     location: GlUniformLocation,
     transpose: boolean,
     data: Float32Array,
@@ -799,58 +814,28 @@ void main() {
 `;
 
 /**
- * The sprite vertex stage: object space → clip space, plus the uv the fragment
- * stage samples with (§55).
+ * The sprite vertex stage: object space → clip space, plus the authored uv
+ * the fragment stage samples with (§55 atlas packet).
  *
- * ## Why uv is computed, not read from an attribute
- *
- * §53's `BufferGeometry` carries positions and indices and nothing else — there
- * is no uv stream to bind, and introducing one is the packet that adds the
- * standard attribute set, not this one. A sprite's quad is a rectangle in the XY
- * plane, so its uv is an exact affine function of its position:
- *
- * ```text
- * uv = (position.xy - quad.xy) / quad.zw
- * ```
- *
- * where `quad` is the rectangle in **local** space that the *whole texture*
- * maps onto. With no frame that is precisely the geometry's own local bounds,
- * `(minX, minY, width, height)`, already computed and cached against its
- * version by `BufferGeometry.computeBounds()`. The mapping is exact for every
- * anchor and every size, costs one `vec4` upload per draw instead of a second
- * vertex buffer per sprite, and lets the sprite pipeline reuse the vertex
- * arrays `gl-geometry.ts` already builds — the position stream is bound to the
- * same fixed `layout(location = 0)` slot, so one geometry cache serves both
- * pipelines (decision, WP-3a.3).
- *
- * ## §55's frame is the same uniform (R-29, 2026-08-08)
- *
- * A frame sub-rectangle does **not** need an authored uv attribute, which is
- * what this backend expected before R-29 measured it. Sampling a sub-rectangle
- * is an affine reparametrization of the map above, so it is reached by
- * uploading a different `quad` — the (larger, offset) rectangle the whole
- * texture would occupy — and changing nothing else. `webgl-renderer.ts` derives
- * it; `@fourjs/render`'s `sprite.ts` carries the algebra. The consequences that
- * matter here: no second uniform, no second attribute, no new GL call, and a
- * frameless sprite's transcript byte-identical because it is the same code
- * path with the same values.
+ * `Sprite` writes the atlas cell onto `BufferGeometry.uvs` at the same fixed
+ * {@link UV_ATTRIBUTE_LOCATION} the unlit `map` path already binds, so one
+ * geometry cache serves both pipelines. There is no `quad` uniform: a frame
+ * change is a versioned attribute rewrite, not a per-draw `vec4`.
  *
  * `v = 0` is the quad's **bottom** edge, matching §7a's Y-up world and the
- * bottom-row-first texel order `@fourjs/render`'s `TextureSource` documents; no
- * flip is needed anywhere in this backend, and §55 frames are measured from the
- * bottom-left texel for the same reason.
+ * bottom-row-first texel order `@fourjs/render`'s `TextureSource` documents.
  */
 const SPRITE_VERTEX_SHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 position;
+layout(location = 2) in vec2 uv;
 
 uniform mat4 viewProjection;
 uniform mat4 model;
-uniform vec4 quad;
 
 out vec2 vUv;
 
 void main() {
-  vUv = (position.xy - quad.xy) / quad.zw;
+  vUv = uv;
   gl_Position = viewProjection * model * vec4(position, 1.0);
 }
 `;
@@ -1283,13 +1268,12 @@ export class ShadowUniforms {
  *
  * The normal is transformed by the **inverse transpose** of the model
  * matrix's upper 3×3 — the standard fix for non-uniform scale, under which
- * the plain 3×3 would bend normals off their surfaces. GLSL ES 3.00 has
- * `inverse()` and `transpose()` built in, so the matrix is derived in the
- * shader per vertex rather than uploaded per draw; staged with a dated note
- * (2026-08-04): when `@fourjs/math`'s `Matrix3` grows a normal-matrix utility,
- * hoisting this to a per-draw uniform saves the per-vertex inversion. MVP
- * vertex counts make the difference unmeasurable, and the shader route needs
- * no new upload path or math surface today.
+ * the plain 3×3 would bend normals off their surfaces. That matrix is
+ * `Matrix3.setNormalFromMatrix4` on the CPU, uploaded once per draw as
+ * `uniform mat3 normalMatrix` (the 2026-08-04 staging note: landed 2026-09-09).
+ * Pixel-identical to the previous per-vertex `transpose(inverse(mat3(model)))`
+ * on any non-singular model; a singular model leaves the scratch identity,
+ * matching invert()'s no-op rather than GLSL's undefined inverse.
  */
 const LIT_VERTEX_SHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 position;
@@ -1298,13 +1282,14 @@ layout(location = 2) in vec2 uv;
 
 uniform mat4 viewProjection;
 uniform mat4 model;
+uniform mat3 normalMatrix;
 
 out vec3 vNormal;
 out vec3 vWorldPosition;
 out vec2 vUv;
 
 void main() {
-  vNormal = transpose(inverse(mat3(model))) * normal;
+  vNormal = normalMatrix * normal;
   vWorldPosition = (model * vec4(position, 1.0)).xyz;
   vUv = uv;
   gl_Position = viewProjection * model * vec4(position, 1.0);
@@ -1422,6 +1407,40 @@ void main() {
  * is consumed by the GL call before the next `set()` can happen.
  */
 export const matrixScratch = new Float32Array(16);
+
+/**
+ * Scratch for the lit/standard `uniform mat3 normalMatrix` upload.
+ *
+ * A dedicated 9-float buffer rather than a view onto {@link matrixScratch}:
+ * `setModel` writes the 4×4 first, and the GL call consumes that buffer
+ * synchronously, but a shared backing store would still make recording
+ * doubles (which keep the argument by reference) rewrite every earlier
+ * `uniformMatrix4fv` line with the 3×3's tail. One extra 36-byte array,
+ * module-level, never per draw.
+ */
+const matrix3Scratch = new Float32Array(9);
+
+/**
+ * Reused {@link Matrix3} for {@link uploadNormalMatrix}. Constructed once;
+ * `setNormalFromMatrix4` mutates in place and allocates nothing (plan D7).
+ */
+const normalMatrixScratch = new Matrix3();
+
+/**
+ * Derives `transpose(inverse(upper 3×3))` of `model` and uploads it as a
+ * column-major `mat3`. Seeds the scratch to identity first so a singular
+ * model (invert no-op) cannot leak the previous draw's inverse-transpose.
+ */
+export function uploadNormalMatrix(
+  gl: WebglContext,
+  location: GlUniformLocation,
+  model: Matrix4,
+): void {
+  normalMatrixScratch.identity();
+  normalMatrixScratch.setNormalFromMatrix4(model);
+  matrix3Scratch.set(normalMatrixScratch.elements);
+  gl.uniformMatrix3fv(location, false, matrix3Scratch);
+}
 
 /** Scratch for {@link UnlitProgram.setColor}; see {@link matrixScratch}. */
 const colorScratch = new Float32Array(4);
@@ -1799,15 +1818,13 @@ export class UnlitProgram implements Disposable {
  * program.setSampler(0);                        // once per activation
  * program.setViewProjection(viewProjection);    // once per viewport
  * program.setModel(item.worldMatrix);           // once per draw
- * program.setQuad(minX, minY, width, height);   // the whole texture's local rect
  * program.setTint(item.material.tint);
  * ```
  *
  * It shares `gl-geometry.ts`'s vertex arrays with {@link UnlitProgram}: both
- * declare the position stream at the fixed
- * {@link POSITION_ATTRIBUTE_LOCATION}, which is what "a second pipeline reuses
- * these vertex arrays unchanged" in that module's header was written for. See
- * `SPRITE_VERTEX_SHADER_SOURCE` for why there is no uv attribute.
+ * declare the position stream at {@link POSITION_ATTRIBUTE_LOCATION} and the
+ * uv stream at {@link UV_ATTRIBUTE_LOCATION}. `Sprite` authors the atlas cell
+ * onto that stream; this program interpolates it.
  *
  * Owns its GL objects and nothing else — the texture it samples belongs to
  * `gl-texture.ts`'s cache, and the renderer re-creates this program on context
@@ -1822,8 +1839,6 @@ export class SpriteProgram implements Disposable {
 
   readonly #modelLocation: GlUniformLocation;
 
-  readonly #quadLocation: GlUniformLocation;
-
   readonly #tintLocation: GlUniformLocation;
 
   readonly #samplerLocation: GlUniformLocation;
@@ -1835,7 +1850,6 @@ export class SpriteProgram implements Disposable {
     program: GlProgramHandle,
     viewProjectionLocation: GlUniformLocation,
     modelLocation: GlUniformLocation,
-    quadLocation: GlUniformLocation,
     tintLocation: GlUniformLocation,
     samplerLocation: GlUniformLocation,
   ) {
@@ -1843,7 +1857,6 @@ export class SpriteProgram implements Disposable {
     this.#program = program;
     this.#viewProjectionLocation = viewProjectionLocation;
     this.#modelLocation = modelLocation;
-    this.#quadLocation = quadLocation;
     this.#tintLocation = tintLocation;
     this.#samplerLocation = samplerLocation;
   }
@@ -1868,7 +1881,6 @@ export class SpriteProgram implements Disposable {
         program,
         requireUniform(gl, program, "viewProjection", "sprite"),
         requireUniform(gl, program, "model", "sprite"),
-        requireUniform(gl, program, "quad", "sprite"),
         requireUniform(gl, program, "tint", "sprite"),
         requireUniform(gl, program, "map", "sprite"),
       );
@@ -1921,24 +1933,6 @@ export class SpriteProgram implements Disposable {
   setModel(matrix: Matrix4): void {
     matrixScratch.set(matrix.elements);
     this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
-  }
-
-  /**
-   * Uploads the local rectangle the **whole texture** maps onto —
-   * `(minX, minY, width, height)` — from which the vertex stage derives uv.
-   *
-   * For a sprite with no §55 frame that is the quad's own local rectangle, and
-   * the parameter names still read that way. For a framed one it is the
-   * rectangle the quad's frame is a window into, which is larger than the quad
-   * and generally starts outside it; the caller derives it. See
-   * `SPRITE_VERTEX_SHADER_SOURCE` for both.
-   */
-  setQuad(minX: number, minY: number, width: number, height: number): void {
-    colorScratch[0] = minX;
-    colorScratch[1] = minY;
-    colorScratch[2] = width;
-    colorScratch[3] = height;
-    this.#gl.uniform4fv(this.#quadLocation, colorScratch);
   }
 
   /**
@@ -2011,6 +2005,8 @@ export class LitProgram implements Disposable {
 
   readonly #modelLocation: GlUniformLocation;
 
+  readonly #normalMatrixLocation: GlUniformLocation;
+
   readonly #colorLocation: GlUniformLocation;
 
   readonly #ambientLightLocation: GlUniformLocation;
@@ -2039,6 +2035,7 @@ export class LitProgram implements Disposable {
     program: GlProgramHandle,
     viewProjectionLocation: GlUniformLocation,
     modelLocation: GlUniformLocation,
+    normalMatrixLocation: GlUniformLocation,
     colorLocation: GlUniformLocation,
     ambientLightLocation: GlUniformLocation,
     lightDirectionLocation: GlUniformLocation,
@@ -2052,6 +2049,7 @@ export class LitProgram implements Disposable {
     this.#program = program;
     this.#viewProjectionLocation = viewProjectionLocation;
     this.#modelLocation = modelLocation;
+    this.#normalMatrixLocation = normalMatrixLocation;
     this.#colorLocation = colorLocation;
     this.#ambientLightLocation = ambientLightLocation;
     this.#lightDirectionLocation = lightDirectionLocation;
@@ -2081,6 +2079,7 @@ export class LitProgram implements Disposable {
         program,
         requireUniform(gl, program, "viewProjection", "lit"),
         requireUniform(gl, program, "model", "lit"),
+        requireUniform(gl, program, "normalMatrix", "lit"),
         requireUniform(gl, program, "color", "lit"),
         requireUniform(gl, program, "ambientLight", "lit"),
         requireUniform(gl, program, "lightDirection", "lit"),
@@ -2119,10 +2118,11 @@ export class LitProgram implements Disposable {
     );
   }
 
-  /** Uploads one render item's world matrix. See {@link setViewProjection}. */
+  /** Uploads one render item's world matrix and its derived normal matrix. */
   setModel(matrix: Matrix4): void {
     matrixScratch.set(matrix.elements);
     this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
+    uploadNormalMatrix(this.#gl, this.#normalMatrixLocation, matrix);
   }
 
   /**

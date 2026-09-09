@@ -7,9 +7,14 @@
  *
  * - **Simulated on the CPU, per fixed step.** A `ParticleSystem` is registered
  *   on the application's §39 registry at priority 500 and steps the emitters
- *   with the injected `fixedDeltaTime`. Nothing here reads a clock (§33); the
- *   one `performance.now()`-shaped value in this file is the rAF timestamp
- *   handed to `app.step`, which is presentation-side by construction (§10).
+ *   with the injected `fixedDeltaTime`. Nothing here reads a clock into the
+ *   simulation (§33). The rAF timestamp handed to `app.step` is presentation-
+ *   side by construction (§10). Two more `performance.now()` reads wrap the
+ *   particle step and `renderer.render` so `#status` can publish **simulate**
+ *   and **present** as separate seconds (R-33's measurement split). Those
+ *   readings never enter `fixedDeltaTime` or an emitter. The split has landed;
+ *   §112's exit still needs a run on **non-SwiftShader** hardware — this page
+ *   does not claim that exit.
  * - **Driven by §27 force fields.** The fountain runs under uniform gravity, a
  *   linear drag and a vortex about +Z, evaluated in that order (the order is
  *   part of the contract — floating-point addition is not associative).
@@ -44,6 +49,25 @@
  * *per system*" visible: the render list carries exactly two particle items, and
  * the backend issues exactly two instanced draws, whatever the particle counts
  * are.
+ *
+ * ## R-33 — simulate vs present, published separately
+ *
+ * §112's exit is *"100k simple particles simulated **and** rendered at
+ * interactive rates on suitable hardware"*. This Cloud / CI host is SwiftShader
+ * and is **not** that hardware, so the page never folds the two halves into one
+ * number and never claims a 16.6 ms budget. After each host frame `#status`
+ * carries:
+ *
+ * | attribute        | unit     | what it is                                              |
+ * | ---------------- | -------- | ------------------------------------------------------- |
+ * | `data-simulate`  | seconds  | wall-clock cost of `ParticleSystem.fixedUpdate` for the frame's fixed-step burst |
+ * | `data-present`   | seconds  | wall-clock cost of `renderer.render` (list + upload + draw) |
+ *
+ * Seconds, not milliseconds: every engine time is seconds (§7a). The visible
+ * sentence shows milliseconds so a human can read it; the attributes stay in
+ * seconds, the way `examples/first-2d-scene` publishes `data-alpha` /
+ * `data-dropped` / `data-substeps`. A later hardware run fills the numbers;
+ * this file only lands the split.
  *
  * ## Colour discipline
  *
@@ -95,6 +119,7 @@ import {
   dragField,
   uniformGravityField,
   vortexField,
+  type ParticleFixedUpdateContext,
 } from "fourJS/particles";
 import { WebglRenderer } from "fourJS/render-webgl";
 import { OrthographicCamera, createFullscreenViewport } from "fourJS/scene";
@@ -119,6 +144,66 @@ function requireElement<T extends Element>(selector: string): T {
 
 const canvas = requireElement<HTMLCanvasElement>("#scene");
 const status = requireElement<HTMLParagraphElement>("#status");
+
+/**
+ * Presentation-side clock in **seconds** (§7a). `performance.now()` is
+ * milliseconds; divide here so every stored duration matches engine time.
+ * Never handed to `app.step` or an emitter.
+ */
+function nowSeconds(): number {
+  return performance.now() / 1000;
+}
+
+/**
+ * Wall-clock seconds spent inside `ParticleSystem.fixedUpdate` for the host
+ * frame that just finished — every fixed step of that frame, summed.
+ *
+ * Reset to `0` at the top of each `app.step` so a frame that ran no fixed
+ * step publishes `0` rather than last frame's number. A later hardware run
+ * reads this; SwiftShader numbers are not an §112 claim.
+ */
+let lastSimulateSeconds = 0;
+
+/**
+ * Wall-clock seconds spent inside `renderer.render` for the host frame that
+ * just finished — list build (including `updateParticleInstances`), instance
+ * upload, and the two instanced draws. Separate from {@link lastSimulateSeconds}
+ * on purpose: folding them would hide which half is the cost.
+ */
+let lastPresentSeconds = 0;
+
+/**
+ * `ParticleSystem` that accumulates the last frame's integration cost.
+ *
+ * A subclass rather than assigning over `fixedUpdate`: class methods are not
+ * writable under `tsc`, and a listener on `fixedUpdate` would fire *after*
+ * the systems (§45), missing the integration it claimed to time.
+ */
+class TimedParticleSystem extends ParticleSystem {
+  override fixedUpdate(context: ParticleFixedUpdateContext): void {
+    const started = nowSeconds();
+    super.fixedUpdate(context);
+    lastSimulateSeconds += nowSeconds() - started;
+  }
+}
+
+/**
+ * `WebglRenderer` that records list + upload + draw as `lastPresentSeconds`.
+ *
+ * `#draw` is the last thing in `Application.step`, after the `render`
+ * listeners, so a listener cannot see that cost. Overriding `render` is the
+ * seam that can.
+ */
+class TimedWebglRenderer extends WebglRenderer {
+  override render(
+    ...args: Parameters<WebglRenderer["render"]>
+  ): ReturnType<WebglRenderer["render"]> {
+    const started = nowSeconds();
+    const result = super.render(...args);
+    lastPresentSeconds = nowSeconds() - started;
+    return result;
+  }
+}
 
 /** Layout size in CSS pixels; the drawing buffer is this times the DPR. */
 const WIDTH = 800;
@@ -149,7 +234,7 @@ view.clearColor = [0.051, 0.059, 0.078, 1];
 
 // --- application (§45) ------------------------------------------------------
 
-const renderer = new WebglRenderer();
+const renderer = new TimedWebglRenderer();
 const app = new Application({ renderer, canvas, views: [view] });
 
 renderer.resize(WIDTH, HEIGHT, window.devicePixelRatio);
@@ -269,7 +354,7 @@ app.scene.add(burst);
 // 500). It tracks *emitters*, not renderables: the renderable's own per-frame
 // job — repacking the instance array — is done by `buildRenderList`, on the
 // render clock, not on the fixed-step clock.
-const particles = new ParticleSystem();
+const particles = new TimedParticleSystem();
 app.systems.register(particles);
 particles.track(fountainEmitter);
 particles.track(burstEmitter);
@@ -293,9 +378,16 @@ let frameCount = 0;
  * Mirrors the live simulation onto `#status`, so a browser gate can read the
  * engine's own numbers instead of inferring everything from pixels.
  *
- * Called from `update` — once per host frame, after every fixed step of that
- * frame has run — because these are counts a *frame* observes, not quantities a
- * fixed step produces.
+ * Called after `app.step` returns — once per host frame, after every fixed
+ * step *and* the draw of that frame have run — because `data-simulate` /
+ * `data-present` are costs a *frame* observes, not quantities a fixed step
+ * produces. Counts (`data-fountain`, …) move here with them so one write
+ * owns the element, the way `examples/first-2d-scene` publishes `data-alpha`
+ * / `data-dropped` / `data-substeps` after `step`.
+ *
+ * `data-simulate` and `data-present` are **seconds** (§7a). The visible
+ * sentence shows milliseconds. R-33's split has landed; §112's exit still
+ * needs non-SwiftShader hardware.
  */
 function publish(): void {
   status.dataset["state"] = "running";
@@ -306,16 +398,18 @@ function publish(): void {
   status.dataset["dropped"] = String(
     fountainEmitter.droppedCount + burstEmitter.droppedCount,
   );
+  // Seconds, six digits — same precision `first-2d-scene` uses for
+  // `data-dropped` (a duration). Two attributes, never one folded number.
+  status.dataset["simulate"] = lastSimulateSeconds.toFixed(6);
+  status.dataset["present"] = lastPresentSeconds.toFixed(6);
+  const simulateMs = lastSimulateSeconds * 1000;
+  const presentMs = lastPresentSeconds * 1000;
   status.textContent =
     `${String(fountainEmitter.particleCount)} fountain + ` +
     `${String(burstEmitter.particleCount)} burst particles — ` +
-    `2 draw calls — click for a burst`;
+    `2 draw calls — simulate ${simulateMs.toFixed(2)} ms / ` +
+    `present ${presentMs.toFixed(2)} ms — click for a burst`;
 }
-
-app.on("update", () => {
-  frameCount += 1;
-  publish();
-});
 
 // --- the frame loop ---------------------------------------------------------
 
@@ -336,7 +430,15 @@ let last: number | null = null;
 
 function frame(now: number): void {
   if (last !== null) {
+    // A new host frame: drop last burst's costs so a 0-substep or skipped-draw
+    // frame publishes `0` rather than a stale number. TimedParticleSystem
+    // adds simulate per fixed step; TimedWebglRenderer overwrites present
+    // when `#draw` runs.
+    lastSimulateSeconds = 0;
+    lastPresentSeconds = 0;
     app.step((now - last) / 1000);
+    frameCount += 1;
+    publish();
   }
   last = now;
   requestAnimationFrame(frame);

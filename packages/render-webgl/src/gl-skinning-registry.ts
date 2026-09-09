@@ -91,13 +91,44 @@ export interface SkinnedLitPipeline {
 }
 
 /**
+ * The surface the §69 caster pass needs from the skinned **depth-only**
+ * program — `ShadowProgram`'s two matrix uploads plus the palette. Structural,
+ * so the renderer (and `gl-shadow.ts`) never names the class or the skinning
+ * GLSL; those live behind `registerSkinningPipeline`.
+ */
+export interface SkinnedShadowPipeline {
+  /** Makes this the current program. */
+  use(): void;
+  /** Uploads the light's shadow view-projection, once per shadow pass. */
+  setViewProjection(matrix: Matrix4): void;
+  /** Uploads one caster's world matrix. */
+  setModel(matrix: Matrix4): void;
+  /** Uploads the item's joint palette — 16 floats per joint (§54). */
+  setJointMatrices(palette: Float32Array): void;
+}
+
+/**
  * One renderer's compiled skinned programs — created lazily on the first
- * skinned draw, dropped on context loss, disposed with the renderer.
+ * skinned colour draw, dropped on context loss, disposed with the renderer.
+ *
+ * The depth-only caster is **not** compiled with the colour pair: a skinned
+ * mesh that never casts must not add a third `createProgram`. The renderer
+ * asks through {@link SkinnedPrograms.acquireShadow} on the first skinned
+ * caster instead.
  */
 export interface SkinnedPrograms {
   readonly unlit: SkinnedUnlitPipeline;
   readonly lit: SkinnedLitPipeline;
-  /** Deletes both GL programs. Live context only; idempotent. */
+  /**
+   * Compiles the skinned caster on first call and returns it. Subsequent
+   * calls reuse the compiled program. May throw `SHADER_COMPILATION_FAILED`
+   * (§89) on the first failure; the renderer catches it — §61 forbids a
+   * frame from throwing — and skips skinned casters on that context. A
+   * later call after a failure must not retry the compile (a `failProgramAt`
+   * driver would otherwise succeed on the next index).
+   */
+  acquireShadow(): SkinnedShadowPipeline;
+  /** Deletes the colour pair and, if compiled, the caster. Live context only; idempotent. */
   dispose(): void;
 }
 
@@ -106,10 +137,13 @@ export interface SkinnedPrograms {
  * **once per context, on the first skinned draw** — never at initialize, so a
  * scene with no skinned mesh issues the byte-identical GL sequence it always
  * did (the RFC's acceptance gate), and never per frame.
+ *
+ * `create` compiles the **colour** pair only (unlit + lit). The caster is
+ * compiled later, from the returned pair, if a skinned mesh actually casts.
  */
 export interface SkinningPipelineFactory {
   /**
-   * Compiles the two skinned programs on `gl`. May throw
+   * Compiles the two skinned colour programs on `gl`. May throw
    * `SHADER_COMPILATION_FAILED` (§89); the renderer catches it — §61 forbids a
    * frame from throwing — warns once, and skins nothing on that context.
    */

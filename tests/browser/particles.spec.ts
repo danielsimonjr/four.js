@@ -18,6 +18,12 @@
  * rasteriser with no GPU is not "suitable hardware", and a CI gate that asserted
  * 100 000 particles at 60 fps on one would be measuring the rasteriser.
  *
+ * R-33's **simulate / present split** has landed on `#status` (`data-simulate`
+ * and `data-present`, seconds, §7a). This file asserts those attributes exist,
+ * are finite, are non-negative, and are **two attributes** — not one folded
+ * number, and **not** a 16.6 ms / 60 fps budget. §112's exit still needs a
+ * run on non-SwiftShader hardware.
+ *
  * ```text
  * page load → WebGL 2 context → ParticleSystem (§39 priority 500)
  *   → ParticleEmitter.step(fixedDeltaTime) → §27 fields → plane collision
@@ -50,6 +56,7 @@
  * | draws and moves | §36, §64 | thousands of warm (fountain-coloured) pixels are on screen, and two frames 300 ms apart differ over a large area |
  * | collides | §36 | every warm pixel stays **above** the collision plane's row — the fountain rests on its floor instead of falling out of the world |
  * | burst | §36 | before a click there is not one cool (burst-coloured) pixel; a click raises `data-bursts`, puts 900 particles in the burst pool, and paints thousands of cool pixels; and the burst then **expires** on its own |
+ * | simulate vs present | R-33 | `#status` publishes `data-simulate` and `data-present` as two finite, non-negative **seconds**; they are distinct attributes. **No** 16.6 ms / 60 fps assertion — SwiftShader is not suitable hardware; §112's exit is not claimed |
  *
  * Every threshold below states the number the WP-9.4 probe measured and the
  * margin it leaves. Nothing here is a golden image: the gate runs on
@@ -391,6 +398,16 @@ interface StatusData {
   bursts?: string;
   frames?: string;
   dropped?: string;
+  /**
+   * Wall-clock seconds of particle integration for the last host frame's
+   * fixed-step burst (R-33). Distinct from {@link StatusData.present}.
+   */
+  simulate?: string;
+  /**
+   * Wall-clock seconds of list + upload + draw for the last host frame
+   * (R-33). Distinct from {@link StatusData.simulate}.
+   */
+  present?: string;
 }
 
 async function readStatus(page: Page): Promise<StatusData> {
@@ -428,9 +445,9 @@ async function openDemo(page: Page): Promise<ErrorLog> {
   await page.goto(PARTICLES_URL, { waitUntil: "load" });
 
   // Readiness is the page's own claim, not a sleep: `data-state` flips to
-  // "running" on the first `update` event, and `data-fountain` is non-zero once
-  // the emitter has actually spawned. The probe measured 126 ms; 20 s is the
-  // budget for a cold software-GL start.
+  // "running" after the first completed `app.step` (fixed steps + draw), and
+  // `data-fountain` is non-zero once the emitter has actually spawned. The
+  // probe measured 126 ms; 20 s is the budget for a cold software-GL start.
   await page.waitForFunction(
     () => {
       const status = document.querySelector<HTMLElement>("#status");
@@ -565,11 +582,11 @@ test.describe("examples/particles-demo (§112, §36)", () => {
     // The engine's own account of the click. Waited for rather than read
     // immediately, and the distinction is a real property of the page rather
     // than flake tolerance: `emit()` happens in the `pointerdown` listener, but
-    // `#status` is rewritten from the `update` event — once per host frame. So
-    // between the click returning and the next frame publishing, the DOM still
-    // says zero bursts. One frame under SwiftShader is tens of milliseconds
-    // against a burst lifetime of 1.6 s, so the count read afterwards is still
-    // the full 900.
+    // `#status` is rewritten after `app.step` returns — once per host frame.
+    // So between the click returning and the next frame publishing, the DOM
+    // still says zero bursts. One frame under SwiftShader is tens of
+    // milliseconds against a burst lifetime of 1.6 s, so the count read
+    // afterwards is still the full 900.
     await page.waitForFunction(
       () =>
         Number(
@@ -614,5 +631,50 @@ test.describe("examples/particles-demo (§112, §36)", () => {
 
     // The fountain never stopped while all that happened.
     expect(after.fountain).toBeGreaterThanOrEqual(MINIMUM_FOUNTAIN_PIXELS);
+  });
+
+  test("publishes simulate and present as separate finite seconds (R-33 split; no fps budget)", async ({
+    page,
+  }) => {
+    await openDemo(page);
+
+    // After `openDemo` the first completed `app.step` has already written both
+    // attributes. Read the raw attribute *names* as well as the values — the
+    // whole of the assertion is that the split exists and is honest, not that
+    // it beats 16.6 ms.
+    const published = await page.locator("#status").evaluate((element) => ({
+      names: [...element.attributes]
+        .map((attribute) => attribute.name)
+        .filter((name) => name.startsWith("data-")),
+      simulate: element.getAttribute("data-simulate"),
+      present: element.getAttribute("data-present"),
+    }));
+    expect(
+      published.names.includes("data-simulate"),
+      "data-simulate is missing — the R-33 split did not land",
+    ).toBe(true);
+    expect(
+      published.names.includes("data-present"),
+      "data-present is missing — present was folded into simulate, or not published",
+    ).toBe(true);
+    expect(
+      published.names.indexOf("data-simulate"),
+      "simulate and present must be two attributes, not one name",
+    ).not.toBe(published.names.indexOf("data-present"));
+
+    const simulate = statusNumber(published.simulate ?? undefined);
+    const present = statusNumber(published.present ?? undefined);
+    expect(Number.isFinite(simulate), `data-simulate=${published.simulate ?? ""}`).toBe(
+      true,
+    );
+    expect(Number.isFinite(present), `data-present=${published.present ?? ""}`).toBe(
+      true,
+    );
+    expect(simulate).toBeGreaterThanOrEqual(0);
+    expect(present).toBeGreaterThanOrEqual(0);
+
+    // Deliberately no `toBeLessThan(1 / 60)` (or 16.6 ms). This gate runs on
+    // SwiftShader. §112's "interactive rates on suitable hardware" exit is
+    // not claimed here.
   });
 });

@@ -36,13 +36,13 @@
  *    default attribute produces, and the fragment stage — shared text between
  *    the two variants — resolves it through the *same* `len > 0` guard to the
  *    same documented shading. Two variants, one arithmetic.
- * 3. **The inverse-transpose is a hand-written function.** GLSL ES 3.00 has
- *    `inverse()` built in; WGSL does not. {@link NORMAL_MATRIX_WGSL} computes
- *    the same matrix per vertex from the cofactor columns —
- *    `transpose(inverse(A)) = cofactor(A) / det(A)`, exact in exact arithmetic
- *    — so the staged note on `LIT_VERTEX_SHADER_SOURCE` (hoist to a per-draw
- *    uniform when `Matrix3` grows a normal-matrix utility) applies to both
- *    backends at once, and neither has hoisted yet.
+ * 3. **The inverse-transpose is a per-draw uniform.** GLSL ES 3.00 has
+ *    `inverse()` built in; WGSL does not. WebGL packs
+ *    `Matrix3.setNormalFromMatrix4` once per draw as `uniform mat3`; this
+ *    backend does the same into `DrawUniforms.normalMatrix` (a std140-ish
+ *    `mat3x3` at offset 144, 48 padded bytes, so the shared block is 192).
+ *    {@link NORMAL_MATRIX_WGSL} is the historical per-vertex cofactor form,
+ *    kept exported for grep/docs — it is not spliced into the live modules.
  */
 
 import { DRAW_UNIFORM_WGSL } from "./wgpu-bindings.js";
@@ -115,14 +115,14 @@ export function shadedVertexBufferLayouts(
 
 /**
  * The inverse-transpose of the model matrix's upper 3×3, as WGSL — the
- * standard fix for non-uniform scale, which GLSL derives with the built-in
- * `inverse()` WGSL does not have.
+ * historical per-vertex cofactor form.
  *
  * Cofactor form: with columns `a₀ a₁ a₂`, `transpose(inverse(A))` has columns
- * `a₁×a₂, a₂×a₀, a₀×a₁`, all over `det(A) = a₀·(a₁×a₂)`. A degenerate model
- * matrix (zero determinant) divides by zero here exactly as GLSL's `inverse()`
- * is undefined on it — flattened-to-nothing geometry is not a shading input
- * either backend defends.
+ * `a₁×a₂, a₂×a₀, a₀×a₁`, all over `det(A) = a₀·(a₁×a₂)`. Kept exported so
+ * tests and docs that grep the name still find it; the live lit/standard
+ * vertex stages read `draw.normalMatrix`, packed once per draw by
+ * `Matrix3.setNormalFromMatrix4` (the same inverse-transpose, and the same
+ * identity-on-singular policy the math tests pin).
  */
 export const NORMAL_MATRIX_WGSL = `fn normalMatrix(model : mat4x4<f32>) -> mat3x3<f32> {
   let a0 = model[0].xyz;
@@ -170,13 +170,7 @@ export function shadedVertexStageWgsl(normals: boolean, map: boolean): string {
       : ""
   }
 };
-${
-  normals
-    ? `
-${NORMAL_MATRIX_WGSL}
-`
-    : ""
-}
+
 @vertex
 fn ${VERTEX_ENTRY_POINT}(
 ${input}
@@ -185,7 +179,7 @@ ${input}
   let world = draw.model * vec4<f32>(position, 1.0);
   output.worldPosition = world.xyz;
   output.normal = ${
-    normals ? "normalMatrix(draw.model) * normal" : "vec3<f32>(0.0, 0.0, 0.0)"
+    normals ? "draw.normalMatrix * normal" : "vec3<f32>(0.0, 0.0, 0.0)"
   };${
     map
       ? `
@@ -214,8 +208,9 @@ ${input}
  * `shadow` (WP-R1.7) swaps the light block for `wgpu-shadow.ts`'s widened
  * twin, splices `shadowFactor`, and multiplies the directional product before
  * it joins the lighting sum — GL's `useShadow` branch, as a variant; the
- * module header carries the argument. With it false — the default, and every
- * pre-R1.7 call — the emitted text is byte-identical to what WP-R1.5 landed.
+ * module header carries the argument. With it false — the default — the
+ * fragment arithmetic is the WP-R1.5 expression; the vertex stage reads
+ * `draw.normalMatrix` rather than the per-vertex cofactor that packet used.
  */
 export function litShaderSource(
   normals: boolean,
