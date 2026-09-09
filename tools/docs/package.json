@@ -4,10 +4,11 @@
   "version": "0.0.0",
   "description": "Isolates TypeDoc and the TypeScript it needs, so the workspace root can be TypeScript 7 only.",
   "scripts": {
-    "build": "typedoc --options ../../typedoc.json"
+    "check-compiler": "node check-compiler.mjs",
+    "build": "node check-compiler.mjs && node ./node_modules/typedoc/bin/typedoc --options ../../typedoc.json"
   },
   "devDependencies": {
     "typedoc": "0.28.20",
-    "typescript": "7.0.2"
+    "typescript": "6.0.3"
   }
 }

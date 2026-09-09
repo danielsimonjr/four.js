@@ -14,6 +14,12 @@ stay on the tracker.
 
 ### Fixed
 
+- **`tools/docs` TypeScript pin restored to 6.0.3.** Dependabot #82 bumped the
+  isolated docs package to 7.0.2 with the root and `bun run docs` died on
+  TypeDoc's `PropertyDeclaration` read — the exact failure the isolation was
+  built to prevent. Main was already red. `tools/docs/check-compiler.mjs` now
+  refuses any resolve that is not 6.0.x so the next bump is a one-line revert.
+
 - **`smoothness.spec.ts` interpolation flake.** The 2026-09-06 virtual-frame wait
   was correct; Playwright's screenshot still let the patched rAF advance 1.5Δ
   frames during SwiftShader PNG encode. A stable stride of 3 aliased the

@@ -30,6 +30,11 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — tools/docs must stay on typescript@6.0.3.** Dependabot #82
+  bumped it to 7.0.2 with the root. TypeDoc 0.28's peer is 5.0–6.0; CI died
+  on `PropertyDeclaration`. Isolation is a version pin, not a directory.
+  `check-compiler.mjs` refuses anything else. Root 7.x is free to move.
+
 - **2026-09-09 — Open-TODO contained-item pass.** Smoothness flake was
   screenshot-stride aliasing against the period-2 virtual clock, not
   dropped-time; pause rAF during `grab()`. §79 diagnostics name authored type
