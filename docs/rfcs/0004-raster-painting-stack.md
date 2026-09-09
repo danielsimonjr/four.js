@@ -546,6 +546,16 @@ the count stays at five.
 | Mipmaps and filter modes for raster surfaces     | `R-30`                                                                                                                                                                       |
 | The §62 Canvas 2D backend                        | nothing in this RFC; it stays a stub by decision (§2c)                                                                                                                       |
 
+**Residue (2026-09-09).** The deferred table above is still the whole remaining
+packet, and **none of it is scheduled**. Video textures and `ImageBitmap` /
+decoded-image sources overlap **R-30c** (cube/array/3D, compressed,
+video/`ImageBitmap`, async upload) — treating both checkboxes as independent
+implementable slices would count the same work twice. The §62 Canvas 2D
+backend stays a stub **by this RFC's own §2c decision**, not because the MVP
+packet is unfinished. GPU readback left this table for
+`docs/rfcs/0009-gpu-readback-raster-source.md` (Proposed 2026-09-06). Shipping
+any deferred row as if it closed RFC 0004 would invert this section.
+
 **Size and tree-shaking expectations**, against measured precedents rather than hope:
 
 - **`@fourjs/render`.** `CanvasTexture` is a class nobody references unless they use it, so it

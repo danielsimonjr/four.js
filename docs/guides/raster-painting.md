@@ -114,4 +114,7 @@ cost to the §10 accumulator.
 - The §73 canvas-view widget (`CanvasViewWidget` in `four/ui`) draws a
   `CanvasTexture` in the UI layer; deferred siblings — video textures,
   `ImageBitmap` sources, in-place resize, dirty-rectangle upload — are listed
-  with what each waits on in RFC 0004's §6 table.
+  with what each waits on in RFC 0004's §6 table. That table is **none
+  scheduled** (2026-09-09): video/`ImageBitmap` overlap R-30c; the Canvas 2D
+  backend stays a stub by RFC 0004 §2c. Do not treat those rows as unfinished
+  MVP.
