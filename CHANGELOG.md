@@ -38,6 +38,7 @@ stay on the tracker.
   now compare the full uploaded matrix, matching the existing particle
   program case.
 
+
 - **§79 diagnostics no longer interpolate `constructor.name`.** A minified
   `Renderable` reported as `"Ur"`. Messages and context now name authored
   document types (`"scene"`, `"group"`, registered `typeName`) and the
@@ -74,6 +75,7 @@ stay on the tracker.
   covers `countContacts` and the paths a rewritten §34 envelope can reach:
   unknown mass mode, Rapier colliders the metadata dropped, a collider whose
   body left the envelope, and collisionstay without adapter body records.
+
 
 ### Documented
 

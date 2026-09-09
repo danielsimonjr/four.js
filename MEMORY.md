@@ -59,6 +59,7 @@ readable; never delete the pointer itself.
   global branches 92.1% (adapter defensive paths). Bump still waits.
   **Superseded the same day — see the 5.0.0 landing entry above.**
 
+
 - **2026-09-09 — Browser-gate follow-up on the open-TODO PR.** Pause-during-
   grab was not enough: `waitForVirtualFrameCount` pumped the patched rAF and
   aliased even frames only. Host rAF (`__fourHostRaf`) is the pump. Character
