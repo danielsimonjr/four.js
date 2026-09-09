@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm** + **WebGL `SkinnedIdProgram`**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster**; lighting leftover **WebGPU `metalRoughnessMap`**; R-30c **map roles**; R-33 simulate/present split; dogfood cycles 4–6. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the **WebGPU** skinned id pass (needs RFC 0003 skinned pipelines).
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm** + **WebGL `SkinnedIdProgram`**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster**; lighting leftover **WebGPU `metalRoughnessMap`**; R-30c **map roles**; R-33 simulate/present split; dogfood cycles 4–7. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the **WebGPU** skinned id pass (needs RFC 0003 skinned pipelines).
 
 ### 0 · Blocked on an event, not on effort
 
@@ -874,6 +874,15 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       endpoint palettes (`0.5`). Scene transforms unchanged. Engine: **clean**.
       Docs were the defect: guides and architecture still described §43 as
       node-matrix lerp only. Patched. Checkbox stays `[ ]`.
+      **Cycle 7 (2026-09-09) — WebGL skinned GPU picking.** Consumer
+      seat: `registerPickingPipeline` + `registerSkinningPipeline` then
+      `createPickingService`. One-bone 2×2 plane translated +1 Y. Id pass
+      compiles `skinMatrix()` + `pickId`, uploads the live palette
+      (`jointMatrices[13] === 1`, not bind pose), unskinned control
+      transcripts identical with/without the skinning seam. Recording GL
+      cannot rasterise; staged texels still resolve through the §33 table.
+      Engine: **clean**. Guide index patched. WebGPU still skips skinned
+      items. Checkbox stays `[ ]`.
 
 - [x] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
       one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`
