@@ -194,7 +194,16 @@ ${input}
   return output;
 }
 
-@fragment
+${unlitFragmentStageWgsl(map)}`;
+}
+
+/**
+ * The unlit fragment stage, isolated so the skinned unlit vertex
+ * (`wgpu-skinning.ts`) splices the same source the unskinned family
+ * compiles — the two cannot drift.
+ */
+export function unlitFragmentStageWgsl(map = false): string {
+  return `@fragment
 fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
   return ${map ? "input.color * textureSample(mapTexture, mapSampler, input.uv)" : "input.color"};
 }

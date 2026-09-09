@@ -78,6 +78,7 @@ import {
   LitProgram,
   MAP_TEXTURE_UNIT,
   METAL_ROUGHNESS_TEXTURE_UNIT,
+  EMISSIVE_TEXTURE_UNIT,
   NORMAL_ATTRIBUTE_LOCATION,
   PARTICLE_ATTRIBUTE_LOCATIONS,
   PARTICLE_GL,
@@ -968,6 +969,8 @@ class TestStandardMaterial {
   map?: ItemTexture | null;
 
   metalRoughnessMap?: ItemTexture | null;
+
+  emissiveMap?: ItemTexture | null;
 
   constructor(
     baseColor: [number, number, number, number] = [1, 1, 1, 1],
@@ -4949,6 +4952,17 @@ function litTriangleGeometry(): TestGeometry {
   );
 }
 
+/** Lit triangle plus a uv stream — an emissive-only (no albedo) draw still interpolates uvs. */
+function litUvTriangleGeometry(): TestGeometry {
+  return new TestGeometry(
+    new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+    undefined,
+    "triangles",
+    new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+    new Float32Array([0, 0, 1, 0, 0, 1]),
+  );
+}
+
 function litRenderable(
   geometry: TestGeometry = litTriangleGeometry(),
   material: TestLitMaterial = new TestLitMaterial(),
@@ -8018,7 +8032,7 @@ function standardRenderable(
 }
 
 describe("StandardProgram — compilation and linking (§59, §61, §89)", () => {
-  it("compiles both stages, links, and resolves the twenty-six uniforms", () => {
+  it("compiles both stages, links, and resolves the twenty-eight uniforms", () => {
     const gl = createFakeGl();
 
     const program = StandardProgram.create(gl);
@@ -8043,6 +8057,8 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
       "useMap",
       "metalRoughnessMap",
       "useMetalRoughnessMap",
+      "emissiveMap",
+      "useEmissiveMap",
       // §68's light set (R-17, 2026-08-09) — the same five names, in the same
       // order, as the lit pipeline's, because both resolve them through the
       // one `PunctualLightUniforms.resolve`.
@@ -8095,6 +8111,9 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
     expect(sources[1]).toContain("uniform float metalness;");
     expect(sources[1]).toContain("uniform float roughness;");
     expect(sources[1]).toContain("uniform vec3 emissive;");
+    expect(sources[1]).toContain("uniform sampler2D emissiveMap;");
+    expect(sources[1]).toContain("uniform bool useEmissiveMap;");
+    expect(sources[1]).toContain("texture(emissiveMap, vUv)");
     expect(sources[1]).toContain("const float DIELECTRIC_F0 = 0.04;");
     expect(sources[1]).toContain("const float MIN_ROUGHNESS = 0.045;");
   });
@@ -8220,6 +8239,36 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
     program.setFeatures(false, true);
     expect(uploadsAt(gl, uniforms.get("metalRoughnessMap"))).toEqual([
       METAL_ROUGHNESS_TEXTURE_UNIT,
+    ]);
+  });
+
+  it("uploads the emissive sampler on unit 3, lazily, without touching units 0 or 2", () => {
+    const gl = createFakeGl();
+    const program = StandardProgram.create(gl);
+    program.use();
+    const uniforms = standardUniforms(gl);
+
+    program.setFeatures(false, false, false);
+    expect(gl.countOf("uniform1i")).toBe(0);
+
+    program.setFeatures(false, false, true);
+    expect(uploadsAt(gl, uniforms.get("emissiveMap"))).toEqual([
+      EMISSIVE_TEXTURE_UNIT,
+    ]);
+    expect(uploadsAt(gl, uniforms.get("useEmissiveMap"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([]);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([]);
+    expect(uploadsAt(gl, uniforms.get("metalRoughnessMap"))).toEqual([]);
+    expect(uploadsAt(gl, uniforms.get("useMetalRoughnessMap"))).toEqual([]);
+
+    program.setFeatures(false, false, true);
+    expect(gl.countOf("uniform1i")).toBe(2);
+
+    program.setFeatures(false, false, false);
+    expect(uploadsAt(gl, uniforms.get("useEmissiveMap"))).toEqual([1, 0]);
+    program.setFeatures(false, false, true);
+    expect(uploadsAt(gl, uniforms.get("emissiveMap"))).toEqual([
+      EMISSIVE_TEXTURE_UNIT,
     ]);
   });
 
@@ -8437,6 +8486,150 @@ describe("WebglRenderer.render — standard surfaces (§59, §68)", () => {
     expect(bound[1]).not.toBeNull();
     expect(bound[2]).toBeNull();
     expect(bound[3]).toBeNull();
+  });
+
+  it("binds the emissive map on unit 3 without an albedo map and restores after the draw", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const texture = new TestTexture();
+    const mapped = new TestStandardMaterial();
+    mapped.emissiveMap = texture.asTexture;
+    root.add(standardRenderable(litUvTriangleGeometry(), mapped));
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("activeTexture").map((call) => call.args[0])).toEqual([
+      GL.TEXTURE0 + EMISSIVE_TEXTURE_UNIT,
+      GL.TEXTURE0,
+    ]);
+    const bound = gl.callsOf("bindTexture").map((call) => call.args[1]);
+    expect(bound).toHaveLength(2);
+    expect(bound[0]).not.toBeNull();
+    expect(bound[1]).toBeNull();
+    // Program-lifetime mirror: the warmup frame already turned the flag on.
+    expect(uploadsAt(gl, standardUniforms(gl).get("useEmissiveMap"))).toEqual(
+      [],
+    );
+    expect(uploadsAt(gl, standardUniforms(gl).get("useMap"))).toEqual([]);
+    expect(
+      uploadsAt(gl, standardUniforms(gl).get("useMetalRoughnessMap")),
+    ).toEqual([]);
+  });
+
+  it("writes uvs when only emissiveMap is set", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const mapped = new TestStandardMaterial();
+    mapped.emissiveMap = new TestTexture().asTexture;
+    root.add(standardRenderable(litUvTriangleGeometry(), mapped));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toContain(UV_ATTRIBUTE_LOCATION);
+    expect(
+      gl.callsOf("vertexAttribPointer").some(
+        (call) =>
+          call.args[0] === UV_ATTRIBUTE_LOCATION && call.args[1] === 2,
+      ),
+    ).toBe(true);
+    expect(uploadsAt(gl, standardUniforms(gl).get("useEmissiveMap"))).toEqual([
+      1,
+    ]);
+    expect(uploadsAt(gl, standardUniforms(gl).get("useMap"))).toEqual([]);
+    expect(uploadsAt(gl, standardUniforms(gl).get("emissiveMap"))).toEqual([
+      EMISSIVE_TEXTURE_UNIT,
+    ]);
+  });
+
+  it("switches the emissive sampler off for an unmapped item after a mapped one", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const mapped = new TestStandardMaterial();
+    mapped.emissiveMap = new TestTexture().asTexture;
+    const root = createRoot();
+    root.add(
+      standardRenderable(litUvTriangleGeometry(), mapped),
+      standardRenderable(),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(uploadsAt(gl, standardUniforms(gl).get("useEmissiveMap"))).toEqual([
+      1, 0,
+    ]);
+    expect(gl.countOf("drawArrays")).toBe(2);
+  });
+
+  it("re-selects unit 3 when restoring after a draw that also bound unit 0", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const mapped = new TestStandardMaterial();
+    mapped.map = new TestTexture().asTexture;
+    mapped.emissiveMap = new TestTexture().asTexture;
+    root.add(standardRenderable(litUvTriangleGeometry(), mapped));
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("activeTexture").map((call) => call.args[0])).toEqual([
+      GL.TEXTURE0 + MAP_TEXTURE_UNIT,
+      GL.TEXTURE0 + EMISSIVE_TEXTURE_UNIT,
+      GL.TEXTURE0 + MAP_TEXTURE_UNIT,
+      GL.TEXTURE0 + EMISSIVE_TEXTURE_UNIT,
+      GL.TEXTURE0,
+    ]);
+    const bound = gl.callsOf("bindTexture").map((call) => call.args[1]);
+    expect(bound).toHaveLength(4);
+    expect(bound[0]).not.toBeNull();
+    expect(bound[1]).not.toBeNull();
+    expect(bound[2]).toBeNull();
+    expect(bound[3]).toBeNull();
+  });
+
+  it("re-selects units 2 and 3 when restoring a draw that bound MR then emissive", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const mapped = new TestStandardMaterial();
+    mapped.metalRoughnessMap = new TestTexture().asTexture;
+    mapped.emissiveMap = new TestTexture().asTexture;
+    root.add(standardRenderable(litUvTriangleGeometry(), mapped));
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("activeTexture").map((call) => call.args[0])).toEqual([
+      GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT,
+      GL.TEXTURE0 + EMISSIVE_TEXTURE_UNIT,
+      GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT,
+      GL.TEXTURE0 + EMISSIVE_TEXTURE_UNIT,
+      GL.TEXTURE0,
+    ]);
+  });
+
+  it("draws a material whose emissive map the application disposed with no emissive sample", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const texture = new TestTexture();
+    texture.disposed = true;
+    const material = new TestStandardMaterial();
+    material.emissiveMap = texture.asTexture;
+    root.add(standardRenderable(litUvTriangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("bindTexture")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(uploadsAt(gl, standardUniforms(gl).get("useEmissiveMap"))).toEqual(
+      [],
+    );
   });
 
   it("draws a material whose texture the application disposed with no map at all", async () => {

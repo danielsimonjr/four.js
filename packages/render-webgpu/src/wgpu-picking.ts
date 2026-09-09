@@ -27,7 +27,9 @@
  *   clip node does not pick as a solid quad. Clipped *content* still
  *   writes an id (scrolled-away list rows can pick — an honest reduction
  *   versus WebGL, which tests the mask bit plane);
- * - **skinned items are skipped** — this backend has no skinned pipelines;
+ * - **skinned items are skipped** — colour pair behind
+ *   `registerSkinningPipeline()`; shadow caster and id pass still absent.
+ *   A bind-pose id would be a different silhouette (RFC 0005 residue);
  *   the bounds tier serves them;
  * - **particle items write one id for the whole system** — §36's batched
  *   item has one node and no per-particle geometry, so the pass instances

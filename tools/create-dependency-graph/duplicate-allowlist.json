@@ -641,6 +641,25 @@
         "packages/render-webgpu/src/wgpu-picking-registry.ts"
       ],
       "reason": "fourJS: parallel per-backend §71 picking seams (RFC 0005). WebGL and WebGPU each own a lazily-filled module `let` so the renderer never statically reaches the id pipeline (pipeline-cost law). The public names match on purpose — `registerPickingPipeline()` is the application opt-in, one import path per backend — and cannot share a body: the frozen dependency matrix forbids render-webgl↔render-webgpu. Distinct hosts (WebglContext vs GpuDevice) and read-backs (fence vs mapAsync). 2026-09-09 wave-4 gate wiring."
+    },
+    {
+      "names": [
+        "registerSkinningPipeline",
+        "clearRegisteredSkinningPipeline",
+        "resolveSkinningPipelineFactory",
+        "setSkinningPipelineFactory",
+        "SkinningPipelineFactory",
+        "SkinnedUnlitPipeline",
+        "SkinnedLitPipeline",
+        "SkinnedPrograms"
+      ],
+      "filesGlob": [
+        "packages/render-webgl/src/gl-skinning.ts",
+        "packages/render-webgl/src/gl-skinning-registry.ts",
+        "packages/render-webgpu/src/wgpu-skinning.ts",
+        "packages/render-webgpu/src/wgpu-skinning-registry.ts"
+      ],
+      "reason": "fourJS: parallel per-backend §54 skinning seams (RFC 0003). WebGL and WebGPU each own a lazily-filled module `let` so the renderer never statically reaches the skinned colour pair (pipeline-cost law). The public names match on purpose — `registerSkinningPipeline()` is the application opt-in, one import path per backend — and cannot share a body: the frozen dependency matrix forbids render-webgl↔render-webgpu. Distinct hosts (WebglContext vs GpuDevice) and palettes (GL uniform vs a 3072-byte bind group). 2026-09-09 colour-pair slice."
     }
   ]
 }

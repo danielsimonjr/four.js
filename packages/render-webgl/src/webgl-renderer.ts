@@ -96,6 +96,7 @@ import {
 import {
   GL,
   LitProgram,
+  EMISSIVE_TEXTURE_UNIT,
   MAP_TEXTURE_UNIT,
   METAL_ROUGHNESS_TEXTURE_UNIT,
   SHADOW_TEXTURE_UNIT,
@@ -858,6 +859,12 @@ function metalRoughnessMapOf(material: {
   metalRoughnessMap?: CacheableTexture | null;
 }): CacheableTexture | null {
   return material.metalRoughnessMap ?? null;
+}
+
+function emissiveMapOf(material: {
+  emissiveMap?: CacheableTexture | null;
+}): CacheableTexture | null {
+  return material.emissiveMap ?? null;
 }
 
 function unlitColorBlends(material: object): boolean {
@@ -1925,6 +1932,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // the same unit, so a frame that mixes them issues one call either way.
     let mapUnitActive = false;
     let metalRoughnessBound = false;
+    let emissiveBound = false;
     // §69 (R-18): whether this frame bound a shadow map to
     // `SHADOW_TEXTURE_UNIT`, so the `finally` knows whether it has one to
     // unbind. A frame in which nothing casts never touches unit 1 at all.
@@ -2806,9 +2814,26 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               gl.bindTexture(GL.TEXTURE_2D, metalRoughnessTexture);
               metalRoughnessBound = true;
             }
+            const emissiveSource = emissiveMapOf(item.material);
+            const emissiveTexture =
+              emissiveSource === null
+                ? null
+                : resolveTexture(
+                    textures,
+                    renderTargets,
+                    activeTarget,
+                    emissiveSource,
+                  );
+            if (emissiveTexture !== null) {
+              gl.activeTexture(GL.TEXTURE0 + EMISSIVE_TEXTURE_UNIT);
+              mapUnitActive = false;
+              gl.bindTexture(GL.TEXTURE_2D, emissiveTexture);
+              emissiveBound = true;
+            }
             standardProgram.setFeatures(
               standardTexture !== null,
               metalRoughnessTexture !== null,
+              emissiveTexture !== null,
             );
             standardProgram.setReceivesShadow(
               shadowActive && item.receiveShadow,
@@ -2902,9 +2927,22 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       if (metalRoughnessBound && nodeUnitsBound === 0) {
         // Unit 2 is already active when this frame bound only the packed map.
         // If unit 0 was also borrowed, the restore above moved the active
-        // unit back to 0 and we have to re-select 2 before unbinding.
-        if (textureBound || mapUnitActive) {
+        // unit back to 0 and we have to re-select 2 before unbinding. Binding
+        // unit 3 after unit 2 does the same: the active unit is no longer 2.
+        if (textureBound || mapUnitActive || emissiveBound) {
           gl.activeTexture(GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT);
+        }
+        gl.bindTexture(GL.TEXTURE_2D, null);
+        if (!emissiveBound) {
+          gl.activeTexture(GL.TEXTURE0);
+        }
+      }
+      if (emissiveBound) {
+        // Unit 3 is already active when this frame bound only the emissive
+        // map. Restoring unit 0 and/or unit 2 first leaves a different unit
+        // active, so re-select 3 before unbinding.
+        if (textureBound || metalRoughnessBound || mapUnitActive) {
+          gl.activeTexture(GL.TEXTURE0 + EMISSIVE_TEXTURE_UNIT);
         }
         gl.bindTexture(GL.TEXTURE_2D, null);
         gl.activeTexture(GL.TEXTURE0);

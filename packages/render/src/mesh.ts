@@ -54,8 +54,9 @@
  *   caveat applies to a §67 `clip` on a skinned mesh (the mask is the
  *   bind-pose shape). The §69 WebGL caster pass deforms skinned casters
  *   when `registerSkinningPipeline()` is linked; without it the draw is
- *   skipped rather than casting a bind-pose shadow. WebGPU has no skinned
- *   pipelines, so a skinned mesh still casts nothing there.
+ *   skipped rather than casting a bind-pose shadow. WebGPU draws the
+ *   skinned colour pair behind the same registration; its caster and id
+ *   pass still skip (never a bind-pose shadow or pick).
  */
 
 import { FourError } from "@fourjs/core";

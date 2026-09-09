@@ -70,6 +70,26 @@ stay on the tracker.
 
 ### Changed
 
+- **WebGPU skinned colour pair (RFC 0003).** `registerSkinningPipeline()`
+  from `@fourjs/render-webgpu` compiles unlit + lit on first skinned
+  draw. Palette is a 3072-byte bind group (`MAX_SKINNING_JOINTS` × 64),
+  not inside `DrawUniforms` (192 bytes stays). Unregistered or failed
+  factories skip — never bind pose. Shadow caster and id pass still
+  skip. RFC 0003 stays open.
+
+- **WebGL `StandardMaterial.emissiveMap` (unit 3).** glTF factor ×
+  texture, sRGB. Lazy sampler; unresolved/disposed map degrades (draw
+  continues). `emissiveTexture` leaves `ignoredTextures`. WebGPU leaves
+  it unsampled — groups 2/3 already hold albedo/MR. Lighting leftover
+  stays open (`normalMap` / `occlusionMap` / WebGPU emissive).
+
+- **Dogfood cycle 7: WebGL skinned GPU picking.** Consumer-seat
+  `tests/integration/skinned-gpu-picking.test.ts`: both registration
+  seams, live palette on the id pass, unskinned control unchanged.
+  Recording GL cannot rasterise the deformed silhouette; staged texels
+  still resolve. Guide index notes WebGL `SkinnedIdProgram`; WebGPU
+  still skips skinned items. Standing map stays open.
+
 - **Texture map roles (R-30c).** Optional `TextureSource.role` /
   `Texture.role` (`"color"` | `"data"`). Omitting the field invents no
   default and leaves `colorSpace` at R-15's `"linear"`, so already-
@@ -96,8 +116,9 @@ stay on the tracker.
 - **WebGPU `StandardMaterial.metalRoughnessMap`.** Packed G=roughness /
   B=metalness, matching WebGL. Bind group 3 when albedo occupies group 2,
   group 2 when it does not (`shadedMrBindingWgsl`). Scalar-only keys stay
-  byte-identical (`|mr:y` only when true). `normalMap` / `occlusionMap` /
-  `emissiveMap` remain unstaged.
+  byte-identical (`|mr:y` only when true). WebGL now samples `emissiveMap`
+  (unit 3); `normalMap` / `occlusionMap` remain unstaged. WebGPU emissive
+  stays unsampled (four-group budget).
 
 - **§43 interpolated skin palettes.** `Skeleton.update` takes an optional
   `worldOf` provider. The interpolated render list composes bone local

@@ -237,7 +237,18 @@ ${SHADOW_FACTOR_WGSL}`
       : ""
   }
 
-@fragment
+${litFragmentStageWgsl(map, shadow)}`;
+}
+
+/**
+ * The lit fragment stage, isolated so the skinned lit vertex
+ * (`wgpu-skinning.ts`) splices the same source the unskinned family
+ * compiles — the two cannot drift. `shadow` is WP-R1.7's variant flag,
+ * forwarded so a receiving skinned draw multiplies the same
+ * `shadowFactor` the unskinned lit family does.
+ */
+export function litFragmentStageWgsl(map: boolean, shadow = false): string {
+  return `@fragment
 fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
   var base = draw.color;${
     map

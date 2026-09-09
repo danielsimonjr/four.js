@@ -728,6 +728,18 @@ export const SHADOW_TEXTURE_UNIT = 1;
 export const METAL_ROUGHNESS_TEXTURE_UNIT = 2;
 
 /**
+ * Emissive map unit (`StandardMaterial.emissiveMap`). Unit 3: 0 is albedo,
+ * 1 is the shadow map that stays live across a shaded draw, 2 is the packed
+ * metallic-roughness map. Node-material samplers that occupy two or more
+ * units also reach 3 on their own draws — never simultaneous with a standard
+ * draw's emissive bind. Unbound in `render`'s `finally`.
+ *
+ * WebGPU does not sample this slot: groups 2 and 3 already hold albedo and
+ * metallic-roughness when both maps exist, and the four-group budget is full.
+ */
+export const EMISSIVE_TEXTURE_UNIT = 3;
+
+/**
  * The MVP vertex stage: object space → clip space, plus the two optional
  * streams the fragment stage may multiply by.
  *

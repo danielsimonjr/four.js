@@ -1,12 +1,12 @@
 {
   "generated": "2026-09-09",
-  "totalFiles": 822,
+  "totalFiles": 826,
   "byDisposition": {
-    "reachable": 269,
+    "reachable": 271,
     "build-entry": 48,
     "test-only": 1,
     "orphan": 0,
-    "test": 472,
+    "test": 474,
     "tool": 1,
     "config": 17,
     "example": 14
@@ -14,12 +14,12 @@
   "byArea": {
     "examples": 14,
     "config": 17,
-    "src": 318,
-    "tests": 472,
+    "src": 320,
+    "tests": 474,
     "tools": 1
   },
   "byPackage": {
-    "(root)": 218,
+    "(root)": 219,
     "@fourjs/animation": 32,
     "@fourjs/assets": 20,
     "@fourjs/core": 26,
@@ -38,7 +38,7 @@
     "@fourjs/render-canvas": 2,
     "@fourjs/render-svg": 2,
     "@fourjs/render-webgl": 28,
-    "@fourjs/render-webgpu": 45,
+    "@fourjs/render-webgpu": 48,
     "@fourjs/render": 64,
     "@fourjs/scene": 35,
     "@fourjs/serialization": 11,
@@ -492,7 +492,7 @@
       "package": "@fourjs/assets",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2549
+      "loc": 2558
     },
     {
       "file": "packages/assets/src/index.ts",
@@ -569,7 +569,7 @@
       "package": "@fourjs/assets",
       "area": "tests",
       "disposition": "test",
-      "loc": 2513
+      "loc": 2532
     },
     {
       "file": "packages/assets/tests/loaders.test.ts",
@@ -1045,7 +1045,7 @@
       "package": "fourJS",
       "area": "src",
       "disposition": "reachable",
-      "loc": 441
+      "loc": 445
     },
     {
       "file": "packages/fourjs/src/index.ts",
@@ -1262,7 +1262,7 @@
       "package": "fourJS",
       "area": "tests",
       "disposition": "test",
-      "loc": 580
+      "loc": 607
     },
     {
       "file": "packages/fourjs/tests/hit-test-mode-serialization.test.ts",
@@ -1696,7 +1696,7 @@
       "package": "@fourjs/materials",
       "area": "src",
       "disposition": "reachable",
-      "loc": 491
+      "loc": 530
     },
     {
       "file": "packages/materials/src/stencil-state.ts",
@@ -1731,7 +1731,7 @@
       "package": "@fourjs/materials",
       "area": "tests",
       "disposition": "test",
-      "loc": 809
+      "loc": 820
     },
     {
       "file": "packages/materials/tests/node-material.test.ts",
@@ -2998,7 +2998,7 @@
       "package": "@fourjs/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2238
+      "loc": 2250
     },
     {
       "file": "packages/render-webgl/src/gl-render-target.ts",
@@ -3040,7 +3040,7 @@
       "package": "@fourjs/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 643
+      "loc": 688
     },
     {
       "file": "packages/render-webgl/src/gl-texture.ts",
@@ -3054,7 +3054,7 @@
       "package": "@fourjs/render-webgl",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 162
+      "loc": 163
     },
     {
       "file": "packages/render-webgl/src/node-pipeline-registry.ts",
@@ -3075,7 +3075,7 @@
       "package": "@fourjs/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 4037
+      "loc": 4075
     },
     {
       "file": "packages/render-webgl/tests/geometry-refresh.test.ts",
@@ -3131,14 +3131,14 @@
       "package": "@fourjs/render-webgl",
       "area": "tests",
       "disposition": "test",
-      "loc": 12591
+      "loc": 12784
     },
     {
       "file": "packages/render-webgpu/src/index.ts",
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 336
+      "loc": 373
     },
     {
       "file": "packages/render-webgpu/src/register.ts",
@@ -3159,7 +3159,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 3776
+      "loc": 4118
     },
     {
       "file": "packages/render-webgpu/src/wgpu-batch.ts",
@@ -3194,7 +3194,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 310
+      "loc": 388
     },
     {
       "file": "packages/render-webgpu/src/wgpu-gpu-timer.ts",
@@ -3215,7 +3215,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 274
+      "loc": 285
     },
     {
       "file": "packages/render-webgpu/src/wgpu-node-program.ts",
@@ -3257,7 +3257,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1140
+      "loc": 1142
     },
     {
       "file": "packages/render-webgpu/src/wgpu-pipeline-cache.ts",
@@ -3285,7 +3285,21 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 337
+      "loc": 339
+    },
+    {
+      "file": "packages/render-webgpu/src/wgpu-skinning-registry.ts",
+      "package": "@fourjs/render-webgpu",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 206
+    },
+    {
+      "file": "packages/render-webgpu/src/wgpu-skinning.ts",
+      "package": "@fourjs/render-webgpu",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 692
     },
     {
       "file": "packages/render-webgpu/src/wgpu-sprite.ts",
@@ -3299,14 +3313,14 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 311
+      "loc": 315
     },
     {
       "file": "packages/render-webgpu/src/wgpu-stencil.ts",
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 183
+      "loc": 192
     },
     {
       "file": "packages/render-webgpu/src/wgpu-texture.ts",
@@ -3320,7 +3334,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 251
+      "loc": 260
     },
     {
       "file": "packages/render-webgpu/tests/register.test.ts",
@@ -3341,7 +3355,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "tests",
       "disposition": "test",
-      "loc": 4056
+      "loc": 4413
     },
     {
       "file": "packages/render-webgpu/tests/wgpu-batch.test.ts",
@@ -3376,7 +3390,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "tests",
       "disposition": "test",
-      "loc": 639
+      "loc": 762
     },
     {
       "file": "packages/render-webgpu/tests/wgpu-node-angle.test.ts",
@@ -3442,11 +3456,18 @@
       "loc": 400
     },
     {
+      "file": "packages/render-webgpu/tests/wgpu-skinning.test.ts",
+      "package": "@fourjs/render-webgpu",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 475
+    },
+    {
       "file": "packages/render-webgpu/tests/wgpu-stencil.test.ts",
       "package": "@fourjs/render-webgpu",
       "area": "tests",
       "disposition": "test",
-      "loc": 157
+      "loc": 171
     },
     {
       "file": "packages/render/src/batch.ts",
@@ -3502,7 +3523,7 @@
       "package": "@fourjs/render",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 323
+      "loc": 324
     },
     {
       "file": "packages/render/src/lights.ts",
@@ -3593,7 +3614,7 @@
       "package": "@fourjs/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1106
+      "loc": 1107
     },
     {
       "file": "packages/render/src/resource-memory.ts",
@@ -3649,7 +3670,7 @@
       "package": "@fourjs/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 850
+      "loc": 918
     },
     {
       "file": "packages/render/src/view-list.ts",
@@ -3880,7 +3901,7 @@
       "package": "@fourjs/render",
       "area": "tests",
       "disposition": "test",
-      "loc": 1249
+      "loc": 1315
     },
     {
       "file": "packages/render/tests/statistics.test.ts",
@@ -5294,7 +5315,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 401
+      "loc": 405
     },
     {
       "file": "tests/integration/examples-build-coverage.test.ts",
@@ -5610,6 +5631,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 250
+    },
+    {
+      "file": "tests/integration/skinned-gpu-picking.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 352
     },
     {
       "file": "tests/integration/skinning.test.ts",

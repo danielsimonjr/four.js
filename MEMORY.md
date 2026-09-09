@@ -30,6 +30,38 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — WebGPU skinned colour pair (RFC 0003).** Opt-in
+  `registerSkinningPipeline()` from `@fourjs/render-webgpu`. `WebgpuRenderer`
+  imports only `wgpu-skinning-registry.ts` (pipeline-cost law). Palette is
+  a separate 3072-byte bind group (`48 × 64`), `hasDynamicOffset`, vertex
+  stage only — `DRAW_UNIFORM_BYTES` stays 192. Group index after existing
+  groups: unlit 1, unlit+map/lit 2, lit+map 3. Joints `@location(4)`
+  `uint16x4`, weights `@location(5)` `float32x4`; LBS, weights not
+  renormalized. Classes are not named `SkinnedUnlitProgram` /
+  `SKINNING_GLSL` (`graph:duplicates`). Unregistered or factory failure
+  skips, never bind-pose. Shadow caster and RFC 0005 id pass still skip.
+  `maximumSkinningJoints` is reported. RFC 0003 checkbox stays `[ ]`.
+
+- **2026-09-09 — WebGL `StandardMaterial.emissiveMap` on unit 3.** Packed
+  glTF factor × texture (sRGB). Allocator: 0 albedo, 1 shadow, 2 MR, 3
+  emissive. Uniform switch `useEmissiveMap` (R-19), not a shader variant.
+  Unresolved/disposed map degrades — the draw continues, matching albedo
+  / MR. glTF `emissiveTexture` is decoded sRGB and dropped from
+  `ignoredTextures`. WebGPU does **not** sample it: groups 2 and 3 already
+  hold albedo and MR when both maps exist, and the four-group budget is
+  full. No fifth bind group. Occlusion stays staged (no AO term); normal
+  stays staged (tangents). Lighting leftover checkbox stays `[ ]`.
+
+- **2026-09-09 — Dogfood cycle 7: WebGL skinned GPU picking.** Read from
+  a consumer seat. `registerPickingPipeline` + `registerSkinningPipeline`
+  then `createPickingService`. One-bone plane, bone +1 Y: id pass uses
+  `SKINNING_GLSL` + `pickId`, uploads the live palette (y-translation
+  1, not bind pose). Unskinned control id/colour transcripts are
+  identical with or without the skinning seam. Recording GL cannot
+  rasterise, so deformed-vs-bind hit/miss is staged texels + the
+  silhouette claim is the program. Engine clean. Guide index patched.
+  WebGPU still skips skinned items. Standing checkbox stays `[ ]`.
+
 - **2026-09-09 — R-30c map roles.** Optional `TextureMapRole` `"color"` |
   `"data"` on `TextureSource` / `Texture.role`. Omitting `role` invents
   **no** default and leaves `colorSpace` at R-15's `"linear"` — that is
