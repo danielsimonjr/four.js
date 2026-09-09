@@ -328,12 +328,22 @@ function createRig(options: { throwOnPipeline?: boolean } = {}): Rig {
 function uniformWritesBeforePass(gpu: RecordingGpu): number[][] {
   const names = gpu.calls.map((call) => call.name);
   const passAt = names.indexOf("encoder.beginRenderPass");
-  return gpu.calls
-    .filter(
-      (call, index) =>
-        call.name === "queue.writeBuffer" && index < passAt,
-    )
-    .map((call) => call.args[2] as number[]);
+  const strideFloats = UNIFORM_STRIDE_BYTES / 4;
+  const writes: number[][] = [];
+  for (let index = 0; index < gpu.calls.length; index += 1) {
+    if (index >= passAt) {
+      break;
+    }
+    const call = gpu.calls[index];
+    if (call.name !== "queue.writeBuffer") {
+      continue;
+    }
+    const data = call.args[2];
+    if (Array.isArray(data) && data.length % strideFloats === 0 && data.length >= strideFloats) {
+      writes.push(data);
+    }
+  }
+  return writes;
 }
 
 function meshDrawCount(gpu: RecordingGpu): number {
