@@ -7,6 +7,10 @@ import {
   ParticleRenderable,
 } from "../src/particle-renderable.js";
 import {
+  DEFAULT_TRAIL_LENGTH,
+  DEFAULT_TRAIL_MIN_DISTANCE,
+  DEFAULT_TRAIL_TAIL_WIDTH_FACTOR,
+  DEFAULT_TRAIL_WIDTH,
   ParticleTrailStore,
   TRAIL_VERTEX_FLOATS,
   buildTrailRibbonMesh,
@@ -59,6 +63,24 @@ describe("evaluateLifetimeRampColor — multi-stop ramps", () => {
   it("clamps normalized age below zero and above one", () => {
     expect(evaluateLifetimeRampNumber({ start: 0, end: 10 }, -1)).toBe(0);
     expect(evaluateLifetimeRampNumber({ start: 0, end: 10 }, 2)).toBe(10);
+    expect(
+      evaluateLifetimeRampColor(
+        {
+          start: { r: 0, g: 0, b: 0, a: 0 },
+          end: { r: 1, g: 1, b: 1, a: 1 },
+        },
+        -1,
+      ),
+    ).toEqual({ r: 0, g: 0, b: 0, a: 0 });
+    expect(
+      evaluateLifetimeRampColor(
+        {
+          start: { r: 0, g: 0, b: 0, a: 0 },
+          end: { r: 1, g: 1, b: 1, a: 1 },
+        },
+        2,
+      ),
+    ).toEqual({ r: 1, g: 1, b: 1, a: 1 });
   });
 
   it("returns a t=0 interior stop verbatim at age zero", () => {
@@ -105,6 +127,44 @@ describe("evaluateLifetimeRampColor — multi-stop ramps", () => {
     expect(evaluateLifetimeRampNumber(tail, 0.75)).toBeCloseTo(0.625);
   });
 
+  it("treats an empty stops array as a two-endpoint lerp", () => {
+    expect(evaluateLifetimeRampNumber({ start: 0, end: 10, stops: [] }, 0.5)).toBe(
+      5,
+    );
+    expect(
+      evaluateLifetimeRampColor(
+        {
+          start: { r: 0, g: 0, b: 0, a: 1 },
+          end: { r: 2, g: 0, b: 0, a: 0 },
+          stops: [],
+        },
+        0.5,
+      ),
+    ).toEqual({ r: 1, g: 0, b: 0, a: 0.5 });
+  });
+
+  it("returns the end value when a NaN age walks past a stop at t >= 1", () => {
+    // Clamping maps every finite age into [0, 1], so the after-last-stop
+    // `span <= 0` guard is only reachable when t is NaN (every `<=` comparison
+    // fails) and the last stop already sits at or past 1.
+    expect(
+      evaluateLifetimeRampNumber(
+        { start: 0, end: 7, stops: [{ t: 1, value: 3 }] },
+        Number.NaN,
+      ),
+    ).toBe(7);
+    expect(
+      evaluateLifetimeRampColor(
+        {
+          start: { r: 0, g: 0, b: 0, a: 1 },
+          end: { r: 0, g: 0, b: 1, a: 0 },
+          stops: [{ t: 1, value: { r: 1, g: 0, b: 0, a: 1 } }],
+        },
+        Number.NaN,
+      ),
+    ).toEqual({ r: 0, g: 0, b: 1, a: 0 });
+  });
+
   it("handles duplicate color stops and the tail segment", () => {
     const duplicate = {
       start: { r: 0, g: 0, b: 0, a: 1 },
@@ -133,6 +193,27 @@ describe("evaluateLifetimeRampColor — multi-stop ramps", () => {
 });
 
 describe("ParticleTrailStore — ring buffer", () => {
+  it("rejects a non-integer capacity or a length below two", () => {
+    expect(() => new ParticleTrailStore(-1, 4)).toThrow(
+      /capacity must be a non-negative safe integer/,
+    );
+    expect(() => new ParticleTrailStore(1, 1)).toThrow(
+      /length must be an integer >= 2/,
+    );
+  });
+
+  it("clears every slot and treats a same-slot copy as a no-op", () => {
+    const store = new ParticleTrailStore(2, 4);
+    store.resetSlot(0);
+    store.pushSample(0, 1, 2, 3, 0);
+    store.pushSample(0, 4, 5, 6, 0);
+    store.copySlot(0, 0);
+    expect(store.getSampleCount(0)).toBe(2);
+    store.clear();
+    expect(store.getSampleCount(0)).toBe(0);
+    expect(store.getSampleCount(1)).toBe(0);
+  });
+
   it("records samples in chronological order", () => {
     const store = new ParticleTrailStore(2, 4);
     store.resetSlot(0);
@@ -158,6 +239,28 @@ describe("ParticleTrailStore — ring buffer", () => {
     expect(store.getSampleCount(0)).toBe(2);
   });
 
+  it("rejects an out-of-range sampleIndex and a slot that is not in the store", () => {
+    const store = new ParticleTrailStore(2, 4);
+    store.resetSlot(0);
+    store.pushSample(0, 1, 0, 0, 0);
+    const out = { x: 0, y: 0, z: 0 };
+    expect(() => store.readSample(0, -1, out)).toThrow(
+      /sampleIndex -1 out of range \(count 1\)/,
+    );
+    expect(() => store.readSample(0, 1, out)).toThrow(
+      /sampleIndex 1 out of range \(count 1\)/,
+    );
+    expect(() => store.resetSlot(-1)).toThrow(
+      /resetSlot: index -1 out of range \(capacity 2\)/,
+    );
+    expect(() => store.getSampleCount(2)).toThrow(
+      /getSampleCount: index 2 out of range \(capacity 2\)/,
+    );
+    expect(() => store.pushSample(1.5, 0, 0, 0, 0)).toThrow(
+      /pushSample: index 1.5 out of range \(capacity 2\)/,
+    );
+  });
+
   it("copies history on swap-remove", () => {
     const store = new ParticleTrailStore(4, 4);
     store.resetSlot(0);
@@ -174,6 +277,36 @@ describe("ParticleTrailStore — ring buffer", () => {
 });
 
 describe("buildTrailRibbonMesh", () => {
+  it("skips a live slot that still has fewer than two samples", () => {
+    const store = new ParticleTrailStore(2, 4);
+    store.resetSlot(0);
+    store.pushSample(0, 0, 0, 0, 0);
+    store.resetSlot(1);
+    store.pushSample(1, 0, 0, 0, 0);
+    store.pushSample(1, 1, 0, 0, 0);
+
+    const ages = new Float32Array([0.5, 0.5]);
+    const lifetimes = new Float32Array([1, 1]);
+    const sizes = new Float32Array([1, 0, 1, 0]);
+    const colors = new Float32Array([
+      1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0,
+    ]);
+    const out = new Float32Array(6 * TRAIL_VERTEX_FLOATS);
+    expect(
+      buildTrailRibbonMesh(
+        store,
+        2,
+        ages,
+        lifetimes,
+        sizes,
+        colors,
+        out,
+        0.2,
+        0,
+      ),
+    ).toBe(6);
+  });
+
   it("emits six vertices per segment", () => {
     const store = new ParticleTrailStore(1, 4);
     store.resetSlot(0);
@@ -285,13 +418,13 @@ describe("resolveTrailOptions", () => {
   });
 
   it("normalizes defaults for enabled trails", () => {
-    const resolved = resolveTrailOptions({ length: 4 });
+    const resolved = resolveTrailOptions({});
     expect(resolved).toBeDefined();
     expect(resolved?.enabled).toBe(true);
-    expect(resolved?.length).toBe(4);
-    expect(typeof resolved?.width).toBe("number");
-    expect(typeof resolved?.minDistance).toBe("number");
-    expect(typeof resolved?.tailWidthFactor).toBe("number");
+    expect(resolved?.length).toBe(DEFAULT_TRAIL_LENGTH);
+    expect(resolved?.width).toBe(DEFAULT_TRAIL_WIDTH);
+    expect(resolved?.minDistance).toBe(DEFAULT_TRAIL_MIN_DISTANCE);
+    expect(resolved?.tailWidthFactor).toBe(DEFAULT_TRAIL_TAIL_WIDTH_FACTOR);
   });
 
   it("rejects invalid trail configuration", () => {

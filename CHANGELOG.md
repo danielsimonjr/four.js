@@ -63,6 +63,10 @@ stay on the tracker.
   stays clean. Package `tsconfig.json` files (the ones that include
   tests) now set `"types": ["node"]` — Vitest 3 referenced Node from its
   own typings; 5 does not, and TypeDoc's TS 6 pass typechecks those tests.
+  Same-day CI follow-up: `@fourjs/particles` was a sixth miss (92.1%
+  branches). Ramp-stop validation, empty/NaN lifetime ramps, trail
+  store guards, and `computeBounds` non-positive lifetime lift it to
+  97.16%.
 
 ### Added
 

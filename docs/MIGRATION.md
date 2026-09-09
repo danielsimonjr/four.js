@@ -551,12 +551,19 @@ without lowering the 95% gate. Re-measured under Vitest 5.0.0:
 | render | 97.59% |
 | physics-rapier | 95.26% (724/760) |
 
-`physics-rapier` was the last holdout. The remaining adapter misses are
-unreachable through a well-formed public API (`localContactPoint` null,
-`colliderIds` that do not resolve). The tests that got the package over the
-line go through a rewritten snapshot envelope — the only way a Rapier
-collider or mass mode can exist on one side of the boundary and not the
-other. `vitest` and `@vitest/coverage-v8` are both 5.0.0.
+`physics-rapier` was the last holdout among those five. The remaining
+adapter misses are unreachable through a well-formed public API
+(`localContactPoint` null, `colliderIds` that do not resolve). The tests
+that got the package over the line go through a rewritten snapshot
+envelope — the only way a Rapier collider or mass mode can exist on one
+side of the boundary and not the other. `vitest` and `@vitest/coverage-v8`
+are both 5.0.0.
+
+**Same-day CI follow-up.** The campaign only re-measured the five named
+failures. `bun run coverage` then failed on **`@fourjs/particles` at
+92.1% branches** (455/494) — ramp-stop validation, empty/NaN lifetime
+ramps, trail store guards, and `computeBounds` non-positive lifetime
+were real misses. Re-measured **97.16% (480/494)**. Gate unchanged.
 
 ---
 

@@ -41,6 +41,18 @@ readable; never delete the pointer itself.
   within 0.002 ms of the mixer. Proposed §86: 227 independent 60-bone
   characters inside one 60 Hz step (host-specific, not a gate).
 
+- **2026-09-09 — Vitest 5 particles follow-up.** Landing the bump on the
+  five named failures left `@fourjs/particles` at 92.1% branches
+  (455/494) under honest v8 remap — CI `bun run coverage` caught it.
+  The misses were real: `copySizeRamp` / `copyColorRamp` reject `t`
+  outside `(0, 1)` and unsorted stops; `evaluateLifetimeRamp*` empty
+  `stops` and the after-last-stop `span <= 0` guard (NaN age past a
+  stop at `t >= 1`); `ParticleTrailStore` out-of-range
+  `readSample` / `#assertSlot`; `buildTrailRibbonMesh` `sampleCount < 2`;
+  `ParticleRenderable.computeBounds` non-positive lifetime. Re-measured
+  **97.16% branches (480/494)**. Gate unchanged. Lesson: remasure every
+  package, not only the ones a local Vitest 5 probe named.
+
 - **2026-09-09 — Vitest 5.0.0 landed.** The coverage campaign closed the
   last honest gap: physics-rapier branches 95.26% (724/760) after
   `rapier-defensive-branches.test.ts` (countContacts + snapshot-envelope
@@ -51,6 +63,7 @@ readable; never delete the pointer itself.
   tsconfigs set `"types": ["node"]` because Vitest 5 dropped the Node
   triple-slash that 3.2.7 shipped (TypeDoc/TS 6 typechecks those tests).
   Supersedes the same-day "second measurement / bump still waits" note.
+  **Same-day follow-up:** particles was a sixth miss — see the entry above.
 
 - **2026-09-09 — Vitest 5 coverage campaign, second measurement.** After
   executing the previously-unrun Rapier init reject path, stale-handle

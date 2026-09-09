@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **13 open**, 248 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, and the Vitest 5 coverage campaign (bump landed). Of the 13, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked — the typedoc/TS 7 pin is no longer a release gate.
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **13 open**, 248 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, and the Vitest 5 coverage campaign (bump landed; particles follow-up the same day after CI caught 92.1% branches). Of the 13, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked — the typedoc/TS 7 pin is no longer a release gate.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -52,6 +52,12 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
   5.0.0: **physics 97.27%, render-webgl 95.57%, text 100%, render 97.59%,
   physics-rapier 95.26%** branches. `vitest` and `@vitest/coverage-v8`
   bumped together to 5.0.0. Written up in `docs/MIGRATION.md` section 5.
+  Follow-up the same day: CI `bun run coverage` then failed on
+  **`@fourjs/particles` at 92.1% branches** — the original campaign only
+  re-measured the five named failures. Honest tests for ramp-stop
+  validation, empty/NaN lifetime ramps, trail store guards, and
+  `computeBounds` non-positive lifetime lifted particles to **97.16%**
+  (480/494). Gate unchanged.
 
 - **Triage the 42 Oxlint warnings the ESLint config never surfaced.** DONE 2026-09-09.
   Count on this tree was **40** (two `no-misused-spread` hits had already gone).
