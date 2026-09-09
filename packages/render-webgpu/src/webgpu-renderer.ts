@@ -180,6 +180,7 @@ import {
   LIGHT_UNIFORM_STRIDE_BYTES,
   LIGHT_UNIFORM_STRIDE_FLOATS,
   SHADED_MAP_BIND_GROUP_INDEX,
+  SHADED_MR_BIND_GROUP_INDEX,
   createLightsBindGroupLayout,
   writeLightUniforms,
 } from "./wgpu-lights.js";
@@ -559,6 +560,12 @@ function resolveFrameTexture(
     return null;
   }
   return renderTargets.sample(source);
+}
+
+function metalRoughnessMapOf(material: {
+  metalRoughnessMap?: WgpuCacheableTexture | null;
+}): WgpuCacheableTexture | null {
+  return material.metalRoughnessMap ?? null;
 }
 
 /** Adds one *submitted* draw to §84's counters — the twin of the GL backend's. */
@@ -1795,6 +1802,31 @@ export class WebgpuRenderer implements Renderer {
             continue;
           }
           const useMap = mapBindGroup !== null;
+          // §59's packed metallic-roughness map: same resolve/skip/degrade
+          // contract as albedo (`map`). Named + uvs + unresolved (disposed
+          // or a feedback loop) skips the draw; named without a uv stream
+          // degrades to the scalar factors. Lit items have no such field.
+          const metalRoughnessSource =
+            item.kind === "standard"
+              ? metalRoughnessMapOf(item.material)
+              : null;
+          const metalRoughnessBindGroup =
+            metalRoughnessSource === null || record.uvBuffer === null
+              ? null
+              : resolveFrameTexture(
+                  textures,
+                  renderTargets,
+                  activeTarget,
+                  metalRoughnessSource,
+                );
+          if (
+            metalRoughnessSource !== null &&
+            record.uvBuffer !== null &&
+            metalRoughnessBindGroup === null
+          ) {
+            continue;
+          }
+          const useMetalRoughness = metalRoughnessBindGroup !== null;
           // The lights group is read off the *field*, not a frame local, and
           // read here — after the material's getters have run — so a
           // reentrant mid-frame `dispose()` inside application code (the
@@ -1848,6 +1880,7 @@ export class WebgpuRenderer implements Renderer {
             batch: null,
             normals,
             shadow: receiving,
+            metalRoughness: useMetalRoughness,
           });
           if (pipeline === null) {
             // Unreachable given the class invariant — the unlit arm's
@@ -1908,17 +1941,27 @@ export class WebgpuRenderer implements Renderer {
           }
           // Slots are positional, in `shadedVertexBufferLayouts`' order:
           // position, then normals if the variant shades with them, then uvs
-          // if it samples. One counter, both sides.
+          // if it samples albedo *or* the packed metallic-roughness map.
           let slot = 0;
           pass.setVertexBuffer(slot, record.positionBuffer);
           if (normals) {
             slot += 1;
             pass.setVertexBuffer(slot, record.normalBuffer);
           }
-          if (mapBindGroup !== null) {
+          if (useMap || useMetalRoughness) {
             slot += 1;
             pass.setVertexBuffer(slot, record.uvBuffer);
+          }
+          if (mapBindGroup !== null) {
             pass.setBindGroup(SHADED_MAP_BIND_GROUP_INDEX, mapBindGroup);
+          }
+          if (metalRoughnessBindGroup !== null) {
+            // Group 3 when albedo occupies 2; group 2 when it does not
+            // (`wgpu-lights.ts` / `wgpu-standard.ts`).
+            pass.setBindGroup(
+              useMap ? SHADED_MR_BIND_GROUP_INDEX : SHADED_MAP_BIND_GROUP_INDEX,
+              metalRoughnessBindGroup,
+            );
           }
           if (record.indexBuffer !== null && record.indexFormat !== null) {
             pass.setIndexBuffer(record.indexBuffer, record.indexFormat);

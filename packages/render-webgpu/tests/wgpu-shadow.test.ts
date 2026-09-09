@@ -344,6 +344,19 @@ describe("pipelineKey and the cache — the shadow axis", () => {
     cache.acquire({ ...LIT, shadow: true, map: true });
     cache.acquire({ ...LIT, kind: "standard", shadow: true });
     cache.acquire({ ...LIT, kind: "standard", shadow: true, map: true });
+    cache.acquire({
+      ...LIT,
+      kind: "standard",
+      shadow: true,
+      metalRoughness: true,
+    });
+    cache.acquire({
+      ...LIT,
+      kind: "standard",
+      shadow: true,
+      map: true,
+      metalRoughness: true,
+    });
     const layoutLabels = gpu
       .callsOf("device.createPipelineLayout")
       .map((call) => String((call.args[0] as { label?: string }).label));
@@ -352,6 +365,8 @@ describe("pipelineKey and the cache — the shadow axis", () => {
       "fourJS:pipeline-layout:lit:shadow:map",
       "fourJS:pipeline-layout:standard:shadow",
       "fourJS:pipeline-layout:standard:shadow:map",
+      "fourJS:pipeline-layout:standard:shadow:mr",
+      "fourJS:pipeline-layout:standard:shadow:map:mr",
     ]);
     const moduleLabels = gpu
       .callsOf("device.createShaderModule")
@@ -362,6 +377,8 @@ describe("pipelineKey and the cache — the shadow axis", () => {
       "fourJS:lit|n|map|sh",
       "fourJS:standard|n|sh",
       "fourJS:standard|n|map|sh",
+      "fourJS:standard|n|mr|sh",
+      "fourJS:standard|n|map|mr|sh",
     ]);
   });
 

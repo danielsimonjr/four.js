@@ -37,6 +37,8 @@ import {
   PUNCTUAL_LIGHT_WGSL,
   SHADED_MAP_BINDING_WGSL,
   SHADED_MAP_BIND_GROUP_INDEX,
+  SHADED_MR_BINDING_WGSL,
+  SHADED_MR_BIND_GROUP_INDEX,
   STANDARD_EMISSIVE_OFFSET,
   STANDARD_NORMAL_OFFSET,
   STANDARD_SURFACE_OFFSET,
@@ -52,6 +54,7 @@ import {
   litShaderSource,
   pipelineKey,
   shadedVertexBufferLayouts,
+  shadedMrBindingWgsl,
   standardShaderSource,
   writeLightUniforms,
   type CacheableGeometry,
@@ -260,10 +263,38 @@ describe("the shaded WGSL builders", () => {
     expect(standardShaderSource(false, true)).toContain(
       SHADED_MAP_BINDING_WGSL,
     );
+    // The fourth argument defaults false: every landed scalar-only module
+    // stays byte-identical.
+    expect(standardShaderSource(true, false)).toBe(
+      standardShaderSource(true, false, false, false),
+    );
+    expect(standardShaderSource(true, false)).not.toContain("mrTexture");
+    expect(standardShaderSource(true, false)).not.toContain("|mr");
+  });
+
+  it("samples the packed metallic-roughness map at group 2 or 3", () => {
+    const mrOnly = standardShaderSource(true, false, false, true);
+    expect(mrOnly).toContain(shadedMrBindingWgsl(SHADED_MAP_BIND_GROUP_INDEX));
+    expect(mrOnly).not.toContain(SHADED_MAP_BINDING_WGSL);
+    expect(mrOnly).toContain("textureSample(mrTexture, mrSampler, input.uv)");
+    expect(mrOnly).toContain("metalness = metalness * mr.b");
+    expect(mrOnly).toContain("roughness = roughness * mr.g");
+    // Uvs without an albedo map — GL's useMetalRoughnessMap without useMap.
+    expect(mrOnly).toContain("@location(2) uv");
+
+    const mapAndMr = standardShaderSource(true, true, false, true);
+    expect(mapAndMr).toContain(SHADED_MAP_BINDING_WGSL);
+    expect(mapAndMr).toContain(SHADED_MR_BINDING_WGSL);
+    expect(mapAndMr).toContain(
+      "textureSample(mapTexture, mapSampler, input.uv)",
+    );
+    expect(mapAndMr).toContain("textureSample(mrTexture, mrSampler, input.uv)");
   });
 
   it("keeps the cofactor helper exported but out of the live modules", () => {
-    expect(NORMAL_MATRIX_WGSL).toContain("fn normalMatrix(model : mat4x4<f32>)");
+    expect(NORMAL_MATRIX_WGSL).toContain(
+      "fn normalMatrix(model : mat4x4<f32>)",
+    );
     expect(STANDARD_UNIFORM_BYTES).toBe(224);
     expect(STANDARD_NORMAL_OFFSET).toBe(144);
     expect(STANDARD_EMISSIVE_OFFSET).toBe(192);
@@ -278,6 +309,13 @@ describe("the shaded WGSL builders", () => {
     );
     expect(SHADED_MAP_BIND_GROUP_INDEX).toBe(2);
     expect(LIGHTS_BIND_GROUP_INDEX).toBe(1);
+    expect(SHADED_MR_BIND_GROUP_INDEX).toBe(3);
+    expect(SHADED_MR_BINDING_WGSL).toContain(
+      `@group(${String(SHADED_MR_BIND_GROUP_INDEX)})`,
+    );
+    expect(shadedMrBindingWgsl(SHADED_MAP_BIND_GROUP_INDEX)).toContain(
+      `@group(${String(SHADED_MAP_BIND_GROUP_INDEX)})`,
+    );
   });
 
   it("lists the shaded vertex buffers in slot order", () => {
@@ -319,6 +357,14 @@ describe("pipelineKey — the shaded families", () => {
       "unlit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus",
     );
     expect(pipelineKey({ ...LIT, kind: "standard" })).toContain("standard|");
+    // `|mr:y` only when true — scalar-only keys stay byte-identical.
+    expect(pipelineKey({ ...LIT, kind: "standard" })).not.toContain("|mr:y");
+    expect(
+      pipelineKey({ ...LIT, kind: "standard", metalRoughness: false }),
+    ).toBe(pipelineKey({ ...LIT, kind: "standard" }));
+    expect(
+      pipelineKey({ ...LIT, kind: "standard", metalRoughness: true }),
+    ).toMatch(/\|mr:y$/u);
   });
 });
 
@@ -358,7 +404,12 @@ describe("WgpuPipelineCache — the shaded families", () => {
       gpu
         .callsOf("device.createShaderModule")
         .map((call) => (call.args[0] as { label?: string }).label),
-    ).toEqual(["fourJS:lit|n", "fourJS:lit", "fourJS:lit|n|map", "fourJS:standard|n"]);
+    ).toEqual([
+      "fourJS:lit|n",
+      "fourJS:lit",
+      "fourJS:lit|n|map",
+      "fourJS:standard|n",
+    ]);
   });
 
   it("composes each family's pipeline layout once and caches it", () => {
@@ -372,6 +423,13 @@ describe("WgpuPipelineCache — the shaded families", () => {
     cache.acquire({ ...LIT, map: true, blend: "normal" });
     cache.acquire({ ...LIT, kind: "standard" });
     cache.acquire({ ...LIT, kind: "standard", map: true });
+    cache.acquire({ ...LIT, kind: "standard", metalRoughness: true });
+    cache.acquire({
+      ...LIT,
+      kind: "standard",
+      map: true,
+      metalRoughness: true,
+    });
     expect(
       gpu
         .callsOf("device.createPipelineLayout")
@@ -381,6 +439,8 @@ describe("WgpuPipelineCache — the shaded families", () => {
       "fourJS:pipeline-layout:lit:map",
       "fourJS:pipeline-layout:standard",
       "fourJS:pipeline-layout:standard:map",
+      "fourJS:pipeline-layout:standard:mr",
+      "fourJS:pipeline-layout:standard:map:mr",
     ]);
   });
 
@@ -390,6 +450,7 @@ describe("WgpuPipelineCache — the shaded families", () => {
     gpu.reset();
     cache.acquire({ ...LIT, map: true });
     cache.acquire({ ...LIT, normals: false });
+    cache.acquire({ ...LIT, kind: "standard", metalRoughness: true });
     const buffers = gpu
       .callsOf("device.createRenderPipeline")
       .map(
@@ -402,6 +463,12 @@ describe("WgpuPipelineCache — the shaded families", () => {
       UV_BUFFER_LAYOUT,
     ]);
     expect(buffers[1]).toEqual([POSITION_BUFFER_LAYOUT]);
+    // Mr-only still needs the uv stream, same slot order as albedo.
+    expect(buffers[2]).toEqual([
+      POSITION_BUFFER_LAYOUT,
+      NORMAL_BUFFER_LAYOUT,
+      UV_BUFFER_LAYOUT,
+    ]);
   });
 
   it("answers null for a shaded descriptor with no lights provider", () => {
@@ -443,7 +510,48 @@ describe("WgpuPipelineCache — the shaded families", () => {
     );
     expect(cache.acquire({ ...LIT, map: true })).toBeNull();
     expect(cache.acquire({ ...LIT, kind: "standard", map: true })).toBeNull();
+    expect(
+      cache.acquire({ ...LIT, kind: "standard", metalRoughness: true }),
+    ).toBeNull();
     expect(cache.acquire({ ...LIT, kind: "standard" })).not.toBeNull();
+  });
+
+  it("compiles a distinct standard module per metallic-roughness variant", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = fullCache(gpuDevice);
+    gpu.reset();
+
+    cache.acquire({ ...LIT, kind: "standard" });
+    cache.acquire({ ...LIT, kind: "standard", metalRoughness: true });
+    cache.acquire({
+      ...LIT,
+      kind: "standard",
+      map: true,
+      metalRoughness: true,
+    });
+    expect(
+      gpu
+        .callsOf("device.createShaderModule")
+        .map((call) => (call.args[0] as { label?: string }).label),
+    ).toEqual([
+      "fourJS:standard|n",
+      "fourJS:standard|n|mr",
+      "fourJS:standard|n|map|mr",
+    ]);
+    const mrOnly = gpu.callsOf("device.createShaderModule")[1]?.args[0] as {
+      code: string;
+    };
+    expect(mrOnly.code).toContain(
+      "textureSample(mrTexture, mrSampler, input.uv)",
+    );
+    expect(mrOnly.code).toContain(
+      `@group(${String(SHADED_MAP_BIND_GROUP_INDEX)})`,
+    );
+    const mapAndMr = gpu.callsOf("device.createShaderModule")[2]?.args[0] as {
+      code: string;
+    };
+    expect(mapAndMr.code).toContain(SHADED_MAP_BINDING_WGSL);
+    expect(mapAndMr.code).toContain(SHADED_MR_BINDING_WGSL);
   });
 });
 

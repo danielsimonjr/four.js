@@ -6,14 +6,14 @@ changes in `CHANGELOG.md`.
 
 ## Priority order
 
-Every open item in the **Now** section, ranked least-to-most complex. This is an *index*: each
+Every open item in the **Now** section, ranked least-to-most complex. This is an _index_: each
 entry keeps its body where it already lives, so the thematic grouping and the
 `R-`/`PH-`/`A-` series stay readable. Line numbers drift — the titles are the key.
 
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + WebGPU particle id arm; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster**; R-33 simulate/present split; dogfood cycles 4–5. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the skinned id pass on both backends.
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster**; lighting leftover **WebGPU `metalRoughnessMap`**; R-33 simulate/present split; dogfood cycles 4–6. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the skinned id pass on both backends.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -119,7 +119,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - RFC 0003 residue (staged in source, 2026-08-28):
 - RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
-- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09.
+- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09. WebGPU `metalRoughnessMap` sampling DONE 2026-09-09 (still open: multi-light, cascades, PBR rest, §60a, light layers, other texture slots).
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
 - Follow-ups the R-1 plan explicitly defers
 - PH-11c — character/dynamics push interaction — DONE 2026-09-06 (`pushMass` / reduced-mass impulse / wake).
@@ -163,7 +163,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 - [x] **`smoothness.spec.ts:794` is still flaky, and this time it is PROVEN, not suspected.**
       **FIXED 2026-09-09 (second pass).** Pause-during-grab was necessary but not
-      sufficient. `waitForVirtualFrameCount` pumped the *patched* rAF, so each
+      sufficient. `waitForVirtualFrameCount` pumped the _patched_ rAF, so each
       sample added a phantom virtual frame on top of the example's loop.
       Combined with pause that produced only even frame numbers (14, 16, … 36)
       — alpha 0.0 every time (`d2f36a5` / run 34295269515). The wait now
@@ -176,49 +176,48 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       A controlled comparison, which is what makes this worth acting on:
 
       | commit | `smoothness.spec.ts:794` |
-      |---|---|
-      | `17fd7e6` | ✓ passed |
-      | `1f75125` | ✘ failed |
+          |---|---|
+          | `17fd7e6` | ✓ passed |
+          | `1f75125` | ✘ failed |
 
-      The **entire** diff between those two commits is `.gitignore` (+8), `TODO.md` (+14) and
-      one comment plus one string literal in `examples/ui-demo/main.ts`. Nothing there can
-      touch motion interpolation, so the test is nondeterministic — not a regression, and not
-      caused by the rebrand (whose 40 changes under `packages/` are provably all comments,
-      README prose and error strings).
+          The **entire** diff between those two commits is `.gitignore` (+8), `TODO.md` (+14) and
+          one comment plus one string literal in `examples/ui-demo/main.ts`. Nothing there can
+          touch motion interpolation, so the test is nondeterministic — not a regression, and not
+          caused by the rebrand (whose 40 changes under `packages/` are provably all comments,
+          README prose and error strings).
 
-      · **Third data point, 2026-09-08 (`eba3c85`), and the cleanest one yet.** It failed on CI
-        with *"every frame landed on an exact fixed-step pose"* (`expect(errors).toEqual([])`,
-        expected >= 2), and **a re-run of the SAME run id on the SAME commit passed** — no code
-        change at all between the two outcomes. That removes the last doubt that some diff was
-        responsible: here there was no diff. It also cost a CI cycle and a root-cause detour
-        during the TypeScript 7 landing, which is the real argument for fixing it rather than
-        re-diagnosing it each time it fires.
+          · **Third data point, 2026-09-08 (`eba3c85`), and the cleanest one yet.** It failed on CI
+            with *"every frame landed on an exact fixed-step pose"* (`expect(errors).toEqual([])`,
+            expected >= 2), and **a re-run of the SAME run id on the SAME commit passed** — no code
+            change at all between the two outcomes. That removes the last doubt that some diff was
+            responsible: here there was no diff. It also cost a CI cycle and a root-cause detour
+            during the TypeScript 7 landing, which is the real argument for fixing it rather than
+            re-diagnosing it each time it fires.
 
-      **Failure signature:** `every frame landed on an exact fixed-step pose`, 0 mid-step
-      frames against a floor of 2. That is the SAME aliasing mode the 2026-09-06 entry
-      ("Smoothness interpolation flake") was written to fix by sampling after a known
-      `__fourVirtualFrames` count. That fix reduced the rate; it did not remove it.
+          **Failure signature:** `every frame landed on an exact fixed-step pose`, 0 mid-step
+          frames against a floor of 2. That is the SAME aliasing mode the 2026-09-06 entry
+          ("Smoothness interpolation flake") was written to fix by sampling after a known
+          `__fourVirtualFrames` count. That fix reduced the rate; it did not remove it.
 
-      **Hypothesis, explicitly unverified:** the test assumes `interpolationAlpha` alternates
-      0.5 / 0.0 because the virtual frame is 1.5× the fixed step. That parity holds only while
-      no step is dropped — and §10's dropped-time guard has been firing under load all day
-      (`maximumSubSteps=5`). One catch-up shifts the phase and every later sample lands
-      on-step. **Do not act on this without measuring it**; the honest next step is to log
-      `droppedTime` alongside the sampled fractions and see whether a drop precedes every
-      failure.
+          **Hypothesis, explicitly unverified:** the test assumes `interpolationAlpha` alternates
+          0.5 / 0.0 because the virtual frame is 1.5× the fixed step. That parity holds only while
+          no step is dropped — and §10's dropped-time guard has been firing under load all day
+          (`maximumSubSteps=5`). One catch-up shifts the phase and every later sample lands
+          on-step. **Do not act on this without measuring it**; the honest next step is to log
+          `droppedTime` alongside the sampled fractions and see whether a drop precedes every
+          failure.
 
-      **Do not fix it by widening `MINIMUM_MID_STEP_FRAMES` to 0** — that deletes the only
-      assertion §106 makes about interpolation.
-
+          **Do not fix it by widening `MINIMUM_MID_STEP_FRAMES` to 0** — that deletes the only
+          assertion §106 makes about interpolation.
 
 ### 🔧 "fourJS" is the library name — rebrand, staged (2026-09-07)
 
-Daniel: *"fourJS is the library name; not four or four.js. Refactor codebase to reflect
-this reality."* Staged deliberately, because the three layers have very different costs
+Daniel: _"fourJS is the library name; not four or four.js. Refactor codebase to reflect
+this reality."_ Staged deliberately, because the three layers have very different costs
 and only the first is unambiguous.
 
 - [x] **Stage 1 — BRANDING (done).** 220 replacements across 128 tracked files: every place
-      the *library* was called `four.js` now reads **fourJS**. Surgical, not a blanket
+      the _library_ was called `four.js` now reads **fourJS**. Surgical, not a blanket
       replace — verified the pattern leaves `four.js-monorepo`, `four.json`, `four.js/`
       paths and `@fourjs/*` untouched, and never touches bare `four`, which is overwhelmingly
       the numeral (130 "all four", 34 "four of", 11 "four packages").
@@ -251,7 +250,7 @@ and only the first is unambiguous.
       `playwright test tests/visual --project=visual --update-snapshots`, committed with the
       new PNGs. Everything else in the rebrand is done.
       · Stray `-visual-win32/-darwin.png` files are now gitignored, so a local visual run on
-        Windows cannot leak goldens that could never match CI.
+      Windows cannot leak goldens that could never match CI.
 
 - [x] **Stage 2 — PACKAGE IDENTIFIERS (needs Daniel's call, not mine).** **DONE 2026-09-07** — authorised
       ("Stage 2 @fourjs", "All imports from four/* need to change to fourJS/*", "We can't use
@@ -262,7 +261,7 @@ and only the first is unambiguous.
       and `@fourjs/*` → `@fourjs/*`. Both are npm-legal (lowercase) and would match the
       already-chosen publish target `@danielsimonjr/fourjs`. **Why this is not a drive-by:**
       it rewrites every import specifier in the repo, the workspace map, the lockfile and
-      `apply-publish-names.mjs`'s mapping — and Daniel has already fixed the *published*
+      `apply-publish-names.mjs`'s mapping — and Daniel has already fixed the _published_
       identity as `@danielsimonjr/fourjs`, so the internal scope is a naming decision with
       publish consequences, taken once. Cheap to do before first publish, expensive after.
 
@@ -273,7 +272,6 @@ and only the first is unambiguous.
 
 > **npm forbids capitals in package names**, so "fourJS" can only ever be branding at the
 > identifier layer — `@danielsimonjr/fourjs` stays lowercase however far stages 2 and 3 go.
-
 
 ### 🔧 Tech-lead decisions on the four dogfooding findings (authorised 2026-09-07)
 
@@ -318,38 +316,37 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       focused scene node; the name promises the opposite. Free to do pre-publish, and
       cheap: 6 files reference it. Do it AFTER (C), so the replacement exists first.
       · **CLOSED 2026-09-07 WITHOUT THE RENAME — deliberately.** Reading the pair before
-        touching it changed the answer: `PointerInput` and `KeyboardInput` are symmetric
-        §72 event sources (platform events in, scene events out; routed by picking and by
-        focus), so the name is accurate in that frame. The trap was never the name — it
-        was that the package offered NO polled-state option, so the one keyboard-shaped
-        class got reached for by people who wanted the other thing. **(C) removed that
-        cause.** Renaming now would churn 100 references (not 6 — that estimate was wrong
-        by 17x) and break a documented pair to fix something already fixed.
+      touching it changed the answer: `PointerInput` and `KeyboardInput` are symmetric
+      §72 event sources (platform events in, scene events out; routed by picking and by
+      focus), so the name is accurate in that frame. The trap was never the name — it
+      was that the package offered NO polled-state option, so the one keyboard-shaped
+      class got reached for by people who wanted the other thing. **(C) removed that
+      cause.** Renaming now would churn 100 references (not 6 — that estimate was wrong
+      by 17x) and break a documented pair to fix something already fixed.
       · What WAS wrong and is now fixed: the dev error told callers to "listen to the DOM
-        directly, as `examples/character-controller` does" — false in both halves since
-        (C) landed. It names `KeyboardState` now, and the two classes cross-reference.
+      directly, as `examples/character-controller` does" — false in both halves since
+      (C) landed. It names `KeyboardState` now, and the two classes cross-reference.
 
 - [x] **(E) `TimeState.deltaTime` — DECIDED: do NOT rename. Document the unit instead.**
       This is the one I came in expecting to change, and the measurement reversed it.
       · **Cost:** `fixedDeltaTime` alone has **263** call sites (118 src / 132 tests / 13
-        examples); the three delta fields together ≈ **347**, much of it in §33
-        determinism-critical paths. A mechanical rename there buys a regression risk.
+      examples); the three delta fields together ≈ **347**, much of it in §33
+      determinism-critical paths. A mechanical rename there buys a regression risk.
       · **Benefit is smaller than it felt:** writing `time.deltaSeconds` is caught by the
-        type checker instantly. It is a five-second correction, not a silent defect —
-        unlike (A), which ships a wrong string to production with no compiler help.
+      type checker instantly. It is a five-second correction, not a silent defect —
+      unlike (A), which ships a wrong string to production with no compiler help.
       · **And the convention argument cuts the other way.** `deltaTime` is the industry's
-        name — Unity `Time.deltaTime`, Unreal `DeltaTime`. Renaming to `deltaSeconds`
-        would make four MORE surprising to the game developers it is aimed at, in
-        exchange for internal tidiness. The inconsistency is real; the fix would cost
-        more than the flaw.
+      name — Unity `Time.deltaTime`, Unreal `DeltaTime`. Renaming to `deltaSeconds`
+      would make four MORE surprising to the game developers it is aimed at, in
+      exchange for internal tidiness. The inconsistency is real; the fix would cost
+      more than the flaw.
       · **What is actually wrong is the DOCS:** `TimeState`'s fields say "frame delta"
-        and never say *seconds*. That is fixed with (E) below at no risk.
+      and never say _seconds_. That is fixed with (E) below at no risk.
 - [x] **(E1) Say "seconds" in `TimeState`'s docstrings** — the zero-risk 90% of (E).
       · DONE 2026-09-07. Six duration fields never named a unit; only `fixedDeltaTime`
-        did. `performance.now()` and `requestAnimationFrame` both hand out milliseconds,
-        so the wrong guess type-checks and yields motion 1000x too fast. Each field
-        repeats the unit, because a reader meets the field, not the type's header.
-
+      did. `performance.now()` and `requestAnimationFrame` both hand out milliseconds,
+      so the wrong guess type-checks and yields motion 1000x too fast. Each field
+      repeats the unit, because a reader meets the field, not the type's header.
 
 > **VERIFICATION RECORD — not a task, so deliberately not a checkbox.**
 > Re-ran BOTH described personas against current `main` (2026-09-07). They
@@ -362,7 +359,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 > `[-237,176,746]` (rolled, climbed, accelerated 120→157), chase camera trailing, **zero
 > page errors**. The `FollowRig` crash found on 09-06 stays fixed.
 > **Quaternion norm measured at full precision: exactly `1`** — no drift. Worth recording
-> *how* that was nearly misreported: the app's own diagnostic rounds the quaternion to 4
+> _how_ that was nearly misreported: the app's own diagnostic rounds the quaternion to 4
 > decimals, so computing the norm from telemetry read **1.000062** and looked like
 > normalisation drift. It was my instrument, not the engine. A rounded readout cannot
 > measure a quantity whose interesting deviation is smaller than the rounding.
@@ -379,49 +376,47 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 > call that "consistent" — the sample window, crank speed and Rapier version (0.20 landed
 > 09-06) all differ, and I did not run a controlled comparison. It needs one before either
 > figure is quoted as the engine's accuracy.
->
 
 - [x] **Error messages name MINIFIED classes in exactly the builds users ship.** Dogfooding
       cycle 3d, §34 round-trip in the browser. `serializeScene(hero, registry)` threw:
 
       > Node node-3 is a **Ur**, which this scene format has no type name for; supply
-      > serializeScene's `nodeTypeOf` option and the matching `nodeFactory` on load (§79).
+          > serializeScene's `nodeTypeOf` option and the matching `nodeFactory` on load (§79).
 
-      `hero` is a `Renderable`. "Ur" is the minified class name. Proven with an A/B on the same
-      app — the only difference being `build.minify`:
+          `hero` is a `Renderable`. "Ur" is the minified class name. Proven with an A/B on the same
+          app — the only difference being `build.minify`:
 
-      | build | message |
-      |---|---|
-      | unminified | *"Node node-3 is a **Renderable**"* |
-      | minified (what every consumer ships) | *"Node node-3 is a **Ur**"* |
+          | build | message |
+          |---|---|
+          | unminified | *"Node node-3 is a **Renderable**"* |
+          | minified (what every consumer ships) | *"Node node-3 is a **Ur**"* |
 
-      The message interpolates `constructor.name`, which minification destroys, and it does so
-      **twice** — in the prose and again in `context.nodeClass`, so the structured field a tool
-      would read is equally useless. **5 sites across 2 packages** do this
-      (`core/src/component.ts:136`, `serialization/src/serializer.ts:266/271/503/504`), and all
-      of them are §79 diagnostics — precisely the errors that fire while a consumer is still
-      wiring serialization up.
+          The message interpolates `constructor.name`, which minification destroys, and it does so
+          **twice** — in the prose and again in `context.nodeClass`, so the structured field a tool
+          would read is equally useless. **5 sites across 2 packages** do this
+          (`core/src/component.ts:136`, `serialization/src/serializer.ts:266/271/503/504`), and all
+          of them are §79 diagnostics — precisely the errors that fire while a consumer is still
+          wiring serialization up.
 
-      The fix is not to drop the name but to source it from something minification cannot
-      rewrite: the registry's own type names, or a `static readonly nodeType` on the class.
+          The fix is not to drop the name but to source it from something minification cannot
+          rewrite: the registry's own type names, or a `static readonly nodeType` on the class.
 
-      Second-order note, not a defect: this is also how I learned that **`serializeScene`
-      refuses any node it has no type name for**, which today means anything that is not a
-      `Group`. So a consumer's first "save my scene" fails on the most ordinary scene there is
-      — one containing a `Renderable`. It is documented and the error names the two options to
-      supply, but it is the same shape as the glTF-transport row above: the default path does
-      not cover the common case.
+          Second-order note, not a defect: this is also how I learned that **`serializeScene`
+          refuses any node it has no type name for**, which today means anything that is not a
+          `Group`. So a consumer's first "save my scene" fails on the most ordinary scene there is
+          — one containing a `Renderable`. It is documented and the error names the two options to
+          supply, but it is the same shape as the glTF-transport row above: the default path does
+          not cover the common case.
 
-      · **FIXED 2026-09-09 — root cause, not another caveat.** Messages and structured
-        context now name authored document types (`"scene"`, `"group"`, registered
-        `typeName`) and the `nodeTypeOf` / `static readonly typeName` options. They
-        never interpolate `constructor.name`. A minified `Renderable` no longer
-        reports as `"Ur"`. Tests assert the class name is absent from the message.
-        The 2026-09-07 caveat and `*IsMinifiable` flags are gone — there is nothing
-        minifiable left to flag. The second-order note (default `serializeScene`
-        still refuses `Renderable` without `registerSceneNodeTypes()`) is unchanged
-        and out of scope.
-
+          · **FIXED 2026-09-09 — root cause, not another caveat.** Messages and structured
+            context now name authored document types (`"scene"`, `"group"`, registered
+            `typeName`) and the `nodeTypeOf` / `static readonly typeName` options. They
+            never interpolate `constructor.name`. A minified `Renderable` no longer
+            reports as `"Ur"`. Tests assert the class name is absent from the message.
+            The 2026-09-07 caveat and `*IsMinifiable` flags are gone — there is nothing
+            minifiable left to flag. The second-order note (default `serializeScene`
+            still refuses `Renderable` without `registerSceneNodeTypes()`) is unchanged
+            and out of scope.
 
 - [x] **§42 `transformAuthority` is mandatory knowledge for animating anything, and the README
       never mentions it.** **FIXED 2026-09-07** — the quick start now
@@ -435,22 +430,21 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 
       The engine was right and said so, unconditionally:
 
-      > `[four] A "animation" system tried to write the transform of node node-3, which is
-      > owned by "manual" authority; the write was refused (§42…). Set
-      > node.transformAuthority = "animation" if that system should own it.`
+          > `[four] A "animation" system tried to write the transform of node node-3, which is
+          > owned by "manual" authority; the write was refused (§42…). Set
+          > node.transformAuthority = "animation" if that system should own it.`
 
-      **The diagnostic is excellent** — names the writer, the owner, the rule and the fix, and
-      it is not DEV-gated, so production users get it too. The gap is upstream of it:
-      `transformAuthority` appears **0 times in README.md**, while the quick-start teaches
-      `app.poses.track()` and manual writes. The examples all declare it
-      (`first-2d-scene` even documents *"Both shapes declare `transformAuthority =
-      "animation"` (§42)"*) — so the knowledge exists everywhere except where a new user
-      starts. Two or three sentences in the README quick-start close it.
+          **The diagnostic is excellent** — names the writer, the owner, the rule and the fix, and
+          it is not DEV-gated, so production users get it too. The gap is upstream of it:
+          `transformAuthority` appears **0 times in README.md**, while the quick-start teaches
+          `app.poses.track()` and manual writes. The examples all declare it
+          (`first-2d-scene` even documents *"Both shapes declare `transformAuthority =
+          "animation"` (§42)"*) — so the knowledge exists everywhere except where a new user
+          starts. Two or three sentences in the README quick-start close it.
 
-      Verified fixed from the consumer's seat: setting `hero.transformAuthority = "animation"`
-      made the tween apply — `scale.x` 1.000 → 1.050 and the rendered box grew from 7,938 to
-      10,080 lit pixels.
-
+          Verified fixed from the consumer's seat: setting `hero.transformAuthority = "animation"`
+          made the tween apply — `scale.x` 1.000 → 1.050 and the rendered box grew from 7,938 to
+          10,080 lit pixels.
 
 - [x] **The first glTF a consumer loads fails, and nothing demonstrates the right way.** **CLOSED 2026-09-07** — both halves. The
       example landed in `977074d`; the transport default landed with (B), so the call the
@@ -459,24 +453,24 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       — fails at runtime with
 
       > `Cannot load glTF "/quad.gltf": buffers[0]: the document names external buffer
-      > "quad.bin" but this loader was built without a transport. Pass { fetch } to
-      > createGltfLoader.`
+          > "quad.bin" but this loader was built without a transport. Pass { fetch } to
+          > createGltfLoader.`
 
-      **The message is excellent** — it names the file, the missing capability and the exact
-      fix — so this is not an error-quality defect. It is an asymmetry:
+          **The message is excellent** — it names the file, the missing capability and the exact
+          fix — so this is not an error-quality defect. It is an asymmetry:
 
-      · `AssetManager` **already defaults its transport to `globalThis.fetch`** (WP-11.2,
-        2026-08-02) precisely so a no-options constructor works.
-      · `createGltfLoader` has **no** such default, and `AssetLoader.load(response, url)` gives
-        the manager no seam to pass its transport down — though that interface's own comment
-        anticipates the case, saying `url` is there *"(once glTF lands) for resolving relative
-        dependencies"*.
-      · So the manager fetches the `.gltf` and then the loader cannot fetch the `.bin` beside
-        it. A user reasonably assumes the thing that fetched the document will fetch its buffer.
+          · `AssetManager` **already defaults its transport to `globalThis.fetch`** (WP-11.2,
+            2026-08-02) precisely so a no-options constructor works.
+          · `createGltfLoader` has **no** such default, and `AssetLoader.load(response, url)` gives
+            the manager no seam to pass its transport down — though that interface's own comment
+            anticipates the case, saying `url` is there *"(once glTF lands) for resolving relative
+            dependencies"*.
+          · So the manager fetches the `.gltf` and then the loader cannot fetch the `.bin` beside
+            it. A user reasonably assumes the thing that fetched the document will fetch its buffer.
 
-      Two fixes, both design calls: default `createGltfLoader`'s `fetch` to `globalThis.fetch`
-      exactly as `AssetManager` already does, or widen the loader seam so the manager injects
-      the transport it owns.
+          Two fixes, both design calls: default `createGltfLoader`'s `fetch` to `globalThis.fetch`
+          exactly as `AssetManager` already does, or widen the loader seam so the manager injects
+          the transport it owns.
 
 - [x] **§78 glTF ships tested but undemonstrated — no example loads a model.** **FIXED 2026-09-07** —
       `examples/gltf-model` added: `createGltfLoader` → `AssetManager.load` → `instantiateGltf`,
@@ -492,7 +486,6 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       newcomer reaches for, and the correct wiring (a transport for external buffers) is
       exactly what the row above shows people get wrong. One small example would close both.
 
-
 - [x] **`KeyboardInput` is a naming trap, and the DEV message did not fix it — I fell in twice.**
       Dogfooding cycle 3 (2026-09-07, `.dogfood/charselect`): writing a character-select screen
       from the README's shape, I wrote `new KeyboardInput({ target: window })` and then
@@ -500,55 +493,54 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `(surface: KeySurface, options: KeyboardInputOptions)` and there is no `isDown`.
 
       **What makes this worth filing rather than shrugging at: the class's own comment predicts
-      the exact mistake I made**, says the name invites it, and notes that
-      `examples/character-controller` uses plain DOM listeners *because* this class is not what
-      game code wants. A DEV-only error message was added for it on 2026-09-06 — and I still
-      made the mistake, from scratch, with the mitigation in place. **A better message does not
-      repair a misleading name; it only apologises after the fact.**
+          the exact mistake I made**, says the name invites it, and notes that
+          `examples/character-controller` uses plain DOM listeners *because* this class is not what
+          game code wants. A DEV-only error message was added for it on 2026-09-06 — and I still
+          made the mistake, from scratch, with the mitigation in place. **A better message does not
+          repair a misleading name; it only apologises after the fact.**
 
-      Two things are true at once and both need a decision:
-      · **The name.** In a package called `@fourjs/input`, `KeyboardInput` reads as "the way to
-        read the keyboard". It routes DOM key events to a focused scene node. Something like
-        `SceneKeyRouter` / `FocusedKeyRouter` would not be reached for by a user wanting WASD.
-      · **The gap it hides.** Grepped for a polled key-state helper across every package:
-        `isDown` / `isKeyDown` / `heldKeys` / `pressedKeys` return **zero files**. So the
-        library ships no way to ask "is this key held", and `character-controller` maintains
-        its own `readonly held = new Set<string>()` off hand-written DOM listeners. Every
-        consumer writing game input reimplements that. It is ~20 lines, which is exactly the
-        size of thing a library should own.
+          Two things are true at once and both need a decision:
+          · **The name.** In a package called `@fourjs/input`, `KeyboardInput` reads as "the way to
+            read the keyboard". It routes DOM key events to a focused scene node. Something like
+            `SceneKeyRouter` / `FocusedKeyRouter` would not be reached for by a user wanting WASD.
+          · **The gap it hides.** Grepped for a polled key-state helper across every package:
+            `isDown` / `isKeyDown` / `heldKeys` / `pressedKeys` return **zero files**. So the
+            library ships no way to ask "is this key held", and `character-controller` maintains
+            its own `readonly held = new Set<string>()` off hand-written DOM listeners. Every
+            consumer writing game input reimplements that. It is ~20 lines, which is exactly the
+            size of thing a library should own.
 
-      · **RESOLVED 2026-09-07, and the two halves resolved DIFFERENTLY.** The *gap* was real
-        and is closed: `KeyboardState` ships in `@fourjs/input` (polled `isDown` / `held`,
-        releases every key on blur, idempotent `dispose`), and `examples/character-controller`
-        now uses it instead of its hand-rolled `Set`. The *name* was NOT changed, on purpose —
-        `PointerInput` and `KeyboardInput` are a symmetric pair of §72 event sources, so the
-        name is accurate in that frame, and the thing that actually trapped me was that the
-        package offered no polled option at all. With `KeyboardState` present, the wrong class
-        is no longer the only keyboard-shaped thing to reach for. What WAS false and is fixed:
-        the DEV error still said "listen to the DOM directly, as `examples/character-controller`
-        does" — untrue in both halves once the above landed.
+          · **RESOLVED 2026-09-07, and the two halves resolved DIFFERENTLY.** The *gap* was real
+            and is closed: `KeyboardState` ships in `@fourjs/input` (polled `isDown` / `held`,
+            releases every key on blur, idempotent `dispose`), and `examples/character-controller`
+            now uses it instead of its hand-rolled `Set`. The *name* was NOT changed, on purpose —
+            `PointerInput` and `KeyboardInput` are a symmetric pair of §72 event sources, so the
+            name is accurate in that frame, and the thing that actually trapped me was that the
+            package offered no polled option at all. With `KeyboardState` present, the wrong class
+            is no longer the only keyboard-shaped thing to reach for. What WAS false and is fixed:
+            the DEV error still said "listen to the DOM directly, as `examples/character-controller`
+            does" — untrue in both halves once the above landed.
 
 - [x] **`TimeState` breaks the `*Seconds` convention the rest of the library teaches.**
       · **RESOLVED 2026-09-07 by (E)/(E1): documented, not renamed.** Renaming the fields
-        would break every `app.on("update")` handler in existence to buy a suffix. All six
-        duration fields now name SECONDS in their own docstring, and the type's header says
-        why it matters: `performance.now()` and `requestAnimationFrame` both hand out
-        milliseconds, so the wrong guess type-checks and runs 1000x too fast.
+      would break every `app.on("update")` handler in existence to buy a suffix. All six
+      duration fields now name SECONDS in their own docstring, and the type's header says
+      why it matters: `performance.now()` and `requestAnimationFrame` both hand out
+      milliseconds, so the wrong guess type-checks and runs 1000x too fast.
       Same cycle: I wrote `time.deltaSeconds` in the update loop without hesitating, because
       that is what four taught me everywhere else. The field is `deltaTime`.
 
       Measured, not impressionistic: **163** occurrences of `deltaSeconds` against **27** of
-      `deltaTime`, and **13 distinct `*Seconds` identifiers** in the public surface
-      (`durationSeconds`, `fixedDeltaSeconds`, `elapsedSeconds`, `localTimeSeconds`,
-      `lastGpuFrameTimeSeconds`, …). The README opens with *"radians and seconds everywhere"*.
-      Yet `TimeState` — the object **every** `app.on("update")` handler receives, so the most
-      touched surface in the library — uses `deltaTime` / `unscaledDeltaTime` /
-      `fixedDeltaTime`, and its docstrings say "frame delta" without naming the unit.
+          `deltaTime`, and **13 distinct `*Seconds` identifiers** in the public surface
+          (`durationSeconds`, `fixedDeltaSeconds`, `elapsedSeconds`, `localTimeSeconds`,
+          `lastGpuFrameTimeSeconds`, …). The README opens with *"radians and seconds everywhere"*.
+          Yet `TimeState` — the object **every** `app.on("update")` handler receives, so the most
+          touched surface in the library — uses `deltaTime` / `unscaledDeltaTime` /
+          `fixedDeltaTime`, and its docstrings say "frame delta" without naming the unit.
 
-      This is the one naming inconsistency positioned where every single user meets it.
-      Renaming is a breaking change, so it is a 0.1 decision: do it before the first publish or
-      keep it forever. A non-breaking half-step is to add `deltaSeconds` as a documented alias.
-
+          This is the one naming inconsistency positioned where every single user meets it.
+          Renaming is a breaking change, so it is a 0.1 decision: do it before the first publish or
+          keep it forever. A non-breaking half-step is to add `deltaSeconds` as a documented alias.
 
 - [x] **`character-controller.spec.ts:509` is a wall-clock race — `main` went RED on a
       DOCS-ONLY commit.** Run 34090671121: `yaw moved -0.133 — → did not turn right`, against
@@ -561,11 +553,10 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       0.133 is 6.4× under the 0.853 reference, and no margin survives starvation.
       Fix: wait on simulation progress, not on real time.
 
-
 - [x] **`motor-digital-twin.spec.ts:613` asserts a stale environment assumption — `main` is RED.**
-      `expect(status["gpuframe"]).toBe("nan")` with the comment *"SwiftShader / CI has no
+      `expect(status["gpuframe"]).toBe("nan")` with the comment _"SwiftShader / CI has no
       `timestamp-query` / `EXT_disjoint_timer_query`, so `gpuFrameTime` stays the §84 'not
-      measured' sentinel."* CI disproved that on 2026-09-07: it returned `0.015531`
+      measured' sentinel."_ CI disproved that on 2026-09-07: it returned `0.015531`
       (run 34082373822, 104 passed / 1 failed). The code is right — `A-1 (c)` shipped
       `Renderer.lastGpuFrameTimeSeconds` on 2026-09-06 and the runner's GL stack now answers.
       The TEST encodes the pre-feature world, and pins a **capability** as if it were a contract,
@@ -573,43 +564,42 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       instead — sentinel OR a finite measurement — exactly as the `contacts` row three lines
       above was corrected in #76.
 
-
 - [x] **`smoothness.spec.ts` "frames are drawn between simulation states" aliases against
       its own virtual frame clock.** DONE 2026-09-06 — sampler is now
       frame-synchronised (`window.__fourVirtualFrames`, alternating odd/even
       counts) so mid-step and on-step poses are chosen rather than inherited
       from wall-clock aliasing. Failed CI on `dd03d1a` and `94860b0`; passed on
-      `d704cd8` and `c14dafa`, and `94860b0`'s *Release* run passed the same job the CI run
+      `d704cd8` and `c14dafa`, and `94860b0`'s _Release_ run passed the same job the CI run
       failed — so roughly 2 in 5, and not caused by any change of mine.
       **Follow-up 2026-09-06:** `waitForFunction` + default rAF polling hung
       the same test for 120 s on `b55a8c1`. `waitForVirtualFrameParity` now
       polls via `page.evaluate` with a 15 s budget (see Done).
 
       Diagnosis, from reading the mechanism rather than the failure rate. The test installs
-      `useVirtualFrameClock(page, 1.5 × FIXED_DELTA)`, which overrides
-      `requestAnimationFrame` so each callback advances the page's clock by exactly 1.5
-      fixed steps. That makes `interpolationAlpha` alternate **0.5, 0.0, 0.5, 0.0** — a
-      *two-frame cycle*, deterministic and machine-independent, which is the clever part.
+          `useVirtualFrameClock(page, 1.5 × FIXED_DELTA)`, which overrides
+          `requestAnimationFrame` so each callback advances the page's clock by exactly 1.5
+          fixed steps. That makes `interpolationAlpha` alternate **0.5, 0.0, 0.5, 0.0** — a
+          *two-frame cycle*, deterministic and machine-independent, which is the clever part.
 
-      But sampling is on **real** time: the loop screenshots every
-      `INTERPOLATION_SAMPLE_INTERVAL_SECONDS`, and however many virtual frames elapse
-      between two screenshots is whatever the machine managed to render. If that count is
-      consistently **even**, every one of the 12 samples lands on the same phase of the
-      cycle, `midStep` is 0, and the test reports "every frame landed on an exact
-      fixed-step pose" while §43's interpolation is working perfectly.
+          But sampling is on **real** time: the loop screenshots every
+          `INTERPOLATION_SAMPLE_INTERVAL_SECONDS`, and however many virtual frames elapse
+          between two screenshots is whatever the machine managed to render. If that count is
+          consistently **even**, every one of the 12 samples lands on the same phase of the
+          cycle, `midStep` is 0, and the test reports "every frame landed on an exact
+          fixed-step pose" while §43's interpolation is working perfectly.
 
-      So the assertion is sound and the sampler is aliased against the very cycle it is
-      trying to observe. Raising `INTERPOLATION_SAMPLE_COUNT` does not help: if the parity
-      is stable, more samples are more samples of the same phase.
+          So the assertion is sound and the sampler is aliased against the very cycle it is
+          trying to observe. Raising `INTERPOLATION_SAMPLE_COUNT` does not help: if the parity
+          is stable, more samples are more samples of the same phase.
 
-      The fix has to break the lock between the sampling interval and the two-frame cycle —
-      most directly by making the *sampler* frame-synchronised (screenshot after a known
-      number of virtual frames) rather than time-synchronised, so the phase is chosen
-      instead of inherited.
+          The fix has to break the lock between the sampling interval and the two-frame cycle —
+          most directly by making the *sampler* frame-synchronised (screenshot after a known
+          number of virtual frames) rather than time-synchronised, so the phase is chosen
+          instead of inherited.
 
-      **Not attempted**, deliberately: it does not reproduce locally, so I cannot tell a fix
-      from a coincidence. Guessing at a change I cannot verify is how the blending
-      step-bound attempt made things worse earlier today.
+          **Not attempted**, deliberately: it does not reproduce locally, so I cannot tell a fix
+          from a coincidence. Guessing at a change I cannot verify is how the blending
+          step-bound attempt made things worse earlier today.
 
 - [x] **De-flake the browser gate: sample counts no longer measure the runner.** DONE
       2026-09-06 — both watches now require a sample floor as well as the window; 1 of 4
@@ -618,7 +608,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       measured.** DONE 2026-09-06 — RECOVER / ANIMATED / RAGDOLL watches now
       read `data-chain-y` until the span/floor is met; screenshots are only
       for pixel assertions, so the observer no longer starves the simulation. Its span assertion needs a full `WAVE_PERIOD` (**3.6 s**) to see both
-      extremes, but the watch runs 4 s of *wall clock* and §10 drops simulation time — so a
+      extremes, but the watch runs 4 s of _wall clock_ and §10 drops simulation time — so a
       slow machine samples a fraction of the wave and a running chain measures 0.156
       against 0.2.
       Bounding by `data-step` (the fixed-step counter the page publishes) is the right fix
@@ -626,15 +616,15 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       raising it to 180 s made things worse (3 of 4 failing vs 1 of 4). The screenshots the
       loop takes are part of what starves the simulation, so watching harder slows the
       thing being watched.
-      A real fix probably has to sample *without* screenshotting — read the centroid from
+      A real fix probably has to sample _without_ screenshotting — read the centroid from
       the page (it already publishes `chain-y`) instead of from a framebuffer grab — which
       removes the observer's cost from the measurement entirely.
       `blending.spec.ts` watches for a fixed `WATCH_SECONDS = 4`, taking a screenshot every
       `FRAME_GAP_MS = 200`, then asserts it collected `>= 8` samples. Each iteration costs
       200 ms plus one screenshot, so a fast runner gets ~10 and a 19%-slower one gets 7 —
       the assertion is on the RUNNER'S THROUGHPUT, not on §110.
-      The file's own comment already states the intent: *"a machine slower than that must
-      weaken the sample count rather than fail"*. A fixed count delivers exactly that — the
+      The file's own comment already states the intent: _"a machine slower than that must
+      weaken the sample count rather than fail"_. A fixed count delivers exactly that — the
       window simply grows in wall-clock on a slow machine, which only strengthens the
       "did the chain actually move" assertions it wraps.
       Not widening the threshold: that moves the cliff instead of removing it.
@@ -644,35 +634,34 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       a URL belongs.** `bun run test:suites` is now **90/90 green here**, for the first time.
 
       **My first diagnosis was wrong and is recorded as such.** I filed this as a missing
-      `.gitattributes`, on the evidence that `tests/fixtures/gltf/quad.gltf` checks out
-      with 104 CRLF and 0 LF. That observation is true and irrelevant: the pinned digest is
-      taken over *parsed* content, and `JSON.parse` does not care about line endings.
+          `.gitattributes`, on the evidence that `tests/fixtures/gltf/quad.gltf` checks out
+          with 104 CRLF and 0 LF. That observation is true and irrelevant: the pinned digest is
+          taken over *parsed* content, and `JSON.parse` does not care about line endings.
 
-      The real error was `ENOENT: open 'C:/Users/danie/Github/four.js/quad.bin'` — the
-      buffer URI resolving against the process CWD. `resolveUri` in `@fourjs/assets`
-      resolves a glTF's relative URIs against the asset's **URL**, lexically, splitting on
-      `/`. That is correct and deliberate (§33: the package names no `URL` global). The
-      tests passed `fileURLToPath(...)` — a *native* path — so on Windows
-      `lastIndexOf("/")` returns −1, the base collapses to `""`, and `quad.bin` went to
-      the CWD. Invisible on POSIX, where a native path is also `/`-separated.
+          The real error was `ENOENT: open 'C:/Users/danie/Github/four.js/quad.bin'` — the
+          buffer URI resolving against the process CWD. `resolveUri` in `@fourjs/assets`
+          resolves a glTF's relative URIs against the asset's **URL**, lexically, splitting on
+          `/`. That is correct and deliberate (§33: the package names no `URL` global). The
+          tests passed `fileURLToPath(...)` — a *native* path — so on Windows
+          `lastIndexOf("/")` returns −1, the base collapses to `""`, and `quad.bin` went to
+          the CWD. Invisible on POSIX, where a native path is also `/`-separated.
 
-      Fixed in `tests/determinism/gltf-load.test.ts` and `tests/integration/gltf-scene.test.ts`:
-      the fixture directory stays a URL all the way to the loader, and becomes a path only
-      at the single call that touches the filesystem. The library was not changed — it was
-      never wrong. The third failure, `determinism/path.test.ts`, passes on a quiet machine;
-      it was contention, not a defect.
+          Fixed in `tests/determinism/gltf-load.test.ts` and `tests/integration/gltf-scene.test.ts`:
+          the fixture directory stays a URL all the way to the loader, and becomes a path only
+          at the single call that touches the filesystem. The library was not changed — it was
+          never wrong. The third failure, `determinism/path.test.ts`, passes on a quiet machine;
+          it was contention, not a defect.
+
 - [x] **Five tests time out under `bun run test` on Windows; none is a code defect.**
       DONE 2026-09-06 — barrels now import lazily inside each test so the first
       await no longer pays every dynamic import; `svg-path` and `random` take a
       30 s describe timeout (Vitest 3.2 options object, not `describe.configure`).
       Surfaced the moment the runner above started working. All are 5 s `testTimeout`
-      expiries, not wrong answers:
-      - `four/tests/barrels.test.ts` — the **first** barrel awaited times out while the
-        other 24 pass in ~0 ms. Every dynamic import is started at module load and the
-        first `await` pays the whole cold-start cost. Fails even with the package run
-        alone, so it is not contention.
-      - `geometry/tests/svg-path.test.ts` and `core/tests/random.test.ts` — pass when
-        their package runs alone, fail under `--concurrency=4`. Contention.
+      expiries, not wrong answers: - `four/tests/barrels.test.ts` — the **first** barrel awaited times out while the
+      other 24 pass in ~0 ms. Every dynamic import is started at module load and the
+      first `await` pays the whole cold-start cost. Fails even with the package run
+      alone, so it is not contention. - `geometry/tests/svg-path.test.ts` and `core/tests/random.test.ts` — pass when
+      their package runs alone, fail under `--concurrency=4`. Contention.
       Both shapes are the charter's "flaky by design" axis: a wall-clock budget that
       happens to hold on CI's hardware and not here. A fix is a real decision (raise
       `testTimeout` for cold-start-bound suites? await the barrels serially?), so it is
@@ -685,39 +674,39 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       run dies before a single test executes:
 
       ```text
-      ENOENT: no such file or directory, scandir '\C:\Users\danie\Github\fourJS\packages'
-      ```
+          ENOENT: no such file or directory, scandir '\C:\Users\danie\Github\fourJS\packages'
+          ```
 
-      It is the **only** tool in `tools/` with this bug — `apply-publish-names`,
-      `check-docs`, `check-spec` and `generate-compatibility` all use `fileURLToPath`
-      already — so the fix is to adopt the idiom the rest of the directory already uses.
-      Invisible on CI, where `.pathname` needs no translation, which is how the repo's two
-      most important scripts can be dead on a platform while every gate stays green.
+          It is the **only** tool in `tools/` with this bug — `apply-publish-names`,
+          `check-docs`, `check-spec` and `generate-compatibility` all use `fileURLToPath`
+          already — so the fix is to adopt the idiom the rest of the directory already uses.
+          Invisible on CI, where `.pathname` needs no translation, which is how the repo's two
+          most important scripts can be dead on a platform while every gate stays green.
 
 - [x] **Make the WebGPU gate run on Windows: `--use-angle=swiftshader` is what blocks it.** DONE — 22 passed, 0 skipped.
       Measured 2026-09-06, both binaries x four flag sets, on a served origin:
 
       | binary | flags | `requestAdapter()` |
-      | --- | --- | --- |
-      | full | `--use-gl=angle --use-angle=swiftshader --enable-unsafe-webgpu` (today's) | **null** |
-      | shell | same | **null** |
-      | full | `--enable-unsafe-webgpu` only | nvidia / pascal, 20 features |
-      | full | `+ --use-webgpu-adapter=swiftshader` | **google / swiftshader, 18 features** |
-      | shell | `--use-gl=angle --enable-unsafe-webgpu` | nvidia / pascal, 20 features |
+          | --- | --- | --- |
+          | full | `--use-gl=angle --use-angle=swiftshader --enable-unsafe-webgpu` (today's) | **null** |
+          | shell | same | **null** |
+          | full | `--enable-unsafe-webgpu` only | nvidia / pascal, 20 features |
+          | full | `+ --use-webgpu-adapter=swiftshader` | **google / swiftshader, 18 features** |
+          | shell | `--use-gl=angle --enable-unsafe-webgpu` | nvidia / pascal, 20 features |
 
-      `--use-angle=swiftshader` governs ANGLE (WebGL) and is right for the `chromium` and
-      `visual` projects — it is what makes a GPU machine measure like CI. But on Windows it
-      also denies Dawn an adapter, so all 22 `webgpu` specs skip.
-      `--use-webgpu-adapter=swiftshader` is the WebGPU-side equivalent and keeps the
-      determinism the config is actually after: a *software* adapter, not this box's NVIDIA.
-      Fix must be platform-conditional. CI (Linux) runs 103/103 with today's flags, so the
-      non-Windows argument list must not change at all.
+          `--use-angle=swiftshader` governs ANGLE (WebGL) and is right for the `chromium` and
+          `visual` projects — it is what makes a GPU machine measure like CI. But on Windows it
+          also denies Dawn an adapter, so all 22 `webgpu` specs skip.
+          `--use-webgpu-adapter=swiftshader` is the WebGPU-side equivalent and keeps the
+          determinism the config is actually after: a *software* adapter, not this box's NVIDIA.
+          Fix must be platform-conditional. CI (Linux) runs 103/103 with today's flags, so the
+          non-Windows argument list must not change at all.
 
 - [x] **`KeyboardInput` is UI focus-routing, and its name sends game code to the wrong
       tool.** Found by the flight-sim persona; never filed until now, which is why it is
       dated late. `@fourjs/input`'s `KeyboardInput` takes
-      `(surface, { focusTarget: () => Node | null })` and dispatches to a *focused scene
-      node* — it pairs with `@fourjs/ui`'s `keyboardFocusTarget(root)`. A game reading WASD
+      `(surface, { focusTarget: () => Node | null })` and dispatches to a _focused scene
+      node_ — it pairs with `@fourjs/ui`'s `keyboardFocusTarget(root)`. A game reading WASD
       wants none of that, and four offers no first-class alternative: its own
       `examples/character-controller` uses raw `window.addEventListener("keydown")`. So the
       sanctioned path for game input is the DOM, undocumented, while the class whose name
@@ -732,13 +721,13 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 
 - [x] **A dynamic body with no collider cannot rotate, and nothing says so.** Found by the
       two-piston-engine persona dogfood. A flat-twin built from `RigidBody({ type:
-      "dynamic", mass: 1 })` with no colliders — reasonable for a pure linkage, where the
+    "dynamic", mass: 1 })` with no colliders — reasonable for a pure linkage, where the
       joints are the only constraints — sat frozen at its assembly angle forever. Every
       accuracy invariant scored a **perfect 0.0 error**, because nothing moved: the exact
       shape of a green result that means nothing. Adding a `Collider` was the whole fix.
       Cause: `mass` supplies mass, not the **inertia tensor**. Without a collider to derive
       it from and with no explicit `inertiaTensor`, angular inertia is zero and the solver
-      will not turn the body. The adapter states this — but only inside a *3D-only*
+      will not turn the body. The adapter states this — but only inside a _3D-only_
       validation message ("omit inertiaTensor and let the solver derive it from the collider
       geometry"), which never fires when the tensor is simply absent.
       A `#warnOnce`-style diagnostic would fit: `PhysicsWorld` already has that pattern for
@@ -760,7 +749,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 - [x] **The `world.initialize()` ordering rule is demonstrated but never stated.** DONE b9ee8aa — stated in docs/guides/fixed-step-simulation.md.
       `addBody` throws unless `world.initialize()` has already run, because that call
       decodes the wasm solver (§37). The error text is excellent and says exactly what to
-      do. But the rule appears in no guide and no README as a *rule* — it is only modelled,
+      do. But the rule appears in no guide and no README as a _rule_ — it is only modelled,
       in `docs/guides/collision-filtering.md` and `examples/mechanism`. Building the scene
       first and initializing last is the order the rest of four reads in (`app.initialize()`
       comes after the scene is built), so the natural guess is the wrong one.
@@ -788,19 +777,17 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       with the workaround removed.
 
 - [x] **The browser gate on Windows — WebGPU fixed; chromium/visual timeouts
-      closed.** DONE 2026-09-06. Two causes were filed; both closed:
-      - **WebGPU (2026-09-06).** All 22 specs had skipped when
-        `requestAdapter()` was `null`. **`--use-angle=swiftshader` was the cause**
-        — it is right for the `chromium` and `visual` projects on Linux but on
-        Windows it also denied Dawn an adapter. Platform-conditional argv:
-        `--use-webgpu-adapter=swiftshader` on Windows only. Result: **22 passed,
-        0 skipped**.
-      - **Chromium/visual (2026-09-06).** Screenshot-bound `animation.spec`
-        sampling replaced with simulation-progress watches on `#status`
-        (`data-beacon-y`, `data-vane-*`, `data-sim`). Windows Playwright
-        timeout 180 s (Linux/CI 120 s). Complements #72's
-        `smoothness.spec` `page.evaluate` parity wait. (#73's shared
-        16-screenshot sweep superseded on this branch.)
+      closed.** DONE 2026-09-06. Two causes were filed; both closed: - **WebGPU (2026-09-06).** All 22 specs had skipped when
+      `requestAdapter()` was `null`. **`--use-angle=swiftshader` was the cause**
+      — it is right for the `chromium` and `visual` projects on Linux but on
+      Windows it also denied Dawn an adapter. Platform-conditional argv:
+      `--use-webgpu-adapter=swiftshader` on Windows only. Result: **22 passed,
+      0 skipped**. - **Chromium/visual (2026-09-06).** Screenshot-bound `animation.spec`
+      sampling replaced with simulation-progress watches on `#status`
+      (`data-beacon-y`, `data-vane-*`, `data-sim`). Windows Playwright
+      timeout 180 s (Linux/CI 120 s). Complements #72's
+      `smoothness.spec` `page.evaluate` parity wait. (#73's shared
+      16-screenshot sweep superseded on this branch.)
 - [x] **`playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.** DONE
       2026-09-06 — `chrome-win64/chrome.exe`, `chrome-win/chrome.exe`, and the
       headless-shell-win64 layout are in the candidate list. Only matters when
@@ -817,7 +804,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `fixtures/readme-page.ts` block and asserts a two-colour frame (single
       unlit circle on a uniform clear). Check-docs still pins the
       `start()`/`step()` pairing.
-- [x] **`examples/README.md` never says how to *view* an example.** DONE b9ee8aa — a "Running one" section. Every entry gives
+- [x] **`examples/README.md` never says how to _view_ an example.** DONE b9ee8aa — a "Running one" section. Every entry gives
       `bun run <name>:build`, which writes `dist/` and shows nothing. The dev-server
       command (`bunx vite examples/<name>`) is in the root `README.md` only, which is not
       where a reader browsing `examples/` is looking.
@@ -845,8 +832,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       whole app kept working on the other backend with nothing else touched. Measured side
       by side: glTF loaded / loaded, particles 245 / 247 alive, tween 1.025–1.550 /
       1.050–1.575, lit pixels 9,462 / 10,903, console errors 0 / 0. The only WebGPU-only
-      message is §10's dropped-time guard on the slower first frame — *"dropped 0.0666s
-      … TimeState.droppedTime is now 0.0666s"* — which is the documented behaviour and names
+      message is §10's dropped-time guard on the slower first frame — _"dropped 0.0666s
+      … TimeState.droppedTime is now 0.0666s"_ — which is the documented behaviour and names
       the field to inspect, not a defect.
       **Cycle 4 (2026-09-09, `.dogfood/cycle4`) — the three remaining surfaces,
       from a consumer seat, in one Scene, in Chrome + Node.** §56 `Text` via
@@ -888,18 +875,19 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       changed — registry semantics are a §37 call.
 
       **DECIDED and DONE 2026-09-06: idempotent for an identical registration.**
-      §37's refusal exists to stop a silent *overwrite* making `"auto"`'s choice depend on
-      module evaluation order (§33). Re-adding the same entry overwrites nothing, so that
-      reasoning never applied to it; a *different* solver under the name still throws, with
-      the same message and context. Compared by function identity, since
-      `registerRapierSolver()` builds a fresh literal each call but its `isSupported` and
-      `create` are module-level bindings.
-      `physics-rapier`'s own test changed with it, deliberately — the contract narrowed, and
-      it now covers both halves. Dogfooded from outside with the `makeWorld()` helper from
-      the finding above: second call threw before, all three build after.
+          §37's refusal exists to stop a silent *overwrite* making `"auto"`'s choice depend on
+          module evaluation order (§33). Re-adding the same entry overwrites nothing, so that
+          reasoning never applied to it; a *different* solver under the name still throws, with
+          the same message and context. Compared by function identity, since
+          `registerRapierSolver()` builds a fresh literal each call but its `isSupported` and
+          `create` are module-level bindings.
+          `physics-rapier`'s own test changed with it, deliberately — the contract narrowed, and
+          it now covers both halves. Dogfooded from outside with the `makeWorld()` helper from
+          the finding above: second call threw before, all three build after.
+
 - [x] **`new Node()` is unguarded at runtime — a JS consumer can instantiate an abstract class.**
       **REOPENED 2026-09-06.** A DEV-gated `devWarnOnce` was implemented and then reverted:
-      `tests/integration/dev-build-mode.test.ts` forbids *any* build-flag branch in a
+      `tests/integration/dev-build-mode.test.ts` forbids _any_ build-flag branch in a
       simulation package (`math`, `motion`, `scene`, `physics`, `animation`, `particles`),
       because those are the packages a replay's numbers come from (§33). Registering it in
       `GATED` fails the same test's other half. Running it unconditionally is not free
@@ -918,21 +906,22 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       performance objection deserves a real answer rather than my assumption either way.
 
       **DECIDED 2026-09-06: leave it to TypeScript. Closed, with the cost measured.**
-      The DEV-gated version is forbidden — §33 bars a simulation package from branching on
-      the build flag, and `scene` is one. So the only remaining shape is an unconditional
-      guard, which every shipped bundle carrying `@fourjs/scene` pays for forever.
-      Measured rather than estimated: a guard whose entire message is
-      `"Node is abstract; use Group (§6)."` — 49 characters, about as terse as a useful
-      error gets — put `examples/ui-demo` **41 B over** its 45 kB §86 budget
-      (45.04 kB against 45 kB; reverting restored `bun run size` to exit 0). There is no
-      version of this that is free, and no version that fits.
-      Against that: `Node` is `abstract`, so **TypeScript already rejects `new Node()`** for
-      the library's primary audience, and the published packages ship `.d.ts`. The guard
-      would buy a runtime message for JavaScript-only consumers, on a mistake the compiler
-      catches at the point of writing — paid for by every user of every app, in bytes, in
-      perpetuity. That is the wrong trade.
-      Reopening this needs one of two things to change: `ui-demo`'s §86 budget rising for a
-      reason of its own, or a home for the check outside the simulation envelope.
+          The DEV-gated version is forbidden — §33 bars a simulation package from branching on
+          the build flag, and `scene` is one. So the only remaining shape is an unconditional
+          guard, which every shipped bundle carrying `@fourjs/scene` pays for forever.
+          Measured rather than estimated: a guard whose entire message is
+          `"Node is abstract; use Group (§6)."` — 49 characters, about as terse as a useful
+          error gets — put `examples/ui-demo` **41 B over** its 45 kB §86 budget
+          (45.04 kB against 45 kB; reverting restored `bun run size` to exit 0). There is no
+          version of this that is free, and no version that fits.
+          Against that: `Node` is `abstract`, so **TypeScript already rejects `new Node()`** for
+          the library's primary audience, and the published packages ship `.d.ts`. The guard
+          would buy a runtime message for JavaScript-only consumers, on a mistake the compiler
+          catches at the point of writing — paid for by every user of every app, in bytes, in
+          perpetuity. That is the wrong trade.
+          Reopening this needs one of two things to change: `ui-demo`'s §86 budget rising for a
+          reason of its own, or a home for the check outside the simulation envelope.
+
 - [x] **Publish path was broken — `apply-publish-names` exited 1, so fourJS could not be
       published at all.** Found by dogfooding the publish path rather than the API. Rewriter did
       not match subpath specifiers while the validator flagged them; two renderer error messages
@@ -952,20 +941,21 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       docs.)
 
       **DECIDED 2026-09-06: no change. The design is right and I was wrong about it.**
-      I implemented "`addBody` claims an unclaimed node" and two existing tests refused it:
-      `world.test.ts` → "refuses the write and warns once for a node it does not own (§42)"
-      sets `transformAuthority = "manual"` on a *dynamic* body **on purpose** and asserts the
-      write is refused and warned. So `"manual"` is not a blank — it is an explicit claim
-      meaning *the author writes this transform*. `DEFAULT_TRANSFORM_AUTHORITY` being
-      `"manual"` makes the default "the app owns it", which is the safe default: claiming it
-      for physics would take the transform away from code that legitimately owns it, and my
-      own control test said never to overrule a chosen authority.
-      The diagnostic is also better than my note implied. It names the writer, the node, the
-      current owner, that the write was **refused**, §42, and the exact line to add
-      (`Set node.transformAuthority = "physics"`), then suppresses repeats. That is a good
-      error, not a silent failure — my complaint was that a `console.warn` is easy to miss on
-      a busy page, which is a property of console warnings, not a defect in §42.
-      Reverted cleanly; physics is 25/25.
+          I implemented "`addBody` claims an unclaimed node" and two existing tests refused it:
+          `world.test.ts` → "refuses the write and warns once for a node it does not own (§42)"
+          sets `transformAuthority = "manual"` on a *dynamic* body **on purpose** and asserts the
+          write is refused and warned. So `"manual"` is not a blank — it is an explicit claim
+          meaning *the author writes this transform*. `DEFAULT_TRANSFORM_AUTHORITY` being
+          `"manual"` makes the default "the app owns it", which is the safe default: claiming it
+          for physics would take the transform away from code that legitimately owns it, and my
+          own control test said never to overrule a chosen authority.
+          The diagnostic is also better than my note implied. It names the writer, the node, the
+          current owner, that the write was **refused**, §42, and the exact line to add
+          (`Set node.transformAuthority = "physics"`), then suppresses repeats. That is a good
+          error, not a silent failure — my complaint was that a `console.warn` is easy to miss on
+          a busy page, which is a property of console warnings, not a defect in §42.
+          Reverted cleanly; physics is 25/25.
+
 - [x] **`main` was RED on CI, Docs and Release; reverted #62 and #63 to restore it.** Both had been
       merged over documented failures. Full evidence in CHANGELOG; the short version is that
       vitest 4 and typedoc 0.28.20 have no TypeScript version in common.
@@ -973,24 +963,24 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       **RESEARCHED 2026-09-07 — the premise is wrong, and there IS a solution.** This row said
       "wait for typedoc", which put a release gate on someone else's roadmap. It does not need to.
       · **What TS 7 is:** the Go port of the compiler (`@typescript/native-preview` exists at
-        `7.0.0-dev`). typedoc consumes the compiler API, which is why it CRASHES on 7 rather
-        than merely warning — and why waiting for a peer-range bump was never the right signal.
-      · **The measured matrix already said so:** TS 7.0.2 → *docs crash, **lint passes***.
-        Only the docs step blocks TS 7. Lint is fine.
+      `7.0.0-dev`). typedoc consumes the compiler API, which is why it CRASHES on 7 rather
+      than merely warning — and why waiting for a peer-range bump was never the right signal.
+      · **The measured matrix already said so:** TS 7.0.2 → _docs crash, **lint passes**_.
+      Only the docs step blocks TS 7. Lint is fine.
       · **typedoc resolves its OWN TypeScript**, not the workspace's — verified: an isolated
-        install printed *"Using TypeScript 6.0.3 from ./node_modules/typescript"*.
+      install printed _"Using TypeScript 6.0.3 from ./node_modules/typescript"_.
       · **Proven end to end:** that isolated typedoc, pointed at this repo's real sources and
-        `typedoc.json`, generated **0 errors / 24 warnings** — identical to the workspace
-        baseline. The "TS 6.0.3 → docs 7 errors" in `dependabot.yml` was `@types/node`
-        unresolved through workspace hoisting, not a typedoc/TS incompatibility.
+      `typedoc.json`, generated **0 errors / 24 warnings** — identical to the workspace
+      baseline. The "TS 6.0.3 → docs 7 errors" in `dependabot.yml` was `@types/node`
+      unresolved through workspace hoisting, not a typedoc/TS incompatibility.
       · **So the path is:** give the docs step its own pinned typedoc + TypeScript, and the
-        workspace is free to move to TS 7 whenever wanted. Cost is one small tool package or a
-        pinned `bunx` invocation in the `docs` script.
+      workspace is free to move to TS 7 whenever wanted. Cost is one small tool package or a
+      pinned `bunx` invocation in the `docs` script.
       · **What this does NOT unblock:** the vitest side. The matrix's 76 lint errors belong to
-        TS **6** + typescript-eslint, a separate dependency with its own range — measure that
-        before bundling it into the same PR.
+      TS **6** + typescript-eslint, a separate dependency with its own range — measure that
+      before bundling it into the same PR.
       · **And nothing is broken today:** the workspace is on TS 5.9.3 and every gate is green.
-        This is a deferred UPGRADE, not a defect — it should not count against a release gate.
+      This is a deferred UPGRADE, not a defect — it should not count against a release gate.
       Corrections to my own research, recorded because each nearly became a false finding:
       typedoc's `1.0.0-dev.*` versions sort last in `npm view versions` but were published in
       **2020**; they are not a newer release. And my earlier "still blocked" came from reading
@@ -1011,43 +1001,43 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       removed.
 
       · **DONE 2026-09-08 — the repo builds and type-checks on TypeScript 7.0.2.** Not by
-        isolating the docs step as sketched above, but more simply: `typescript` stays at
-        **6.0.3** (what TypeDoc and typescript-eslint resolve) and TS 7 is installed
-        alongside as the `ts7` alias, which the 24 package builds and every typecheck script
-        now call **by explicit path**. Clean-tree evidence: 315 `.d.ts` emitted, 7,246 tests
-        across 282 files green against TS-7-built artifacts, and an injected `TS2322` caught
-        — so the green is a real check, not a no-op.
-      · **CORRECTION — this item's own research note was wrong.** It claimed *"TS 7.0.2 →
-        docs crash, **lint passes**"*. Lint does **not** pass: typescript-eslint refuses TS 7
-        by name (`typescript-eslint does not support TS 7.0`, exit 2), which is why TS 6.0.3
-        has to stay for lint as well as docs. My own note was a hypothesis with my handwriting
-        on it; today's reading is direct and reproducible.
-      · **The vitest half of this row was never blocked by TypeDoc at all** — vitest declares
-        no `typescript` peer. Two unrelated pins were bundled into one sentence. Split out
-        below as its own item.
-      · **RESOLVED 2026-09-08 — the root is TypeScript 7.0.2 only.** Not by either tool
-        shipping support. typescript-eslint was **replaced** by Oxlint (whose type-aware mode
-        REQUIRES TS 7), and TypeDoc was **isolated** into `tools/docs` with `typescript@6.0.3`
-        as a direct dependency. `typescript@6.0.3` had exactly two consumers, so neither could
-        be removed alone — that is why both had to land together.
-      · What remains is one dependency, not a gate: drop `typescript@6.0.3` entirely when
-        TypeDoc ships TS 7 support (its issue is open with no timeline) or is replaced by API
-        Extractor, which bundles its own compiler. Nothing waits on it.
-      · **RE-BROKEN by #82 (2026-09-09), restored the same day.** Dependabot grouped the
-        root 7.0.2 bump with `tools/docs`, which is the isolation. `bun run docs` died
-        on `PropertyDeclaration`. Pin is 6.0.3 again; `check-compiler.mjs` refuses
-        anything else so the next grouped bump fails with that sentence.
-      · **Reasoning and evidence now live in `docs/MIGRATION.md`** (2026-09-08), including the
-        exit criteria for every layer and the commands to re-measure. Read it before re-opening
-        this row — the numbers in it expire when the tools move.
-      · **Research 2026-09-08 halved this blocker.** Oxlint's type-aware mode *requires*
-        TypeScript 7 (it is `typescript-go` underneath), so swapping typescript-eslint for
-        Oxlint removes half the reason `typescript@6.0.3` is installed — and takes lint from
-        **3m56s to 13s**. All three repo-specific guards were verified to survive. **TypeDoc is
-        then the only holdout**, and its issue is open with no timeline, so it needs isolating
-        or replacing rather than waiting on. See `docs/MIGRATION.md` sections 3.1a, 3.1b, 4a.
-        **The Oxlint swap is a gate-semantics change and wants a rule-parity diff first — it is
-        a decision, not a bump.**
+            isolating the docs step as sketched above, but more simply: `typescript` stays at
+            **6.0.3** (what TypeDoc and typescript-eslint resolve) and TS 7 is installed
+            alongside as the `ts7` alias, which the 24 package builds and every typecheck script
+            now call **by explicit path**. Clean-tree evidence: 315 `.d.ts` emitted, 7,246 tests
+            across 282 files green against TS-7-built artifacts, and an injected `TS2322` caught
+            — so the green is a real check, not a no-op.
+          · **CORRECTION — this item's own research note was wrong.** It claimed *"TS 7.0.2 →
+            docs crash, **lint passes**"*. Lint does **not** pass: typescript-eslint refuses TS 7
+            by name (`typescript-eslint does not support TS 7.0`, exit 2), which is why TS 6.0.3
+            has to stay for lint as well as docs. My own note was a hypothesis with my handwriting
+            on it; today's reading is direct and reproducible.
+          · **The vitest half of this row was never blocked by TypeDoc at all** — vitest declares
+            no `typescript` peer. Two unrelated pins were bundled into one sentence. Split out
+            below as its own item.
+          · **RESOLVED 2026-09-08 — the root is TypeScript 7.0.2 only.** Not by either tool
+            shipping support. typescript-eslint was **replaced** by Oxlint (whose type-aware mode
+            REQUIRES TS 7), and TypeDoc was **isolated** into `tools/docs` with `typescript@6.0.3`
+            as a direct dependency. `typescript@6.0.3` had exactly two consumers, so neither could
+            be removed alone — that is why both had to land together.
+          · What remains is one dependency, not a gate: drop `typescript@6.0.3` entirely when
+            TypeDoc ships TS 7 support (its issue is open with no timeline) or is replaced by API
+            Extractor, which bundles its own compiler. Nothing waits on it.
+          · **RE-BROKEN by #82 (2026-09-09), restored the same day.** Dependabot grouped the
+            root 7.0.2 bump with `tools/docs`, which is the isolation. `bun run docs` died
+            on `PropertyDeclaration`. Pin is 6.0.3 again; `check-compiler.mjs` refuses
+            anything else so the next grouped bump fails with that sentence.
+          · **Reasoning and evidence now live in `docs/MIGRATION.md`** (2026-09-08), including the
+            exit criteria for every layer and the commands to re-measure. Read it before re-opening
+            this row — the numbers in it expire when the tools move.
+          · **Research 2026-09-08 halved this blocker.** Oxlint's type-aware mode *requires*
+            TypeScript 7 (it is `typescript-go` underneath), so swapping typescript-eslint for
+            Oxlint removes half the reason `typescript@6.0.3` is installed — and takes lint from
+            **3m56s to 13s**. All three repo-specific guards were verified to survive. **TypeDoc is
+            then the only holdout**, and its issue is open with no timeline, so it needs isolating
+            or replacing rather than waiting on. See `docs/MIGRATION.md` sections 3.1a, 3.1b, 4a.
+            **The Oxlint swap is a gate-semantics change and wants a rule-parity diff first — it is
+            a decision, not a bump.**
 
 - [x] **Open-PR sweep 2026-09-06: Dependabot hygiene + stale branches.** #65
       (rapier 0.20) and #66 (eslint 10 dev-deps) **closed** and ignored in
@@ -1144,7 +1134,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       ~3–4× the list. Fence vs stall timed on the counting-GL seam only
       (no host WebGL 2 / no WebGPU `PickingService`). ~~§72
       pointer-event dispatch on a `PickProvider` result is an input packet~~
-      **DONE 2026-09-09** (      `PointerInputOptions.pickProvider`; default
+      **DONE 2026-09-09** ( `PointerInputOptions.pickProvider`; default
       handlers stay synchronous; provider path serializes per `pointerId`).
       ~~WebGPU's `PickingService` (`mapAsync`)~~ **DONE 2026-09-09**
       (`registerPickingPipeline()` from `@fourjs/render-webgpu`;
@@ -1181,10 +1171,10 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       rewritten to say so. check-docs green, 10 pins.
 
       0001's landing decides WP-R1.9's
-                                              input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-                                              reachability are backend-independent and re-exported through `@fourjs/render`;
-                                              the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
-                                              (screen domain included, for §70 graph effects).
+                                                  input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+                                                  reachability are backend-independent and re-exported through `@fourjs/render`;
+                                                  the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+                                                  (screen domain included, for §70 graph effects).
 
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
@@ -1219,9 +1209,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       walk, and the 180-channel clip through both `AnimationMixer` and
       `AnimationController`. Alternative A does **not** return: at ×10 a Bone
       chain is within noise of Groups. Proposed §86 sentence (not a spec
-      amendment, not a gate): *227 independently animated 60-bone characters
+      amendment, not a gate): _227 independently animated 60-bone characters
       inside one 60 Hz fixed step on the recording host (resolve + palette +
-      controller)*. Record: `benchmarks/results/skinning-resolve.json`.
+      controller)_. Record: `benchmarks/results/skinning-resolve.json`.
 - [x] **glTF loader (§78) shipped 2026-08-29** — `createGltfLoader`/`GltfAsset`
       (`@fourjs/assets`) + `instantiateGltf` (`four`), glTF 2.0 core tier: both
       containers, all six §53 attributes, §59 factors + base-colour texture,
@@ -1231,7 +1221,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `tests/browser/gltf.spec.ts`.
 - [x] **§59 second texture unit** (R-13 follow-up, flagged by the §78 packet):
       DONE 2026-09-06 — `StandardMaterial.metalRoughnessMap` (glTF G=roughness,
-      B=metalness). WebGL binds unit 2. WebGPU field is staged inert.
+      B=metalness). WebGL binds unit 2. ~~WebGPU field is staged inert.~~
+      **WebGPU samples it 2026-09-09** (group 2 mr-only, group 3 with albedo).
       The glTF loader decodes that slot as linear and drops `ignoredTextures`
       for it. Normal/occlusion/emissive remain warned-inert until further
       units land.
@@ -1259,7 +1250,10 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       utility~~ **DONE 2026-09-09** — WebGL `uniform mat3 normalMatrix`;
       WebGPU `DrawUniforms.normalMatrix` (192-byte block, standard extras
       shifted to 192/208). `Matrix3.setNormalFromMatrix4` on CPU; singular
-      models upload identity.
+      models upload identity. ~~WebGPU `metalRoughnessMap` staged inert~~
+      **DONE 2026-09-09** (sampled at group 2 when `!map`, group 3 when
+      `map`; G=roughness, B=metalness). Remaining: multi-light, cascades,
+      PBR rest, §60a, light layers, other texture slots.
 - [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
       family list now names `LitMaterial`
 - [ ] First publish (§94 0.1): Changesets release workflow + the
@@ -1379,8 +1373,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       neither); §65's persistent-mapped/staging-ring buffers; §27 GPU fields and §36
       `collisions: "depth-buffer"`; ~~RFC 0005's `Rectangle2` prerequisite for a regional
       `readPixels`~~ **DONE 2026-08-29** — `render/src/renderer.ts:464` states it outright
-      (*"`readPixels` joined the interface when `Rectangle2` landed in `@fourjs/math`
-      (2026-08-29; RFC 0005's recorded prerequisite, cleared)"*), `Rectangle2` is exported
+      (_"`readPixels` joined the interface when `Rectangle2` landed in `@fourjs/math`
+      (2026-08-29; RFC 0005's recorded prerequisite, cleared)"_), `Rectangle2` is exported
       from `@fourjs/math`, and `render/src/read-pixels.ts:44` declares
       `readPixels(target, region?)`.
 - [x] **PH-11 residue — §12 character controllers DONE 2026-08-21.**
@@ -1569,8 +1563,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals);
       ~~glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas
       material batch as they are)~~ **DONE 2026-08-13 (R-28)** — and both the CHANGELOG and
-      the code say so: *"consecutive labels sharing a material merge into one draw under
-      §65 batching, which closes §65's glyph-batching strategy at the label level"*, and
+      the code say so: _"consecutive labels sharing a material merge into one draw under
+      §65 batching, which closes §65's glyph-batching strategy at the label level"_, and
       `four/src/text-node.ts:71` repeats it, adding that the residue is grouping labels
       that do NOT share a material — which is the atlas-grouping sub-part already listed
       separately below, not a second open claim; texture-atlas _grouping_ of distinct textures (needs a
@@ -1617,8 +1611,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       video/`ImageBitmap`, map roles, async upload.
 
       · **OVERLAP, closed 2026-09-09:** "A-19 remainder" described the SAME remaining
-        work. A-19 is now marked merged; this is the surviving item. GlTF residue
-        (morph / CUBICSPLINE / remaining texture slots) stays with those rows.
+            work. A-19 is now marked merged; this is the surviving item. GlTF residue
+            (morph / CUBICSPLINE / remaining texture slots) stays with those rows.
 
 - [x] **Examples onto `Text` — DONE 2026-08-21**, extended to both flagships
       (layer assignment needs one node per label). Draw calls: first-2d 30 → 1,
@@ -1769,20 +1763,20 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       step 2); converting scattered scene/physics checks to `devAssert` (step 3);
       **CLOSED 2026-09-07. Step 2 is DONE; step 3 is WON'T-DO, for the same reason
       step 4 was reverted — and the item should have said so already.**
-      · *Step 2 verified independently, not taken on report:* `validation.ts` is 278
+      · _Step 2 verified independently, not taken on report:_ `validation.ts` is 278
       lines / 18 exports, re-exported from `diagnostics/src/index.ts`, carries its own
       `tests/validation.test.ts`, and is consumed by `packages/fourjs`
       (`application.ts`, `diagnostics.ts`) — a catalogue nothing imported would not
       have counted.
-      · *Step 3 cannot be done as written.* `devAssert` opens `if (!DEV) return`, so
+      · _Step 3 cannot be done as written._ `devAssert` opens `if (!DEV) return`, so
       converting scene/physics checks means those packages import the build flag. They
       do not, and may not: **`GATED` in `dev-build-mode.test.ts` lists 26 files and NOT
       ONE is from `packages/scene` or `packages/physics`.** Verified by a second method
       — a grep for real `import { DEV | devAssert | devWarn }` statements across scene,
       physics, physics-rapier, physics-box2d, physics-soft and math returns **zero**
       (a first grep for the bare word matched only prose in `authority.ts`, which says
-      *"not `DEV` / `devWarnOnce`"*). Suite green, 10/10.
-      · *Where the work actually belongs:* §33's envelope is the point, not an obstacle
+      _"not `DEV` / `devWarnOnce`"_). Suite green, 10/10.
+      · _Where the work actually belongs:_ §33's envelope is the point, not an obstacle
       — a replay recorded in a dev build must reproduce bit-exactly in production, so a
       simulation package must behave identically either way. Checks that want DEV live
       in `@fourjs/diagnostics`, which is already GATED and already holds the catalogue.
@@ -1923,7 +1917,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       extrudes (`tessellation.ts` + `extrudeGeometry`); holes live on
       `polygonGeometry2D`. §55 atlas packet: sprites author `geometry.uvs`
       from `Sprite.frame` and both backends sample that stream — `uniform vec4
-      quad` / `SPRITE_QUAD_OFFSET` are gone. Frame writes rewrite eight floats
+    quad` / `SPRITE_QUAD_OFFSET` are gone. Frame writes rewrite eight floats
       in place and bump geometry version (animation clips re-upload the uv
       buffer, not the texture). AUDIT-120 "basic 3D meshes" honesty pass
       2026-09-07.
@@ -1933,21 +1927,21 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       original RECOVER isolation flake was the same sampling strategy.
 
       **Widened 2026-09-06: it is the file's sampling strategy, not one test.** A CI run
-      failed two *different* tests in the same file — "ANIMATED" (`:836`) and "RAGDOLL"
-      (`:907`) — and both failed on **sample counts**, not on physics:
+          failed two *different* tests in the same file — "ANIMATED" (`:836`) and "RAGDOLL"
+          (`:907`) — and both failed on **sample counts**, not on physics:
 
-      | assertion | expected | got |
-      | --- | --- | --- |
-      | `bandDeltas.length` | `>= 8` | 7 |
-      | `samples.length` | `> 10` | 8 |
+          | assertion | expected | got |
+          | --- | --- | --- |
+          | `bandDeltas.length` | `>= 8` | 7 |
+          | `samples.length` | `> 10` | 8 |
 
-      The run was simply slower: **101 passed in 8.1 min**, against **103 passed in
-      6.8 min** on the last green run — the same suite, 19% slower, on a different
-      runner. A test that samples over wall-clock and then asserts it collected enough
-      samples is asserting the runner's throughput, which is not what §110 is about.
-      The fix is to make the sampling bounded by *simulation* progress rather than
-      elapsed real time, or to sample until the count is met with a generous deadline —
-      not to widen the threshold, which would just move the cliff.
+          The run was simply slower: **101 passed in 8.1 min**, against **103 passed in
+          6.8 min** on the last green run — the same suite, 19% slower, on a different
+          runner. A test that samples over wall-clock and then asserts it collected enough
+          samples is asserting the runner's throughput, which is not what §110 is about.
+          The fix is to make the sampling bounded by *simulation* progress rather than
+          elapsed real time, or to sample until the count is met with a generous deadline —
+          not to widen the threshold, which would just move the cliff.
 
 - [x] **A-26 DONE 2026-08-07.** `docs/COMPATIBILITY.md` (§90's five tables) +
       `tools/generate-compatibility.mjs` (solver-adapter block generated from live
@@ -2153,7 +2147,7 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       `NPM_TOKEN` / a custom domain remain owner steps.
 - [x] §55 frame regions + §65 sprite batching — `Sprite.frame` already
       shipped; `groupSpritesByTexture` consecutive-run helper DONE 2026-09-06.
-      Atlas *packing* of distinct textures remains.
+      Atlas _packing_ of distinct textures remains.
 - [x] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
       — **Proposed 2026-09-06** (`docs/rfcs/0008-text-shaping-engine.md`). Owner
       decision pending; default stays the identity pen walk.
@@ -2191,8 +2185,7 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       texture.
 
 - [x] 2026-09-09 — **Open-TODO first-wave slices (simple → complex).** Did
-      not close any of the 13 checkboxes. Landed: `Matrix3.setNormalFromMatrix4`
-      + WebGL lit/standard `uniform mat3 normalMatrix`; RFC 0005
+      not close any of the 13 checkboxes. Landed: `Matrix3.setNormalFromMatrix4` + WebGL lit/standard `uniform mat3 normalMatrix`; RFC 0005
       `benchmarks/pick-latency.mjs` (id-pass vs list, fence vs stall);
       R-33 `data-simulate` / `data-present` on particles-demo (seconds, no
       fps budget); dogfood cycle 4 (text / `.four.json` + §34 / one-scene

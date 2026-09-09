@@ -62,6 +62,16 @@
  * group carries no index of its own (the pipeline layout assigns it), so the
  * texture cache's records serve both families unchanged.
  *
+ * §59's packed metallic-roughness map reuses that same texture layout
+ * object. WebGPU allows four bind groups, so the MR sample sits at
+ * {@link SHADED_MR_BIND_GROUP_INDEX} **when albedo already occupies group 2**,
+ * and at {@link SHADED_MAP_BIND_GROUP_INDEX} when there is no albedo (the
+ * pipeline layout is then `[uniforms, lights, texture]` and group 3 would
+ * be an empty slot the API does not permit). {@link shadedMrBindingWgsl}
+ * takes the index so the two WGSL strings share one helper. The sampler
+ * names (`mrTexture` / `mrSampler`) are distinct from the albedo pair so
+ * both can coexist in the map+mr module.
+ *
  * ## The shadow half rides the spare stride bytes (WP-R1.7)
  *
  * §69's comparison sampler is a structurally different binding, and it lives
@@ -100,6 +110,16 @@ export const LIGHTS_BIND_GROUP_INDEX = 1;
  * so one texture cache serves all three sampling families.
  */
 export const SHADED_MAP_BIND_GROUP_INDEX = 2;
+
+/**
+ * The bind-group index §59's packed metallic-roughness map occupies **when
+ * the albedo `map` is also bound**: group 3, the last WebGPU slot. An
+ * mr-only draw binds the same layout object at
+ * {@link SHADED_MAP_BIND_GROUP_INDEX} instead — see the module header.
+ * Distinct from WebGL's `METAL_ROUGHNESS_TEXTURE_UNIT` (a texture *unit*,
+ * not a bind-group index).
+ */
+export const SHADED_MR_BIND_GROUP_INDEX = 3;
 
 /** Byte offset of `LightUniforms.ambientColor` (rgb; w unused, written 0). */
 export const LIGHT_AMBIENT_OFFSET = 0;
@@ -260,6 +280,27 @@ fn punctualLight(index : i32, p : vec3<f32>) -> PunctualLight {
  */
 export const SHADED_MAP_BINDING_WGSL = `@group(${String(SHADED_MAP_BIND_GROUP_INDEX)}) @binding(${String(MAP_TEXTURE_BINDING)}) var mapTexture : texture_2d<f32>;
 @group(${String(SHADED_MAP_BIND_GROUP_INDEX)}) @binding(${String(MAP_SAMPLER_BINDING)}) var mapSampler : sampler;`;
+
+/**
+ * The packed metallic-roughness declaration for one bind-group index —
+ * the albedo pair's two bindings and the same `createTextureBindGroupLayout`
+ * object, renamed so the map+mr module can splice both.
+ *
+ * Pass {@link SHADED_MR_BIND_GROUP_INDEX} when albedo occupies group 2;
+ * pass {@link SHADED_MAP_BIND_GROUP_INDEX} for an mr-only pipeline.
+ */
+export function shadedMrBindingWgsl(groupIndex: number): string {
+  return `@group(${String(groupIndex)}) @binding(${String(MAP_TEXTURE_BINDING)}) var mrTexture : texture_2d<f32>;
+@group(${String(groupIndex)}) @binding(${String(MAP_SAMPLER_BINDING)}) var mrSampler : sampler;`;
+}
+
+/**
+ * The map+mr form — MR at {@link SHADED_MR_BIND_GROUP_INDEX}. Mr-only
+ * modules call {@link shadedMrBindingWgsl} with group 2 instead.
+ */
+export const SHADED_MR_BINDING_WGSL = shadedMrBindingWgsl(
+  SHADED_MR_BIND_GROUP_INDEX,
+);
 
 /**
  * Packs one view's `LightUniforms` block into `staging` at `floatBase`.

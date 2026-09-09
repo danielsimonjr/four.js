@@ -30,12 +30,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — Open-TODO wave 5, simple → complex.** Twelve checkboxes
+  remain; three slices landed without pretending the packets closed.
+  (1) RFC 0005 WebGPU particle id: one id per emitter, private pipeline
+  (not exported as `ParticleIdProgram`); 208-byte `PARTICLE_ID_*` block;
+  CPU 8-float stream; trails / GPU-sim / wide stream skip. Remaining:
+  skinned id pass on both backends. (2) Lighting leftover: WebGPU
+  samples `StandardMaterial.metalRoughnessMap` (G=roughness, B=metalness);
+  group 3 with albedo, group 2 without (`shadedMrBindingWgsl`). `|mr:y`
+  only when true. Remaining: multi-light / cascades / PBR / §60a / light
+  layers / other texture slots. (3) Dogfood cycle 6 sat on §43 palettes;
+  engine clean; guides patched; standing checkbox stays open. First
+  publish and R-33's §112 exit stay blocked.
+
 - **2026-09-09 — WebGPU particle id arm (RFC 0005 residue).** One id per
   emitter, mirroring WebGL's `ParticleIdProgram` without exporting that
   class name (`graph:duplicates`). `PickingRendererHost.particles()` is
   the live `WgpuParticleCache` accessor. Mesh `IdUniforms` stay 144
   bytes; the particle id block is 208 bytes (`PARTICLE_ID_PROJECTION_
-  OFFSET` 0 / `VIEW` 64 / `MODEL` 128 / `PICK` 192) in the 256-byte
+OFFSET` 0 / `VIEW` 64 / `MODEL` 128 / `PICK` 192) in the 256-byte
   stride. Billboard vertex math is `PARTICLE_SHADER_SOURCE`'s (view·
   model, view-space corner, projection, depth remap). Default 8-float
   CPU stream only; trails, GPU-sim layouts, and the R-32 wide stream
@@ -53,6 +66,16 @@ readable; never delete the pointer itself.
   wave 4. Evidence: `tests/integration/interpolated-skin-palettes.test.ts`
   (two-bone, 90° hip; mid-alpha ≠ lerp of endpoints). Guides and
   architecture docs patched. Standing dogfood checkbox stays open.
+
+- **2026-09-09 — WebGPU samples `StandardMaterial.metalRoughnessMap`.** Packed
+  G=roughness / B=metalness, matching WebGL unit 2. Bind-group index is
+  **3 when albedo occupies group 2, 2 when it does not** (`shadedMrBindingWgsl`);
+  WebGPU pipeline layouts are an array, so an empty slot 2 would make
+  `@group(3)` invalid. `|mr:y` appends to the pipeline key only when true,
+  so scalar-only transcripts stay byte-identical. Unresolved named maps skip
+  the draw (WebGPU albedo's §83 rule, not GL's degrade). `normalMap` /
+  `occlusionMap` / `emissiveMap` remain unstaged. Lighting follow-ups stay
+  open (multi-light, cascades, PBR rest, §60a, light layers).
 
 - **2026-09-09 — WebGPU browser gates follow `DRAW_UNIFORM_BYTES`.** The
   Playwright page programs are not the renderer: they bind their own
@@ -172,7 +195,6 @@ readable; never delete the pointer itself.
   global branches 92.1% (adapter defensive paths). Bump still waits.
   **Superseded the same day — see the 5.0.0 landing entry above.**
 
-
 - **2026-09-09 — Browser-gate follow-up on the open-TODO PR.** Pause-during-
   grab was not enough: `waitForVirtualFrameCount` pumped the patched rAF and
   aliased even frames only. Host rAF (`__fourHostRaf`) is the pump. Character
@@ -242,7 +264,7 @@ readable; never delete the pointer itself.
 - **2026-09-06 — A-5 materials / solver-handle counts.** Process-wide
   `liveMaterialCount` and `liveSolver{Body,Collider,Joint,Handle}Count` are
   always-on numbers (no `DEV` in those packages). `auditResourceLeaks` still
-  gates the *message*. No new `FrameStats` fields.
+  gates the _message_. No new `FrameStats` fields.
 
 - **2026-09-06 — RFCs 0007–0009 proposed (owner pending).** Path-planning
   adapters (`0007`: waypoint polyline + `followWaypoints`, grid/navmesh later);
@@ -288,7 +310,6 @@ readable; never delete the pointer itself.
   behaviours stay agnostic — they accept `Iterable<SteeringNeighbor>` from brute
   force or this index.
 
-
 - **2026-09-06 — §42 warn stays off the DEV flag.** A-4 step 4
   routed `warnAuthorityConflict` through `devWarnOnce`, which
   `dev-build-mode.test.ts` refuses in `@fourjs/scene` (simulation
@@ -310,7 +331,6 @@ readable; never delete the pointer itself.
   `__fourVirtualFrames` moving — CI hung 120 s on `b55a8c1`. Poll through
   `page.evaluate`, pump one real rAF per poll, and wait for `start + 1` (parity-
   against-stale-`since` also failed when two increments landed per pump).
-
 
 - **2026-09-06 — unlit `color` is read after bind + features (F13).**
   `unlitColorBlends` must not run before the texture unit and
@@ -386,19 +406,19 @@ readable; never delete the pointer itself.
 
 - **2026-09-06 — open-TODO pass, first landing.** Four items closed without an
   owner product decision: Windows Chromium binary layouts + lazy barrel imports
-  + slower-runner timeouts; a Dependabot-only workflow that regenerates
-  `bun.lock` (does not weaken `--frozen-lockfile` on CI); A-26's generated
-  renderer-backend table, read before `initialize` so device-derived WebGPU
-  fields stay at the construction-time floor (captioned, not claimed as "cannot");
-  Rapier `inheritVelocityFrom` documented as nearly a no-op. **Isolation
-  leak:** unrestored `vi.spyOn(console, "warn")` in two physics files —
-  Vitest 4 keeps the spy history, Vitest 3 did not. Not leftover worlds.
-  `#62` and `eslint >=10` are unblocked on that axis; the typedoc/TS 7
-  joint pin remains. Remaining packets still in flight: diagnosed flakes,
-  scissor, §59 textures, field batching, docs gates. Owner-gated items
-  (first publish, rapier 0.20, typedoc/TS 7, A-25 secrets, RFC residues)
-  stay owner-gated. Superceded for remaining-packet policy by the
-  2026-09-06 second-landing entry.
+  - slower-runner timeouts; a Dependabot-only workflow that regenerates
+    `bun.lock` (does not weaken `--frozen-lockfile` on CI); A-26's generated
+    renderer-backend table, read before `initialize` so device-derived WebGPU
+    fields stay at the construction-time floor (captioned, not claimed as "cannot");
+    Rapier `inheritVelocityFrom` documented as nearly a no-op. **Isolation
+    leak:** unrestored `vi.spyOn(console, "warn")` in two physics files —
+    Vitest 4 keeps the spy history, Vitest 3 did not. Not leftover worlds.
+    `#62` and `eslint >=10` are unblocked on that axis; the typedoc/TS 7
+    joint pin remains. Remaining packets still in flight: diagnosed flakes,
+    scissor, §59 textures, field batching, docs gates. Owner-gated items
+    (first publish, rapier 0.20, typedoc/TS 7, A-25 secrets, RFC residues)
+    stay owner-gated. Superceded for remaining-packet policy by the
+    2026-09-06 second-landing entry.
 
 - **2026-09-06 — three headline claims verified FROM OUTSIDE the library, against the published
   packages.** Not the repo's own suite: the staged `@danielsimonjr/fourjs-*` tree laid out in a
@@ -413,9 +433,9 @@ readable; never delete the pointer itself.
     continuing changed the checksum, so the equality is not trivial.
   - **§7a's Y-up-in-2D convention is real.** A 2D body falls in −Y, matches the closed form to
     ~10 mm over 30 steps, and stays on the z = 0 plane. 2D gravity takes a `Vector2`.
-  Also: all 25 umbrella subpath exports resolve, and a strict-mode TypeScript consumer typechecks
-  clean with `skipLibCheck: false` — so the shipped `.d.ts` files are internally consistent, not
-  merely present.
+    Also: all 25 umbrella subpath exports resolve, and a strict-mode TypeScript consumer typechecks
+    clean with `skipLibCheck: false` — so the shipped `.d.ts` files are internally consistent, not
+    merely present.
 
 - **2026-09-05 — repository configuration was three-quarters broken, and none of it showed in
   the tree.** `Docs` had failed on every run because **Pages was never enabled**, while the
@@ -426,7 +446,7 @@ readable; never delete the pointer itself.
   was no `.github/dependabot.yml` at all**, while vulnerability alerts were on: problems were
   detected and nothing remediated them.
   Lesson worth keeping: **a repo can be green in CI and still be broken everywhere CI does not
-  look.** Three of these were repository *settings*, invisible to any check that reads the
+  look.** Three of these were repository _settings_, invisible to any check that reads the
   working tree, and each had been failing quietly for weeks. When a workflow fails on a step it
   does not own (`Configure Pages`, `Create version pull request`), suspect a setting before
   suspecting the code.
