@@ -75,6 +75,12 @@ stay on the tracker.
   one texel through `mapAsync`. Particles and skinned items are skipped
   (no `ParticleIdProgram`, no skinned pipelines).
 
+- **WebGPU `StandardMaterial.metalRoughnessMap`.** Packed G=roughness /
+  B=metalness, matching WebGL. Bind group 3 when albedo occupies group 2,
+  group 2 when it does not (`shadedMrBindingWgsl`). Scalar-only keys stay
+  byte-identical (`|mr:y` only when true). `normalMap` / `occlusionMap` /
+  `emissiveMap` remain unstaged.
+
 - **WebGPU lit/standard read `draw.normalMatrix`.** `DRAW_UNIFORM_BYTES`
   is 192; `STANDARD_UNIFORM_BYTES` is 224 (`emissive` 192, `surface` 208).
   Sprites stay 144. The per-vertex cofactor function is still exported

@@ -47,10 +47,10 @@
  *   evaluate, and emissive still needs a third colour texture; both stay
  *   warned-inert on the glTF loader until those terms exist.
  *
- * **WebGPU staging (2026-09-06).** {@link StandardMaterial.metalRoughnessMap}
- * is a real field on every backend, but `@fourjs/render-webgpu`'s standard
- * family still shades from the scalar factors alone — see `wgpu-standard.ts`.
- * Do not read a WebGPU standard draw as sampling this map.
+ * **WebGPU (2026-09-09).** {@link StandardMaterial.metalRoughnessMap}
+ * samples on both backends — WebGL on texture unit 2, WebGPU at bind
+ * group 3 when albedo occupies group 2 and at group 2 when it does not.
+ * Do not read a WebGPU standard draw as ignoring this map.
  *
  * §59's seven physical extensions are `PhysicalMaterial`'s (§57's family puts it
  * above this class) and are not sketched here.

@@ -30,6 +30,16 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — WebGPU samples `StandardMaterial.metalRoughnessMap`.** Packed
+  G=roughness / B=metalness, matching WebGL unit 2. Bind-group index is
+  **3 when albedo occupies group 2, 2 when it does not** (`shadedMrBindingWgsl`);
+  WebGPU pipeline layouts are an array, so an empty slot 2 would make
+  `@group(3)` invalid. `|mr:y` appends to the pipeline key only when true,
+  so scalar-only transcripts stay byte-identical. Unresolved named maps skip
+  the draw (WebGPU albedo's §83 rule, not GL's degrade). `normalMap` /
+  `occlusionMap` / `emissiveMap` remain unstaged. Lighting follow-ups stay
+  open (multi-light, cascades, PBR rest, §60a, light layers).
+
 - **2026-09-09 — WebGPU browser gates follow `DRAW_UNIFORM_BYTES`.** The
   Playwright page programs are not the renderer: they bind their own
   layouts. After `DrawUniforms` grew to 192 bytes (`normalMatrix` at 144)

@@ -61,10 +61,18 @@
  * position and §57's `map` bind exactly as the lit family's do
  * (`wgpu-lights.ts`).
  *
- * ## Second texture unit — staged on this backend (2026-09-06)
+ * ## Packed metallic-roughness map (§59)
  *
- * `StandardMaterial.metalRoughnessMap` is a real field and WebGL samples it.
- * This family still shades from the scalar factors only. `normalMap` /
+ * `StandardMaterial.metalRoughnessMap` is sampled here as on WebGL: G is
+ * roughness, B is metalness, each a multiply on the scalar factor. Bind-group
+ * index is **not** a constant — WebGPU pipeline layouts are an array whose
+ * index *is* the group, so an empty slot 2 would make `@group(3)` invalid.
+ * Rule, documented also on `wgpu-lights.ts`: **MR at group 3 when albedo
+ * occupies group 2, at group 2 when there is no albedo.**
+ * `shadedMrBindingWgsl` is the one helper; {@link standardShaderSource}
+ * passes `map ? 3 : 2`. Vertex uvs are written when *either* texture is
+ * sampled (`shadedVertexStageWgsl(normals, map || metalRoughness)`), matching
+ * GL's `useMetalRoughnessMap` without `useMap`. `normalMap` /
  * `occlusionMap` / `emissiveMap` remain unstaged on both backends.
  */
 
@@ -76,7 +84,10 @@ import {
 import {
   LIGHT_UNIFORM_WGSL,
   PUNCTUAL_LIGHT_WGSL,
+  SHADED_MAP_BIND_GROUP_INDEX,
   SHADED_MAP_BINDING_WGSL,
+  SHADED_MR_BIND_GROUP_INDEX,
+  shadedMrBindingWgsl,
 } from "./wgpu-lights.js";
 import { shadedVertexStageWgsl } from "./wgpu-lit.js";
 import {
@@ -155,13 +166,13 @@ export const STANDARD_UNIFORM_WGSL = `struct StandardUniforms {
 @group(0) @binding(0) var<uniform> draw : StandardUniforms;`;
 
 /**
- * The standard WGSL module for one variant triple — the same variant axes as
- * the lit family (`normals`, `map`, WP-R1.7's `shadow`), for the same reasons
- * (`wgpu-lit.ts`'s departures 2 and 3 apply verbatim; the vertex stage *is*
- * the lit family's, over this module's own uniform block; `shadow` defaults
- * false and the fragment arithmetic stays the WP-R1.5 expression; both
+ * The standard WGSL module for one variant quadruple — the lit family's
+ * (`normals`, `map`, WP-R1.7's `shadow`) plus §59's packed metallic-roughness
+ * map. `metalRoughness` defaults false so every landed scalar-only module is
+ * byte-identical. The vertex stage is the lit family's, over this module's
+ * own uniform block, and writes uvs when *either* texture is sampled; both
  * structs carry `normalMatrix` at the same offset so the shared vertex stage
- * reads `draw.normalMatrix` unchanged).
+ * reads `draw.normalMatrix` unchanged.
  *
  * The fragment stage is `STANDARD_FRAGMENT_SHADER_SOURCE`'s arithmetic in its
  * order: the base sample, the diffuse/F0 split, ambient into the diffuse lobe,
@@ -175,6 +186,7 @@ export function standardShaderSource(
   normals: boolean,
   map: boolean,
   shadow = false,
+  metalRoughness = false,
 ): string {
   return `${STANDARD_UNIFORM_WGSL}
 
@@ -184,9 +196,17 @@ ${shadow ? SHADOW_LIGHT_UNIFORM_WGSL : LIGHT_UNIFORM_WGSL}${
 
 ${SHADED_MAP_BINDING_WGSL}`
       : ""
+  }${
+    metalRoughness
+      ? `
+
+${shadedMrBindingWgsl(
+  map ? SHADED_MR_BIND_GROUP_INDEX : SHADED_MAP_BIND_GROUP_INDEX,
+)}`
+      : ""
   }
 
-${shadedVertexStageWgsl(normals, map)}
+${shadedVertexStageWgsl(normals, map || metalRoughness)}
 
 ${PUNCTUAL_LIGHT_WGSL}${
     shadow
@@ -234,8 +254,17 @@ fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
   base = base * textureSample(mapTexture, mapSampler, input.uv);`
       : ""
   }
-  let albedo = base.rgb;
-  let metalness = draw.surface.x;
+  let albedo = base.rgb;${
+    metalRoughness
+      ? `
+  var metalness = draw.surface.x;
+  var roughness = draw.surface.y;
+  let mr = textureSample(mrTexture, mrSampler, input.uv);
+  metalness = metalness * mr.b;
+  roughness = roughness * mr.g;`
+      : `
+  let metalness = draw.surface.x;`
+  }
   let diffuseColor = albedo * (1.0 - metalness);
   let f0 = mix(vec3<f32>(DIELECTRIC_F0), albedo, metalness);
   var shaded = lights.ambientColor.xyz * diffuseColor;
@@ -245,7 +274,7 @@ fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
     let n = input.normal / normalLength;
     let v = normalize(lights.cameraPosition.xyz - input.worldPosition);
 
-    var alpha = max(draw.surface.y, MIN_ROUGHNESS);
+    var alpha = max(${metalRoughness ? "roughness" : "draw.surface.y"}, MIN_ROUGHNESS);
     alpha = alpha * alpha;
     let alpha2 = alpha * alpha;
 

@@ -119,7 +119,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - RFC 0003 residue (staged in source, 2026-08-28):
 - RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
-- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09.
+- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09. WebGPU `metalRoughnessMap` sampling DONE 2026-09-09 (still open: multi-light, cascades, PBR rest, §60a, light layers, other texture slots).
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
 - Follow-ups the R-1 plan explicitly defers
 - PH-11c — character/dynamics push interaction — DONE 2026-09-06 (`pushMass` / reduced-mass impulse / wake).
@@ -1216,7 +1216,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `tests/browser/gltf.spec.ts`.
 - [x] **§59 second texture unit** (R-13 follow-up, flagged by the §78 packet):
       DONE 2026-09-06 — `StandardMaterial.metalRoughnessMap` (glTF G=roughness,
-      B=metalness). WebGL binds unit 2. WebGPU field is staged inert.
+      B=metalness). WebGL binds unit 2. ~~WebGPU field is staged inert.~~
+      **WebGPU samples it 2026-09-09** (group 2 mr-only, group 3 with albedo).
       The glTF loader decodes that slot as linear and drops `ignoredTextures`
       for it. Normal/occlusion/emissive remain warned-inert until further
       units land.
@@ -1244,7 +1245,10 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       utility~~ **DONE 2026-09-09** — WebGL `uniform mat3 normalMatrix`;
       WebGPU `DrawUniforms.normalMatrix` (192-byte block, standard extras
       shifted to 192/208). `Matrix3.setNormalFromMatrix4` on CPU; singular
-      models upload identity.
+      models upload identity. ~~WebGPU `metalRoughnessMap` staged inert~~
+      **DONE 2026-09-09** (sampled at group 2 when `!map`, group 3 when
+      `map`; G=roughness, B=metalness). Remaining: multi-light, cascades,
+      PBR rest, §60a, light layers, other texture slots.
 - [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
       family list now names `LitMaterial`
 - [ ] First publish (§94 0.1): Changesets release workflow + the

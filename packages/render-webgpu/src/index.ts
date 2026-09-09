@@ -156,7 +156,10 @@ export {
   PUNCTUAL_LIGHT_WGSL,
   SHADED_MAP_BINDING_WGSL,
   SHADED_MAP_BIND_GROUP_INDEX,
+  SHADED_MR_BINDING_WGSL,
+  SHADED_MR_BIND_GROUP_INDEX,
   createLightsBindGroupLayout,
+  shadedMrBindingWgsl,
   writeLightUniforms,
 } from "./wgpu-lights.js";
 export {
