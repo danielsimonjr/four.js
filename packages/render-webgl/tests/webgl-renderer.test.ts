@@ -42,6 +42,9 @@ import { Matrix4, Quaternion, Rectangle2, Vector3 } from "@fourjs/math";
 import {
   MAX_PUNCTUAL_LIGHTS,
   PARTICLE_INSTANCE_FLOATS,
+  PARTICLE_ROTATION_OFFSET,
+  PARTICLE_SOFTNESS_OFFSET,
+  PARTICLE_WIDE_INSTANCE_FLOATS,
   TRAIL_VERTEX_FLOATS,
   RenderTarget,
   Renderable,
@@ -4005,11 +4008,21 @@ class TestGroup {
 /** The particle program's uniform handles, found by the one name only it declares. */
 function particleUniforms(gl: FakeGl): Map<string, object> {
   for (const perProgram of gl.uniformsByProgram.values()) {
-    if (perProgram.has("projection")) {
+    if (perProgram.has("projection") && !perProgram.has("useMap")) {
       return perProgram;
     }
   }
   throw new Error("the particle program never resolved its uniforms");
+}
+
+/** R-32 appearance program — distinguished by `useMap` / `hasSceneDepth`. */
+function appearanceUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("useMap")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the appearance program never resolved its uniforms");
 }
 
 /** A render item as `buildRenderList` writes it, for the cache's direct tests. */
@@ -4248,6 +4261,61 @@ describe("ParticleAppearanceProgram — R-32 textured/rotated/soft (opt-in)", ()
     expect(program.disposed).toBe(false);
     program.dispose();
   });
+
+  it("uploads map and scene-depth uniforms and disposes once", () => {
+    const gl = createFakeGl();
+    const program = ParticleAppearanceProgram.create(gl);
+    const uniforms = appearanceUniforms(gl);
+    const model = new Matrix4();
+    model.elements[12] = 4;
+
+    program.use();
+    program.setProjection(new Matrix4());
+    program.setView(new Matrix4());
+    program.setModel(model);
+    program.setUseMap(true);
+    program.setSceneDepth(true, 128, 64);
+    program.setUseMap(false);
+    program.setSceneDepth(false);
+
+    expect(uploadsAt(gl, uniforms.get("model"))[0]?.[12]).toBe(4);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1, 0]);
+    expect(uploadsAt(gl, uniforms.get("hasSceneDepth"))).toEqual([1, 0]);
+    expect(uploadsAt(gl, uniforms.get("depthWidth"))).toEqual([128, 1]);
+    expect(uploadsAt(gl, uniforms.get("depthHeight"))).toEqual([64, 1]);
+
+    program.dispose();
+    program.dispose();
+    expect(program.disposed).toBe(true);
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("deletes the program when a required uniform is missing", () => {
+    const gl = createFakeGl({ resolveUniforms: false });
+    const error = thrown(() => {
+      ParticleAppearanceProgram.create(gl);
+    });
+    expect(error.context?.uniform).toBe("projection");
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("still constructs when the optional map and depth samplers are missing", () => {
+    const gl = createFakeGl();
+    const original = gl.getUniformLocation.bind(gl);
+    gl.getUniformLocation = (program, name) => {
+      if (name === "map" || name === "sceneDepth") {
+        return null;
+      }
+      return original(program, name);
+    };
+
+    const program = ParticleAppearanceProgram.create(gl);
+    expect(program.disposed).toBe(false);
+    expect(
+      gl.callsOf("uniform1i").map((call) => call.args[1]),
+    ).not.toContain(MAP_TEXTURE_UNIT);
+    program.dispose();
+  });
 });
 
 describe("ParticleBatchCache — one vertex array per system (§61, §64)", () => {
@@ -4403,6 +4471,48 @@ describe("ParticleBatchCache — one vertex array per system (§61, §64)", () =
     expect(gl.calls).toHaveLength(0);
   });
 
+  it("binds the wide-stream rotation and softness attributes (R-32)", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleBatchCache(gl);
+    const item: ParticleRenderItem = {
+      ...particleItem(
+        new Float32Array(2 * PARTICLE_WIDE_INSTANCE_FLOATS),
+        2,
+      ),
+      instanceFloats: PARTICLE_WIDE_INSTANCE_FLOATS,
+    };
+
+    const record = cache.acquire(item, cornerBuffer);
+    expect(record).not.toBeNull();
+    const strideBytes = PARTICLE_WIDE_INSTANCE_FLOATS * 4;
+    expect(gl.callsOf("vertexAttribPointer").map((call) => call.args)).toEqual(
+      expect.arrayContaining([
+        [
+          PARTICLE_ATTRIBUTE_LOCATIONS.instanceRotation,
+          1,
+          GL.FLOAT,
+          false,
+          strideBytes,
+          PARTICLE_ROTATION_OFFSET * 4,
+        ],
+        [
+          PARTICLE_ATTRIBUTE_LOCATIONS.instanceSoftness,
+          1,
+          GL.FLOAT,
+          false,
+          strideBytes,
+          PARTICLE_SOFTNESS_OFFSET * 4,
+        ],
+      ]),
+    );
+    expect(gl.callsOf("vertexAttribDivisor").map((call) => call.args)).toEqual(
+      expect.arrayContaining([
+        [PARTICLE_ATTRIBUTE_LOCATIONS.instanceRotation, 1],
+        [PARTICLE_ATTRIBUTE_LOCATIONS.instanceSoftness, 1],
+      ]),
+    );
+  });
+
   it("deletes every vertex array and buffer on dispose, idempotently (§83)", () => {
     const gl = createFakeGl();
     const cache = new ParticleBatchCache(gl);
@@ -4435,8 +4545,30 @@ describe("ParticleTrailProgram — compilation and linking (§36 trail tier)", (
       gl.callsOf("getUniformLocation").map((call) => call.args[1]),
     ).toEqual(["projection", "view", "model"]);
     program.dispose();
+    program.dispose();
     expect(program.disposed).toBe(true);
     expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("uploads the three matrices and deletes the program on a missing uniform", () => {
+    const gl = createFakeGl();
+    const program = ParticleTrailProgram.create(gl);
+    const uniforms = particleUniforms(gl);
+    const model = new Matrix4();
+    model.elements[14] = 3;
+    program.use();
+    program.setProjection(new Matrix4());
+    program.setView(new Matrix4());
+    program.setModel(model);
+    expect(uploadsAt(gl, uniforms.get("model"))[0]?.[14]).toBe(3);
+    program.dispose();
+
+    const unresolved = createFakeGl({ resolveUniforms: false });
+    const error = thrown(() => {
+      ParticleTrailProgram.create(unresolved);
+    });
+    expect(error.context?.uniform).toBe("projection");
+    expect(unresolved.countOf("deleteProgram")).toBe(1);
   });
 });
 
@@ -4449,6 +4581,7 @@ describe("ParticleTrailBatchCache — ribbon vertex cache (§36 trail tier)", ()
 
     const record = cache.acquire(item);
     expect(record).not.toBeNull();
+    expect(cache.acquire(item)).toBe(record);
     expect(cache.size).toBe(1);
     expect(gl.callsOf("vertexAttribPointer").map((call) => call.args)).toEqual([
       [0, 3, GL.FLOAT, false, TRAIL_VERTEX_FLOATS * 4, 0],
@@ -4521,6 +4654,16 @@ describe("ParticleTrailBatchCache — ribbon vertex cache (§36 trail tier)", ()
     cache.dispose();
     gl.reset();
     cache.dispose();
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("forgets records without touching the context (§61 loss)", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleTrailBatchCache(gl);
+    cache.acquire(trailParticleItem(new Float32Array(TRAIL_VERTEX_FLOATS), 1));
+    gl.reset();
+    cache.forget();
+    expect(cache.size).toBe(0);
     expect(gl.calls).toHaveLength(0);
   });
 });

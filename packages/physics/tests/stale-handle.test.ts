@@ -32,4 +32,22 @@ describe("rejectStalePhysicsHandle (§83)", () => {
       }
     }
   });
+
+  it("attaches context when the caller provides it", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      rejectStalePhysicsHandle(
+        "joint",
+        "9",
+        "stale joint.",
+        "INVALID_APPLICATION_STATE",
+        { handle: 9 },
+      );
+    } catch (error: unknown) {
+      expect(isFourError(error)).toBe(true);
+      if (isFourError(error)) {
+        expect(error.context).toEqual({ handle: 9 });
+      }
+    }
+  });
 });
