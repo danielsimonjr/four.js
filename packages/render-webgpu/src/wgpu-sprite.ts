@@ -13,9 +13,10 @@
  * ## Why sprites still have their own bind-group layout at group 0
  *
  * A sprite draw used to need one more `vec4` than `DrawUniforms` carried —
- * §55's `quad`. That member is gone (the atlas packet), so the block is the
- * same 144 bytes as `DrawUniforms` (`viewProjection`, `model`, `tint` in
- * `color`'s slot). The **second group-0 layout** stays: `minBindingSize`
+ * §55's `quad`. That member is gone (the atlas packet), so the sprite block
+ * is the 144-byte prefix (`viewProjection`, `model`, `tint` in `color`'s
+ * slot). `DrawUniforms` continues with `normalMatrix` (192 bytes); sprites
+ * do not bind that tail. The **second group-0 layout** stays: `minBindingSize`
  * appears in the `createBindGroupLayout` call every application records at
  * initialization, and sharing the unlit layout would move the spriteless
  * transcript. The layout and its bind group are still created lazily by the
@@ -52,8 +53,8 @@ export const SPRITE_TINT_OFFSET = 128;
 
 /**
  * Size of the `SpriteUniforms` block in bytes — `viewProjection`, `model`,
- * `tint`. Matches `DRAW_UNIFORM_BYTES`; the retired `quad` member is what
- * used to make this 160.
+ * `tint`. Stays 144 after `DRAW_UNIFORM_BYTES` widened for `normalMatrix`;
+ * the retired `quad` member is what used to make this 160.
  *
  * The binding size, not the 256-byte stride — `DRAW_UNIFORM_BYTES`'s
  * distinction, restated because both bindings still read the same strided

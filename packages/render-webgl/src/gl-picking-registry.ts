@@ -23,6 +23,7 @@
 import type { PickingService } from "@fourjs/render";
 
 import type { GeometryCache } from "./gl-geometry.js";
+import type { ParticleBatchCache } from "./gl-particles.js";
 import type { WebglContext } from "./gl-program.js";
 import type { RenderTargetCache } from "./gl-render-target.js";
 
@@ -32,11 +33,11 @@ import type { RenderTargetCache } from "./gl-render-target.js";
  * else.
  *
  * Every member is a **live accessor** (a method, so the renderer implements
- * the whole window as seven `this`-capturing arrows), not a snapshot, because three of them
- * change identity under the renderer's feet: a §61 context restore builds
- * *new* caches (the old handles died with the context), so a service that
- * captured `geometries` once would draw with a cache the renderer has already
- * abandoned. A service re-reads all of them per pass, and detects a
+ * the whole window as eight `this`-capturing arrows), not a snapshot, because
+ * the caches change identity under the renderer's feet: a §61 context restore
+ * builds *new* caches (the old handles died with the context), so a service
+ * that captured `geometries` once would draw with a cache the renderer has
+ * already abandoned. A service re-reads all of them per pass, and detects a
  * lost-and-restored context by cache identity (`gl-picking.ts`).
  *
  * Sharing the renderer's caches — rather than the service owning twins — is
@@ -49,6 +50,12 @@ export interface PickingRendererHost {
   context(): WebglContext | null;
   /** The renderer's geometry cache, or `null` when the context is down. */
   geometries(): GeometryCache | null;
+  /**
+   * The renderer's particle-batch cache, or `null` when the context is down
+   * — the live accessor the id pass uses to instance §36 systems rather than
+   * rasterising the shared unit quad.
+   */
+  particleBatches(): ParticleBatchCache | null;
   /** The renderer's render-target cache, or `null` when the context is down. */
   renderTargets(): RenderTargetCache | null;
   /** Drawing-buffer width in device pixels — what §48 rectangles resolve against. */

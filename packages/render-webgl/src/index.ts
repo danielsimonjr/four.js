@@ -32,6 +32,7 @@ export {
   PARTICLE_ATTRIBUTE_LOCATIONS,
   PARTICLE_DEPTH_TEXTURE_UNIT,
   PARTICLE_GL,
+  PARTICLE_VERTEX_SHADER_SOURCE,
   ParticleAppearanceProgram,
   ParticleBatchCache,
   ParticleProgram,
@@ -85,6 +86,7 @@ export {
 export {
   IdPassProgram,
   PICKING_GL,
+  ParticleIdProgram,
   WebglPickingService,
   registerPickingPipeline,
 } from "./gl-picking.js";

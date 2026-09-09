@@ -8,7 +8,7 @@ import { FourError } from "@fourjs/core";
 import { planeGeometry } from "@fourjs/geometry";
 import type { Matrix4 } from "@fourjs/math";
 import { UnlitMaterial } from "@fourjs/materials";
-import { Group, Scene } from "@fourjs/scene";
+import { Group, Node, Scene } from "@fourjs/scene";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -28,6 +28,19 @@ function renderable(name: string): Renderable {
   const node = new Renderable(planeGeometry(), new UnlitMaterial());
   node.name = name;
   return node;
+}
+
+/**
+ * A structural §36 drawable: the brand plus the repack method, on a real
+ * `Node` so the scene walk, visibility, and world-matrix join key are the
+ * production ones. `collectPickCandidates` must not require `Renderable`.
+ */
+class TestParticleDrawable extends Node {
+  readonly isParticleDrawable = true;
+
+  updateParticleInstances(): void {
+    // Collect does not repack; the method exists so the brand is honest.
+  }
 }
 
 describe("collectPickCandidates (§33)", () => {
@@ -73,6 +86,42 @@ describe("collectPickCandidates (§33)", () => {
     const byMatrix = new Map<Matrix4, number>();
     collectPickCandidates(scene, ids, byMatrix);
     expect(ids).toEqual([kept.id]);
+  });
+
+  it("collects particle drawables in traversal order; invisible and disabled prune", () => {
+    const scene = new Scene();
+    const a = renderable("a");
+    const group = new Group();
+    const particles = new TestParticleDrawable();
+    particles.name = "particles";
+    const hidden = new TestParticleDrawable();
+    hidden.visible = false;
+    const inHidden = new TestParticleDrawable();
+    hidden.add(inHidden);
+    const disabled = new TestParticleDrawable();
+    disabled.enabled = false;
+    const kept = renderable("kept");
+    scene.add(a);
+    a.add(group);
+    group.add(particles);
+    scene.add(hidden);
+    scene.add(disabled);
+    scene.add(kept);
+
+    const ids: string[] = [];
+    const byMatrix = new Map<Matrix4, number>();
+    collectPickCandidates(scene, ids, byMatrix);
+
+    // Depth-first, insertion order: a, then a's descendant particles, then
+    // kept. Hidden/disabled particle subtrees prune exactly as renderables.
+    expect(ids).toEqual([a.id, particles.id, kept.id]);
+    expect(byMatrix.get(a.transform.worldMatrix)).toBe(0);
+    expect(byMatrix.get(particles.transform.worldMatrix)).toBe(1);
+    expect(byMatrix.get(kept.transform.worldMatrix)).toBe(2);
+    expect(byMatrix.has(hidden.transform.worldMatrix)).toBe(false);
+    expect(byMatrix.has(inHidden.transform.worldMatrix)).toBe(false);
+    expect(byMatrix.has(disabled.transform.worldMatrix)).toBe(false);
+    expect(byMatrix.has(group.transform.worldMatrix)).toBe(false);
   });
 
   it("rebuilds the table per pass — no index survives a scene change", () => {

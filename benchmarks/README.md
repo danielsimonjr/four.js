@@ -603,8 +603,8 @@ the id-pass cost against the flagship list (and R-8's 10 000 / 50 000 /
 two measurements.
 
 The §118 flagship is O(10²) id-pass candidates; the 1× row is **64**
-rectangles (that order of magnitude; particle systems are omitted because
-they still pick by bounds — no `ParticleIdProgram`). One arm is
+rectangles (that order of magnitude; particle systems are omitted so
+the ratio is not mixed with `ParticleIdProgram`). One arm is
 `PickingService.update`; the other is `buildRenderList` +
 `buildViewRenderList`, which is the list the pass itself builds.
 

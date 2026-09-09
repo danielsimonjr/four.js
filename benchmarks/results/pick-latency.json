@@ -6,7 +6,7 @@
   "flagshipOrderNodes": 64,
   "flagshipOrderNote": "The §118 flagship is O(10²) id-pass candidates (named meshes, 16 orbit dots, Text, UI skin quads; particle systems skipped). 64 is that order of magnitude. R-8 sizes are 10 000 / 50 000 / 100 000.",
   "particleIdProgram": false,
-  "particleIdProgramNote": "Particle systems still pick by bounds. This packet does not implement ParticleIdProgram.",
+  "particleIdProgramNote": "This harness times unlit rectangles. ParticleIdProgram exists (2026-09-09) but is not in these scenes.",
   "fixedDeltaTimeSeconds": 0.016666667,
   "fixedStepBudgetMs": 16.6667,
   "measuredPasses": 30,

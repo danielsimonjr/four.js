@@ -1556,7 +1556,7 @@
       "package": "@fourjs/input",
       "area": "src",
       "disposition": "reachable",
-      "loc": 754
+      "loc": 989
     },
     {
       "file": "packages/input/src/propagation.ts",
@@ -1612,7 +1612,7 @@
       "package": "@fourjs/input",
       "area": "tests",
       "disposition": "test",
-      "loc": 1343
+      "loc": 1788
     },
     {
       "file": "packages/input/tests/smoke.test.ts",
@@ -2977,21 +2977,21 @@
       "package": "@fourjs/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1082
+      "loc": 1085
     },
     {
       "file": "packages/render-webgl/src/gl-picking-registry.ts",
       "package": "@fourjs/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 106
+      "loc": 113
     },
     {
       "file": "packages/render-webgl/src/gl-picking.ts",
       "package": "@fourjs/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1055
+      "loc": 1305
     },
     {
       "file": "packages/render-webgl/src/gl-program.ts",
@@ -3047,7 +3047,7 @@
       "package": "@fourjs/render-webgl",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 155
+      "loc": 157
     },
     {
       "file": "packages/render-webgl/src/node-pipeline-registry.ts",
@@ -3068,7 +3068,7 @@
       "package": "@fourjs/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 3944
+      "loc": 3945
     },
     {
       "file": "packages/render-webgl/tests/geometry-refresh.test.ts",
@@ -3103,7 +3103,7 @@
       "package": "@fourjs/render-webgl",
       "area": "tests",
       "disposition": "test",
-      "loc": 1395
+      "loc": 1622
     },
     {
       "file": "packages/render-webgl/tests/register.test.ts",
@@ -3131,7 +3131,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 302
+      "loc": 304
     },
     {
       "file": "packages/render-webgpu/src/register.ts",
@@ -3152,7 +3152,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 3648
+      "loc": 3676
     },
     {
       "file": "packages/render-webgpu/src/wgpu-batch.ts",
@@ -3166,7 +3166,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 204
+      "loc": 213
     },
     {
       "file": "packages/render-webgpu/src/wgpu-compute.ts",
@@ -3208,7 +3208,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 284
+      "loc": 274
     },
     {
       "file": "packages/render-webgpu/src/wgpu-node-program.ts",
@@ -3271,14 +3271,14 @@
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 143
+      "loc": 144
     },
     {
       "file": "packages/render-webgpu/src/wgpu-standard.ts",
       "package": "@fourjs/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 272
+      "loc": 282
     },
     {
       "file": "packages/render-webgpu/src/wgpu-stencil.ts",
@@ -3320,7 +3320,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "tests",
       "disposition": "test",
-      "loc": 3909
+      "loc": 3950
     },
     {
       "file": "packages/render-webgpu/tests/wgpu-batch.test.ts",
@@ -3334,7 +3334,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "tests",
       "disposition": "test",
-      "loc": 1387
+      "loc": 1390
     },
     {
       "file": "packages/render-webgpu/tests/wgpu-compute.test.ts",
@@ -3355,7 +3355,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "tests",
       "disposition": "test",
-      "loc": 509
+      "loc": 531
     },
     {
       "file": "packages/render-webgpu/tests/wgpu-node-angle.test.ts",
@@ -3502,7 +3502,7 @@
       "package": "@fourjs/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 344
+      "loc": 352
     },
     {
       "file": "packages/render/src/raster.ts",
@@ -3740,7 +3740,7 @@
       "package": "@fourjs/render",
       "area": "tests",
       "disposition": "test",
-      "loc": 181
+      "loc": 230
     },
     {
       "file": "packages/render/tests/raster.test.ts",

@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL normal-matrix hoist, RFC 0005 pick-latency record, R-33 simulate/present split, dogfood cycle 4. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets.
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + **WebGPU** normal-matrix hoist, RFC 0005 pick-latency record + **ParticleIdProgram** + **§72 PickProvider dispatch**, R-33 simulate/present split, dogfood cycle 4. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is WebGPU `PickingService` (`mapAsync`).
 
 ### 0 · Blocked on an event, not on effort
 
@@ -114,12 +114,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 - Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; ~~spherical wander~~ DONE 2026-09-06; ~~CCD/FABRIK~~ DONE 2026-09-06; ~~path-planning adapters (RFC)~~ **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
-- RFC 0005 residue (staged in source, 2026-08-29): §86 pick measurements DONE 2026-09-09 (`benchmarks/pick-latency.mjs`); ParticleIdProgram / WebGPU pick / §72 dispatch remain.
+- RFC 0005 residue (staged in source, 2026-08-29): §86 pick measurements DONE 2026-09-09 (`benchmarks/pick-latency.mjs`); ParticleIdProgram + §72 PickProvider dispatch DONE 2026-09-09; WebGPU `PickingService` (`mapAsync`) remains.
 - RFC 0001 residue (staged in source, 2026-08-28):
 - RFC 0003 residue (staged in source, 2026-08-28):
 - RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
-- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL normal-matrix hoist DONE 2026-09-09; WebGPU still per-vertex.
+- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09.
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
 - Follow-ups the R-1 plan explicitly defers
 - PH-11c — character/dynamics push interaction — DONE 2026-09-06 (`pushMass` / reduced-mass impulse / wake).
@@ -1112,18 +1112,23 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       byte-identical), §85 refusals, §33 pure-math determinism pinned. 36 new
       tests; input/four/geometry 100×4. **A-11 is closed.** ui-demo budget
       bumped 44 → 44.5 kB at landing (A/B: the tier riding ui-demo's `pick()`).
-- [ ] **RFC 0005 residue (staged in source, 2026-08-29):** the instanced particle
+- [ ] **RFC 0005 residue (staged in source, 2026-08-29):** ~~the instanced particle
       id arm (a `ParticleIdProgram` sharing the §36 billboard vertex stage — until
-      then particle systems pick by bounds only); ~~§86 rows still owed: id-pass
+      then particle systems pick by bounds only)~~ **DONE 2026-09-09**
+      (`ParticleIdProgram` + `collectPickCandidates` includes
+      `isParticleDrawable`; one id per emitter, trails skipped, skinned
+      still bounds-only); ~~§86 rows still owed: id-pass
       cost vs the flagship list and measured fence-vs-stall pick latency~~
       **DONE 2026-09-09** (`benchmarks/pick-latency.mjs`): at flagship-order
       N=64 the id pass is within noise of the list (1.03×); at 10k–100k it is
       ~3–4× the list. Fence vs stall timed on the counting-GL seam only
-      (no host WebGL 2 / no WebGPU `PickingService`). WebGPU's
-      `PickingService` (`mapAsync`) is WP-R1.x material; §72
-      pointer-event dispatch on a `PickProvider` result is an input packet. The analytic
-      `"geometry"` tier + `node.hitTestMode` landed 2026-08-29 — A-11 closed;
-      only the render-side residues above remain here.
+      (no host WebGL 2 / no WebGPU `PickingService`). ~~§72
+      pointer-event dispatch on a `PickProvider` result is an input packet~~
+      **DONE 2026-09-09** (`PointerInputOptions.pickProvider`; default
+      handlers stay synchronous; provider path serializes per `pointerId`).
+      WebGPU's `PickingService` (`mapAsync`) is WP-R1.x material and is
+      the remaining render-side residue. The analytic `"geometry"` tier +
+      `node.hitTestMode` landed 2026-08-29 — A-11 closed.
 - [x] **docs/COMPATIBILITY.md §2 — DONE 2026-08-29** (documentation truth
       sweep): §2 rewritten to the tip — seven init pipelines + three registered
       seams, punctual lights, opt-in §65 batching, §69/§70 rows, all-eleven
@@ -1220,9 +1225,10 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       ~~CSS color strings on lights~~ **DONE** (`parseColorRGB` on `Light`),
       light layers; ~~hoist the lit shader's per-vertex inverse-transpose to a
       per-draw normal-matrix uniform when @fourjs/math grows a Matrix3
-      utility~~ **DONE 2026-09-09 on WebGL** (`Matrix3.setNormalFromMatrix4`
-      + `uniform mat3 normalMatrix` on lit/standard). WebGPU still evaluates
-      the cofactor per vertex until `DrawUniforms` is widened.
+      utility~~ **DONE 2026-09-09** — WebGL `uniform mat3 normalMatrix`;
+      WebGPU `DrawUniforms.normalMatrix` (192-byte block, standard extras
+      shifted to 192/208). `Matrix3.setNormalFromMatrix4` on CPU; singular
+      models upload identity.
 - [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
       family list now names `LitMaterial`
 - [ ] First publish (§94 0.1): Changesets release workflow + the
@@ -2128,6 +2134,15 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       pre-1.0 PDF.
 
 ## Done
+
+- [x] 2026-09-09 — **Open-TODO second-wave slices (simple → complex).**
+      Did not close any of the 12 checkboxes. Landed: WebGPU
+      `DrawUniforms.normalMatrix` (192 bytes; standard 224);
+      RFC 0005 `ParticleIdProgram` (one id per emitter); §72
+      `PointerInputOptions.pickProvider` (sync default path). Still
+      open on those rows: WebGPU `mapAsync` picking, multi-light /
+      shadows / PBR / §60a. Still owner/hardware: first publish, R-33
+      exit.
 
 - [x] 2026-09-09 — **R-19/R-20 closed.** §52 concave-extrude was already
       on the tree. §55 atlas: sprites author `geometry.uvs` from

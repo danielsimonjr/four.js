@@ -47,6 +47,7 @@ import {
 import {
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  DRAW_NORMAL_OFFSET,
   LIGHT_AMBIENT_OFFSET,
   LIGHT_CAMERA_OFFSET,
   LIGHT_COLOR_OFFSET,
@@ -849,6 +850,16 @@ describe("WebgpuRenderer.render", () => {
     const model = stride + DRAW_MODEL_OFFSET / 4;
     expect(data[model]).toBe(1);
     expect(data[model + 5]).toBe(1);
+    // Clear (model null) and the triangle (identity mat4) both pack identity
+    // `normalMatrix` — three columns padded to vec4.
+    const clearNormal = DRAW_NORMAL_OFFSET / 4;
+    expect(data.slice(clearNormal, clearNormal + 12)).toEqual([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0,
+    ]);
+    const drawNormal = stride + DRAW_NORMAL_OFFSET / 4;
+    expect(data.slice(drawNormal, drawNormal + 12)).toEqual([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0,
+    ]);
   });
 
   it("copies retained typed arrays at record time (the recording gotcha)", () => {
@@ -2533,6 +2544,29 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     ]);
   });
 
+  it("packs a scaled model's inverse-transpose into the padded mat3 slot", () => {
+    const root = createRoot();
+    const mesh = new Renderable(
+      litTriangle().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    // Scale (2, 4, 8): inverse-transpose is the reciprocal diagonal. Translation
+    // does not participate. Column-major, matching `Matrix3.setNormalFromMatrix4`.
+    // Culling off so the scaled triangle is not dropped by an identity frustum.
+    mesh.frustumCulled = false;
+    mesh.transform.worldMatrix.fromArray([
+      2, 0, 0, 0, 0, 4, 0, 0, 0, 0, 8, 0, 1, 2, 3, 1,
+    ]);
+    root.add(mesh);
+
+    harness.renderer.render(root, [createView()]);
+    const floats = drawUniformUpload(harness.gpu);
+    const base = UNIFORM_STRIDE_BYTES / 4;
+    expect(
+      floats.slice(base + DRAW_NORMAL_OFFSET / 4, base + DRAW_NORMAL_OFFSET / 4 + 12),
+    ).toEqual([0.5, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0.125, 0]);
+  });
+
   it("draws a standard item through the widened block and its own group 0", () => {
     const root = createRoot();
     const material = new TestStandardMaterial([0.5, 0.25, 0.125, 1]);
@@ -2570,6 +2604,13 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
         base + STANDARD_SURFACE_OFFSET / 4 + 4,
       ),
     ).toEqual([0.75, Math.fround(0.3), 0, 0]);
+    // Identity model → identity normal matrix in the padded mat3x3 slot.
+    expect(
+      floats.slice(
+        base + DRAW_NORMAL_OFFSET / 4,
+        base + DRAW_NORMAL_OFFSET / 4 + 12,
+      ),
+    ).toEqual([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
     // The eye rides the light block, for the specular lobe.
     const { floats: lightFloats } = lightsUpload(harness.gpu);
     expect(lightSlot(lightFloats, 0, LIGHT_CAMERA_OFFSET)).toEqual([

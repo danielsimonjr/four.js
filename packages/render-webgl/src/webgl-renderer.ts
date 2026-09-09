@@ -3145,12 +3145,12 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * in (the pipeline-cost law; `gl-picking-registry.ts`).
    *
    * What the service receives is a **live window** onto exactly the renderer
-   * state an id pass needs — context, the two shared caches, the surface
-   * size, and the two lifecycle flags — as accessors, so a §61 restore's new
-   * caches are seen rather than captured stale (`PickingRendererHost`). Each
-   * call builds an independent service; the caller owns and disposes it
-   * (§83). No GL call is issued here — the id program compiles on the
-   * service's first pass.
+   * state an id pass needs — context, the three shared caches (geometry,
+   * render targets, particle batches), the surface size, and the two
+   * lifecycle flags — as accessors, so a §61 restore's new caches are seen
+   * rather than captured stale (`PickingRendererHost`). Each call builds an
+   * independent service; the caller owns and disposes it (§83). No GL call is
+   * issued here — the id program compiles on the service's first pass.
    *
    * @throws FourError `INVALID_APPLICATION_STATE` on a disposed renderer, or
    * when no picking pipeline is registered.
@@ -3166,7 +3166,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         { context: { registered: false } },
       );
     }
-    // Seven `this`-capturing arrows are the whole window: the host outlives
+    // Eight `this`-capturing arrows are the whole window: the host outlives
     // this call and must keep seeing the *live* renderer state (a §61 restore
     // swaps the caches), which is why the seam is accessor methods rather
     // than a snapshot — and arrows rather than getters is what keeps this
@@ -3175,6 +3175,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     const host: PickingRendererHost = {
       context: () => this.#gl,
       geometries: () => this.#geometries,
+      particleBatches: () => this.#particleBatches,
       renderTargets: () => this.#renderTargets,
       surfaceWidth: () => this.#bufferWidth,
       surfaceHeight: () => this.#bufferHeight,

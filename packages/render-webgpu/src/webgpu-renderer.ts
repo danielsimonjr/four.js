@@ -102,7 +102,7 @@
  */
 
 import { DEV, EventEmitter, FourError, devWarnOnce } from "@fourjs/core";
-import { Frustum, Matrix4, type Rectangle2 } from "@fourjs/math";
+import { Frustum, Matrix3, Matrix4, type Rectangle2 } from "@fourjs/math";
 import {
   COLOR_GRADE_DEFAULTS,
   RenderTarget,
@@ -147,6 +147,7 @@ import {
 import {
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  DRAW_NORMAL_OFFSET,
   DRAW_UNIFORM_BYTES,
   DRAW_VIEW_PROJECTION_OFFSET,
   MAP_BIND_GROUP_INDEX,
@@ -283,6 +284,15 @@ const DEPTH_FORMAT = "depth24plus";
  * frame that names it, no option required.
  */
 const DEPTH_STENCIL_FORMAT = "depth24plus-stencil8";
+
+/**
+ * Scratch for the per-draw `normalMatrix` pack in {@link WebgpuRenderer}.
+ * Constructed once; `setNormalFromMatrix4` mutates in place and allocates
+ * nothing (plan D7). Seeded to identity before each use so a singular model
+ * (invert no-op) cannot leak the previous draw's inverse-transpose — the
+ * math helper's documented policy, not a second one.
+ */
+const normalMatrixScratch = new Matrix3();
 
 /** The swap-chain format used when the host will not name a preferred one. */
 const FALLBACK_CANVAS_FORMAT = "bgra8unorm";
@@ -662,8 +672,9 @@ export class WebgpuRenderer implements Renderer {
   /**
    * The sprite draws' bind group over {@link WebgpuRenderer.#uniformBuffer} —
    * the same strided blocks, bound at {@link SPRITE_UNIFORM_BYTES} instead of
-   * 144. Dropped (not destroyed — bind groups have no `destroy`) whenever the
-   * buffer is regrown, and recreated by the next sprite draw.
+   * {@link DRAW_UNIFORM_BYTES}. Dropped (not destroyed — bind groups have no
+   * `destroy`) whenever the buffer is regrown, and recreated by the next
+   * sprite draw.
    */
   #spriteBindGroup: GpuBindGroup | null = null;
 
@@ -3396,7 +3407,7 @@ export class WebgpuRenderer implements Renderer {
   /**
    * Packs §59's two extra vec4s — the emissive term, then metalness and
    * roughness — into the spare bytes of `block`'s stride, after the
-   * `DrawUniforms`-shaped 144 `#writeBlock` wrote (`wgpu-standard.ts`'s
+   * 192-byte `DrawUniforms` `#writeBlock` wrote (`wgpu-standard.ts`'s
    * layout). The unused slots are written, not assumed: the staging array is
    * reused across frames, and an uploaded byte nobody wrote this frame is a
    * transcript that depends on history.
@@ -3483,6 +3494,23 @@ export class WebgpuRenderer implements Renderer {
     staging[colorBase + 1] = green;
     staging[colorBase + 2] = blue;
     staging[colorBase + 3] = alpha;
+    // Inverse-transpose of the model's upper 3×3, packed as a WGSL uniform
+    // `mat3x3` (three columns padded to vec4). Identity when the mat4 upload
+    // was identity (`model === null`) or when the upper 3×3 is singular.
+    normalMatrixScratch.identity();
+    if (model !== null) {
+      normalMatrixScratch.setNormalFromMatrix4(model);
+    }
+    const n = normalMatrixScratch.elements;
+    const normalBase = base + DRAW_NORMAL_OFFSET / 4;
+    for (let column = 0; column < 3; column += 1) {
+      const dst = normalBase + column * 4;
+      const src = column * 3;
+      staging[dst] = n[src];
+      staging[dst + 1] = n[src + 1];
+      staging[dst + 2] = n[src + 2];
+      staging[dst + 3] = 0;
+    }
   }
 
   /**

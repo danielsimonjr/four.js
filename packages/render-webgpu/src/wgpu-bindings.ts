@@ -22,6 +22,7 @@
  *   viewProjection : mat4x4<f32>,   //   0 .. 64
  *   model          : mat4x4<f32>,   //  64 .. 128
  *   color          : vec4<f32>,     // 128 .. 144
+ *   normalMatrix   : mat3x3<f32>,   // 144 .. 192  (3 columns × vec4 stride)
  * };
  * @group(0) @binding(0) var<uniform> draw : DrawUniforms;
  * ```
@@ -59,15 +60,22 @@ export const DRAW_MODEL_OFFSET = 64;
 export const DRAW_COLOR_OFFSET = 128;
 
 /**
+ * Byte offset of `DrawUniforms.normalMatrix` — a WGSL `mat3x3<f32>` in a
+ * uniform block is three columns padded to `vec4` (48 bytes), so this slot
+ * occupies 144 .. 192.
+ */
+export const DRAW_NORMAL_OFFSET = 144;
+
+/**
  * Size of the `DrawUniforms` block in bytes — the layout above, ending on its
  * last member.
  *
  * Not the 256-byte *stride*: this is the size a binding declares
  * (`minBindingSize`) and the size a bind group binds, while the stride is how
- * far apart two blocks sit in the buffer. Conflating them would bind 112 bytes
+ * far apart two blocks sit in the buffer. Conflating them would bind 64 bytes
  * of the next draw's block into this draw's shader.
  */
-export const DRAW_UNIFORM_BYTES = 144;
+export const DRAW_UNIFORM_BYTES = 192;
 
 /** `DRAW_UNIFORM_BYTES` in `Float32Array` elements — the packing loop's unit. */
 export const DRAW_UNIFORM_FLOATS = DRAW_UNIFORM_BYTES / 4;
@@ -76,10 +84,10 @@ export const DRAW_UNIFORM_FLOATS = DRAW_UNIFORM_BYTES / 4;
  * The one bind-group layout this tier declares: group 0, binding 0, a
  * dynamically-offset uniform buffer visible to both stages.
  *
- * Both stages, not one each: the vertex stage reads `viewProjection` and
- * `model`, the fragment stage reads `color`, and they are one block because
- * splitting them would double the bind-group traffic to save nothing — a
- * uniform block is uploaded whole either way.
+ * Both stages, not one each: the vertex stage reads `viewProjection`,
+ * `model` and `normalMatrix`, the fragment stage reads `color`, and they are
+ * one block because splitting them would double the bind-group traffic to
+ * save nothing — a uniform block is uploaded whole either way.
  *
  * `minBindingSize` is set, so a mis-sized bind group is a validation error at
  * creation rather than a shader reading past its block at draw time.
@@ -116,6 +124,7 @@ export const DRAW_UNIFORM_WGSL = `struct DrawUniforms {
   viewProjection : mat4x4<f32>,
   model : mat4x4<f32>,
   color : vec4<f32>,
+  normalMatrix : mat3x3<f32>,
 };
 
 @group(0) @binding(0) var<uniform> draw : DrawUniforms;`;

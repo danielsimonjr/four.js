@@ -30,6 +30,23 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — Open-TODO second wave, simple → complex.** Twelve
+  checkboxes remain; three slices landed without pretending the packets
+  closed. (1) Lighting leftover: WebGPU `DrawUniforms` is 192 bytes
+  (`normalMatrix` at 144, std140-padded mat3); `StandardUniforms` 224
+  (emissive 192, surface 208); sprites stay 144. Lit/standard vertex
+  stages read `draw.normalMatrix`; `NORMAL_MATRIX_WGSL` stays exported
+  and is not spliced. `#writeBlock` uses a module-level `Matrix3`
+  scratch and `setNormalFromMatrix4` (identity on null/singular).
+  (2) RFC 0005 `ParticleIdProgram`: `collectPickCandidates` includes
+  `isParticleDrawable`; WebGL id pass instances the §36 billboard with
+  one `pickId` per emitter; skinned still skipped; trails not drawn.
+  (3) §72: optional `PointerInputOptions.pickProvider`; default
+  handlers stay fully synchronous; provider path copies the event and
+  serializes per `pointerId`. Remaining on those rows: WebGPU
+  `PickingService` `mapAsync`; multi-light / cascades / PBR / §60a.
+  First publish and R-33's §112 exit stay blocked.
+
 - **2026-09-09 — R-19/R-20 closed (§55 authored sprite uvs).** `Sprite`
   writes a 4-vertex `uvs` stream (`frame / textureSize`, or 0…1 if
   frameless). WebGL `SpriteProgram` and WebGPU sprite WGSL sample

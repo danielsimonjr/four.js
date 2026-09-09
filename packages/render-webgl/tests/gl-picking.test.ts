@@ -28,11 +28,14 @@ import {
   GeometryCache,
   IdPassProgram,
   PICKING_GL,
+  ParticleBatchCache,
+  ParticleIdProgram,
   RenderTargetCache,
   WebglPickingService,
   clearRegisteredPickingPipeline,
   registerPickingPipeline,
   resolvePickingServiceFactory,
+  type ParticleGlContext,
   type PickingRendererHost,
   type WebglContext,
 } from "../src/index.js";
@@ -43,8 +46,9 @@ type ItemGeometry = RenderItem["geometry"];
 type ItemMaterial = UnlitRenderItem["material"];
 
 // ---------------------------------------------------------------------------
-// The fake GL context — the members the service, `GeometryCache`, and
-// `RenderTargetCache` touch, plus the optional read-back group under test.
+// The fake GL context — the members the service, `GeometryCache`,
+// `ParticleBatchCache`, and `RenderTargetCache` touch, plus the optional
+// read-back group under test.
 // ---------------------------------------------------------------------------
 
 interface RecordedCall {
@@ -69,9 +73,9 @@ interface FakePickGlOptions {
   waitStatuses?: number[];
 }
 
-interface FakePickGl extends WebglContext {
+interface FakePickGl extends ParticleGlContext {
   readonly calls: RecordedCall[];
-  /** Uniform handles by name — one program compiles here, so one scope. */
+  /** Uniform handles by name — locations are keyed by name, not program. */
   readonly uniforms: Map<string, object>;
   /** The texel `readPixels` answers with, RGBA bytes. */
   nextTexel: [number, number, number, number];
@@ -337,6 +341,15 @@ function createFakePickGl(options: FakePickGlOptions = {}): FakePickGl {
     drawElements(mode, count, type, offset) {
       record("drawElements", mode, count, type, offset);
     },
+    bufferSubData(target, dstByteOffset, data, srcOffset, length) {
+      record("bufferSubData", target, dstByteOffset, data, srcOffset, length);
+    },
+    vertexAttribDivisor(index, divisor) {
+      record("vertexAttribDivisor", index, divisor);
+    },
+    drawArraysInstanced(mode, first, count, instanceCount) {
+      record("drawArraysInstanced", mode, first, count, instanceCount);
+    },
     isContextLost() {
       record("isContextLost");
       return false;
@@ -454,6 +467,46 @@ function drawable(
 }
 
 /**
+ * A structural §36 emitter — not a `Renderable`, so only the particle arm
+ * of `collectPickCandidates` / `buildRenderList` claims it.
+ */
+function particleEmitter(
+  count: number,
+  instances = new Float32Array(Math.max(count, 1) * 8),
+  id = "test-emitter",
+): {
+  readonly isParticleDrawable: true;
+  readonly id: string;
+  readonly parent: null;
+  readonly children: unknown[];
+  visible: boolean;
+  enabled: boolean;
+  renderLayer: number;
+  renderOrder: number;
+  particleCount: number;
+  particleInstances: Float32Array;
+  transform: { worldMatrix: Matrix4 };
+  updateParticleInstances(): void;
+} {
+  return {
+    isParticleDrawable: true,
+    id,
+    parent: null,
+    children: [],
+    visible: true,
+    enabled: true,
+    renderLayer: 0,
+    renderOrder: 0,
+    particleCount: count,
+    particleInstances: instances,
+    transform: { worldMatrix: new Matrix4() },
+    updateParticleInstances(): void {
+      // repacked elsewhere
+    },
+  };
+}
+
+/**
  * A container: an empty-geometry `Renderable` (`webgl-renderer.test.ts`'s
  * `createRoot` argument — `Group` lives outside this package's dependency
  * row). It occupies candidate index 0 and never draws.
@@ -494,10 +547,11 @@ function createView(
   };
 }
 
-/** The mutable state behind one live host — a renderer in seven fields. */
+/** The mutable state behind one live host — a renderer in eight fields. */
 interface HostState {
   gl: FakePickGl;
   geometries: GeometryCache;
+  particleBatches: ParticleBatchCache;
   renderTargets: RenderTargetCache;
   surfaceWidth: number;
   surfaceHeight: number;
@@ -519,6 +573,7 @@ function createRig(options: FakePickGlOptions = {}): Rig {
   const state: HostState = {
     gl,
     geometries: new GeometryCache(gl),
+    particleBatches: new ParticleBatchCache(gl),
     renderTargets: new RenderTargetCache(gl),
     surfaceWidth: 64,
     surfaceHeight: 64,
@@ -528,6 +583,7 @@ function createRig(options: FakePickGlOptions = {}): Rig {
   const host: PickingRendererHost = {
     context: () => state.gl,
     geometries: () => state.geometries,
+    particleBatches: () => state.particleBatches,
     renderTargets: () => state.renderTargets,
     surfaceWidth: () => state.surfaceWidth,
     surfaceHeight: () => state.surfaceHeight,
@@ -548,6 +604,7 @@ function createRig(options: FakePickGlOptions = {}): Rig {
 /** §61 loss-and-restore, as the renderer performs it: new caches, same context. */
 function restoreContext(state: HostState): void {
   state.geometries = new GeometryCache(state.gl);
+  state.particleBatches = new ParticleBatchCache(state.gl);
   state.renderTargets = new RenderTargetCache(state.gl);
   state.contextLost = false;
 }
@@ -911,22 +968,7 @@ describe("WebglPickingService.update — the id pass", () => {
     // A container double (`webgl-renderer.test.ts`'s pattern): a structural
     // node whose children mix a particle drawable — which must NOT be a
     // `Renderable`, or the renderable arm would claim it — with real ones.
-    const emitter = {
-      isParticleDrawable: true as const,
-      id: "test-emitter",
-      parent: null,
-      children: [] as unknown[],
-      visible: true,
-      enabled: true,
-      renderLayer: 0,
-      renderOrder: 0,
-      particleCount: 1,
-      particleInstances: new Float32Array(12),
-      transform: { worldMatrix: new Matrix4() },
-      updateParticleInstances(): void {
-        // repacked elsewhere
-      },
-    };
+    const emitter = particleEmitter(1);
     // A skinned mesh, structurally: a drawable whose skeleton and streams
     // make `collect` emit a skinned item.
     const skinnedGeometry = triangleGeometry();
@@ -953,11 +995,160 @@ describe("WebglPickingService.update — the id pass", () => {
     type PickRoot = Parameters<PickingService["update"]>[0];
 
     service.update(root as unknown as PickRoot, view);
-    // Only the plain drawable drew — and only it uploaded an id. The table
-    // held the two renderables (indices 0 and 1: the skinned one and the
-    // plain one, traversal order), so the plain draw encodes index 1.
+    // Traversal table: emitter 0, skinned 1, plain 2. Skinned stays in the
+    // table but is never drawn (bind-pose ids are a different picture).
+    // Particles instance the live quads; the plain drawable is the one
+    // `drawArrays`. Drawing the shared unit quad via `drawArrays` would be
+    // the wrong picture this test exists to refuse.
+    expect(gl.countOf("drawArraysInstanced")).toBe(1);
     expect(gl.countOf("drawArrays")).toBe(1);
-    expect(idUploads(gl)).toEqual([expectedIdUpload(1)]);
+    expect(idUploads(gl)).toEqual([expectedIdUpload(0), expectedIdUpload(2)]);
+  });
+
+  it("instances a particle system with one id for the whole emitter", () => {
+    const { gl, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const liveCount = 3;
+    const emitter = particleEmitter(liveCount);
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [emitter] as unknown[],
+    };
+
+    service.update(root as unknown as PickRoot, view);
+
+    expect(gl.countOf("drawArraysInstanced")).toBe(1);
+    expect(gl.callsOf("drawArraysInstanced")[0].args[3]).toBe(liveCount);
+    expect(gl.countOf("drawArrays")).toBe(0);
+    expect(idUploads(gl)).toEqual([expectedIdUpload(0)]);
+
+    const sources = gl
+      .callsOf("shaderSource")
+      .map((call) => call.args[1] as string);
+    const billboard = sources.find(
+      (source) =>
+        source.includes("view * model") &&
+        source.includes("corner.xy * instanceSize"),
+    );
+    expect(billboard).toBeDefined();
+    const billboardIndex = sources.indexOf(billboard!);
+    expect(sources[billboardIndex + 1]).toContain("pickId");
+
+    // Second pass reuses the compiled particle id program (no recompile).
+    service.update(root as unknown as PickRoot, view);
+    expect(gl.countOf("linkProgram")).toBe(2);
+    expect(gl.countOf("drawArraysInstanced")).toBe(2);
+
+    gl.reset();
+    const empty = particleEmitter(0, new Float32Array(8));
+    const emptyRoot = {
+      visible: true,
+      enabled: true,
+      children: [empty] as unknown[],
+    };
+    service.update(emptyRoot as unknown as PickRoot, view);
+    expect(gl.countOf("drawArraysInstanced")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("skips a particle item when the host has no particle batch cache", () => {
+    const { gl, service, host, view } = createRig();
+    host.particleBatches = () => null;
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [particleEmitter(2)] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(gl.countOf("drawArraysInstanced")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("skips a particle item whose instance buffer has no capacity", () => {
+    const { gl, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [particleEmitter(1, new Float32Array(0))] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(gl.countOf("drawArraysInstanced")).toBe(0);
+  });
+
+  it("assigns a distinct table id per particle system, switching programs back to meshes", () => {
+    const { gl, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const first = particleEmitter(2, undefined, "emitter-a");
+    const second = particleEmitter(4, undefined, "emitter-b");
+    const plain = drawable();
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [first, second, plain] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(gl.countOf("drawArraysInstanced")).toBe(2);
+    expect(
+      gl.callsOf("drawArraysInstanced").map((call) => call.args[3]),
+    ).toEqual([2, 4]);
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(idUploads(gl)).toEqual([
+      expectedIdUpload(0),
+      expectedIdUpload(1),
+      expectedIdUpload(2),
+    ]);
+  });
+
+  it("latches a particle-program compile failure and still draws meshes", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {
+      // silenced
+    });
+    try {
+      const { gl, service, view } = createRig();
+      const original = gl.getUniformLocation.bind(gl);
+      gl.getUniformLocation = (program, name) => {
+        if (name === "projection") {
+          return null;
+        }
+        return original(program, name);
+      };
+      type PickRoot = Parameters<PickingService["update"]>[0];
+      const emitter = particleEmitter(1);
+      const plain = drawable();
+      const root = {
+        visible: true,
+        enabled: true,
+        children: [emitter, plain] as unknown[],
+      };
+      service.update(root as unknown as PickRoot, view);
+      service.update(root as unknown as PickRoot, view);
+      expect(gl.countOf("drawArraysInstanced")).toBe(0);
+      expect(gl.countOf("drawArrays")).toBe(2);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("recompiles the particle id program after a context restore", () => {
+    const { gl, service, state, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [particleEmitter(1)] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(gl.countOf("linkProgram")).toBe(2);
+
+    state.contextLost = true;
+    restoreContext(state);
+    service.update(root as unknown as PickRoot, view);
+    expect(gl.countOf("linkProgram")).toBe(4);
+    expect(gl.countOf("drawArraysInstanced")).toBe(2);
   });
 
   it("refuses a zero-area viewport and a zero-size surface (§85)", () => {
@@ -1353,6 +1544,21 @@ describe("WebglPickingService.dispose (§83)", () => {
     expect(gl.countOf("deleteProgram")).toBe(1);
   });
 
+  it("deletes the particle id program with the mesh program", () => {
+    const { gl, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [particleEmitter(1)] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    gl.reset();
+
+    service.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(2);
+  });
+
   it("touches nothing on a lost context — handles are already invalid (§61)", () => {
     const { gl, service, state, view } = createRig();
     const root = createRoot();
@@ -1390,5 +1596,26 @@ describe("IdPassProgram", () => {
       getUniformLocation: () => null,
     } as unknown as WebglContext;
     expect(() => IdPassProgram.create(broken)).toThrow();
+  });
+});
+
+describe("ParticleIdProgram", () => {
+  it("is disposable directly, and idempotently", () => {
+    const gl = createFakePickGl();
+    const program = ParticleIdProgram.create(gl);
+    expect(program.disposed).toBe(false);
+    program.dispose();
+    program.dispose();
+    expect(program.disposed).toBe(true);
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("deletes the program when a uniform is missing", () => {
+    const gl = createFakePickGl();
+    const broken = {
+      ...gl,
+      getUniformLocation: () => null,
+    } as unknown as WebglContext;
+    expect(() => ParticleIdProgram.create(broken)).toThrow();
   });
 });

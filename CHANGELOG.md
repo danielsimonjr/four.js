@@ -47,6 +47,21 @@ stay on the tracker.
 
 ### Changed
 
+- **WebGPU lit/standard read `draw.normalMatrix`.** `DRAW_UNIFORM_BYTES`
+  is 192; `STANDARD_UNIFORM_BYTES` is 224 (`emissive` 192, `surface` 208).
+  Sprites stay 144. The per-vertex cofactor function is still exported
+  and is no longer spliced into those shaders.
+
+- **Particle systems pick as one node (RFC 0005).** `collectPickCandidates`
+  includes `isParticleDrawable`. The WebGL id pass draws them through
+  `ParticleIdProgram` (shared §36 billboard vertex, flat `pickId`). One
+  id per emitter; trails skipped; skinned items still bounds-only.
+
+- **`PointerInput` accepts an optional `PickProvider` (§72).** GPU-mode
+  nodes resolve through that seam. The default (no provider) path stays
+  fully synchronous. The provider path copies the event and serializes
+  per `pointerId`.
+
 - **§55 sprites author UVs; `quad` uniform retired.** `Sprite.frame` writes
   the cell into `geometry.uvs`. WebGL and WebGPU sample that attribute.
   `SPRITE_QUAD_OFFSET` is gone. Changing a frame re-uploads eight floats
@@ -75,17 +90,18 @@ stay on the tracker.
 
 ### Added
 
-- **`Matrix3` normal-matrix utility and WebGL hoist.** `transpose()`,
+- **`Matrix3` normal-matrix utility and per-draw hoist.** `transpose()`,
   `setFromMatrix4Upper3x3()`, `setNormalFromMatrix4()` — the inverse-transpose
   of a `Matrix4`'s upper 3×3. Lit and standard WebGL vertex stages upload
   `uniform mat3 normalMatrix` once per draw instead of
-  `transpose(inverse(mat3(model)))` per vertex. WebGPU still uses the
-  per-vertex cofactor until `DrawUniforms` is widened.
+  `transpose(inverse(mat3(model)))` per vertex. WebGPU follows:
+  `DrawUniforms.normalMatrix` (192-byte block); standard extras shifted
+  to 192/208. Singular models upload identity on both backends.
 
 - **RFC 0005 pick-latency record.** `benchmarks/pick-latency.mjs` times
   id-pass vs the render list (flagship-order 64 and R-8 10k/50k/100k) and
-  fence vs stall `pick()` on the counting-GL seam. Not a gate. Particle
-  systems still pick by bounds.
+  fence vs stall `pick()` on the counting-GL seam. Not a gate. The harness
+  still times unlit rectangles (no particle systems in those scenes).
 
 - **R-33 simulate / present split.** `examples/particles-demo` publishes
   `data-simulate` and `data-present` in seconds on `#status`. The browser

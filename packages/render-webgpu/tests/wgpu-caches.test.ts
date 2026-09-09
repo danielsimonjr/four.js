@@ -26,6 +26,7 @@ import {
   createTextureBindGroupLayout,
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  DRAW_NORMAL_OFFSET,
   DRAW_UNIFORM_BYTES,
   DRAW_UNIFORM_FLOATS,
   DRAW_UNIFORM_WGSL,
@@ -539,14 +540,16 @@ describe("the bind-group layout, declared as data (§7)", () => {
   });
 
   it("keeps the block size and the stride distinct", () => {
-    // Conflating them would bind 112 bytes of the next draw's block into this
+    // Conflating them would bind 64 bytes of the next draw's block into this
     // draw's shader — see `wgpu-bindings.ts`.
-    expect(DRAW_UNIFORM_BYTES).toBe(144);
-    expect(DRAW_UNIFORM_FLOATS).toBe(36);
+    expect(DRAW_UNIFORM_BYTES).toBe(192);
+    expect(DRAW_UNIFORM_FLOATS).toBe(48);
     expect(UNIFORM_STRIDE_BYTES).toBe(256);
     expect(DRAW_VIEW_PROJECTION_OFFSET).toBe(0);
     expect(DRAW_MODEL_OFFSET).toBe(64);
     expect(DRAW_COLOR_OFFSET).toBe(128);
+    expect(DRAW_NORMAL_OFFSET).toBe(144);
+    expect(DRAW_UNIFORM_WGSL).toContain("normalMatrix : mat3x3<f32>");
   });
 
   it("is the same declaration the WGSL reads", () => {

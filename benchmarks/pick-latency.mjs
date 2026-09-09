@@ -16,8 +16,8 @@
  *    times the list the pass itself builds (`buildRenderList` +
  *    `buildViewRenderList`). The difference is the id draw on top of the
  *    list — the cheapest honest comparison the public APIs allow. Particle
- *    systems are not in these scenes: the id pass still skips them (no
- *    `ParticleIdProgram`; they pick by bounds).
+ *    systems are not in these scenes: the harness times unlit rectangles
+ *    so the id-pass vs list ratio is not mixed with `ParticleIdProgram`.
  * 2. **Read-back latency.** `PickingService.pick` chooses the fence path
  *    (`PIXEL_PACK_BUFFER` + `fenceSync`) when those entry points exist, and
  *    the stalling `readPixels` otherwise. Both arms are timed when the
@@ -581,7 +581,7 @@ const record = {
     "The §118 flagship is O(10²) id-pass candidates (named meshes, 16 orbit dots, Text, UI skin quads; particle systems skipped). 64 is that order of magnitude. R-8 sizes are 10 000 / 50 000 / 100 000.",
   particleIdProgram: false,
   particleIdProgramNote:
-    "Particle systems still pick by bounds. This packet does not implement ParticleIdProgram.",
+    "This harness times unlit rectangles. ParticleIdProgram exists (2026-09-09) but is not in these scenes.",
   fixedDeltaTimeSeconds: round(FIXED_DELTA_TIME, 9),
   fixedStepBudgetMs: round(FIXED_STEP_BUDGET_MS, 4),
   measuredPasses: MEASURED_PASSES,

@@ -4,7 +4,7 @@ metadata:
   lastUpdated: "2026-09-09"
   totalFiles: 314
   totalModules: 24
-  totalExports: 3163
+  totalExports: 3171
 entryPoints:
   - file: packages/diagnostics/src/index.ts
     type: main
@@ -2274,6 +2274,9 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./particles.js
+          imports:
+            - isParticleDrawable
         - file: ./renderable.js
           imports:
             - Renderable
@@ -11660,6 +11663,7 @@ modules:
         - STANDARD_VIEW_PROJECTION_OFFSET
         - STANDARD_MODEL_OFFSET
         - STANDARD_BASE_COLOR_OFFSET
+        - STANDARD_NORMAL_OFFSET
         - STANDARD_EMISSIVE_OFFSET
         - STANDARD_SURFACE_OFFSET
         - STANDARD_UNIFORM_BYTES
@@ -11673,6 +11677,7 @@ modules:
         - STANDARD_VIEW_PROJECTION_OFFSET
         - STANDARD_MODEL_OFFSET
         - STANDARD_BASE_COLOR_OFFSET
+        - STANDARD_NORMAL_OFFSET
         - STANDARD_EMISSIVE_OFFSET
         - STANDARD_SURFACE_OFFSET
         - STANDARD_UNIFORM_BYTES
@@ -12126,6 +12131,7 @@ modules:
           imports:
             - DRAW_COLOR_OFFSET
             - DRAW_MODEL_OFFSET
+            - DRAW_NORMAL_OFFSET
             - DRAW_UNIFORM_BYTES
             - DRAW_VIEW_PROJECTION_OFFSET
             - MAP_BIND_GROUP_INDEX
@@ -12240,6 +12246,7 @@ modules:
           directory: packages/math
           imports:
             - Frustum
+            - Matrix3
             - Matrix4
             - Rectangle2
         - package: "@fourjs/render"
@@ -12362,6 +12369,7 @@ modules:
         - DRAW_VIEW_PROJECTION_OFFSET
         - DRAW_MODEL_OFFSET
         - DRAW_COLOR_OFFSET
+        - DRAW_NORMAL_OFFSET
         - DRAW_UNIFORM_BYTES
         - DRAW_UNIFORM_FLOATS
         - DRAW_UNIFORM_WGSL
@@ -12378,6 +12386,7 @@ modules:
         - DRAW_VIEW_PROJECTION_OFFSET
         - DRAW_MODEL_OFFSET
         - DRAW_COLOR_OFFSET
+        - DRAW_NORMAL_OFFSET
         - DRAW_UNIFORM_BYTES
         - DRAW_UNIFORM_FLOATS
         - DRAW_UNIFORM_WGSL
@@ -12563,6 +12572,7 @@ modules:
           imports:
             - DRAW_COLOR_OFFSET
             - DRAW_MODEL_OFFSET
+            - DRAW_NORMAL_OFFSET
             - DRAW_UNIFORM_BYTES
             - DRAW_UNIFORM_FLOATS
             - DRAW_UNIFORM_WGSL
@@ -12750,6 +12760,7 @@ modules:
             - STANDARD_BASE_COLOR_OFFSET
             - STANDARD_EMISSIVE_OFFSET
             - STANDARD_MODEL_OFFSET
+            - STANDARD_NORMAL_OFFSET
             - STANDARD_SURFACE_OFFSET
             - STANDARD_UNIFORM_BYTES
             - STANDARD_UNIFORM_WGSL
@@ -12906,6 +12917,7 @@ modules:
         - registerWebgpuRenderer
         - DRAW_COLOR_OFFSET
         - DRAW_MODEL_OFFSET
+        - DRAW_NORMAL_OFFSET
         - DRAW_UNIFORM_BYTES
         - DRAW_UNIFORM_FLOATS
         - DRAW_UNIFORM_WGSL
@@ -13042,6 +13054,7 @@ modules:
         - STANDARD_BASE_COLOR_OFFSET
         - STANDARD_EMISSIVE_OFFSET
         - STANDARD_MODEL_OFFSET
+        - STANDARD_NORMAL_OFFSET
         - STANDARD_SURFACE_OFFSET
         - STANDARD_UNIFORM_BYTES
         - STANDARD_UNIFORM_WGSL
@@ -13135,6 +13148,7 @@ modules:
         - registerWebgpuRenderer
         - DRAW_COLOR_OFFSET
         - DRAW_MODEL_OFFSET
+        - DRAW_NORMAL_OFFSET
         - DRAW_UNIFORM_BYTES
         - DRAW_UNIFORM_FLOATS
         - DRAW_UNIFORM_WGSL
@@ -13271,6 +13285,7 @@ modules:
         - STANDARD_BASE_COLOR_OFFSET
         - STANDARD_EMISSIVE_OFFSET
         - STANDARD_MODEL_OFFSET
+        - STANDARD_NORMAL_OFFSET
         - STANDARD_SURFACE_OFFSET
         - STANDARD_UNIFORM_BYTES
         - STANDARD_UNIFORM_WGSL
@@ -15291,6 +15306,11 @@ modules:
           imports:
             - GeometryCache
           typeOnly: true
+        - file: ./gl-particles.js
+          imports:
+            - PARTICLE_VERTEX_SHADER_SOURCE
+            - ParticleBatchCache
+            - ParticleGlContext
         - file: ./gl-picking-registry.js
           imports:
             - setPickingServiceFactory
@@ -15340,9 +15360,11 @@ modules:
         - PICKING_GL
         - registerPickingPipeline
         - IdPassProgram
+        - ParticleIdProgram
         - WebglPickingService
       classes:
         - IdPassProgram
+        - ParticleIdProgram
         - WebglPickingService
       functions:
         - registerPickingPipeline
@@ -15471,6 +15493,7 @@ modules:
       exports:
         - PARTICLE_GL
         - PARTICLE_ATTRIBUTE_LOCATIONS
+        - PARTICLE_VERTEX_SHADER_SOURCE
         - PARTICLE_DEPTH_TEXTURE_UNIT
         - particleItemFloats
         - ParticleProgram
@@ -15493,6 +15516,7 @@ modules:
       constants:
         - PARTICLE_GL
         - PARTICLE_ATTRIBUTE_LOCATIONS
+        - PARTICLE_VERTEX_SHADER_SOURCE
         - PARTICLE_DEPTH_TEXTURE_UNIT
     packages/render-webgl/src/gl-picking-registry.ts:
       description: The picking pipeline's registration slot (§71, §62; RFC 0005, 2026-08-28) —
@@ -15502,6 +15526,10 @@ modules:
         - file: ./gl-geometry.js
           imports:
             - GeometryCache
+          typeOnly: true
+        - file: ./gl-particles.js
+          imports:
+            - ParticleBatchCache
           typeOnly: true
         - file: ./gl-program.js
           imports:
@@ -15821,6 +15849,7 @@ modules:
             - PARTICLE_ATTRIBUTE_LOCATIONS
             - PARTICLE_DEPTH_TEXTURE_UNIT
             - PARTICLE_GL
+            - PARTICLE_VERTEX_SHADER_SOURCE
             - ParticleAppearanceProgram
             - ParticleBatchCache
             - ParticleProgram
@@ -15855,6 +15884,7 @@ modules:
           imports:
             - IdPassProgram
             - PICKING_GL
+            - ParticleIdProgram
             - WebglPickingService
             - registerPickingPipeline
           reExport: true
@@ -16007,6 +16037,7 @@ modules:
         - PARTICLE_ATTRIBUTE_LOCATIONS
         - PARTICLE_DEPTH_TEXTURE_UNIT
         - PARTICLE_GL
+        - PARTICLE_VERTEX_SHADER_SOURCE
         - ParticleAppearanceProgram
         - ParticleBatchCache
         - ParticleProgram
@@ -16032,6 +16063,7 @@ modules:
         - resolvePickingServiceFactory
         - IdPassProgram
         - PICKING_GL
+        - ParticleIdProgram
         - WebglPickingService
         - registerPickingPipeline
         - RenderTargetCache
@@ -16102,6 +16134,7 @@ modules:
         - PARTICLE_ATTRIBUTE_LOCATIONS
         - PARTICLE_DEPTH_TEXTURE_UNIT
         - PARTICLE_GL
+        - PARTICLE_VERTEX_SHADER_SOURCE
         - ParticleAppearanceProgram
         - ParticleBatchCache
         - ParticleProgram
@@ -16127,6 +16160,7 @@ modules:
         - resolvePickingServiceFactory
         - IdPassProgram
         - PICKING_GL
+        - ParticleIdProgram
         - WebglPickingService
         - registerPickingPipeline
         - RenderTargetCache
@@ -17134,6 +17168,7 @@ modules:
             - pick
             - PickHit
             - Pickable
+            - PickProvider
         - file: ./pointer-events.js
           imports:
             - ScenePointerEvent
@@ -18743,16 +18778,16 @@ dependencyGraph:
 statistics:
   totalTypeScriptFiles: 314
   totalModules: 24
-  totalLinesOfCode: 151273
-  totalExports: 3163
-  totalClasses: 195
+  totalLinesOfCode: 151819
+  totalExports: 3171
+  totalClasses: 196
   totalInterfaces: 590
   totalFunctions: 516
   totalTypeGuards: 26
   totalEnums: 0
-  totalConstants: 456
-  totalReExports: 2019
-  totalTypeOnlyImports: 400
+  totalConstants: 459
+  totalReExports: 2023
+  totalTypeOnlyImports: 401
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 6
   unusedFilesCount: 0
