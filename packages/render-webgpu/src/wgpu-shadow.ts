@@ -91,13 +91,15 @@
  * of the kinds this backend draws — `unlit`, `lit`, `standard`. Sprites are
  * excluded (a depth-only pass would cast the §55 rectangle, not the texture);
  * particles carry `castShadow: false` from the list builder; masks likewise.
- * The two GL exclusions with a WebGPU twist: skinned and `node` items are
- * excluded here **by absence** — this backend has no pipeline for either
- * surface (WP-R1.4's pinned transcript-invisibility; RFC 0001's emitter is
- * staged), and an invisible surface must not cast, so the caster filter is
- * simply "what this backend draws". GL's finer rule (an *undisplaced* node
- * caster casts exactly) becomes reachable only when the WGSL emitter lands
- * the node tier itself.
+ * The two GL exclusions with a WebGPU twist: skinned items are excluded
+ * from the caster pass **by absence of a skinned caster** — the colour
+ * pair lives behind `registerSkinningPipeline()`; the shadow caster and
+ * id pass still absent. An invisible surface must not cast a bind-pose
+ * silhouette. `node` items: an undisplaced graph casts its geometry
+ * exactly (depth ignores colour), while a displacing graph would cast
+ * its *undisplaced* silhouette, a different picture, so those casters
+ * skip: GL's node-caster rule, verbatim (and like GL's, registration-
+ * independent — the caster module is this backend's own).
  */
 
 import type { SceneLights } from "@fourjs/render";

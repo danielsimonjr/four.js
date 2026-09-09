@@ -30,6 +30,18 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — WebGPU skinned colour pair (RFC 0003).** Opt-in
+  `registerSkinningPipeline()` from `@fourjs/render-webgpu`. `WebgpuRenderer`
+  imports only `wgpu-skinning-registry.ts` (pipeline-cost law). Palette is
+  a separate 3072-byte bind group (`48 × 64`), `hasDynamicOffset`, vertex
+  stage only — `DRAW_UNIFORM_BYTES` stays 192. Group index after existing
+  groups: unlit 1, unlit+map/lit 2, lit+map 3. Joints `@location(4)`
+  `uint16x4`, weights `@location(5)` `float32x4`; LBS, weights not
+  renormalized. Classes are not named `SkinnedUnlitProgram` /
+  `SKINNING_GLSL` (`graph:duplicates`). Unregistered or factory failure
+  skips, never bind-pose. Shadow caster and RFC 0005 id pass still skip.
+  `maximumSkinningJoints` is reported. RFC 0003 checkbox stays `[ ]`.
+
 - **2026-09-09 — WebGL `StandardMaterial.emissiveMap` on unit 3.** Packed
   glTF factor × texture (sRGB). Allocator: 0 albedo, 1 shadow, 2 MR, 3
   emissive. Uniform switch `useEmissiveMap` (R-19), not a shader variant.

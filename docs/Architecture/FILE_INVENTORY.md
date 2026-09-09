@@ -6,21 +6,21 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 822
+**Total files**: 826
 
 ## Disposition counts
 
 | Disposition | Count | Meaning |
 | --- | --: | --- |
-| `reachable` | 269 | A `src/` file in the module graph, reachable from a root. |
+| `reachable` | 271 | A `src/` file in the module graph, reachable from a root. |
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 1 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 472 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 474 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
 | `config` | 17 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 14 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **822** | |
+| **Total** | **826** | |
 
 ## Per-area counts
 
@@ -28,15 +28,15 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | --- | --: |
 | `config` | 17 |
 | `examples` | 14 |
-| `src` | 318 |
-| `tests` | 472 |
+| `src` | 320 |
+| `tests` | 474 |
 | `tools` | 1 |
 
 ## Per-package counts
 
 | Package | Files |
 | --- | --: |
-| `(root)` | 218 |
+| `(root)` | 219 |
 | `@fourjs/animation` | 32 |
 | `@fourjs/assets` | 20 |
 | `@fourjs/core` | 26 |
@@ -55,7 +55,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@fourjs/render-canvas` | 2 |
 | `@fourjs/render-svg` | 2 |
 | `@fourjs/render-webgl` | 28 |
-| `@fourjs/render-webgpu` | 45 |
+| `@fourjs/render-webgpu` | 48 |
 | `@fourjs/scene` | 35 |
 | `@fourjs/serialization` | 11 |
 | `@fourjs/text` | 6 |
@@ -529,6 +529,8 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgpu/src/wgpu-readback.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-render-target.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-shadow.ts` | @fourjs/render-webgpu | src | reachable |
+| `packages/render-webgpu/src/wgpu-skinning-registry.ts` | @fourjs/render-webgpu | src | reachable |
+| `packages/render-webgpu/src/wgpu-skinning.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-sprite.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-standard.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-stencil.ts` | @fourjs/render-webgpu | src | reachable |
@@ -551,6 +553,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgpu/tests/wgpu-readback.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-render-target.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-shadow.test.ts` | @fourjs/render-webgpu | tests | test |
+| `packages/render-webgpu/tests/wgpu-skinning.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-stencil.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render/src/batch.ts` | @fourjs/render | src | reachable |
 | `packages/render/src/bounds.ts` | @fourjs/render | src | reachable |
@@ -861,6 +864,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/integration/shape-paint-objects.test.ts` | (root) | tests | test |
 | `tests/integration/shape-paints.test.ts` | (root) | tests | test |
 | `tests/integration/shape-rendering.test.ts` | (root) | tests | test |
+| `tests/integration/skinned-gpu-picking.test.ts` | (root) | tests | test |
 | `tests/integration/skinning.test.ts` | (root) | tests | test |
 | `tests/integration/sprite-frames.test.ts` | (root) | tests | test |
 | `tests/integration/standard-material.test.ts` | (root) | tests | test |

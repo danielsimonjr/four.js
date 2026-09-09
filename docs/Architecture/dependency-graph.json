@@ -3,9 +3,9 @@
     "name": "fourjs-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-09-09",
-    "totalFiles": 317,
+    "totalFiles": 319,
     "totalModules": 24,
-    "totalExports": 3218
+    "totalExports": 3266
   },
   "entryPoints": [
     {
@@ -4349,6 +4349,7 @@
             "imports": [
               "TextureDimension",
               "TextureFilter",
+              "TextureMapRole",
               "TextureMinFilter",
               "TextureSource",
               "TextureWrap"
@@ -4654,6 +4655,7 @@
           "SpriteTextureRun",
           "TextureDimension",
           "TextureFilter",
+          "TextureMapRole",
           "TextureMinFilter",
           "TextureSource",
           "TextureWrap",
@@ -4915,6 +4917,7 @@
           "SpriteTextureRun",
           "TextureDimension",
           "TextureFilter",
+          "TextureMapRole",
           "TextureMinFilter",
           "TextureSource",
           "TextureWrap",
@@ -15416,12 +15419,14 @@
           "NORMAL_MATRIX_WGSL",
           "shadedVertexBufferLayouts",
           "shadedVertexStageWgsl",
-          "litShaderSource"
+          "litShaderSource",
+          "litFragmentStageWgsl"
         ],
         "functions": [
           "shadedVertexBufferLayouts",
           "shadedVertexStageWgsl",
-          "litShaderSource"
+          "litShaderSource",
+          "litFragmentStageWgsl"
         ],
         "constants": [
           "NORMAL_SHADER_LOCATION",
@@ -16238,6 +16243,49 @@
           "clearRegisteredWebgpuNodeMaterialPipeline"
         ]
       },
+      "packages/render-webgpu/src/wgpu-skinning-registry.ts": {
+        "description": "The skinning pipeline's registration slot (§54, §62; RFC 0003) — the",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GpuBindGroup",
+              "GpuBindGroupLayout",
+              "GpuDevice",
+              "GpuRenderPipeline"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./wgpu-pipeline-cache.js",
+            "imports": [
+              "WgpuStencilDescriptor"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "setSkinningPipelineFactory",
+          "resolveSkinningPipelineFactory",
+          "clearRegisteredSkinningPipeline"
+        ],
+        "interfaces": [
+          "SkinningPipelineHost",
+          "WgpuSkinnedDrawDescriptor",
+          "SkinnedUnlitPipeline",
+          "SkinnedLitPipeline",
+          "SkinnedPrograms",
+          "SkinningPipelineFactory"
+        ],
+        "functions": [
+          "setSkinningPipelineFactory",
+          "resolveSkinningPipelineFactory",
+          "clearRegisteredSkinningPipeline"
+        ]
+      },
       "packages/render-webgpu/src/wgpu-stencil.ts": {
         "description": "§57/§67 stencil parity for the WebGPU backend (WP-R1.7) — the per-frame",
         "externalDependencies": [],
@@ -16477,6 +16525,15 @@
             ]
           },
           {
+            "file": "./wgpu-skinning-registry.js",
+            "imports": [
+              "resolveSkinningPipelineFactory",
+              "SkinnedPrograms",
+              "SkinningPipelineHost",
+              "WgpuSkinnedDrawDescriptor"
+            ]
+          },
+          {
             "file": "./wgpu-unlit.js",
             "imports": [
               "CLEAR_VERTEX_COUNT"
@@ -16513,9 +16570,12 @@
               "buildInterpolatedRenderList",
               "buildRenderList",
               "buildViewRenderList",
+              "MAX_SKINNING_JOINTS",
               "collectSceneLights",
               "createSceneLights",
               "isRenderTargetTexture",
+              "isSkinnedLitItem",
+              "isSkinnedUnlitItem",
               "intersectScissor",
               "validateReadbackRegion",
               "EffectRenderPass",
@@ -16684,6 +16744,130 @@
           "MAP_TEXTURE_BINDING",
           "MAP_SAMPLER_BINDING",
           "MAP_BINDING_WGSL"
+        ]
+      },
+      "packages/render-webgpu/src/wgpu-skinning.ts": {
+        "description": "The skinned colour pipelines (§54, §62; RFC 0003) — a skinned variant of",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GPU_BUFFER_USAGE",
+              "GPU_SHADER_STAGE",
+              "GpuBindGroup",
+              "GpuBindGroupLayout",
+              "GpuBuffer",
+              "GpuDevice",
+              "GpuPipelineLayout",
+              "GpuRenderPipeline",
+              "GpuShaderModule",
+              "GpuVertexBufferLayout"
+            ]
+          },
+          {
+            "file": "./wgpu-bindings.js",
+            "imports": [
+              "DRAW_UNIFORM_WGSL",
+              "MAP_BINDING_WGSL"
+            ]
+          },
+          {
+            "file": "./wgpu-lights.js",
+            "imports": [
+              "LIGHT_UNIFORM_WGSL",
+              "PUNCTUAL_LIGHT_WGSL",
+              "SHADED_MAP_BINDING_WGSL"
+            ]
+          },
+          {
+            "file": "./wgpu-lit.js",
+            "imports": [
+              "NORMAL_MATRIX_WGSL",
+              "litFragmentStageWgsl",
+              "shadedVertexBufferLayouts"
+            ]
+          },
+          {
+            "file": "./wgpu-pipeline-cache.js",
+            "imports": [
+              "blendStateFor",
+              "stencilStateFor"
+            ]
+          },
+          {
+            "file": "./wgpu-shadow.js",
+            "imports": [
+              "SHADOW_FACTOR_WGSL",
+              "SHADOW_LIGHT_UNIFORM_WGSL"
+            ]
+          },
+          {
+            "file": "./wgpu-skinning-registry.js",
+            "imports": [
+              "setSkinningPipelineFactory",
+              "SkinnedLitPipeline",
+              "SkinnedPrograms",
+              "SkinnedUnlitPipeline",
+              "SkinningPipelineHost",
+              "WgpuSkinnedDrawDescriptor"
+            ]
+          },
+          {
+            "file": "./wgpu-unlit.js",
+            "imports": [
+              "FRAGMENT_ENTRY_POINT",
+              "VERTEX_ENTRY_POINT",
+              "unlitFragmentStageWgsl",
+              "unlitVertexBufferLayouts"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@fourjs/render",
+            "directory": "packages/render",
+            "imports": [
+              "MAX_SKINNING_JOINTS"
+            ]
+          }
+        ],
+        "exports": [
+          "JOINTS_SHADER_LOCATION",
+          "WEIGHTS_SHADER_LOCATION",
+          "JOINTS_BUFFER_LAYOUT",
+          "WEIGHTS_BUFFER_LAYOUT",
+          "JOINT_PALETTE_BYTES",
+          "JOINT_PALETTE_FLOATS",
+          "JOINT_PALETTE_BINDING",
+          "skinnedPaletteBindGroupIndex",
+          "createJointPaletteBindGroupLayout",
+          "skinningWgsl",
+          "skinnedUnlitVertexBufferLayouts",
+          "skinnedLitVertexBufferLayouts",
+          "skinnedUnlitShaderSource",
+          "skinnedLitShaderSource",
+          "registerSkinningPipeline"
+        ],
+        "functions": [
+          "skinnedPaletteBindGroupIndex",
+          "createJointPaletteBindGroupLayout",
+          "skinningWgsl",
+          "skinnedUnlitVertexBufferLayouts",
+          "skinnedLitVertexBufferLayouts",
+          "skinnedUnlitShaderSource",
+          "skinnedLitShaderSource",
+          "registerSkinningPipeline"
+        ],
+        "constants": [
+          "JOINTS_SHADER_LOCATION",
+          "WEIGHTS_SHADER_LOCATION",
+          "JOINTS_BUFFER_LAYOUT",
+          "WEIGHTS_BUFFER_LAYOUT",
+          "JOINT_PALETTE_BYTES",
+          "JOINT_PALETTE_FLOATS",
+          "JOINT_PALETTE_BINDING"
         ]
       },
       "packages/render-webgpu/src/wgpu-pipeline-cache.ts": {
@@ -17025,7 +17209,8 @@
               "UV_SHADER_LOCATION",
               "VERTEX_ENTRY_POINT",
               "unlitShaderSource",
-              "unlitVertexBufferLayouts"
+              "unlitVertexBufferLayouts",
+              "unlitFragmentStageWgsl"
             ],
             "reExport": true
           },
@@ -17067,7 +17252,8 @@
               "NORMAL_SHADER_LOCATION",
               "litShaderSource",
               "shadedVertexBufferLayouts",
-              "shadedVertexStageWgsl"
+              "shadedVertexStageWgsl",
+              "litFragmentStageWgsl"
             ],
             "reExport": true
           },
@@ -17250,6 +17436,35 @@
             "reExport": true
           },
           {
+            "file": "./wgpu-skinning-registry.js",
+            "imports": [
+              "clearRegisteredSkinningPipeline",
+              "resolveSkinningPipelineFactory"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./wgpu-skinning.js",
+            "imports": [
+              "JOINTS_BUFFER_LAYOUT",
+              "JOINTS_SHADER_LOCATION",
+              "JOINT_PALETTE_BINDING",
+              "JOINT_PALETTE_BYTES",
+              "JOINT_PALETTE_FLOATS",
+              "WEIGHTS_BUFFER_LAYOUT",
+              "WEIGHTS_SHADER_LOCATION",
+              "createJointPaletteBindGroupLayout",
+              "registerSkinningPipeline",
+              "skinnedLitShaderSource",
+              "skinnedLitVertexBufferLayouts",
+              "skinnedPaletteBindGroupIndex",
+              "skinnedUnlitShaderSource",
+              "skinnedUnlitVertexBufferLayouts",
+              "skinningWgsl"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./webgpu-device.js",
             "imports": [
               "Gpu",
@@ -17418,6 +17633,19 @@
             ],
             "reExport": true,
             "typeOnly": true
+          },
+          {
+            "file": "./wgpu-skinning-registry.js",
+            "imports": [
+              "SkinningPipelineFactory",
+              "SkinningPipelineHost",
+              "SkinnedLitPipeline",
+              "SkinnedPrograms",
+              "SkinnedUnlitPipeline",
+              "WgpuSkinnedDrawDescriptor"
+            ],
+            "reExport": true,
+            "typeOnly": true
           }
         ],
         "workspaceDependencies": [],
@@ -17476,6 +17704,7 @@
           "VERTEX_ENTRY_POINT",
           "unlitShaderSource",
           "unlitVertexBufferLayouts",
+          "unlitFragmentStageWgsl",
           "LIGHTS_BIND_GROUP_INDEX",
           "LIGHT_AMBIENT_OFFSET",
           "LIGHT_CAMERA_OFFSET",
@@ -17506,6 +17735,7 @@
           "litShaderSource",
           "shadedVertexBufferLayouts",
           "shadedVertexStageWgsl",
+          "litFragmentStageWgsl",
           "RENDER_TARGET_COLOR_FORMAT",
           "RENDER_TARGET_DEPTH_FORMAT",
           "RENDER_TARGET_DEPTH_STENCIL_FORMAT",
@@ -17606,6 +17836,23 @@
           "PARTICLE_ID_VIEW_OFFSET",
           "WebgpuPickingService",
           "registerPickingPipeline",
+          "clearRegisteredSkinningPipeline",
+          "resolveSkinningPipelineFactory",
+          "JOINTS_BUFFER_LAYOUT",
+          "JOINTS_SHADER_LOCATION",
+          "JOINT_PALETTE_BINDING",
+          "JOINT_PALETTE_BYTES",
+          "JOINT_PALETTE_FLOATS",
+          "WEIGHTS_BUFFER_LAYOUT",
+          "WEIGHTS_SHADER_LOCATION",
+          "createJointPaletteBindGroupLayout",
+          "registerSkinningPipeline",
+          "skinnedLitShaderSource",
+          "skinnedLitVertexBufferLayouts",
+          "skinnedPaletteBindGroupIndex",
+          "skinnedUnlitShaderSource",
+          "skinnedUnlitVertexBufferLayouts",
+          "skinningWgsl",
           "PACKAGE_NAME",
           "Gpu",
           "GpuAdapter",
@@ -17671,7 +17918,13 @@
           "WgpuNodePipelineHost",
           "EmittedWgslNodeShader",
           "PickingRendererHost",
-          "PickingServiceFactory"
+          "PickingServiceFactory",
+          "SkinningPipelineFactory",
+          "SkinningPipelineHost",
+          "SkinnedLitPipeline",
+          "SkinnedPrograms",
+          "SkinnedUnlitPipeline",
+          "WgpuSkinnedDrawDescriptor"
         ],
         "reExported": [
           "GPU_BUFFER_USAGE",
@@ -17728,6 +17981,7 @@
           "VERTEX_ENTRY_POINT",
           "unlitShaderSource",
           "unlitVertexBufferLayouts",
+          "unlitFragmentStageWgsl",
           "LIGHTS_BIND_GROUP_INDEX",
           "LIGHT_AMBIENT_OFFSET",
           "LIGHT_CAMERA_OFFSET",
@@ -17758,6 +18012,7 @@
           "litShaderSource",
           "shadedVertexBufferLayouts",
           "shadedVertexStageWgsl",
+          "litFragmentStageWgsl",
           "RENDER_TARGET_COLOR_FORMAT",
           "RENDER_TARGET_DEPTH_FORMAT",
           "RENDER_TARGET_DEPTH_STENCIL_FORMAT",
@@ -17858,6 +18113,23 @@
           "PARTICLE_ID_VIEW_OFFSET",
           "WebgpuPickingService",
           "registerPickingPipeline",
+          "clearRegisteredSkinningPipeline",
+          "resolveSkinningPipelineFactory",
+          "JOINTS_BUFFER_LAYOUT",
+          "JOINTS_SHADER_LOCATION",
+          "JOINT_PALETTE_BINDING",
+          "JOINT_PALETTE_BYTES",
+          "JOINT_PALETTE_FLOATS",
+          "WEIGHTS_BUFFER_LAYOUT",
+          "WEIGHTS_SHADER_LOCATION",
+          "createJointPaletteBindGroupLayout",
+          "registerSkinningPipeline",
+          "skinnedLitShaderSource",
+          "skinnedLitVertexBufferLayouts",
+          "skinnedPaletteBindGroupIndex",
+          "skinnedUnlitShaderSource",
+          "skinnedUnlitVertexBufferLayouts",
+          "skinningWgsl",
           "Gpu",
           "GpuAdapter",
           "GpuStencilFaceState",
@@ -17922,7 +18194,13 @@
           "WgpuNodePipelineHost",
           "EmittedWgslNodeShader",
           "PickingRendererHost",
-          "PickingServiceFactory"
+          "PickingServiceFactory",
+          "SkinningPipelineFactory",
+          "SkinningPipelineHost",
+          "SkinnedLitPipeline",
+          "SkinnedPrograms",
+          "SkinnedUnlitPipeline",
+          "WgpuSkinnedDrawDescriptor"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -18112,11 +18390,13 @@
           "CLEAR_VERTEX_COUNT",
           "CLEAR_SHADER_SOURCE",
           "unlitVertexBufferLayouts",
-          "unlitShaderSource"
+          "unlitShaderSource",
+          "unlitFragmentStageWgsl"
         ],
         "functions": [
           "unlitVertexBufferLayouts",
-          "unlitShaderSource"
+          "unlitShaderSource",
+          "unlitFragmentStageWgsl"
         ],
         "constants": [
           "POSITION_SHADER_LOCATION",
@@ -20301,6 +20581,7 @@
             "imports": [
               "GL",
               "LitProgram",
+              "EMISSIVE_TEXTURE_UNIT",
               "MAP_TEXTURE_UNIT",
               "METAL_ROUGHNESS_TEXTURE_UNIT",
               "SHADOW_TEXTURE_UNIT",
@@ -20437,6 +20718,7 @@
           {
             "file": "./gl-program.js",
             "imports": [
+              "EMISSIVE_TEXTURE_UNIT",
               "MAP_TEXTURE_UNIT",
               "METAL_ROUGHNESS_TEXTURE_UNIT",
               "PUNCTUAL_LIGHT_GLSL",
@@ -21226,6 +21508,7 @@
           "MAP_TEXTURE_UNIT",
           "SHADOW_TEXTURE_UNIT",
           "METAL_ROUGHNESS_TEXTURE_UNIT",
+          "EMISSIVE_TEXTURE_UNIT",
           "FRAGMENT_SHADER_SOURCE",
           "PUNCTUAL_LIGHT_GLSL",
           "SHADOW_GLSL",
@@ -21266,6 +21549,7 @@
           "MAP_TEXTURE_UNIT",
           "SHADOW_TEXTURE_UNIT",
           "METAL_ROUGHNESS_TEXTURE_UNIT",
+          "EMISSIVE_TEXTURE_UNIT",
           "FRAGMENT_SHADER_SOURCE",
           "PUNCTUAL_LIGHT_GLSL",
           "SHADOW_GLSL",
@@ -21326,6 +21610,7 @@
               "LitProgram",
               "MAP_TEXTURE_UNIT",
               "METAL_ROUGHNESS_TEXTURE_UNIT",
+              "EMISSIVE_TEXTURE_UNIT",
               "NORMAL_ATTRIBUTE_LOCATION",
               "POSITION_ATTRIBUTE_LOCATION",
               "PUNCTUAL_LIGHT_GLSL",
@@ -21593,6 +21878,7 @@
           "LitProgram",
           "MAP_TEXTURE_UNIT",
           "METAL_ROUGHNESS_TEXTURE_UNIT",
+          "EMISSIVE_TEXTURE_UNIT",
           "NORMAL_ATTRIBUTE_LOCATION",
           "POSITION_ATTRIBUTE_LOCATION",
           "PUNCTUAL_LIGHT_GLSL",
@@ -21695,6 +21981,7 @@
           "LitProgram",
           "MAP_TEXTURE_UNIT",
           "METAL_ROUGHNESS_TEXTURE_UNIT",
+          "EMISSIVE_TEXTURE_UNIT",
           "NORMAL_ATTRIBUTE_LOCATION",
           "POSITION_ATTRIBUTE_LOCATION",
           "PUNCTUAL_LIGHT_GLSL",
@@ -25055,10 +25342,12 @@
           "packages/render-webgpu/src/wgpu-sprite.ts",
           "packages/render-webgpu/src/wgpu-batch.ts",
           "packages/render-webgpu/src/wgpu-node-registry.ts",
+          "packages/render-webgpu/src/wgpu-skinning-registry.ts",
           "packages/render-webgpu/src/wgpu-stencil.ts",
           "packages/render-webgpu/src/webgpu-renderer.ts",
           "packages/render-webgpu/src/wgpu-particles.ts",
           "packages/render-webgpu/src/wgpu-bindings.ts",
+          "packages/render-webgpu/src/wgpu-skinning.ts",
           "packages/render-webgpu/src/wgpu-pipeline-cache.ts",
           "packages/render-webgpu/src/wgpu-shadow.ts",
           "packages/render-webgpu/src/wgpu-geometry.ts",
@@ -25209,18 +25498,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 317,
+    "totalTypeScriptFiles": 319,
     "totalModules": 24,
-    "totalLinesOfCode": 153923,
-    "totalExports": 3218,
+    "totalLinesOfCode": 155533,
+    "totalExports": 3266,
     "totalClasses": 199,
-    "totalInterfaces": 593,
-    "totalFunctions": 521,
+    "totalInterfaces": 599,
+    "totalFunctions": 534,
     "totalTypeGuards": 26,
     "totalEnums": 0,
-    "totalConstants": 473,
-    "totalReExports": 2047,
-    "totalTypeOnlyImports": 407,
+    "totalConstants": 481,
+    "totalReExports": 2074,
+    "totalTypeOnlyImports": 410,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 6,
     "unusedFilesCount": 0,

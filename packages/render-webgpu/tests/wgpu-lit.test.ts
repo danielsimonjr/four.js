@@ -636,3 +636,126 @@ describe("WgpuGeometryCache — the normal stream (WP-R1.5)", () => {
     expect(gpu.countOf("buffer.destroy")).toBe(2);
   });
 });
+
+/** A §53 geometry double carrying joints/weights, the skinned families' input. */
+function skinnedCacheGeometry(
+  withSkin: boolean,
+  extras: Partial<{
+    normals: boolean;
+    uvs: boolean;
+    colors: boolean;
+    indices: boolean;
+  }> = {},
+): CacheableGeometry {
+  nextId += 1;
+  const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  return {
+    id: `skinned-geometry-${String(nextId)}`,
+    version: 0,
+    positions,
+    normals: extras.normals
+      ? new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1])
+      : undefined,
+    uvs: extras.uvs ? new Float32Array([0, 0, 1, 0, 0.5, 1]) : undefined,
+    colors: extras.colors ? new Float32Array(12).fill(1) : undefined,
+    indices: extras.indices ? new Uint16Array([0, 1, 2]) : undefined,
+    joints: withSkin ? new Uint16Array(12) : undefined,
+    weights: withSkin ? new Float32Array(12).fill(0.25) : undefined,
+    mode: "triangles",
+    drawCount: extras.indices ? 3 : 3,
+  } as unknown as CacheableGeometry;
+}
+
+describe("WgpuGeometryCache — joints and weights (RFC 0003)", () => {
+  it("uploads joints and weights only when the acquiring draw skins", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuGeometryCache(gpuDevice);
+    const unskinned = cache.acquire(skinnedCacheGeometry(true));
+    expect(unskinned?.jointBuffer).toBeNull();
+    expect(unskinned?.weightBuffer).toBeNull();
+    const labels = (): string[] =>
+      gpu
+        .callsOf("device.createBuffer")
+        .map((call) => String((call.args[0] as { label?: string }).label));
+    expect(labels().some((label) => label.startsWith("fourJS:joints:"))).toBe(
+      false,
+    );
+    expect(labels().some((label) => label.startsWith("fourJS:weights:"))).toBe(
+      false,
+    );
+
+    const skinned = cache.acquire(skinnedCacheGeometry(true), false, true);
+    expect(skinned?.jointBuffer).not.toBeNull();
+    expect(skinned?.weightBuffer).not.toBeNull();
+    expect(labels().slice(-3, -2)[0]).toContain("fourJS:positions:");
+    expect(labels().slice(-2, -1)[0]).toContain("fourJS:joints:");
+    expect(labels().slice(-1)[0]).toContain("fourJS:weights:");
+  });
+
+  it("upgrades a record in place when its first skinned draw arrives", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuGeometryCache(gpuDevice);
+    const geometry = skinnedCacheGeometry(true);
+    const record = cache.acquire(geometry);
+    expect(record?.jointBuffer).toBeNull();
+    gpu.reset();
+
+    const upgraded = cache.acquire(geometry, false, true);
+    expect(upgraded).toBe(record);
+    expect(upgraded?.jointBuffer).not.toBeNull();
+    expect(upgraded?.weightBuffer).not.toBeNull();
+    expect(gpu.countOf("device.createBuffer")).toBe(2);
+    expect(gpu.countOf("queue.writeBuffer")).toBe(2);
+
+    gpu.reset();
+    expect(cache.acquire(geometry, false, true)).toBe(record);
+    expect(gpu.countOf("device.createBuffer")).toBe(0);
+  });
+
+  it("skins a joint-less geometry without inventing streams", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuGeometryCache(gpuDevice);
+    const geometry = skinnedCacheGeometry(false);
+    expect(cache.acquire(geometry, false, true)?.jointBuffer).toBeNull();
+    gpu.reset();
+    expect(cache.acquire(geometry, false, true)?.jointBuffer).toBeNull();
+    expect(gpu.countOf("device.createBuffer")).toBe(0);
+  });
+
+  it("keeps allocation order positions → normals → uvs → colours → joints → weights → indices", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuGeometryCache(gpuDevice);
+    cache.acquire(
+      skinnedCacheGeometry(true, {
+        normals: true,
+        uvs: true,
+        colors: true,
+        indices: true,
+      }),
+      true,
+      true,
+    );
+    const labels = gpu
+      .callsOf("device.createBuffer")
+      .map((call) => String((call.args[0] as { label?: string }).label));
+    const kinds = labels.map((label) => label.split(":")[1]);
+    expect(kinds).toEqual([
+      "positions",
+      "normals",
+      "uvs",
+      "colors",
+      "joints",
+      "weights",
+      "indices",
+    ]);
+  });
+
+  it("destroys the joint and weight buffers with their record", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuGeometryCache(gpuDevice);
+    cache.acquire(skinnedCacheGeometry(true), false, true);
+    gpu.reset();
+    cache.dispose();
+    expect(gpu.countOf("buffer.destroy")).toBe(3);
+  });
+});

@@ -135,6 +135,7 @@ export {
   VERTEX_ENTRY_POINT,
   unlitShaderSource,
   unlitVertexBufferLayouts,
+  unlitFragmentStageWgsl,
 } from "./wgpu-unlit.js";
 export {
   LIGHTS_BIND_GROUP_INDEX,
@@ -169,6 +170,7 @@ export {
   litShaderSource,
   shadedVertexBufferLayouts,
   shadedVertexStageWgsl,
+  litFragmentStageWgsl,
 } from "./wgpu-lit.js";
 export type {
   WgpuCacheableRenderTarget,
@@ -333,3 +335,38 @@ export {
   WebgpuPickingService,
   registerPickingPipeline,
 } from "./wgpu-picking.js";
+// §54's skinning pipeline (RFC 0003). Deliberately — like the picking
+// pipeline above — a module `WebgpuRenderer` never reaches statically:
+// importing `registerSkinningPipeline` is what links the two skinned colour
+// pipelines and the palette uploader into a bundle, and a barrel re-export
+// does not (it tree-shakes like every other unused export) —
+// see `wgpu-skinning-registry.ts` for the whole seam.
+export type {
+  SkinningPipelineFactory,
+  SkinningPipelineHost,
+  SkinnedLitPipeline,
+  SkinnedPrograms,
+  SkinnedUnlitPipeline,
+  WgpuSkinnedDrawDescriptor,
+} from "./wgpu-skinning-registry.js";
+export {
+  clearRegisteredSkinningPipeline,
+  resolveSkinningPipelineFactory,
+} from "./wgpu-skinning-registry.js";
+export {
+  JOINTS_BUFFER_LAYOUT,
+  JOINTS_SHADER_LOCATION,
+  JOINT_PALETTE_BINDING,
+  JOINT_PALETTE_BYTES,
+  JOINT_PALETTE_FLOATS,
+  WEIGHTS_BUFFER_LAYOUT,
+  WEIGHTS_SHADER_LOCATION,
+  createJointPaletteBindGroupLayout,
+  registerSkinningPipeline,
+  skinnedLitShaderSource,
+  skinnedLitVertexBufferLayouts,
+  skinnedPaletteBindGroupIndex,
+  skinnedUnlitShaderSource,
+  skinnedUnlitVertexBufferLayouts,
+  skinningWgsl,
+} from "./wgpu-skinning.js";

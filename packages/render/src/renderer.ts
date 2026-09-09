@@ -141,8 +141,9 @@ export type RendererBackend = "webgpu" | "webgl2" | "canvas2d" | "svg" | "null";
  * capability query must be lazy if the alternative moves recorded
  * transcripts*, applies verbatim to the two extra `getParameter` calls, and
  * nothing in the engine reads either number yet (see `webgl-renderer.ts`);
- * `WebgpuRenderer` answers from the device's own limits but omits
- * `maximumSkinningJoints`, having no skinned pipeline (RFC 0003). This
+ * `WebgpuRenderer` answers from the device's own limits and reports
+ * `maximumSkinningJoints` (RFC 0003's colour pair behind
+ * `registerSkinningPipeline()`). This
  * paragraph claimed the three backends "answer **all** of them" until
  * 2026-08-29; the omissions above were deliberate from the day each backend's
  * record landed.

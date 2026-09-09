@@ -26,19 +26,24 @@
  * `version` bump is what re-uploads it.
  *
  * This cache uploads **positions, optional normals, optional uvs, optional
- * colours and optional indices**: exactly the streams this package's pipelines
- * draw. Uvs joined in WP-R1.2, with the textured variant that reads them.
- * Normals joined in WP-R1.5 with the lit and standard pipelines — and joined
- * **per acquisition, not per geometry**: the caller states whether the draw at
- * hand shades (`acquire`'s second parameter), and the stream uploads on the
- * first acquisition that says so. The rule stands — a stream is uploaded when
- * a pipeline can read it, never before — and it is applied per *draw kind*
- * rather than per package on purpose: a normal-carrying geometry drawn only
- * unlit (`planeGeometry` under an `UnlitMaterial`, every §55 sprite quad)
- * would otherwise upload a buffer nothing ever binds, and every landed
- * pre-WP-R1.5 transcript would move. (The GL cache uploads normals
- * unconditionally because its VAO records all streams at once; here a record
- * is loose buffers, so the honest unit of need is the draw.)
+ * colours, optional joints/weights and optional indices**: exactly the streams
+ * this package's pipelines draw. Uvs joined in WP-R1.2, with the textured
+ * variant that reads them. Normals joined in WP-R1.5 with the lit and
+ * standard pipelines — and joined **per acquisition, not per geometry**: the
+ * caller states whether the draw at hand shades (`acquire`'s second
+ * parameter), and the stream uploads on the first acquisition that says so.
+ * Joints and weights joined with RFC 0003's skinned colour pair, on the
+ * same per-acquisition terms (`acquire`'s third parameter): a skinned draw
+ * asks, an unlit acquire of the same geometry does not, and a skinless
+ * scene records the byte-identical upload sequence it always did. The rule
+ * stands — a stream is uploaded when a pipeline can read it, never before —
+ * and it is applied per *draw kind* rather than per package on purpose: a
+ * normal-carrying geometry drawn only unlit (`planeGeometry` under an
+ * `UnlitMaterial`, every §55 sprite quad) would otherwise upload a buffer
+ * nothing ever binds, and every landed pre-WP-R1.5 transcript would move.
+ * (The GL cache uploads normals and joints unconditionally because its VAO
+ * records all streams at once; here a record is loose buffers, so the honest
+ * unit of need is the draw.)
  */
 
 import type { RenderItem } from "@fourjs/render";
@@ -80,6 +85,21 @@ export interface WgpuGeometryRecord {
    * uncoloured, textured one binds them to slot 1.
    */
   readonly uvBuffer: GpuBuffer | null;
+  /**
+   * Buffer backing the optional per-vertex joint-index attribute (§54,
+   * RFC 0003: four `uint16` influences, shader location 4), or `null` —
+   * for a geometry that carries none, **and** for one whose joints have
+   * not been asked for yet (`acquire`'s `skinning` parameter). Mutable
+   * for the same upgrade `normalBuffer` uses: a record first acquired
+   * unskinned meets its first skinned draw and uploads one stream.
+   */
+  jointBuffer: GpuBuffer | null;
+  /**
+   * Buffer backing the optional per-vertex influence-weight attribute
+   * (§54: four `f32` weights, shader location 5), or `null`. Paired with
+   * {@link WgpuGeometryRecord.jointBuffer}; the two upgrade together.
+   */
+  weightBuffer: GpuBuffer | null;
   /** Index buffer, or `null` for a non-indexed geometry. */
   readonly indexBuffer: GpuBuffer | null;
   /** `"uint16"` or `"uint32"`, or `null` when there are no indices. */
@@ -146,7 +166,12 @@ export class WgpuGeometryCache {
    * upgrade of a record first acquired by an unshaded draw — and `false` (the
    * default, and every pre-WP-R1.5 call site verbatim) never touches it, so a
    * scene with no lit materials records the byte-identical upload sequence it
-   * always did. See the module header for why the flag is per acquisition.
+   * always did. `skinning` is the same flag for §54's joints and weights
+   * (RFC 0003): `true` uploads them on a skinned colour draw, `false` (the
+   * default, every pre-skinning call site verbatim) never touches them, so a
+   * skinless scene — and an unregistered skinned skip, which never asks —
+   * records the byte-identical upload sequence it always did. See the module
+   * header for why the flags are per acquisition.
    *
    * Returns `null` — and creates no entry — when there is nothing to draw
    * (`drawCount === 0`, which includes every disposed geometry) or once the
@@ -156,6 +181,7 @@ export class WgpuGeometryCache {
   acquire(
     geometry: CacheableGeometry,
     normals = false,
+    skinning = false,
   ): WgpuGeometryRecord | null {
     if (this.#disposed) {
       return null;
@@ -177,6 +203,9 @@ export class WgpuGeometryCache {
             `fourJS:normals:${geometry.id}`,
           );
         }
+        if (skinning) {
+          this.#upgradeSkinning(existing, geometry);
+        }
         return existing;
       }
       this.#destroyRecord(existing);
@@ -190,7 +219,7 @@ export class WgpuGeometryCache {
       return null;
     }
 
-    const record = this.#upload(geometry, normals);
+    const record = this.#upload(geometry, normals, skinning);
     this.#records.set(geometry.id, record);
     return record;
   }
@@ -216,17 +245,42 @@ export class WgpuGeometryCache {
     this.#records.clear();
   }
 
-  #upload(geometry: CacheableGeometry, normals: boolean): WgpuGeometryRecord {
+  #upgradeSkinning(
+    record: WgpuGeometryRecord,
+    geometry: CacheableGeometry,
+  ): void {
+    if (record.jointBuffer === null && geometry.joints !== undefined) {
+      record.jointBuffer = this.#uploadBuffer(
+        geometry.joints,
+        GPU_BUFFER_USAGE.VERTEX,
+        `fourJS:joints:${geometry.id}`,
+      );
+    }
+    if (record.weightBuffer === null && geometry.weights !== undefined) {
+      record.weightBuffer = this.#uploadBuffer(
+        geometry.weights,
+        GPU_BUFFER_USAGE.VERTEX,
+        `fourJS:weights:${geometry.id}`,
+      );
+    }
+  }
+
+  #upload(
+    geometry: CacheableGeometry,
+    normals: boolean,
+    skinning: boolean,
+  ): WgpuGeometryRecord {
     const positionBuffer = this.#uploadBuffer(
       geometry.positions,
       GPU_BUFFER_USAGE.VERTEX,
       `fourJS:positions:${geometry.id}`,
     );
 
-    // Allocation order is positions → normals → uvs → colours → indices, the
-    // order `gl-geometry.ts` allocates in, so the two backends' upload
-    // transcripts stay readable side by side. Normals only when the acquiring
-    // draw shades (see the module header).
+    // Allocation order is positions → normals → uvs → colours → joints →
+    // weights → indices, the order `gl-geometry.ts` allocates in, so the
+    // two backends' upload transcripts stay readable side by side. Normals
+    // only when the acquiring draw shades; joints/weights only when it skins
+    // (see the module header).
     const normalData = normals ? geometry.normals : undefined;
     const normalBuffer =
       normalData === undefined
@@ -257,6 +311,26 @@ export class WgpuGeometryCache {
             `fourJS:colors:${geometry.id}`,
           );
 
+    const jointData = skinning ? geometry.joints : undefined;
+    const jointBuffer =
+      jointData === undefined
+        ? null
+        : this.#uploadBuffer(
+            jointData,
+            GPU_BUFFER_USAGE.VERTEX,
+            `fourJS:joints:${geometry.id}`,
+          );
+
+    const weightData = skinning ? geometry.weights : undefined;
+    const weightBuffer =
+      weightData === undefined
+        ? null
+        : this.#uploadBuffer(
+            weightData,
+            GPU_BUFFER_USAGE.VERTEX,
+            `fourJS:weights:${geometry.id}`,
+          );
+
     const indices = geometry.indices;
     const indexBuffer =
       indices === undefined
@@ -272,6 +346,8 @@ export class WgpuGeometryCache {
       normalBuffer,
       colorBuffer,
       uvBuffer,
+      jointBuffer,
+      weightBuffer,
       indexBuffer,
       indexFormat:
         indices === undefined
@@ -304,6 +380,8 @@ export class WgpuGeometryCache {
     record.normalBuffer?.destroy();
     record.colorBuffer?.destroy();
     record.uvBuffer?.destroy();
+    record.jointBuffer?.destroy();
+    record.weightBuffer?.destroy();
     record.indexBuffer?.destroy();
   }
 }
