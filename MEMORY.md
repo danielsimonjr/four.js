@@ -30,6 +30,11 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — Size budgets after #86.** Main CI failed at `bun run size`
+  with the browser gate green (107/107). particles-demo 43.04/43 kB (+38 B),
+  ui-demo 49.51/49.5 kB (+11 B). Limits 43.5 / 50 kB. first-3d holds.
+  PickProvider and the WebGL particle id arm ride those two graphs.
+
 - **2026-09-09 — Open-TODO wave 5, simple → complex.** Twelve checkboxes
   remain; three slices landed without pretending the packets closed.
   (1) RFC 0005 WebGPU particle id: one id per emitter, private pipeline

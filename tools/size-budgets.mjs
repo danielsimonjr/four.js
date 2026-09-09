@@ -20,6 +20,16 @@
  * first-2d-scene (56.23 / 150 kB) unchanged — still well under §86's
  * minimal-2D-app gate. `__FOUR_DEV__: false` on every production example
  * except the twin; the wasm deltas are the solver bump, not DEV leftovers.
+ *
+ * **2026-09-09 (#86 squash on main, run 34339266079):** PickProvider,
+ * WebGL `ParticleIdProgram`, 192-byte `DrawUniforms`, and the particles-demo
+ * simulate/present split pushed two gzip bundles over the 2026-09-07
+ * ceilings. Browser tests were green (107/107). first-3d 42.74/43 kB holds.
+ *
+ * | Example        | Measured (gzip) | Prior limit | New limit | Rationale |
+ * |----------------|-----------------|-------------|-----------|-----------|
+ * | particles-demo | 43.04 kB        | 43 kB       | 43.5 kB   | +38 B over — id-pass / appearance already in the demo graph. A: hold at 43 → red; B: 43.5 kB. |
+ * | ui-demo        | 49.51 kB        | 49.5 kB     | 50 kB     | +11 B over — PickProvider on `@fourjs/input` rides the retained-mode graph. B: 50 kB. |
  */
 
 export const SIZE_BUDGETS_DOC = "tools/size-budgets.mjs";

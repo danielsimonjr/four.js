@@ -14,6 +14,11 @@ stay on the tracker.
 
 ### Fixed
 
+- **Size budgets after #86.** CI `bun run size` failed with the browser
+  gate green (107/107): particles-demo 43.04/43 kB (+38 B), ui-demo
+  49.51/49.5 kB (+11 B). Limits 43.5 / 50 kB. first-3d 42.74/43 kB holds.
+  Rationale in `tools/size-budgets.mjs`.
+
 - **WebGPU Playwright gates match the 192-byte `DrawUniforms` block.** After
   the `normalMatrix` hoist, six `[webgpu]` specs still bound
   `minBindingSize: 144` (shader reads 192). Sprites still packed a retired

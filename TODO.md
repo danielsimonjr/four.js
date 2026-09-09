@@ -91,7 +91,7 @@ Bounded work with a clear shape, but more than a single edit.
 
 - The browser gate on Windows — DONE 2026-09-06 (WebGPU 22/22 via platform argv; `animation.spec` simulation-bound `#status` sampling; Windows timeout 180 s; `smoothness.spec` uses `page.evaluate` parity wait per #72).
 - Unlit materials render with GL_BLEND off — DONE 2026-09-06 (alpha / `transparent` enables SRC_ALPHA blend).
-- Size budgets are thin after R-36 — DONE 2026-09-07 (re-measured after #76: 43 / 43 / 49.5 kB and 2.05 / 1.25 / 1.20 MB; rationale in `tools/size-budgets.mjs`).
+- Size budgets are thin after R-36 — DONE 2026-09-07 (re-measured after #76: 43 / 43 / 49.5 kB and 2.05 / 1.25 / 1.20 MB; rationale in `tools/size-budgets.mjs`). Follow-up 2026-09-09 after #86: particles-demo 43 → 43.5 kB, ui-demo 49.5 → 50 kB (CI 43.04 / 49.51 kB).
 - Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` — DONE 2026-09-06 (package `moduleResolution: bundler`; upstream type aliases).
 - Extend `tools/check-docs.mjs` — DONE 2026-09-06 (24 packages, suite counts, AUDIT-120 census).
 
