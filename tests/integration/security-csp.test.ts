@@ -105,9 +105,10 @@ function typescriptFilesUnder(dir: string): string[] {
 /**
  * Every shipped source file the engine and its examples are built from.
  *
- * `packages/*​/src` rather than the whole package, so a package's own tests —
- * which may legitimately name a construct in order to assert it is absent —
- * are out of scope. This file lives under `tests/`, so it excludes itself.
+ * Scoped to each package's `src` directory rather than the whole package, so
+ * a package's own tests — which may legitimately name a construct in order to
+ * assert it is absent — are out of scope. This file lives under `tests/`, so
+ * it excludes itself.
  */
 function shippedSources(): string[] {
   const files: string[] = [];

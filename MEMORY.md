@@ -30,7 +30,27 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
-## Decisions
+- **2026-09-09 — tools/docs must stay on typescript@6.0.3.** Dependabot #82
+  bumped it to 7.0.2 with the root. TypeDoc 0.28's peer is 5.0–6.0; CI died
+  on `PropertyDeclaration`. Isolation is a version pin, not a directory.
+  `check-compiler.mjs` refuses anything else. Root 7.x is free to move.
+
+- **2026-09-09 — Browser-gate follow-up on the open-TODO PR.** Pause-during-
+  grab was not enough: `waitForVirtualFrameCount` pumped the patched rAF and
+  aliased even frames only. Host rAF (`__fourHostRaf`) is the pump. Character
+  walk test had the same wall-clock starvation the look test already fixed —
+  wait on settled `data-pz`, not `waitForTimeout(4s)`.
+
+- **2026-09-09 — Open-TODO contained-item pass.** Smoothness flake was
+  screenshot-stride aliasing against the period-2 virtual clock, not
+  dropped-time; pause rAF during `grab()`. §79 diagnostics name authored type
+  strings only — never `constructor.name`. Oxlint correctness warnings triaged
+  to zero (fixes + test-scoped allow for `no-unsafe-optional-chaining`). The
+  12.8s barrels duration is under an explicit 30s suite timeout; application
+  9809ms is a file aggregate. A-5 `auditFinalizedLeaks` stays opt-in (finalizers
+  are nondeterministic). A-19 merged into R-30c. Still open: RFC residues,
+  lighting/batching/§77/§96/tessellation packets, R-33 (hardware), first
+  publish (owner), dogfooding map (standing), vitest 5 coverage campaign.
 
 - **2026-09-07 — Size budgets after #76.** `bun run size` sits after
   `test:browser`, so #76/#77 never measured the Rapier 0.20 wasm jump.

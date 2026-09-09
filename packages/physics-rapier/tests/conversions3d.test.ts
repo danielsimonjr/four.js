@@ -78,12 +78,17 @@ describe("vector mapping", () => {
 describe("rotation mapping", () => {
   it("copies a quaternion component for component", () => {
     const out = createRapierRotation3();
-    const quaternion = new Quaternion(0.1, 0.2, 0.3, 0.9273618495495704);
+    const quaternion = new Quaternion(
+      0.1,
+      0.2,
+      0.3,
+      Math.sqrt(1 - 0.1 * 0.1 - 0.2 * 0.2 - 0.3 * 0.3),
+    );
     expect(toRapierRotation3(quaternion, new Quaternion(), out)).toBe(out);
-    expect(out.x).toBeCloseTo(0.1, 12);
-    expect(out.y).toBeCloseTo(0.2, 12);
-    expect(out.z).toBeCloseTo(0.3, 12);
-    expect(out.w).toBeCloseTo(0.9273618495495704, 12);
+    expect(out.x).toBeCloseTo(quaternion.x, 12);
+    expect(out.y).toBeCloseTo(quaternion.y, 12);
+    expect(out.z).toBeCloseTo(quaternion.z, 12);
+    expect(out.w).toBeCloseTo(quaternion.w, 12);
   });
 
   it("treats a scalar angle as radians about +Z (§7a)", () => {

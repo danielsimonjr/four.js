@@ -212,6 +212,7 @@ function inline(text) {
   s = escapeHtml(s);
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  // oxlint-disable-next-line no-control-regex -- slot placeholders are NUL-delimited by design
   return s.replace(/\u0000(\d+)\u0000/g, (_, i) => slots[Number(i)]);
 }
 

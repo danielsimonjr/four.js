@@ -129,7 +129,9 @@ function select(argv) {
   const matched = new Set(
     chosen.flatMap((entry) => [entry.record, entry.file.replace(/\.mjs$/, "")]),
   );
-  const unknown = [...wanted].filter((name) => !matched.has(name)).sort();
+  const unknown = [...wanted]
+    .filter((name) => !matched.has(name))
+    .sort((a, b) => a.localeCompare(b));
   if (unknown.length > 0) {
     throw new Error(
       `run-all: no benchmark named ${unknown.join(", ")}. Run 'pnpm bench --list' for the suite.`,

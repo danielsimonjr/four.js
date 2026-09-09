@@ -522,7 +522,7 @@ export class WgpuComputeCache {
     }
     const layout = this.#device.createBindGroupLayout({
       label: `fourJS:compute:${pattern}`,
-      entries: [...pattern].map((access, index) => ({
+      entries: Array.from(pattern).map((access, index) => ({
         binding: index,
         visibility: GPU_SHADER_STAGE.COMPUTE,
         buffer: {

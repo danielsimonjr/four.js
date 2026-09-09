@@ -622,15 +622,16 @@ describe("UI composition (§72–§75)", () => {
     // the test below — but they are opt-in, and a caller that supplies none
     // still gets this refusal rather than a silent downgrade.
     //
-    // The refusal names the *deepest* offending class, because `serializeScene`
-    // walks children before it resolves its own type — here the `Label` inside
-    // the button, not the `Panel` at the root.
+    // The refusal names authored document types and the `nodeTypeOf` option,
+    // never `constructor.name` (a minifier rewrites that to something like
+    // "Ur"). `serializeScene` walks children before it resolves its own type,
+    // so the deepest widget is the one that throws.
     const { root } = buildUITree();
     expect(() => serializeScene(root, createRoundtripSerializers())).toThrow(
-      /has no type name for/,
+      /has no serializable type name/,
     );
     expect(() => serializeScene(root, createRoundtripSerializers())).toThrow(
-      /Label|Button|Panel/,
+      /nodeTypeOf/,
     );
   });
 

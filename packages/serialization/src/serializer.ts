@@ -102,22 +102,16 @@ export const SCENE_NODE_TYPE = "scene";
 export const GROUP_NODE_TYPE = "group";
 
 /**
- * Appended to any §79 diagnostic whose only identifier is `constructor.name`.
+ * §79 diagnostics name types from authored strings, never `constructor.name`.
  *
- * Added 2026-09-07 after a dogfooding round hit
- * *"Node node-3 is a **Ur**, which this scene format has no type name for"*. The
- * node was a `Renderable`; `Ur` is what the minifier called it. Every consumer
- * ships a minified build, so the useful name survives only where the error
- * matters least — and the reader is sent hunting a symbol that appears nowhere
- * in their source.
- *
- * The name is kept, because in development it is exactly right and this suite
- * never runs minified. What is added is the part that survives: what the format
- * knows, and the fact that the name may not be the one you wrote.
+ * A 2026-09-07 dogfooding round hit *"Node node-3 is a **Ur**"* — the node was
+ * a `Renderable`; `Ur` is what the minifier called it. Every consumer ships a
+ * minified build, so interpolating `constructor.name` sent readers hunting a
+ * symbol that appears nowhere in their source. The 2026-09-07 caveat noted the
+ * problem; this rewrite removes the name. Built-in document types
+ * (`SCENE_NODE_TYPE`, `GROUP_NODE_TYPE`) and registered `typeName`s are
+ * string constants a minifier cannot rewrite.
  */
-const MINIFIED_NAME_CAVEAT =
-  "(Class names come from `constructor.name`, which minifiers rewrite — in a " +
-  "minified production build the name above may not be the one in your source.)";
 
 // --- component serializers ---------------------------------------------------
 
@@ -281,15 +275,13 @@ export class ComponentSerializerRegistry {
         }
         throw new FourError(
           "INVALID_APPLICATION_STATE",
-          `Node ${node.id} carries a component of type ${JSON.stringify(typeName ?? component.constructor.name)}, which has no registered serializer (§79); register one, or pass { unknownComponents: "skip" } to drop it from the document.${typeName === undefined ? ` ${MINIFIED_NAME_CAVEAT}` : ""}`,
+          typeName === undefined
+            ? `Node ${node.id} carries a component with no static typeName and no registered serializer (§79); add \`static readonly typeName\` (plan D2), register a serializer, or pass { unknownComponents: "skip" } to drop it from the document.`
+            : `Node ${node.id} carries a component of type ${JSON.stringify(typeName)}, which has no registered serializer (§79); register one, or pass { unknownComponents: "skip" } to drop it from the document.`,
           {
             context: {
               node: node.id,
               typeName: typeName ?? null,
-              componentClass: component.constructor.name,
-              // True only when the name above came from `constructor.name`; a
-              // registered `typeName` is authored text and survives minification.
-              componentClassIsMinifiable: typeName === undefined,
             },
           },
         );
@@ -521,12 +513,10 @@ function resolveNodeType(node: Node, options: SerializeSceneOptions): string {
   }
   throw new FourError(
     "INVALID_APPLICATION_STATE",
-    `Node ${node.id} is a ${constructor.name}, which this scene format has no type name for; supply serializeScene's \`nodeTypeOf\` option and the matching \`nodeFactory\` on load (§79). This format knows "${SCENE_NODE_TYPE}", "${GROUP_NODE_TYPE}" built in; every other class needs \`nodeTypeOf\`. ${MINIFIED_NAME_CAVEAT}`,
+    `Node ${node.id} has no serializable type name (§79). This format knows "${SCENE_NODE_TYPE}", "${GROUP_NODE_TYPE}" built in; every other class needs serializeScene's \`nodeTypeOf\` option and the matching \`nodeFactory\` on load, or \`registerSceneNodeTypes()\` from the umbrella package.`,
     {
       context: {
         node: node.id,
-        nodeClass: constructor.name,
-        nodeClassIsMinifiable: true,
         builtInTypes: [SCENE_NODE_TYPE, GROUP_NODE_TYPE],
       },
     },

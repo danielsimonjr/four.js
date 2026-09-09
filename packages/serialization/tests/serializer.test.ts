@@ -241,14 +241,10 @@ describe("ComponentSerializerRegistry", () => {
     expect(isFourError(thrown) && thrown.message).toMatch(
       /no registered serializer/,
     );
+    expect(isFourError(thrown) && thrown.message).toContain(Health.typeName);
     expect(isFourError(thrown) && thrown.context).toEqual({
       node: node.id,
       typeName: Health.typeName,
-      componentClass: "Health",
-      // False here: the name shown came from a registered `typeName`, which is
-      // authored text and survives minification. Only a `constructor.name`
-      // fallback is minifiable.
-      componentClassIsMinifiable: false,
     });
   });
 
@@ -292,13 +288,13 @@ describe("ComponentSerializerRegistry", () => {
     expect(isFourError(thrown) && thrown.code).toBe(
       "INVALID_APPLICATION_STATE",
     );
+    expect(isFourError(thrown) && thrown.message).toMatch(
+      /no static typeName/,
+    );
+    expect(isFourError(thrown) && thrown.message).not.toMatch(/Rogue/);
     expect(isFourError(thrown) && thrown.context).toEqual({
       node: "node-rogue",
       typeName: null,
-      componentClass: "Rogue",
-      // True: with no registered typeName the message falls back to
-      // `constructor.name`, which a minifier rewrites.
-      componentClassIsMinifiable: true,
     });
   });
 
@@ -416,19 +412,15 @@ describe("serializeScene", () => {
     expect(isFourError(thrown) && thrown.code).toBe(
       "INVALID_APPLICATION_STATE",
     );
-    expect(String(thrown)).toMatch(/is a Mesh, which this scene format has no/);
-    // The class name above is `constructor.name`, which a minifier rewrites -- a
-    // production build reports "is a Ur". This suite can never catch that, because
-    // tests do not run minified, so the message must ALSO carry something that
-    // survives: what the format does know, and a warning that the name may be
-    // mangled. Without these a reader chases a symbol that exists nowhere in
-    // their source.
+    expect(String(thrown)).toMatch(/has no serializable type name/);
+    // Diagnostics name authored document types, never `constructor.name` — a
+    // minifier rewrites the latter (dogfooding: `Renderable` → "Ur"). The
+    // message must stay useful in the build every consumer ships.
+    expect(String(thrown)).not.toMatch(/Mesh/);
     expect(String(thrown), "names the built-in types a reader can act on").toMatch(
       /"scene", "group"/,
     );
-    expect(String(thrown), "warns the class name may be minified").toMatch(
-      /minified/,
-    );
+    expect(String(thrown)).toMatch(/nodeTypeOf/);
   });
 
   it("maps application classes through nodeTypeOf", () => {

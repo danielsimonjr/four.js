@@ -133,7 +133,11 @@ export class ComponentRegistry implements ComponentHost {
       throw new FourError(
         "INVALID_SCENE_GRAPH",
         "Component class is missing a `static readonly typeName` (plan D2).",
-        { context: { component: component.constructor.name } },
+        {
+          context: {
+            hint: "Add static readonly typeName to the component class (plan D2).",
+          },
+        },
       );
     }
 

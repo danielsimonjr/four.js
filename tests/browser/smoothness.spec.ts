@@ -83,6 +83,19 @@ declare global {
   interface Window {
     /** rAF callbacks delivered by {@link useVirtualFrameClock}. */
     __fourVirtualFrames?: number;
+    /**
+     * When true, the injected clock holds the next virtual frame so a
+     * screenshot cannot advance `interpolationAlpha` underneath the sampler.
+     */
+    __fourPauseRaf?: boolean;
+    /**
+     * The browser's own `requestAnimationFrame`, captured before the virtual
+     * clock replaced it. Waits and GPU flushes must use this: pumping the
+     * patched function increments `__fourVirtualFrames` without running the
+     * example's loop, which aliases the period-2 alpha cycle (even frames
+     * only → every sample on-step).
+     */
+    __fourHostRaf?: typeof requestAnimationFrame;
   }
 }
 
@@ -572,17 +585,62 @@ async function useVirtualFrameClock(
     const schedule = globalThis.requestAnimationFrame.bind(globalThis);
     let virtualTime = 0;
     let frames = 0;
+    let paused = false;
     Object.defineProperty(globalThis, "__fourVirtualFrames", {
       get: () => frames,
       configurable: true,
     });
+    Object.defineProperty(globalThis, "__fourPauseRaf", {
+      get: () => paused,
+      set(value: boolean) {
+        paused = Boolean(value);
+      },
+      configurable: true,
+    });
+    Object.defineProperty(globalThis, "__fourHostRaf", {
+      value: schedule,
+      configurable: true,
+    });
+    // While paused the host rAF keeps the example's loop alive, but virtual
+    // time does not advance. Playwright screenshots take long enough on
+    // SwiftShader that an unpaused clock delivers 2+ extra 1.5Δ frames and
+    // aliases the period-2 alpha cycle — every sample then lands on-step.
     globalThis.requestAnimationFrame = (callback: FrameRequestCallback) =>
-      schedule(() => {
+      schedule(function pump() {
+        if (paused) {
+          schedule(pump);
+          return;
+        }
         virtualTime += milliseconds;
         frames += 1;
         callback(virtualTime);
       });
   }, frameSeconds * 1000);
+}
+
+/**
+ * Screenshots with the virtual clock held so the PNG encode cannot sneak
+ * extra 1.5Δ frames between the wait and the pixels.
+ */
+async function grabWithClockPaused(
+  page: Page,
+  canvas: Locator,
+): Promise<DecodedImage> {
+  await page.evaluate(() => {
+    window.__fourPauseRaf = true;
+  });
+  try {
+    // Two host frames let SwiftShader present the last unpaused draw. Must
+    // not go through the patched rAF — that would increment the virtual
+    // clock (and skip the example's loop) while we are trying to hold it.
+    await pumpHostAnimationFrame(page);
+    await pumpHostAnimationFrame(page);
+    return await grab(canvas);
+  } finally {
+    await page.evaluate(() => {
+      window.__fourPauseRaf = false;
+    });
+  }
 }
 
 /** How many virtual frames the injected clock has delivered. */
@@ -599,13 +657,18 @@ const VIRTUAL_FRAME_WAIT_BUDGET_MS = 15_000;
 
 /**
  * Waits until the injected clock has delivered at least `minimum` virtual
- * frames. Each poll pumps one real `requestAnimationFrame` turn so headless
- * SwiftShader advances the example's patched loop between checks.
+ * frames. Each poll pumps one **host** `requestAnimationFrame` turn so
+ * headless SwiftShader advances the example's patched loop between checks
+ * without the wait itself incrementing `__fourVirtualFrames`.
  *
  * Playwright's `waitForFunction` (default `polling: "raf"`) deadlocks against
  * this test's `requestAnimationFrame` override — CI hung 120 s on `b55a8c1`
  * even though `page.evaluate` could read `__fourVirtualFrames`. Waiting for
  * `start + 1` avoids parity-matching races when two increments land per pump.
+ *
+ * Pumping the *patched* rAF (2026-09-09, `d2f36a5`) added one extra virtual
+ * frame per sample on top of the example's own loop. Combined with pause-
+ * during-grab that produced only even frame numbers — alpha 0.0 every time.
  */
 async function waitForVirtualFrameCount(
   page: Page,
@@ -617,17 +680,27 @@ async function waitForVirtualFrameCount(
     if (n >= minimum) {
       return n;
     }
-    await page.evaluate(
-      () =>
-        new Promise<void>((resolve) => {
-          requestAnimationFrame(() => resolve());
-        }),
-    );
+    await pumpHostAnimationFrame(page);
   }
   const stuck = await virtualFrameCount(page);
   throw new Error(
     `virtual frame ${String(minimum)} not reached within ${String(VIRTUAL_FRAME_WAIT_BUDGET_MS / 1000)} s ` +
       `(stuck at ${String(stuck)})`,
+  );
+}
+
+/** One real display frame, bypassing the virtual clock. */
+async function pumpHostAnimationFrame(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const host = window.__fourHostRaf;
+        if (host === undefined) {
+          requestAnimationFrame(() => resolve());
+          return;
+        }
+        host(() => resolve());
+      }),
   );
 }
 
@@ -815,10 +888,15 @@ test.describe("§106: moving primitives render smoothly under fixed-step simulat
     const frameNumbers: number[] = [];
     for (let i = 0; i < INTERPOLATION_SAMPLE_COUNT; i++) {
       // One new virtual frame per sample — consecutive counts alternate parity,
-      // so both alpha 0.5 and 0.0 appear without a wall-clock alias.
+      // so both alpha 0.5 and 0.0 appear without a wall-clock alias. The wait
+      // pumps host rAF so it cannot increment the virtual clock itself (that
+      // plus pause produced even frames only on `d2f36a5`). The screenshot is
+      // taken with the clock paused: otherwise SwiftShader encode time advances
+      // 1.5Δ frames and a stable stride of 3 aliases every sample onto an
+      // on-step pose (the 2026-09-08 same-commit flake).
       const start = await virtualFrameCount(page);
       frameNumbers.push(await waitForVirtualFrameCount(page, start + 1));
-      const image = await grab(canvas);
+      const image = await grabWithClockPaused(page, canvas);
       const fix = locateOrbiter(image);
       expect(
         fix,
@@ -847,6 +925,12 @@ test.describe("§106: moving primitives render smoothly under fixed-step simulat
     );
     console.log(
       `frames drawn strictly between simulation states: ${String(midStep)}/${String(INTERPOLATION_SAMPLE_COUNT)}`,
+    );
+    const status = page.locator("#status");
+    console.log(
+      `clock diagnostics: alpha=${(await status.getAttribute("data-alpha")) ?? "?"} ` +
+        `dropped=${(await status.getAttribute("data-dropped")) ?? "?"} ` +
+        `substeps=${(await status.getAttribute("data-substeps")) ?? "?"}`,
     );
 
     expect(

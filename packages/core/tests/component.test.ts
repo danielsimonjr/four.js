@@ -155,6 +155,10 @@ describe("ComponentRegistry (§6a)", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(FourError);
       expect((error as FourError).code).toBe("INVALID_SCENE_GRAPH");
+      expect(String(error)).not.toMatch(/NamelessComponent/);
+      expect((error as FourError).context).toEqual({
+        hint: "Add static readonly typeName to the component class (plan D2).",
+      });
     }
   });
 

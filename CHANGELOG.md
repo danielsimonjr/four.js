@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — open-TODO burndown (2026-09-09)
+
+Closed the remaining *contained* open items. Feature packets, RFC residues, the
+standing dogfooding map, first publish, and R-33 (needs non-SwiftShader hardware)
+stay on the tracker.
+
+### Fixed
+
+- **`tools/docs` TypeScript pin restored to 6.0.3.** Dependabot #82 bumped the
+  isolated docs package to 7.0.2 with the root and `bun run docs` died on
+  TypeDoc's `PropertyDeclaration` read — the exact failure the isolation was
+  built to prevent. Main was already red. `tools/docs/check-compiler.mjs` now
+  refuses any resolve that is not 6.0.x so the next bump is a one-line revert.
+
+- **`smoothness.spec.ts` interpolation flake.** Two leaks, both required:
+  Playwright's screenshot let the patched rAF advance 1.5Δ frames during
+  SwiftShader PNG encode (pause via `__fourPauseRaf`), *and* the wait helper
+  pumped that same patched rAF, adding a phantom frame per sample. Together
+  they produced only even virtual frames (alpha 0.0). The wait now uses
+  `__fourHostRaf`. `MINIMUM_MID_STEP_FRAMES` stays 2. `examples/first-2d-scene`
+  publishes `data-alpha` / `data-dropped` / `data-substeps`.
+
+- **`character-controller.spec.ts` walk gate no longer uses a 4 s wall-clock
+  hold.** Same starvation pattern the look test already fixed: on a contended
+  runner the capsule reached `WALL_REACHED_Z` while still sliding into the
+  wall. The walk now waits on settled `data-pz`.
+
+- **§79 diagnostics no longer interpolate `constructor.name`.** A minified
+  `Renderable` reported as `"Ur"`. Messages and context now name authored
+  document types (`"scene"`, `"group"`, registered `typeName`) and the
+  `nodeTypeOf` / `static readonly typeName` options. The 2026-09-07 caveat and
+  `*IsMinifiable` flags are gone.
+
+### Changed
+
+- **Oxlint correctness warnings triaged to zero.** The 40 remaining default-
+  category warnings (down from 42) were either one-line fixes (`Array.from`,
+  `localeCompare`, computed quaternion `w`, a JSDoc that accidentally contained
+  `*/`) or explicit allows (self-assign probes, NUL-delimited guide slots,
+  `no-unsafe-optional-chaining` off under `**/tests/**`). `bun run lint` prints
+  nothing.
+
+### Documented
+
+- **12.8s barrels test vs 5s default timeout.** The suite sets `{ timeout: 30_000 }`;
+  the 9809ms application figure is a file-aggregate, not a hidden config.
+- **A-5 leak audit is opt-in by design.** `auditFinalizedLeaks` is a drain, not a
+  runtime warning, for the same reason as `auditResourceLeaks`: finalizers run on
+  an unspecified turn.
+- **A-19 remainder merged into R-30c.** Same §77 upload work; one checkbox.
+
 ## Unreleased — the root is TypeScript 7 only
 
 > **Note on the commit split, recorded because `git log` is misleading here.** This work

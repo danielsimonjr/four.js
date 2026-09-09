@@ -136,7 +136,8 @@
         "**/tests/**"
       ],
       "rules": {
-        "no-restricted-properties": "off"
+        "no-restricted-properties": "off",
+        "no-unsafe-optional-chaining": "off"
       }
     },
     {

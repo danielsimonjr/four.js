@@ -90,11 +90,11 @@ for (const file of tracked) {
 const realExamples = [...exampleDirs]
   .filter(([, has]) => has)
   .map(([d]) => d)
-  .sort();
+  .sort((a, b) => a.localeCompare(b));
 const placeholderExamples = [...exampleDirs]
   .filter(([, has]) => !has)
   .map(([d]) => d)
-  .sort();
+  .sort((a, b) => a.localeCompare(b));
 
 if (realExamples.length === 0) {
   errors.push(
