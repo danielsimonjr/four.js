@@ -113,6 +113,18 @@ const list = buildRenderList(scene, []); // live transforms
 buildInterpolatedRenderList(scene, poses, alpha, list); // §43 render poses
 ```
 
+For a skinned mesh the same call also refreshes the joint palette. Local
+poses interpolate (position lerp, rotation slerp), then
+`Skeleton.update(skinRoot, worldOf)` runs the palette product
+`inverse(skinRootWorld) · boneWorld · inverseBind[i]`. Palettes are
+**never** matrix-lerped — a 90° joint at `alpha = 0.5` is a 45° slerp,
+not the average of two matrices — and nothing is written back into
+`node.transform` (§42). The live-transform path (`buildRenderList`)
+calls `update(skinRoot)` with no provider. See
+[fixed-step simulation](fixed-step-simulation.md) for the pose buffer,
+and `tests/integration/interpolated-skin-palettes.test.ts` for the
+two-bone consumer check.
+
 Items sort by §66's keys 1, 2 and 5 — **`renderLayer`, then opaque before
 transparent (the material's `transparent` flag, since 2026-08-06), then
 `renderOrder`** — and because `Array.prototype.sort` is stable, equal keys

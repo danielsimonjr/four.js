@@ -30,6 +30,18 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — Dogfood cycle 6: §43 interpolated skin palettes.**
+  Read from a consumer seat. `Skeleton.update(skinRoot, worldOf?)` and
+  `buildInterpolatedRenderList` compose interpolated local poses, then
+  run the palette product. Palettes are never matrix-lerped; scene
+  transforms are unchanged. Engine clean. The 2026-08-28 RFC 0003
+  note that "under the §43 interpolated builder the palette uses the
+  last resolved pose (palette interpolation deferred with CPU
+  skinning)" is **superseded** — that residue landed the same day as
+  wave 4. Evidence: `tests/integration/interpolated-skin-palettes.test.ts`
+  (two-bone, 90° hip; mid-alpha ≠ lerp of endpoints). Guides and
+  architecture docs patched. Standing dogfood checkbox stays open.
+
 - **2026-09-09 — WebGPU browser gates follow `DRAW_UNIFORM_BYTES`.** The
   Playwright page programs are not the renderer: they bind their own
   layouts. After `DrawUniforms` grew to 192 bytes (`normalMatrix` at 144)

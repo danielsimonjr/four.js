@@ -392,7 +392,9 @@ frame time ──► accumulator ──► while (accumulator ≥ fixedDeltaTime
 - **Interpolated rendering** (§43): each fixed step, a snapshot system
   captures poses into the scene-side `PoseBuffer` (one store, lerp for
   positions, slerp for rotations); `buildInterpolatedRenderList` blends
-  previous→current by `interpolationAlpha`. Render interpolation **never
+  previous→current by `interpolationAlpha`. A skinned item's palette is
+  the product of those composed locals (`Skeleton.update(skinRoot,
+  worldOf)`), not a lerp of `jointMatrices`. Render interpolation **never
   feeds back** into simulation state.
 - One deliberately frozen wart: the accumulator's ULP drift can fire a
   boundary-sitting timeline marker one step late; this is pinned in a golden

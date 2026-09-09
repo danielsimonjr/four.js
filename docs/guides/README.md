@@ -31,12 +31,14 @@ assumes the ones above it:
    `registerPickingPipeline` / `createPickingService`, and
    `createPickProvider` / `PointerInput.pickProvider`.
 3. **[Fixed-step simulation](fixed-step-simulation.md)** — §9 time domains, the
-   §10 accumulator, §39 system ordering, and §43 interpolated rendering.
+   §10 accumulator, §39 system ordering, and §43 interpolated rendering
+   (including skin palettes via `Skeleton.update(..., worldOf)`).
 4. **[Transform authority](transform-authority.md)** — §42's one-owner rule,
    authority handovers, and the §19 physics-animation blending pipeline.
 5. **[Materials and the render graph](materials-and-render-graph.md)** — the
    five shipped material classes over §57's complete base (§59's
-   `StandardMaterial` and §60's `NodeMaterial` included), render lists and
+   `StandardMaterial` and §60's `NodeMaterial` included), render lists
+   (`buildInterpolatedRenderList` also refreshes §43 skin palettes),
    opt-in §65 batching, and the shipped §63 render graph with its §69/§70
    tiers. (Until 2026-08-29 this entry read "the shipped unlit/sprite
    material tier … and the honest state of the §63 render graph", describing
@@ -126,6 +128,7 @@ under `/examples/<name>/` on Pages; browser gates live in `tests/browser/`.
 | Mixed 2D / 3D / physics | `examples/mixed-scene` / `examples/physics-playground` (a 2D world and a 3D world side by side); the §118 flagship (2D + 3D in **one** scene) |
 | Text / §56 | `examples/first-2d-scene`; `tests/browser/text.spec.ts`. `buildGlyphAtlas` lives on `fourJS/text`; the `Text` node is imported from `fourJS`, not that subpath |
 | Scene save / §79 + §34 snapshot | `examples/flagship/motor-digital-twin`; [digital-twin](digital-twin.md). `registerSceneNodeTypes()` then `serializeScene` / `instantiateScene` — `createDefaultComponentSerializers()` alone refuses a `Renderable`. `PhysicsWorld.createSnapshot()` is the solver half |
+| §43 interpolated skin palettes | `Skeleton.update(skinRoot, worldOf?)` + `buildInterpolatedRenderList` — local poses interpolate, then the palette product; palettes are never matrix-lerped. [materials-and-render-graph](materials-and-render-graph.md), [fixed-step-simulation](fixed-step-simulation.md). Consumer check: `tests/integration/interpolated-skin-palettes.test.ts` |
 
 ## Beside the guides
 

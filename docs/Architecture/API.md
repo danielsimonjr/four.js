@@ -152,6 +152,7 @@ browser driver; `examples/first-2d-scene/main.ts` is the compiling version.
 | `DirectionalLight`                              | §68 MVP light — a node shining along its **−Z world axis**; color + intensity.                                                                                   |
 | `resolveWorldTransforms(scene)`                 | The §7 world-matrix resolver `Application` calls for you.                                                                                                        |
 | `PoseBuffer` / `PoseTarget`                     | §43/§37 previous+current pose store; interpolation is opt-in per node via `poses.track(node)`.                                                                   |
+| `Bone` / `Skeleton`                             | §54 joints. `Skeleton.update(skinRoot, worldOf?)` writes the palette; omit `worldOf` for resolved worlds. The interpolated list supplies a composer.             |
 | `NodeEventMap`                                  | The typed event map; `four/input` and physics augment it (`click`, collision events, …).                                                                         |
 
 The one-graph principle (§6): 2D shapes, 3D meshes, sprites, text glyphs, UI
@@ -206,7 +207,8 @@ not node subclasses.
 | `UnlitMaterial` / `LitMaterial` (`four/materials`)                     | Flat color vs. Lambert-diffuse + scene-ambient color (§68 MVP); both carry a `readonly kind` discriminant that selects the pipeline. |
 | `SpriteMaterial`                                                       | Texture + tint for sprites; sprites and particles are the only blended passes (§66).                                                 |
 | `boxGeometry` / `planeGeometry` / `circleGeometry2D` (`four/geometry`) | Procedural primitives returning `BufferGeometry` (box/plane carry per-face normals for the lit path).                                |
-| `buildRenderList` / `buildInterpolatedRenderList`                      | The scene→draw-list step (§64–§66); called by the backend, public for custom pipelines.                                              |
+| `buildRenderList` / `buildInterpolatedRenderList`                      | The scene→draw-list step (§64–§66); interpolated path also refreshes skin palettes from composed §43 poses (never a lerp of `jointMatrices`).                    |
+| `Mesh`                                                                     | §54 renderable that can carry a `Skeleton`; skinned when geometry has `joints`/`weights`.                                            |
 | `collectSceneLights`                                                   | §68 light discovery: first `DirectionalLight` in DFS order + `Scene.ambientLight`.                                                   |
 
 ```typescript

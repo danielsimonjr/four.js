@@ -149,6 +149,14 @@ stay on the tracker.
 
 ### Documented
 
+- **Dogfooding cycle 6 — §43 interpolated skin palettes.** Guides and
+  architecture docs now say `buildInterpolatedRenderList` refreshes
+  skinned palettes via `Skeleton.update(skinRoot, worldOf)`: local
+  poses interpolate, then the palette product; palettes are never
+  matrix-lerped. Consumer check:
+  `tests/integration/interpolated-skin-palettes.test.ts`. Engine was
+  clean; the standing dogfood checkbox stays open.
+
 - **Two follow-up rows were already shipped.** The §65 idle-scene batch
   cache (`contentVersion` / `#canSkipUpload`, 0 `bufferSubData` on a still
   run) and §52's concave-extrude lift (`extrudeGeometry` + tessellator)

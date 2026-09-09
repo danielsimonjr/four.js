@@ -865,6 +865,19 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       guide described only the sync ray path); patched. No Pages demo
       calls `registerPickingPipeline()` (only `tests/browser/fixtures/picking-page.ts`).
       Standing checkbox stays open.
+      **Cycle 6 (2026-09-09) — §43 interpolated skin palettes.** Consumer
+      seat, public `@fourjs/*` APIs: two-bone hip+knee, hip rotated 90°
+      about +Z. `Skeleton.update(mesh, worldOf)` at alpha 0 / 0.5 / 1
+      (consumer `worldOf` composes `PoseBuffer.computeRenderPose` locals)
+      matches `buildInterpolatedRenderList`. Palettes at 0 and 1 differ;
+      mid-alpha is a 45° slerp (`cos(π/4)`), **not** the lerp of the
+      endpoint palettes (`0.5`). Scene transforms unchanged. Existing
+      package units still pass (scene `worldOf` suite 28/28; render-list
+      translating-bone interpolated palette). Engine: **clean**. Docs were
+      the defect: guides and architecture still described §43 as
+      node-matrix lerp only, and MEMORY.md 2026-08-28 still said the
+      interpolated palette was "the last resolved pose". Patched.
+      Checkbox stays `[ ]`.
 
 - [x] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
       one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`
