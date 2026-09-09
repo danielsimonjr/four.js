@@ -20,14 +20,18 @@ stay on the tracker.
   built to prevent. Main was already red. `tools/docs/check-compiler.mjs` now
   refuses any resolve that is not 6.0.x so the next bump is a one-line revert.
 
-- **`smoothness.spec.ts` interpolation flake.** The 2026-09-06 virtual-frame wait
-  was correct; Playwright's screenshot still let the patched rAF advance 1.5Δ
-  frames during SwiftShader PNG encode. A stable stride of 3 aliased the
-  period-2 `interpolationAlpha` cycle, so every sample landed on-step — including
-  on a same-commit re-run. The injected clock now holds on `__fourPauseRaf`; the
-  interpolation test screenshots with the clock paused. `MINIMUM_MID_STEP_FRAMES`
-  stays 2. `examples/first-2d-scene` publishes `data-alpha` / `data-dropped` /
-  `data-substeps` so the next failure is diagnosable.
+- **`smoothness.spec.ts` interpolation flake.** Two leaks, both required:
+  Playwright's screenshot let the patched rAF advance 1.5Δ frames during
+  SwiftShader PNG encode (pause via `__fourPauseRaf`), *and* the wait helper
+  pumped that same patched rAF, adding a phantom frame per sample. Together
+  they produced only even virtual frames (alpha 0.0). The wait now uses
+  `__fourHostRaf`. `MINIMUM_MID_STEP_FRAMES` stays 2. `examples/first-2d-scene`
+  publishes `data-alpha` / `data-dropped` / `data-substeps`.
+
+- **`character-controller.spec.ts` walk gate no longer uses a 4 s wall-clock
+  hold.** Same starvation pattern the look test already fixed: on a contended
+  runner the capsule reached `WALL_REACHED_Z` while still sliding into the
+  wall. The walk now waits on settled `data-pz`.
 
 - **§79 diagnostics no longer interpolate `constructor.name`.** A minified
   `Renderable` reported as `"Ur"`. Messages and context now name authored

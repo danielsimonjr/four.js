@@ -162,15 +162,17 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 ## Now
 
 - [x] **`smoothness.spec.ts:794` is still flaky, and this time it is PROVEN, not suspected.**
-      **FIXED 2026-09-09.** The 2026-09-06 virtual-frame wait was correct; the leak was
-      `grab()` — SwiftShader PNG encode lets the patched rAF deliver 2+ extra 1.5Δ
-      frames, a stable stride of 3 aliases the period-2 alpha cycle, and every sample
-      lands on-step. Same-commit pass/fail is that encode-time jitter. The clock now
-      exposes `__fourPauseRaf`; the interpolation test screenshots with the clock
-      held. `MINIMUM_MID_STEP_FRAMES` stays 2. `#status` also publishes `data-alpha` /
-      `data-dropped` / `data-substeps` so the next failure is diagnosable. The
-      dropped-time hypothesis was measured as weaker for this test (1.5Δ/frame never
-      hits `maximumSubSteps=5`); the stride bug was sufficient.
+      **FIXED 2026-09-09 (second pass).** Pause-during-grab was necessary but not
+      sufficient. `waitForVirtualFrameCount` pumped the *patched* rAF, so each
+      sample added a phantom virtual frame on top of the example's loop.
+      Combined with pause that produced only even frame numbers (14, 16, … 36)
+      — alpha 0.0 every time (`d2f36a5` / run 34295269515). The wait now
+      pumps `__fourHostRaf`. `MINIMUM_MID_STEP_FRAMES` stays 2. `#status`
+      publishes `data-alpha` / `data-dropped` / `data-substeps`.
+      The 2026-09-06 virtual-frame wait was correct; the first 2026-09-09
+      pass correctly identified screenshot-stride aliasing. Both leaks had
+      to go. The dropped-time hypothesis was measured as weaker for this
+      test (1.5Δ/frame never hits `maximumSubSteps=5`).
       A controlled comparison, which is what makes this worth acting on:
 
       | commit | `smoothness.spec.ts:794` |
@@ -1003,6 +1005,10 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       · What remains is one dependency, not a gate: drop `typescript@6.0.3` entirely when
         TypeDoc ships TS 7 support (its issue is open with no timeline) or is replaced by API
         Extractor, which bundles its own compiler. Nothing waits on it.
+      · **RE-BROKEN by #82 (2026-09-09), restored the same day.** Dependabot grouped the
+        root 7.0.2 bump with `tools/docs`, which is the isolation. `bun run docs` died
+        on `PropertyDeclaration`. Pin is 6.0.3 again; `check-compiler.mjs` refuses
+        anything else so the next grouped bump fails with that sentence.
       · **Reasoning and evidence now live in `docs/MIGRATION.md`** (2026-09-08), including the
         exit criteria for every layer and the commands to re-measure. Read it before re-opening
         this row — the numbers in it expire when the tools move.

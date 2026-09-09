@@ -35,6 +35,12 @@ readable; never delete the pointer itself.
   on `PropertyDeclaration`. Isolation is a version pin, not a directory.
   `check-compiler.mjs` refuses anything else. Root 7.x is free to move.
 
+- **2026-09-09 — Browser-gate follow-up on the open-TODO PR.** Pause-during-
+  grab was not enough: `waitForVirtualFrameCount` pumped the patched rAF and
+  aliased even frames only. Host rAF (`__fourHostRaf`) is the pump. Character
+  walk test had the same wall-clock starvation the look test already fixed —
+  wait on settled `data-pz`, not `waitForTimeout(4s)`.
+
 - **2026-09-09 — Open-TODO contained-item pass.** Smoothness flake was
   screenshot-stride aliasing against the period-2 virtual clock, not
   dropped-time; pause rAF during `grab()`. §79 diagnostics name authored type

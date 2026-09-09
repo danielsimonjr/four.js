@@ -220,12 +220,18 @@ const PLATFORM_STANDING_Y = 1.58;
 const WALL_REACHED_Z = -2.9;
 
 /**
- * Seconds of W required to reach the wall: 7.64 m at 3.5 m/s is 2.18 s of
- * simulation; 4 s covers it with 80 % margin for a loaded machine whose frames
- * arrive late (the reference run, sharing its CPU with a package test suite,
- * still arrived with 1.3 s to spare).
+ * How long the walk gate will wait for simulated progress before giving up.
+ * 7.64 m at 3.5 m/s is 2.18 s of simulation; the timeout is wall-clock, so a
+ * starved runner that drops most of §10's backlog still has room to finish
+ * the walk. The previous 4 s *hold* was wall-clock too — and on CI the
+ * capsule reached {@link WALL_REACHED_Z} while still sliding into the wall
+ * (`|Δpz| = 0.21` over the next 500 ms). Waiting on settled `data-pz` is
+ * what makes the gate measure the controller, not the container.
  */
-const WALK_HOLD_SECONDS = 4;
+const WALK_HOLD_TIMEOUT_SECONDS = 15;
+
+/** Consecutive rAF polls of `|Δpz| ≤ 0.02` that count as "stopped". */
+const WALL_SETTLE_POLLS = 8;
 
 /**
  * Jump rise the gate requires, in world units above the standing height.
@@ -338,7 +344,6 @@ async function waitForRunning(page: Page): Promise<void> {
   );
 }
 
-/** Reads one numeric `data-*` attribute off `#status`. */
 /**
  * Holds `code` until `name` has moved `minimum` away from `from`, or until
  * {@link LOOK_HOLD_TIMEOUT_SECONDS} elapses — then releases it and reports the
@@ -396,6 +401,86 @@ async function readNumber(page: Page, name: string): Promise<number> {
   const parsed = Number(value);
   expect(Number.isFinite(parsed), `data-${name}=${String(value)}`).toBe(true);
   return parsed;
+}
+
+/**
+ * Holds `code` until `name ≤ maximum`, then until that value has stopped
+ * changing, then takes two settled readings while the key is still down.
+ *
+ * Same reason as {@link holdUntilMoved}: a wall-clock `waitForTimeout` after
+ * `keyboard.down` measures how much simulation the runner had spare, not
+ * whether the north wall stopped the walk. CI run 34295269515 reached
+ * `pz = -2.90` (the {@link WALL_REACHED_Z} threshold) and then slid another
+ * 0.21 over 500 ms of real time — still walking, just late.
+ */
+async function holdUntilSettledAtMost(
+  page: Page,
+  code: string,
+  name: string,
+  maximum: number,
+): Promise<{ first: number; second: number }> {
+  await page.keyboard.down(code);
+  try {
+    await page
+      .waitForFunction(
+        ([field, target]) => {
+          const element = document.querySelector<HTMLElement>("#status");
+          if (element === null) return false;
+          const raw = element.dataset[field];
+          if (raw === undefined) return false;
+          return Number(raw) <= target;
+        },
+        [name, maximum] as const,
+        { timeout: WALK_HOLD_TIMEOUT_SECONDS * 1000 },
+      )
+      .catch(() => undefined);
+    await waitUntilAttributeSettled(page, name);
+    const first = await readNumber(page, name);
+    await waitUntilAttributeSettled(page, name);
+    const second = await readNumber(page, name);
+    return { first, second };
+  } finally {
+    await page.keyboard.up(code);
+  }
+}
+
+/** Waits until `data-{name}` has stayed within 0.02 for {@link WALL_SETTLE_POLLS} rAF polls. */
+async function waitUntilAttributeSettled(
+  page: Page,
+  name: string,
+): Promise<void> {
+  await page.evaluate(() => {
+    delete (window as Window & { __fourSettle?: unknown }).__fourSettle;
+  });
+  await page
+    .waitForFunction(
+      ({ field, epsilon, needed }) => {
+        const element = document.querySelector<HTMLElement>("#status");
+        if (element === null) return false;
+        const raw = element.dataset[field];
+        if (raw === undefined) return false;
+        const value = Number(raw);
+        if (!Number.isFinite(value)) return false;
+        const store = window as Window & {
+          __fourSettle?: { field: string; prev: number; count: number };
+        };
+        const state = store.__fourSettle;
+        if (state === undefined || state.field !== field) {
+          store.__fourSettle = { field, prev: value, count: 0 };
+          return false;
+        }
+        if (Math.abs(value - state.prev) <= epsilon) {
+          state.count += 1;
+        } else {
+          state.count = 0;
+        }
+        state.prev = value;
+        return state.count >= needed;
+      },
+      { field: name, epsilon: 0.02, needed: WALL_SETTLE_POLLS },
+      { timeout: WALK_HOLD_TIMEOUT_SECONDS * 1000 },
+    )
+    .catch(() => undefined);
 }
 
 async function grab(canvas: Locator): Promise<DecodedImage> {
@@ -523,18 +608,17 @@ test.describe("§12: the character-controller family in the browser", () => {
       { timeout: 5000 },
     );
 
-    // Hold W long enough to cross the arena, climb three risers, and hit the
+    // Hold W until the capsule is past the platform and settled against the
     // north wall — all in one held key, which is the §39 pipeline end to end:
-    // real keydown → intent at 100 → sweeps at 400 → solve at 600.
-    await page.keyboard.down("KeyW");
-    await page.waitForTimeout(WALK_HOLD_SECONDS * 1000);
-
-    // Still holding W: the character must be *stopped*, not still moving and
-    // not through the wall. Two reads a half-second apart, key held.
-    const pzA = await readNumber(page, "pz");
-    await page.waitForTimeout(500);
-    const pzB = await readNumber(page, "pz");
-    await page.keyboard.up("KeyW");
+    // real keydown → intent at 100 → sweeps at 400 → solve at 600. The wait
+    // is on published `data-pz`, not wall-clock: a starved runner that used
+    // to sample mid-approach (`|Δpz| = 0.21`) now just takes longer.
+    const { first: pzA, second: pzB } = await holdUntilSettledAtMost(
+      page,
+      "KeyW",
+      "pz",
+      WALL_REACHED_Z,
+    );
 
     expect(
       pzA,
