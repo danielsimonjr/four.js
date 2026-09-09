@@ -14,6 +14,11 @@ stay on the tracker.
 
 ### Fixed
 
+- **`graph:duplicates` allowlists the parallel picking seams.** WebGL and
+  WebGPU each own `registerPickingPipeline` / `PickingServiceFactory` /
+  `PickingRendererHost`. The names match on purpose; the backends cannot
+  share a body. Same class as `CacheableGeometry`.
+
 - **`tools/docs` TypeScript pin restored to 6.0.3.** Dependabot #82 bumped the
   isolated docs package to 7.0.2 with the root and `bun run docs` died on
   TypeDoc's `PropertyDeclaration` read — the exact failure the isolation was

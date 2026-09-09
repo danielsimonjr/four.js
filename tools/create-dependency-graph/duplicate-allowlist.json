@@ -624,6 +624,23 @@
       "names": ["CacheableGeometry"],
       "filesGlob": ["packages/render-webgl/src/gl-geometry.ts", "packages/render-webgpu/src/wgpu-geometry.ts"],
       "reason": "fourJS: backend-local structural view of the geometry a resource cache consumes (types only, no runtime body) — the PARTICLE_INSTANCE_FLOATS class of deliberate per-backend duck typing. Each backend declares the narrowed shape it reads so the cache's requirements live in the file that enforces them and neither backend names the other; the shared render-list consumption harness catches drift. 2026-08-21, WP-R1.1 gate wiring."
+    },
+    {
+      "names": [
+        "registerPickingPipeline",
+        "clearRegisteredPickingPipeline",
+        "resolvePickingServiceFactory",
+        "setPickingServiceFactory",
+        "PickingRendererHost",
+        "PickingServiceFactory"
+      ],
+      "filesGlob": [
+        "packages/render-webgl/src/gl-picking.ts",
+        "packages/render-webgl/src/gl-picking-registry.ts",
+        "packages/render-webgpu/src/wgpu-picking.ts",
+        "packages/render-webgpu/src/wgpu-picking-registry.ts"
+      ],
+      "reason": "fourJS: parallel per-backend §71 picking seams (RFC 0005). WebGL and WebGPU each own a lazily-filled module `let` so the renderer never statically reaches the id pipeline (pipeline-cost law). The public names match on purpose — `registerPickingPipeline()` is the application opt-in, one import path per backend — and cannot share a body: the frozen dependency matrix forbids render-webgl↔render-webgpu. Distinct hosts (WebglContext vs GpuDevice) and read-backs (fence vs mapAsync). 2026-09-09 wave-4 gate wiring."
     }
   ]
 }
