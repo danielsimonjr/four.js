@@ -28,11 +28,13 @@
  *   `lines` modes, interleaved and strided accessors.
  * - **Materials**: §59's metallic-roughness tier — base colour factor and
  *   texture, metallic/roughness factors, packed `metallicRoughnessTexture`
- *   (linear), emissive factor, `OPAQUE`/`BLEND`. Texture slots this tier
- *   still cannot sample (`normalTexture`, `occlusionTexture`,
- *   `emissiveTexture`) are validated, **not decoded**, and recorded per
- *   material as {@link GltfMaterialRecord.ignoredTextures}. WebGL samples
- *   the packed map; WebGPU still shades from the scalar factors.
+ *   (linear), emissive factor, `OPAQUE`/`BLEND`. Packed MR and emissive
+ *   textures are decoded and assigned; remaining unstaged slots
+ *   (`normalTexture`, `occlusionTexture`) are validated, **not decoded**,
+ *   and recorded per material as {@link GltfMaterialRecord.ignoredTextures}.
+ *   WebGL samples the packed map (unit 2) and the emissive map (unit 3);
+ *   WebGPU samples the packed map and still shades emissive from the factor
+ *   alone (four-group budget when albedo and MR occupy groups 2 and 3).
  * - **Textures**: decoded through {@link createTextureLoader}'s injected
  *   seam with its §96 decompression bounds, tagged `srgb` for colour maps
  *   and `linear` for the packed metallic-roughness map, rows flipped to
@@ -230,6 +232,8 @@ export interface GltfMaterialRecord {
   readonly baseColorTexture: number | null;
   /** Packed metallic-roughness map index, or `null`. Decoded linear. */
   readonly metallicRoughnessTexture: number | null;
+  /** Emissive map index, or `null`. Decoded sRGB. */
+  readonly emissiveTexture: number | null;
   /** Whether `alphaMode` was `"BLEND"`. */
   readonly transparent: boolean;
   /**
@@ -240,8 +244,8 @@ export interface GltfMaterialRecord {
   readonly doubleSided: boolean;
   /**
    * Texture slots the file carries but this tier cannot sample
-   * (`normalTexture`, `occlusionTexture`, `emissiveTexture`): validated, not
-   * decoded, warned at instantiation.
+   * (`normalTexture`, `occlusionTexture`): validated, not decoded, warned
+   * at instantiation. `emissiveTexture` is decoded (sRGB) and assigned.
    */
   readonly ignoredTextures: readonly string[];
   /** §78 user metadata (`extras`). */
@@ -1719,6 +1723,7 @@ async function parseGltf(
     let roughness = 1;
     let baseColorTexture: number | null = null;
     let metallicRoughnessTexture: number | null = null;
+    let emissiveTexture: number | null = null;
     const pbrValue = record["pbrMetallicRoughness"];
     if (pbrValue !== undefined) {
       const pbr = asObject(pbrValue, url, `${where}.pbrMetallicRoughness`);
@@ -1748,15 +1753,18 @@ async function parseGltf(
         referenceTexture(metallicRoughnessTexture, "linear");
       }
     }
-    for (const slot of [
-      "normalTexture",
-      "occlusionTexture",
-      "emissiveTexture",
-    ]) {
+    for (const slot of ["normalTexture", "occlusionTexture"]) {
       if (record[slot] !== undefined) {
         textureInfo(record[slot], `${where}.${slot}`);
         ignoredTextures.push(slot);
       }
+    }
+    if (record["emissiveTexture"] !== undefined) {
+      emissiveTexture = textureInfo(
+        record["emissiveTexture"],
+        `${where}.emissiveTexture`,
+      );
+      referenceTexture(emissiveTexture, "srgb");
     }
     if (ignoredTextures.length > 0) {
       ignore(
@@ -1790,6 +1798,7 @@ async function parseGltf(
       emissive: [emissive[0], emissive[1], emissive[2]],
       baseColorTexture,
       metallicRoughnessTexture,
+      emissiveTexture,
       transparent: alphaMode === "BLEND",
       doubleSided: record["doubleSided"] === true,
       ignoredTextures,

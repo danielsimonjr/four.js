@@ -30,6 +30,16 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — WebGL `StandardMaterial.emissiveMap` on unit 3.** Packed
+  glTF factor × texture (sRGB). Allocator: 0 albedo, 1 shadow, 2 MR, 3
+  emissive. Uniform switch `useEmissiveMap` (R-19), not a shader variant.
+  Unresolved/disposed map degrades — the draw continues, matching albedo
+  / MR. glTF `emissiveTexture` is decoded sRGB and dropped from
+  `ignoredTextures`. WebGPU does **not** sample it: groups 2 and 3 already
+  hold albedo and MR when both maps exist, and the four-group budget is
+  full. No fifth bind group. Occlusion stays staged (no AO term); normal
+  stays staged (tangents). Lighting leftover checkbox stays `[ ]`.
+
 - **2026-09-09 — Dogfood cycle 7: WebGL skinned GPU picking.** Read from
   a consumer seat. `registerPickingPipeline` + `registerSkinningPipeline`
   then `createPickingService`. One-bone plane, bone +1 Y: id pass uses

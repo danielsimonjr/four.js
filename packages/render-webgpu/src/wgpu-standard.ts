@@ -73,7 +73,11 @@
  * passes `map ? 3 : 2`. Vertex uvs are written when *either* texture is
  * sampled (`shadedVertexStageWgsl(normals, map || metalRoughness)`), matching
  * GL's `useMetalRoughnessMap` without `useMap`. `normalMap` /
- * `occlusionMap` / `emissiveMap` remain unstaged on both backends.
+ * `occlusionMap` remain unstaged on both backends. `emissiveMap` is sampled
+ * on WebGL 2 (texture unit 3) this slice; WebGPU leaves it unsampled —
+ * groups 2 and 3 already hold albedo and metallic-roughness when both maps
+ * exist, and the four-group budget is full. Do not add a fifth bind group
+ * for it.
  */
 
 import {

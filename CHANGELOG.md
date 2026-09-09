@@ -70,6 +70,12 @@ stay on the tracker.
 
 ### Changed
 
+- **WebGL `StandardMaterial.emissiveMap` (unit 3).** glTF factor ×
+  texture, sRGB. Lazy sampler; unresolved/disposed map degrades (draw
+  continues). `emissiveTexture` leaves `ignoredTextures`. WebGPU leaves
+  it unsampled — groups 2/3 already hold albedo/MR. Lighting leftover
+  stays open (`normalMap` / `occlusionMap` / WebGPU emissive).
+
 - **Dogfood cycle 7: WebGL skinned GPU picking.** Consumer-seat
   `tests/integration/skinned-gpu-picking.test.ts`: both registration
   seams, live palette on the id pass, unskinned control unchanged.
@@ -103,8 +109,9 @@ stay on the tracker.
 - **WebGPU `StandardMaterial.metalRoughnessMap`.** Packed G=roughness /
   B=metalness, matching WebGL. Bind group 3 when albedo occupies group 2,
   group 2 when it does not (`shadedMrBindingWgsl`). Scalar-only keys stay
-  byte-identical (`|mr:y` only when true). `normalMap` / `occlusionMap` /
-  `emissiveMap` remain unstaged.
+  byte-identical (`|mr:y` only when true). WebGL now samples `emissiveMap`
+  (unit 3); `normalMap` / `occlusionMap` remain unstaged. WebGPU emissive
+  stays unsampled (four-group budget).
 
 - **§43 interpolated skin palettes.** `Skeleton.update` takes an optional
   `worldOf` provider. The interpolated render list composes bone local

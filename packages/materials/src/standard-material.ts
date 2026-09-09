@@ -27,9 +27,9 @@
  * | `baseColor`          | {@link StandardMaterial.baseColor} (+ optional {@link StandardMaterial.map}) |
  * | `metalness`          | {@link StandardMaterial.metalness} (+ optional packed {@link StandardMaterial.metalRoughnessMap}) |
  * | `roughness`          | {@link StandardMaterial.roughness} (+ the same packed map) |
- * | `emissive`           | {@link StandardMaterial.emissive}               |
+ * | `emissive`           | {@link StandardMaterial.emissive} (+ optional {@link StandardMaterial.emissiveMap}) |
  * | `normalMap`          | **staged** — needs the tangent attribute        |
- * | `occlusionMap`       | **staged** — needs a third data unit and AO term |
+ * | `occlusionMap`       | **staged** — needs an AO multiply the BRDF does not evaluate |
  *
  * The two staged maps stay staged for causes that are recorded elsewhere:
  *
@@ -40,17 +40,22 @@
  *   attribute would put a texture in the public API that every geometry in the
  *   engine silently ignores. This packet does **not** pretend it shipped PBR
  *   normal mapping.
- * - **`occlusionMap` and `emissiveMap` need more than a second unit.** The
- *   unit allocator (`@fourjs/render-webgl`'s `gl-program.ts`, named since
- *   WP-3a.3) now reserves unit 2 for the packed metallic-roughness map glTF
- *   actually authors. Occlusion still needs an AO multiply the BRDF does not
- *   evaluate, and emissive still needs a third colour texture; both stay
- *   warned-inert on the glTF loader until those terms exist.
+ * - **Unit 2 is the packed metallic-roughness map.** The unit allocator
+ *   (`@fourjs/render-webgl`'s `gl-program.ts`, named since WP-3a.3) binds
+ *   albedo on unit 0, the shadow map on unit 1, and
+ *   {@link StandardMaterial.metalRoughnessMap} on unit 2. WebGL now samples
+ *   {@link StandardMaterial.emissiveMap} on unit 3 (glTF factor × texture,
+ *   sRGB). Occlusion stays staged: the BRDF has no AO term to multiply, so
+ *   a free unit is not enough. WebGPU leaves emissive unsampled this slice —
+ *   groups 2 and 3 already hold albedo and metallic-roughness when both maps
+ *   exist, and the four-group budget is full.
  *
  * **WebGPU (2026-09-09).** {@link StandardMaterial.metalRoughnessMap}
  * samples on both backends — WebGL on texture unit 2, WebGPU at bind
  * group 3 when albedo occupies group 2 and at group 2 when it does not.
  * Do not read a WebGPU standard draw as ignoring this map.
+ * {@link StandardMaterial.emissiveMap} is the opposite: WebGL-only until
+ * a fifth group (or a spare binding inside an existing group) exists.
  *
  * §59's seven physical extensions are `PhysicalMaterial`'s (§57's family puts it
  * above this class) and are not sketched here.
@@ -180,6 +185,13 @@ export interface StandardMaterialOptions extends MaterialOptions {
    * `null`.
    */
   metalRoughnessMap?: MaterialTexture | null;
+
+  /**
+   * Initial {@link StandardMaterial.emissiveMap} — glTF's emissive texture
+   * (sRGB, multiplied by {@link StandardMaterial.emissive}). Defaults to
+   * `null`.
+   */
+  emissiveMap?: MaterialTexture | null;
 
   /**
    * Initial {@link StandardMaterial.metalness}; defaults to `0` (a dielectric).
@@ -322,6 +334,8 @@ export class StandardMaterial extends Material {
 
   #metalRoughnessMap: MaterialTexture | null;
 
+  #emissiveMap: MaterialTexture | null;
+
   #metalness: number;
 
   #roughness: number;
@@ -343,6 +357,7 @@ export class StandardMaterial extends Material {
     ];
     this.#map = options.map ?? null;
     this.#metalRoughnessMap = options.metalRoughnessMap ?? null;
+    this.#emissiveMap = options.emissiveMap ?? null;
     this.#metalness = requireFiniteScalar("metalness", options.metalness ?? 0);
     this.#roughness = requireFiniteScalar("roughness", options.roughness ?? 1);
   }
@@ -380,7 +395,8 @@ export class StandardMaterial extends Material {
    *
    * glTF stores **roughness in G and metalness in B**; R and A are unused at
    * this tier. The sampled channels **multiply the scalar factors**.
-   * **Sampled on WebGL 2** (unit 2). **Inert on WebGPU** (`wgpu-standard.ts`).
+   * Sampled on WebGL 2 (unit 2) and on WebGPU (group 3 when albedo occupies
+   * group 2, otherwise group 2).
    */
   get metalRoughnessMap(): MaterialTexture | null {
     return this.#metalRoughnessMap;
@@ -388,6 +404,29 @@ export class StandardMaterial extends Material {
 
   set metalRoughnessMap(value: MaterialTexture | null) {
     this.#metalRoughnessMap = value;
+    this.markDirty();
+  }
+
+  /**
+   * Emissive colour texture sampled with the geometry's `uvs`, or `null`
+   * (§59, glTF 2.0 `emissiveTexture`).
+   *
+   * The sampled RGB **multiplies {@link StandardMaterial.emissive}** (glTF:
+   * factor × texture). Authored sRGB; WebGL uploads it as `SRGB8_ALPHA8` so
+   * the sampler linearizes it. **Sampled on WebGL 2** (unit 3). **Unsampled
+   * on WebGPU** this slice: groups 2 and 3 already hold albedo and
+   * metallic-roughness when both maps exist, and the four-group budget is
+   * full (`wgpu-standard.ts`).
+   *
+   * Assigning bumps {@link Material.version}. Ownership and disposal are
+   * {@link StandardMaterial.map}'s.
+   */
+  get emissiveMap(): MaterialTexture | null {
+    return this.#emissiveMap;
+  }
+
+  set emissiveMap(value: MaterialTexture | null) {
+    this.#emissiveMap = value;
     this.markDirty();
   }
 

@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm** + **WebGL `SkinnedIdProgram`**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster**; lighting leftover **WebGPU `metalRoughnessMap`**; R-30c **map roles**; R-33 simulate/present split; dogfood cycles 4–7. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the **WebGPU** skinned id pass (needs RFC 0003 skinned pipelines).
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm** + **WebGL `SkinnedIdProgram`**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster**; lighting leftover **WebGPU `metalRoughnessMap`** + **WebGL `emissiveMap`**; R-30c **map roles**; R-33 simulate/present split; dogfood cycles 4–7. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the **WebGPU** skinned id pass (needs RFC 0003 skinned pipelines).
 
 ### 0 · Blocked on an event, not on effort
 
@@ -119,7 +119,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - RFC 0003 residue (staged in source, 2026-08-28):
 - RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
-- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09. WebGPU `metalRoughnessMap` sampling DONE 2026-09-09 (still open: multi-light, cascades, PBR rest, §60a, light layers, other texture slots).
+- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09. WebGPU `metalRoughnessMap` sampling DONE 2026-09-09. WebGL `emissiveMap` (unit 3) DONE 2026-09-09 (still open: multi-light, cascades, PBR rest, §60a, light layers, `normalMap` / `occlusionMap`, WebGPU emissive).
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
 - Follow-ups the R-1 plan explicitly defers
 - PH-11c — character/dynamics push interaction — DONE 2026-09-06 (`pushMass` / reduced-mass impulse / wake).
@@ -1243,8 +1243,11 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       B=metalness). WebGL binds unit 2. ~~WebGPU field is staged inert.~~
       **WebGPU samples it 2026-09-09** (group 2 mr-only, group 3 with albedo).
       The glTF loader decodes that slot as linear and drops `ignoredTextures`
-      for it. Normal/occlusion/emissive remain warned-inert until further
-      units land.
+      for it. ~~Normal/occlusion/emissive remain warned-inert until further
+      units land.~~ **WebGL `emissiveMap` (unit 3) 2026-09-09** — glTF
+      `emissiveTexture` decoded sRGB, assigned, dropped from `ignoredTextures`.
+      WebGPU leaves it unsampled (four-group budget). `normalMap` /
+      `occlusionMap` stay staged (tangents / AO term).
 
 - [x] **Move the six capability tokens to their owning packages — DONE
       2026-08-29** (RFC 0002 §2's spelling executed): each owner declares its
@@ -1271,8 +1274,11 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       shifted to 192/208). `Matrix3.setNormalFromMatrix4` on CPU; singular
       models upload identity. ~~WebGPU `metalRoughnessMap` staged inert~~
       **DONE 2026-09-09** (sampled at group 2 when `!map`, group 3 when
-      albedo occupies group 2). Remaining: multi-light, cascades, PBR rest,
-      §60a, light layers, other texture slots.
+      albedo occupies group 2). ~~WebGL `emissiveMap` staged~~ **DONE
+      2026-09-09** (unit 3, glTF factor × texture; WebGPU unsampled —
+      groups 2/3 already hold albedo/MR). Remaining: multi-light, cascades,
+      PBR rest, §60a, light layers, `normalMap` / `occlusionMap`, WebGPU
+      emissive.
 - [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
       family list now names `LitMaterial`
 - [ ] First publish (§94 0.1): Changesets release workflow + the
