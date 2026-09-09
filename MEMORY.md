@@ -42,7 +42,11 @@ readable; never delete the pointer itself.
   sentences on closed rows (rigs, PH-11c, scissor, `recording-gl` adopt,
   flagship §46 layers, WebGPU `maximumSkinningJoints`) and Priority-index
   leftovers (A-4/A-5/A-19, R-32, camera-rig residue, particle-trail
-  spatial-hash). Do not re-triage the 12 as quick wins.
+  spatial-hash). Remaining-work wording follow-up: R-17 point/spot
+  (8 punctual) is not “multi-light still open”; §27 GPU fields /
+  depth-buffer are stub-tier; §96 shader trust is the closed union
+  (extensible operators still deferred); WebGPU batch idle-skip absent.
+  Do not re-triage the 12 as quick wins.
 
 - **2026-09-09 — WebGPU skinned colour pair (RFC 0003).** Opt-in
   `registerSkinningPipeline()` from `@fourjs/render-webgpu`. `WebgpuRenderer`

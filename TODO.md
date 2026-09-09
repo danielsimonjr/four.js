@@ -119,7 +119,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - RFC 0003 residue (staged in source, 2026-08-28): WebGPU colour pair DONE 2026-09-09; WebGL shadow caster DONE 2026-09-09; still GPU morph, CPU skinning, bone-texture; WebGPU skinned shadow/id still skip.
 - RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
-- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09. WebGPU `metalRoughnessMap` sampling DONE 2026-09-09. WebGL `emissiveMap` (unit 3) DONE 2026-09-09 (still open: multi-light, cascades, PBR rest, §60a, light layers, `normalMap` / `occlusionMap`, WebGPU emissive).
+- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): ~~point/spot multi-light~~ **DONE 2026-08-09** (R-17, 8 punctual); still multi-directional + hemisphere/area + clustered path, shadows (§69 — directional tier shipped; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 PBR rest, §60a tone-mapping operator + IBL (sRGB encode + color grade shipped), light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09. WebGPU `metalRoughnessMap` sampling DONE 2026-09-09. WebGL `emissiveMap` (unit 3) DONE 2026-09-09 (still open: extra directionals / hemisphere / area / clustered, cascades, PBR rest, tone-map operator, light layers, `normalMap` / `occlusionMap`, WebGPU emissive).
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
 - Follow-ups the R-1 plan explicitly defers
 - PH-11c — character/dynamics push interaction — DONE 2026-09-06 (`pushMass` / reduced-mass impulse / wake).
@@ -1141,8 +1141,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       id arm (a `ParticleIdProgram` sharing the §36 billboard vertex stage — until
       then particle systems pick by bounds only)~~ **DONE 2026-09-09**
       (`ParticleIdProgram` + `collectPickCandidates` includes
-      `isParticleDrawable`; one id per emitter, trails skipped, skinned
-      still bounds-only); ~~§86 rows still owed: id-pass
+      `isParticleDrawable`; one id per emitter, trails skipped; WebGL
+      skinned id landed the same day — WebGPU skinned still bounds-only); ~~§86 rows still owed: id-pass
       cost vs the flagship list and measured fence-vs-stall pick latency~~
       **DONE 2026-09-09** (`benchmarks/pick-latency.mjs`): at flagship-order
       N=64 the id pass is within noise of the list (1.03×); at 10k–100k it is
@@ -1267,11 +1267,17 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 
 ### Post-plan backlog (final exit verifier, 2026-08-02)
 
-- [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light +
-      point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 —
-      directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas,
-      transparent masks and contact shadows remain),
-      §59 StandardMaterial/PBR, §60a color management + tone mapping,
+- [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done):
+      ~~point/spot multi-light~~ **DONE 2026-08-09** (R-17: `MAX_PUNCTUAL_LIGHTS`
+      = 8; one directional still wins by scene-graph order). Remaining light
+      types: extra directionals, hemisphere, rectangular area, clustered /
+      forward-plus. Shadows (§69 — directional tier shipped 2026-08-09;
+      cascades, point/spot maps, the atlas, transparent masks and contact
+      shadows remain),
+      §59 StandardMaterial/PBR rest (`normalMap` / `occlusionMap` staged;
+      IBL / PhysicalMaterial extensions absent), §60a tone-mapping operator
+      (sRGB encode + `ColorGradeEffect` shipped; operator waits on float
+      targets),
       ~~CSS color strings on lights~~ **DONE** (`parseColorRGB` on `Light`),
       light layers; ~~hoist the lit shader's per-vertex inverse-transpose to a
       per-draw normal-matrix uniform when @fourjs/math grows a Matrix3
@@ -1282,9 +1288,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       **DONE 2026-09-09** (sampled at group 2 when `!map`, group 3 when
       albedo occupies group 2). ~~WebGL `emissiveMap` staged~~ **DONE
       2026-09-09** (unit 3, glTF factor × texture; WebGPU unsampled —
-      groups 2/3 already hold albedo/MR). Remaining: multi-light, cascades,
-      PBR rest, §60a, light layers, `normalMap` / `occlusionMap`, WebGPU
-      emissive.
+      groups 2/3 already hold albedo/MR). Remaining: extra directionals /
+      hemisphere / area / clustered, cascades, PBR rest, tone-map operator,
+      light layers, `normalMap` / `occlusionMap`, WebGPU emissive.
 - [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
       family list now names `LitMaterial`
 - [ ] First publish (§94 0.1): Changesets release workflow + the
@@ -1401,8 +1407,10 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       declares the tier absent.
 - [ ] **Follow-ups the R-1 plan explicitly defers** (each needs its own filing): §63
       transient-target pooling and barrier scheduling (must land on both backends or
-      neither); §65's persistent-mapped/staging-ring buffers; §27 GPU fields and §36
-      `collisions: "depth-buffer"`; ~~RFC 0005's `Rectangle2` prerequisite for a regional
+      neither); §65's persistent-mapped/staging-ring buffers; §27 GPU fields
+      (radial-only stub on `simulation: "gpu"`; generic GPU field stack staged)
+      and §36 `collisions: "depth-buffer"` (CPU kill-below-ground + GPU
+      `y=ground` rest; true depth-texture collide-and-kill still open); ~~RFC 0005's `Rectangle2` prerequisite for a regional
       `readPixels`~~ **DONE 2026-08-29** — `render/src/renderer.ts:464` states it outright
       (*"`readPixels` joined the interface when `Rectangle2` landed in `@fourjs/math`
       (2026-08-29; RFC 0005's recorded prerequisite, cleared)"*), `Rectangle2` is exported
@@ -1605,7 +1613,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       (already on the tree):** `RenderBatch.contentVersion` +
       `createGlBatching` `#canSkipUpload`;
       `webgl-renderer.test.ts` asserts a still scene issues **0**
-      `bufferSubData` and a transform bump re-uploads. Making batching the
+      `bufferSubData` and a transform bump re-uploads. WebGPU
+      `WgpuBatching.draw` still `writeBuffer`s every frame — idle skip is
+      GL-only. Making batching the
       default still needs A-4's build-time pipeline-selection seam (the opt-in
       seam already costs every bundle +0.17 kB).
 - [x] **`buildRenderList` is now ~40% of a 100 000-sprite frame's preparation**
@@ -1941,8 +1951,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       multi-texture-unit widening `gl-program.ts` records (R-13 follow-up) —
       metallic-roughness landed 2026-09-06; normal/occlusion/emissive remain.
       The loader parses them already and widens without a format change.
-- [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust boundary still open (RFC 0001's, not A-3's — shading is a graph of
-      closed operators and a new operator is out of scope in both RFCs). **Plugin trust
+- [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust **runtime** boundary is the closed operator union (shipped); **extensible** data-declared operators remain a follow-up RFC (0001 alternative E — `SHADER_OPERATORS` is the named hook only). **Plugin trust
       boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a
       document; enforced by `tests/integration/plugin-boundary.test.ts`; explicitly not a
       sandbox. Guide row moved absent → partial

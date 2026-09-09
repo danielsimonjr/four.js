@@ -78,6 +78,9 @@ No packet closed.
   closed rows (rigs, PH-11c, scissor, `recording-gl` adopt, flagship §46
   layers, WebGPU `maximumSkinningJoints`) and Priority-index leftovers
   (A-4/A-5/A-19, R-32, camera-rig residue, particle-trail spatial-hash).
+  Remaining-work wording: R-17 point/spot (8) is landed; §27/§36 GPU
+  stubs named; §96 closed-union vs extensible operators; WebGPU batch
+  idle-skip is GL-only.
 
 - **WebGPU skinned colour pair (RFC 0003).** `registerSkinningPipeline()`
   from `@fourjs/render-webgpu` compiles unlit + lit on first skinned
