@@ -30,6 +30,16 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — Dogfood cycle 7: WebGL skinned GPU picking.** Read from
+  a consumer seat. `registerPickingPipeline` + `registerSkinningPipeline`
+  then `createPickingService`. One-bone plane, bone +1 Y: id pass uses
+  `SKINNING_GLSL` + `pickId`, uploads the live palette (y-translation
+  1, not bind pose). Unskinned control id/colour transcripts are
+  identical with or without the skinning seam. Recording GL cannot
+  rasterise, so deformed-vs-bind hit/miss is staged texels + the
+  silhouette claim is the program. Engine clean. Guide index patched.
+  WebGPU still skips skinned items. Standing checkbox stays `[ ]`.
+
 - **2026-09-09 — R-30c map roles.** Optional `TextureMapRole` `"color"` |
   `"data"` on `TextureSource` / `Texture.role`. Omitting `role` invents
   **no** default and leaves `colorSpace` at R-15's `"linear"` — that is

@@ -123,12 +123,13 @@ under `/examples/<name>/` on Pages; browser gates live in `tests/browser/`.
 | Tweens / clips / timelines | `examples/first-2d-scene` / `examples/first-animated-scene`; `tests/browser/animation.spec.ts` |
 | glTF | no example site; `tests/browser/gltf.spec.ts` loads the committed fixture through the real loader |
 | UI | `examples/ui-demo`; `tests/browser/ui.spec.ts` |
-| Input / picking / dragging | `examples/first-2d-scene`; `tests/browser/interaction.spec.ts`. First-person: `examples/character-controller`. GPU/pixel: `registerPickingPipeline` + `createPickProvider` in [cameras-and-coordinate-conversion](cameras-and-coordinate-conversion.md); `tests/browser/picking.spec.ts` |
+| Input / picking / dragging | `examples/first-2d-scene`; `tests/browser/interaction.spec.ts`. First-person: `examples/character-controller`. GPU/pixel: `registerPickingPipeline` + `createPickProvider` in [cameras-and-coordinate-conversion](cameras-and-coordinate-conversion.md); `tests/browser/picking.spec.ts`. WebGL skinned GPU pick: `tests/integration/skinned-gpu-picking.test.ts` (`SkinnedIdProgram`; WebGPU still skips skinned items) |
 | Particles | `examples/particles-demo`; `tests/browser/particles.spec.ts` |
 | Mixed 2D / 3D / physics | `examples/mixed-scene` / `examples/physics-playground` (a 2D world and a 3D world side by side); the §118 flagship (2D + 3D in **one** scene) |
 | Text / §56 | `examples/first-2d-scene`; `tests/browser/text.spec.ts`. `buildGlyphAtlas` lives on `fourJS/text`; the `Text` node is imported from `fourJS`, not that subpath |
 | Scene save / §79 + §34 snapshot | `examples/flagship/motor-digital-twin`; [digital-twin](digital-twin.md). `registerSceneNodeTypes()` then `serializeScene` / `instantiateScene` — `createDefaultComponentSerializers()` alone refuses a `Renderable`. `PhysicsWorld.createSnapshot()` is the solver half |
 | §43 interpolated skin palettes | `Skeleton.update(skinRoot, worldOf?)` + `buildInterpolatedRenderList` — local poses interpolate, then the palette product; palettes are never matrix-lerped. [materials-and-render-graph](materials-and-render-graph.md), [fixed-step-simulation](fixed-step-simulation.md). Consumer check: `tests/integration/interpolated-skin-palettes.test.ts` |
+| WebGL skinned GPU picking | `registerPickingPipeline` + `registerSkinningPipeline` then `createPickingService` — WebGL draws the deformed silhouette (`SkinnedIdProgram`, live palette). WebGPU still skips skinned items (no RFC 0003 skinned pipelines). [cameras-and-coordinate-conversion](cameras-and-coordinate-conversion.md). Consumer check: `tests/integration/skinned-gpu-picking.test.ts` |
 
 ## Beside the guides
 
