@@ -153,6 +153,11 @@ describe("pipelineKey", () => {
     expect(pipelineKey({ ...BASE, vertexColors: true })).toContain("|vc|");
     expect(pipelineKey({ ...BASE, map: true })).toContain("|map|");
     expect(pipelineKey({ ...BASE, depthFormat: null })).toMatch(/\|-$/u);
+    expect(pipelineKey({ ...BASE, metalRoughness: true })).toMatch(/\|mr:y$/u);
+    expect(pipelineKey(BASE)).not.toContain("|mr:y");
+    expect(pipelineKey({ ...BASE, metalRoughness: false })).toBe(
+      pipelineKey(BASE),
+    );
   });
 
   it("separates every field that a pipeline bakes in", () => {

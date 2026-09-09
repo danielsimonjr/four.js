@@ -51,8 +51,9 @@
  * material is skipped on the same terms. §71 picking is **opt-in**:
  * `createPickingService()` is declared (presence is the capability, matching
  * WebGL) and throws until `registerPickingPipeline()` links `wgpu-picking.ts`.
- * Particle systems are skipped in the id pass (no `ParticleIdProgram` on
- * this backend yet). The one exception is deliberate and
+ * The id pass draws particle systems with one colour per emitter (the §36
+ * billboard, CPU 8-float instance stream); trails stay undrawn and skinned
+ * items stay skipped. The one exception is deliberate and
  * narrow: a §67 **mask** is coverage, not shading, so a clip node of any
  * material family masks correctly today through the flat unlit pipeline with
  * colour writes off.
@@ -179,6 +180,7 @@ import {
   LIGHT_UNIFORM_STRIDE_BYTES,
   LIGHT_UNIFORM_STRIDE_FLOATS,
   SHADED_MAP_BIND_GROUP_INDEX,
+  SHADED_MR_BIND_GROUP_INDEX,
   createLightsBindGroupLayout,
   writeLightUniforms,
 } from "./wgpu-lights.js";
@@ -558,6 +560,12 @@ function resolveFrameTexture(
     return null;
   }
   return renderTargets.sample(source);
+}
+
+function metalRoughnessMapOf(material: {
+  metalRoughnessMap?: WgpuCacheableTexture | null;
+}): WgpuCacheableTexture | null {
+  return material.metalRoughnessMap ?? null;
 }
 
 /** Adds one *submitted* draw to §84's counters — the twin of the GL backend's. */
@@ -1794,6 +1802,31 @@ export class WebgpuRenderer implements Renderer {
             continue;
           }
           const useMap = mapBindGroup !== null;
+          // §59's packed metallic-roughness map: same resolve/skip/degrade
+          // contract as albedo (`map`). Named + uvs + unresolved (disposed
+          // or a feedback loop) skips the draw; named without a uv stream
+          // degrades to the scalar factors. Lit items have no such field.
+          const metalRoughnessSource =
+            item.kind === "standard"
+              ? metalRoughnessMapOf(item.material)
+              : null;
+          const metalRoughnessBindGroup =
+            metalRoughnessSource === null || record.uvBuffer === null
+              ? null
+              : resolveFrameTexture(
+                  textures,
+                  renderTargets,
+                  activeTarget,
+                  metalRoughnessSource,
+                );
+          if (
+            metalRoughnessSource !== null &&
+            record.uvBuffer !== null &&
+            metalRoughnessBindGroup === null
+          ) {
+            continue;
+          }
+          const useMetalRoughness = metalRoughnessBindGroup !== null;
           // The lights group is read off the *field*, not a frame local, and
           // read here — after the material's getters have run — so a
           // reentrant mid-frame `dispose()` inside application code (the
@@ -1847,6 +1880,7 @@ export class WebgpuRenderer implements Renderer {
             batch: null,
             normals,
             shadow: receiving,
+            metalRoughness: useMetalRoughness,
           });
           if (pipeline === null) {
             // Unreachable given the class invariant — the unlit arm's
@@ -1907,17 +1941,27 @@ export class WebgpuRenderer implements Renderer {
           }
           // Slots are positional, in `shadedVertexBufferLayouts`' order:
           // position, then normals if the variant shades with them, then uvs
-          // if it samples. One counter, both sides.
+          // if it samples albedo *or* the packed metallic-roughness map.
           let slot = 0;
           pass.setVertexBuffer(slot, record.positionBuffer);
           if (normals) {
             slot += 1;
             pass.setVertexBuffer(slot, record.normalBuffer);
           }
-          if (mapBindGroup !== null) {
+          if (useMap || useMetalRoughness) {
             slot += 1;
             pass.setVertexBuffer(slot, record.uvBuffer);
+          }
+          if (mapBindGroup !== null) {
             pass.setBindGroup(SHADED_MAP_BIND_GROUP_INDEX, mapBindGroup);
+          }
+          if (metalRoughnessBindGroup !== null) {
+            // Group 3 when albedo occupies 2; group 2 when it does not
+            // (`wgpu-lights.ts` / `wgpu-standard.ts`).
+            pass.setBindGroup(
+              useMap ? SHADED_MR_BIND_GROUP_INDEX : SHADED_MAP_BIND_GROUP_INDEX,
+              metalRoughnessBindGroup,
+            );
           }
           if (record.indexBuffer !== null && record.indexFormat !== null) {
             pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
@@ -2274,12 +2318,12 @@ export class WebgpuRenderer implements Renderer {
    * bundles that opted in (the pipeline-cost law; `wgpu-picking-registry.ts`).
    *
    * What the service receives is a **live window** onto exactly the renderer
-   * state an id pass needs — device, the two shared caches (geometry, render
-   * targets), the surface size, and the two lifecycle flags — as accessors,
-   * so a §61 loss's dropped caches are seen rather than captured stale
-   * (`PickingRendererHost`). Each call builds an independent service; the
-   * caller owns and disposes it (§83). No GPU call is issued here — the id
-   * pipeline compiles on the service's first pass.
+   * state an id pass needs — device, the three shared caches (geometry,
+   * particles, render targets), the surface size, and the two lifecycle
+   * flags — as accessors, so a §61 loss's dropped caches are seen rather
+   * than captured stale (`PickingRendererHost`). Each call builds an
+   * independent service; the caller owns and disposes it (§83). No GPU call
+   * is issued here — the id pipeline compiles on the service's first pass.
    *
    * @throws FourError `INVALID_APPLICATION_STATE` on a disposed renderer, or
    * when no picking pipeline is registered.
@@ -2298,6 +2342,7 @@ export class WebgpuRenderer implements Renderer {
     const host: PickingRendererHost = {
       device: () => this.#device,
       geometries: () => this.#geometries,
+      particles: () => this.#particles,
       renderTargets: () => this.#renderTargets,
       surfaceWidth: () => Math.round(this.#width * this.#resolution),
       surfaceHeight: () => Math.round(this.#height * this.#resolution),

@@ -156,7 +156,10 @@ export {
   PUNCTUAL_LIGHT_WGSL,
   SHADED_MAP_BINDING_WGSL,
   SHADED_MAP_BIND_GROUP_INDEX,
+  SHADED_MR_BINDING_WGSL,
+  SHADED_MR_BIND_GROUP_INDEX,
   createLightsBindGroupLayout,
+  shadedMrBindingWgsl,
   writeLightUniforms,
 } from "./wgpu-lights.js";
 export {
@@ -321,6 +324,12 @@ export {
   ID_SHADER_SOURCE,
   ID_UNIFORM_BYTES,
   ID_VIEW_PROJECTION_OFFSET,
+  PARTICLE_ID_MODEL_OFFSET,
+  PARTICLE_ID_PICK_OFFSET,
+  PARTICLE_ID_PROJECTION_OFFSET,
+  PARTICLE_ID_SHADER_SOURCE,
+  PARTICLE_ID_UNIFORM_BYTES,
+  PARTICLE_ID_VIEW_OFFSET,
   WebgpuPickingService,
   registerPickingPipeline,
 } from "./wgpu-picking.js";

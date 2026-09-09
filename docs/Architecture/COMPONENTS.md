@@ -105,6 +105,7 @@ Everything in the scene is a `Node` (single inheritance extending `EventEmitter<
 | Node type                                                      | Package           | Role                                                                                                             |
 | -------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `Node` / `Group` / `Scene`                                     | `@fourjs/scene`     | Hierarchy base, plain container, root (§6, §46)                                                                  |
+| `Bone`                                                         | `@fourjs/scene`     | §54 joint — an ordinary node; `Skeleton` is shared palette state, not a node                                     |
 | `Camera` (abstract), `OrthographicCamera`, `PerspectiveCamera` | `@fourjs/scene`     | §47 cameras — a camera is a node (spec rev 1.3 placement)                                                        |
 | `DirectionalLight`                                             | `@fourjs/scene`     | §68 MVP lighting — shines along its node's −Z world axis; scene-wide ambient is `Scene.ambientLight`, not a node |
 | `Renderable`                                                   | `@fourjs/render`    | §49 geometry + material drawable                                                                                 |
@@ -160,7 +161,8 @@ Key exports (33 total):
 - **Authority (§42)** — `TransformAuthority` (`"manual" | "animation" | "kinematic" | "physics" | "blended" | "constraint" | "network"`), `TRANSFORM_AUTHORITIES`, `DEFAULT_TRANSFORM_AUTHORITY`, `AuthorityNode`, `warnAuthorityConflict`: conflicts warn and refuse rather than silently overwrite.
 - **Cameras & viewports (§47–48)** — `Camera`, `OrthographicCamera`, `PerspectiveCamera`, `Viewport`, `createFullscreenViewport`.
 - **Lighting (§68 MVP)** — `DirectionalLight`, `DirectionalLightOptions`, `ColorRGB`. One directional light + `Scene.ambientLight`; point/spot/area lights and shadows (§69) are staged with dated notes.
-- **Pose interpolation (§43)** — `PoseBuffer`, `PoseSnapshotSystem`, `createSnapshotSystem`, `POSE_SNAPSHOT_PRIORITY` (1000 — duplicated from motion's `PRIORITY_SNAPSHOT` because scene must not depend on motion; a test pins the two equal). `PoseTarget` is the §19 blending target component with one-step finite-difference history.
+- **Pose interpolation (§43)** — `PoseBuffer`, `PoseSnapshotSystem`, `createSnapshotSystem`, `POSE_SNAPSHOT_PRIORITY` (1000 — duplicated from motion's `PRIORITY_SNAPSHOT` because scene must not depend on motion; a test pins the two equal). `PoseTarget` is the §19 blending target component with one-step finite-difference history. `Skeleton.update(skinRoot, worldOf?)` is how a skinned palette reaches those poses: the interpolated list supplies a `worldOf` that composes locals, then the palette product — palettes are never matrix-lerped.
+- **Bones (§54)** — `Bone`, `Skeleton`, `MorphWeights` / `MORPH_WEIGHTS_SERIALIZER`.
 
 ---
 
@@ -323,8 +325,8 @@ Key exports (9 total): `UnlitMaterial` (`kind: "unlit"`), `LitMaterial` (`kind: 
 Key exports (selected from ~40):
 
 - **Interface (§61–62)** — `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererOptions`, `RendererEventMap`, `NullRenderer` (headless tier), `RenderInterpolation` (`{ poseBuffer, alpha }`).
-- **Render list (§64/§66)** — `buildRenderList`, `buildInterpolatedRenderList` (§43 poses), `RenderItem` = `UnlitRenderItem | LitRenderItem | SpriteRenderItem | ParticleRenderItem` discriminated by `RenderItemKind`, sorted by render layer → explicit `renderOrder` → scene-graph order (deterministic, §33).
-- **Drawables** — `Renderable` (§49), `Sprite` + `Texture`/`TextureSource` (§55 — sprites map whole textures; §55 frame regions unimplemented, recorded advisory).
+- **Render list (§64/§66)** — `buildRenderList`, `buildInterpolatedRenderList` (§43 poses **and** skinned palettes via `Skeleton.update(..., worldOf)` — composed locals, never a lerp of `jointMatrices`), `RenderItem` discriminated by `RenderItemKind` (unlit / lit / sprite / particles / node / skinned-unlit / skinned-lit), sorted by render layer → opaque/transparent → explicit `renderOrder` → scene-graph order (deterministic, §33).
+- **Drawables** — `Renderable` (§49), `Mesh` (§54, optional `skeleton`), `Sprite` + `Texture`/`TextureSource` (§55).
 - **Lights (§68)** — `collectSceneLights`, `SceneLights`, `DirectionalLightSource`, `AmbientLightSource`, `isDirectionalLightSource` (duck-typed brand check — deliberate, so render-webgl's doubles-only tests can fake lights). First light in scene-graph DFS order wins; light collection runs only for frames whose list contains a lit item; lights are not §43-interpolated (dated trade).
 - **Particle contract** — `ParticleDrawable`, `isParticleDrawable`, `particleQuadGeometry`, `PARTICLE_INSTANCE_FLOATS` and offsets: the duck-typed seam `@fourjs/particles` satisfies (the matrix forbids the edge in either direction).
 

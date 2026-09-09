@@ -59,6 +59,18 @@ stay on the tracker.
 
 ### Changed
 
+- **WebGPU particle id pass (RFC 0005).** Emitters pick by GPU id — one
+  colour per system — through a private billboard pipeline (CPU 8-float
+  instance stream, 208-byte `PARTICLE_ID_*` block). Trails stay undrawn;
+  GPU-sim / R-32 wide streams skip; skinned items still bounds-only on
+  both backends. RFC 0005 stays open.
+
+- **WebGPU `StandardMaterial.metalRoughnessMap`.** Packed G=roughness /
+  B=metalness, matching WebGL. Bind group 3 when albedo occupies group 2,
+  group 2 when it does not (`shadedMrBindingWgsl`). Scalar-only keys stay
+  byte-identical (`|mr:y` only when true). `normalMap` / `occlusionMap` /
+  `emissiveMap` remain unstaged.
+
 - **§43 interpolated skin palettes.** `Skeleton.update` takes an optional
   `worldOf` provider. The interpolated render list composes bone local
   poses at `interpolationAlpha` then runs the palette product. Palettes
@@ -72,8 +84,8 @@ stay on the tracker.
 
 - **WebGPU `PickingService` (RFC 0005).** `registerPickingPipeline()` from
   `@fourjs/render-webgpu`, then `createPickingService()`. `pick` copies
-  one texel through `mapAsync`. Particles and skinned items are skipped
-  (no `ParticleIdProgram`, no skinned pipelines).
+  one texel through `mapAsync`. Particle emitters now have their own id
+  arm (see the particle id-pass bullet); skinned items stay skipped.
 
 - **WebGPU lit/standard read `draw.normalMatrix`.** `DRAW_UNIFORM_BYTES`
   is 192; `STANDARD_UNIFORM_BYTES` is 224 (`emissive` 192, `surface` 208).
@@ -117,6 +129,12 @@ stay on the tracker.
   97.16%.
 
 ### Added
+
+- **Dogfooding cycle 6 — §43 interpolated skin palettes.** Guides and
+  architecture docs no longer describe interpolated rendering as
+  node-matrix lerp only. Consumer-seat proof:
+  `tests/integration/interpolated-skin-palettes.test.ts`. Engine was
+  clean. The standing dogfood checkbox stays open.
 
 - **`Matrix3` normal-matrix utility and per-draw hoist.** `transpose()`,
   `setFromMatrix4Upper3x3()`, `setNormalFromMatrix4()` — the inverse-transpose

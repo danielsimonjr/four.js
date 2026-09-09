@@ -30,6 +30,46 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — Open-TODO wave 5, simple → complex.** Twelve checkboxes
+  remain; three slices landed without pretending the packets closed.
+  (1) RFC 0005 WebGPU particle id: one id per emitter, private pipeline
+  (not exported as `ParticleIdProgram`); 208-byte `PARTICLE_ID_*` block;
+  CPU 8-float stream; trails / GPU-sim / wide stream skip. Remaining:
+  skinned id pass on both backends. (2) Lighting leftover: WebGPU
+  samples `StandardMaterial.metalRoughnessMap` (G=roughness, B=metalness);
+  group 3 with albedo, group 2 without (`shadedMrBindingWgsl`). `|mr:y`
+  only when true. Remaining: multi-light / cascades / PBR / §60a / light
+  layers / other texture slots. (3) Dogfood cycle 6 sat on §43 palettes;
+  engine clean; guides patched; standing checkbox stays open. First
+  publish and R-33's §112 exit stay blocked.
+
+- **2026-09-09 — WebGPU particle id arm (RFC 0005 residue).** One id per
+  emitter, mirroring WebGL's `ParticleIdProgram` without exporting that
+  class name (`graph:duplicates`). `PickingRendererHost.particles()` is
+  the live `WgpuParticleCache` accessor. Mesh `IdUniforms` stay 144
+  bytes; the particle id block is 208 bytes (projection 0 / view 64 /
+  model 128 / pickId 192) in the 256-byte stride. Billboard vertex math
+  is `PARTICLE_SHADER_SOURCE`'s. Default 8-float CPU stream only; trails,
+  GPU-sim layouts, and the R-32 wide stream skip. Skinned id pass remains
+  open on both backends. RFC 0005 is not closed.
+
+- **2026-09-09 — Dogfood cycle 6: §43 interpolated skin palettes.**
+  Read from a consumer seat. `Skeleton.update(skinRoot, worldOf?)` and
+  `buildInterpolatedRenderList` compose interpolated local poses, then
+  run the palette product. Palettes are never matrix-lerped; scene
+  transforms are unchanged. Engine clean. Evidence:
+  `tests/integration/interpolated-skin-palettes.test.ts` (two-bone, 90°
+  hip; mid-alpha ≠ lerp of endpoints). Guides and architecture docs
+  patched. Standing dogfood checkbox stays open.
+
+- **2026-09-09 — WebGPU samples `StandardMaterial.metalRoughnessMap`.** Packed
+  G=roughness / B=metalness, matching WebGL unit 2. Bind-group index is
+  **3 when albedo occupies group 2, 2 when it does not** (`shadedMrBindingWgsl`).
+  `|mr:y` appends to the pipeline key only when true, so scalar-only
+  transcripts stay byte-identical. Unresolved named maps skip the draw.
+  `normalMap` / `occlusionMap` / `emissiveMap` remain unstaged. Lighting
+  follow-ups stay open.
+
 - **2026-09-09 — WebGPU browser gates follow `DRAW_UNIFORM_BYTES`.** The
   Playwright page programs are not the renderer: they bind their own
   layouts. After `DrawUniforms` grew to 192 bytes (`normalMatrix` at 144)

@@ -29,10 +29,14 @@
  *   versus WebGL, which tests the mask bit plane);
  * - **skinned items are skipped** — this backend has no skinned pipelines;
  *   the bounds tier serves them;
- * - **particle items are skipped** — WebGL instances the §36 billboard
- *   through `ParticleIdProgram`; this backend has no particle id arm yet
- *   and will not invent one. The bounds tier serves emitters. Trails are
- *   not drawn either;
+ * - **particle items write one id for the whole system** — §36's batched
+ *   item has one node and no per-particle geometry, so the pass instances
+ *   the shared unit quad through a private particle id pipeline (the §36
+ *   billboard vertex, a flat `pickId` fragment) and encodes the emitter's
+ *   table index. Trails are not drawn. GPU-sim (`simulation: "gpu"`) and
+ *   the R-32 wide instance stream need a second vertex layout and stay
+ *   skipped. The bounds tier still serves a zero-count system, which
+ *   issues no instanced draw;
  * - **sprites draw** — they share the unlit-shaped position layout (the
  *   unit quad); the id vertex stage is that same `viewProjection * model *
  *   vec4(position, 1)` expression, uv derivation aside.
@@ -67,6 +71,7 @@
 import { DEV, FourError, devWarnOnce } from "@fourjs/core";
 import { Frustum, Matrix4, Rectangle2 } from "@fourjs/math";
 import {
+  PARTICLE_INSTANCE_FLOATS,
   RenderTarget,
   assertEncodableCandidateCount,
   buildRenderList,
@@ -74,6 +79,7 @@ import {
   collectPickCandidates,
   decodePickId,
   encodePickId,
+  type ParticleRenderItem,
   type PickRequest,
   type PickResult,
   type PickingService,
@@ -92,6 +98,11 @@ import {
   type GpuTextureView,
 } from "./webgpu-device.js";
 import type { WgpuGeometryCache, WgpuGeometryRecord } from "./wgpu-geometry.js";
+import {
+  PARTICLE_VERTEX_BUFFER_LAYOUTS,
+  type WgpuParticleCache,
+  type WgpuParticleRecord,
+} from "./wgpu-particles.js";
 import {
   setPickingServiceFactory,
   type PickingRendererHost,
@@ -134,6 +145,26 @@ export const ID_PICK_OFFSET = 128;
  */
 export const ID_UNIFORM_BYTES = 144;
 
+/** Byte offset of `ParticleIdUniforms.projection`. */
+export const PARTICLE_ID_PROJECTION_OFFSET = 0;
+
+/** Byte offset of `ParticleIdUniforms.view`. */
+export const PARTICLE_ID_VIEW_OFFSET = 64;
+
+/** Byte offset of `ParticleIdUniforms.model`. */
+export const PARTICLE_ID_MODEL_OFFSET = 128;
+
+/** Byte offset of `ParticleIdUniforms.pickId`. */
+export const PARTICLE_ID_PICK_OFFSET = 192;
+
+/**
+ * Size of the `ParticleIdUniforms` block in bytes — three `mat4x4<f32>` plus
+ * `pickId`. Distinct from the shaded particle block's `PARTICLE_UNIFORM_BYTES`
+ * (192, no pickId) so `graph:duplicates` does not collapse them. Fits in
+ * {@link UNIFORM_STRIDE_BYTES}.
+ */
+export const PARTICLE_ID_UNIFORM_BYTES = 208;
+
 /** `UNIFORM_STRIDE_BYTES` in `Float32Array` elements. */
 const UNIFORM_STRIDE_FLOATS = UNIFORM_STRIDE_BYTES / 4;
 
@@ -165,6 +196,44 @@ fn ${FRAGMENT_ENTRY_POINT}() -> @location(0) vec4<f32> {
 }
 `;
 
+/**
+ * The particle id pass's WGSL — the §36 billboard vertex
+ * (`PARTICLE_SHADER_SOURCE`: view·model, then view-space corner offset,
+ * then projection, then the unlit clip-depth remap) with a flat `pickId`
+ * fragment. Compiled lazily on the service's **first particle item**, never
+ * at registration or construction. Kept private on the service (WebGL
+ * already exports `ParticleIdProgram`; this name must not collide).
+ */
+export const PARTICLE_ID_SHADER_SOURCE = `struct ParticleIdUniforms {
+  projection : mat4x4<f32>,
+  view : mat4x4<f32>,
+  model : mat4x4<f32>,
+  pickId : vec4<f32>,
+};
+
+@group(0) @binding(0) var<uniform> id : ParticleIdUniforms;
+
+@vertex
+fn ${VERTEX_ENTRY_POINT}(
+  @location(0) corner : vec3<f32>,
+  @location(1) instancePosition : vec3<f32>,
+  @location(2) instanceSize : f32,
+  @location(3) instanceColor : vec4<f32>,
+) -> @builtin(position) vec4<f32> {
+  var center = id.view * id.model * vec4<f32>(instancePosition, 1.0);
+  center.x = center.x + corner.x * instanceSize;
+  center.y = center.y + corner.y * instanceSize;
+  let clip = id.projection * center;
+  // WebGL clip depth [-w, w] onto WebGPU's [0, w]; see wgpu-unlit.ts.
+  return vec4<f32>(clip.x, clip.y, (clip.z + clip.w) * 0.5, clip.w);
+}
+
+@fragment
+fn ${FRAGMENT_ENTRY_POINT}() -> @location(0) vec4<f32> {
+  return id.pickId;
+}
+`;
+
 /** One pass's resolved viewport rectangle, in target pixels (§7a, bottom-left). */
 interface PassRect {
   x: number;
@@ -176,6 +245,15 @@ interface PassRect {
 /** One item the pass will actually draw. */
 interface PackedDraw {
   readonly geometry: WgpuGeometryRecord;
+  readonly model: Matrix4;
+  readonly tableIndex: number;
+}
+
+/** One §36 emitter the particle id arm will instance. */
+interface PackedParticleDraw {
+  readonly geometry: WgpuGeometryRecord;
+  readonly batch: WgpuParticleRecord;
+  readonly item: ParticleRenderItem;
   readonly model: Matrix4;
   readonly tableIndex: number;
 }
@@ -204,7 +282,10 @@ interface PassState {
 const passItems: RenderItem[] = [];
 const passViewItems: RenderItem[] = [];
 const packedDraws: PackedDraw[] = [];
+const packedParticleDraws: PackedParticleDraw[] = [];
 const passViewProjection = new Matrix4();
+const passProjection = new Matrix4();
+const passView = new Matrix4();
 const passFrustum = new Frustum();
 const idScratch = new Float32Array(4);
 const rectScratch: PassRect = { x: 0, y: 0, width: 0, height: 0 };
@@ -252,8 +333,27 @@ export class WebgpuPickingService implements PickingService {
 
   #uniformCapacity = 0;
 
+  /**
+   * The instanced particle id pipeline — compiled on the first particle
+   * item of an era, never at construction. `null` until then.
+   */
+  #particlePipeline: GpuRenderPipeline | null = null;
+
+  #particleBindGroupLayout: GpuBindGroupLayout | null = null;
+
+  #particleUniformBuffer: GpuBuffer | null = null;
+
+  #particleBindGroup: GpuBindGroup | null = null;
+
+  #particleUniformStaging = new Float32Array(0);
+
+  #particleUniformCapacity = 0;
+
   /** Latched per era — a driver that refused last era is asked once more. */
   #pipelineFailed = false;
+
+  /** Latched per era, same discipline as `#pipelineFailed`. */
+  #particlePipelineFailed = false;
 
   /** The cache era `#pipeline` was compiled in. */
   #pipelineEra: WgpuGeometryCache | null = null;
@@ -366,6 +466,8 @@ export class WebgpuPickingService implements PickingService {
     passViewProjection
       .copy(camera.projectionMatrix)
       .multiply(camera.viewMatrix);
+    passProjection.copy(camera.projectionMatrix);
+    passView.copy(camera.viewMatrix);
     passFrustum.setFromViewProjection(passViewProjection);
     const viewItems = buildViewRenderList(items, view, passViewItems, {
       frustum: passFrustum,
@@ -375,12 +477,11 @@ export class WebgpuPickingService implements PickingService {
     this.#pass = null;
 
     packedDraws.length = 0;
+    packedParticleDraws.length = 0;
+    const particleCache = host.particles();
     for (let index = 0; index < viewItems.length; index += 1) {
       const item = viewItems[index];
       if (item.kind === "skinned-unlit" || item.kind === "skinned-lit") {
-        continue;
-      }
-      if (item.kind === "particles") {
         continue;
       }
       const maskPass = item.clip?.maskPass === true;
@@ -389,6 +490,46 @@ export class WebgpuPickingService implements PickingService {
       }
       const joined = this.#indexByMatrix.get(item.worldMatrix);
       if (joined === undefined) {
+        continue;
+      }
+      if (item.kind === "particles") {
+        if (item.count === 0) {
+          continue;
+        }
+        // Default 8-float CPU stream only (v1). The R-32 wide stream and
+        // GPU-sim (`PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS`) need a second
+        // pipeline; skip rather than bind the wrong vertex layout.
+        if (
+          item.instanceFloats !== undefined &&
+          item.instanceFloats !== PARTICLE_INSTANCE_FLOATS
+        ) {
+          continue;
+        }
+        if (particleCache === null) {
+          continue;
+        }
+        const geometry = geometries.acquire(item.geometry);
+        if (geometry === null) {
+          continue;
+        }
+        const batch = particleCache.acquire(item);
+        if (batch === null) {
+          continue;
+        }
+        const particleCompiled = this.#acquireParticlePipeline(
+          device,
+          geometries,
+        );
+        if (particleCompiled === null) {
+          continue;
+        }
+        packedParticleDraws.push({
+          geometry,
+          batch,
+          item,
+          model: item.worldMatrix,
+          tableIndex: joined,
+        });
         continue;
       }
       const geometry = geometries.acquire(item.geometry);
@@ -410,6 +551,8 @@ export class WebgpuPickingService implements PickingService {
       depthView,
       rect,
       packedDraws,
+      packedParticleDraws,
+      particleCache,
     );
 
     this.#pass = {
@@ -549,6 +692,7 @@ export class WebgpuPickingService implements PickingService {
       !host.disposed() && !host.deviceLost() && host.geometries() !== null;
     if (live && host.geometries() === this.#pipelineEra) {
       this.#uniformBuffer?.destroy();
+      this.#particleUniformBuffer?.destroy();
     }
     this.#uniformBuffer = null;
     this.#bindGroup = null;
@@ -556,6 +700,12 @@ export class WebgpuPickingService implements PickingService {
     this.#bindGroupLayout = null;
     this.#uniformStaging = new Float32Array(0);
     this.#uniformCapacity = 0;
+    this.#particleUniformBuffer = null;
+    this.#particleBindGroup = null;
+    this.#particlePipeline = null;
+    this.#particleBindGroupLayout = null;
+    this.#particleUniformStaging = new Float32Array(0);
+    this.#particleUniformCapacity = 0;
     const target = this.#target;
     if (target !== null) {
       target.dispose();
@@ -582,6 +732,12 @@ export class WebgpuPickingService implements PickingService {
       this.#uniformBuffer = null;
       this.#uniformCapacity = 0;
       this.#pipelineFailed = false;
+      this.#particlePipeline = null;
+      this.#particleBindGroupLayout = null;
+      this.#particleBindGroup = null;
+      this.#particleUniformBuffer = null;
+      this.#particleUniformCapacity = 0;
+      this.#particlePipelineFailed = false;
       this.#pipelineEra = era;
     }
     if (this.#pipeline !== null && this.#bindGroupLayout !== null) {
@@ -657,9 +813,107 @@ export class WebgpuPickingService implements PickingService {
   }
 
   /**
+   * The compiled particle id pipeline for this era, or `null`. Compiled on
+   * the first particle item, never at construction — a scene that registers
+   * picking and never submits a particle system issues the mesh id pipeline
+   * only. Not a `ParticleIdProgram` class: WebGL already exports that name.
+   */
+  #acquireParticlePipeline(
+    device: GpuDevice,
+    era: WgpuGeometryCache,
+  ): { pipeline: GpuRenderPipeline; layout: GpuBindGroupLayout } | null {
+    if (this.#pipelineEra !== era) {
+      this.#particlePipeline = null;
+      this.#particleBindGroupLayout = null;
+      this.#particleBindGroup = null;
+      this.#particleUniformBuffer = null;
+      this.#particleUniformCapacity = 0;
+      this.#particlePipelineFailed = false;
+    }
+    if (
+      this.#particlePipeline !== null &&
+      this.#particleBindGroupLayout !== null
+    ) {
+      return {
+        pipeline: this.#particlePipeline,
+        layout: this.#particleBindGroupLayout,
+      };
+    }
+    if (this.#particlePipelineFailed) {
+      return null;
+    }
+    try {
+      const bindGroupLayout = device.createBindGroupLayout({
+        label: "fourJS:pick-particle-id-uniforms",
+        entries: [
+          {
+            binding: 0,
+            visibility: GPU_SHADER_STAGE.VERTEX | GPU_SHADER_STAGE.FRAGMENT,
+            buffer: {
+              type: "uniform",
+              hasDynamicOffset: true,
+              minBindingSize: PARTICLE_ID_UNIFORM_BYTES,
+            },
+          },
+        ],
+      });
+      const pipelineLayout = device.createPipelineLayout({
+        label: "fourJS:pick-particle-id-layout",
+        bindGroupLayouts: [bindGroupLayout],
+      });
+      const module = device.createShaderModule({
+        label: "fourJS:pick-particle-id",
+        code: PARTICLE_ID_SHADER_SOURCE,
+      });
+      const pipeline = device.createRenderPipeline({
+        label: "fourJS:pick-particle-id",
+        layout: pipelineLayout,
+        vertex: {
+          module,
+          entryPoint: VERTEX_ENTRY_POINT,
+          buffers: PARTICLE_VERTEX_BUFFER_LAYOUTS,
+        },
+        fragment: {
+          module,
+          entryPoint: FRAGMENT_ENTRY_POINT,
+          targets: [
+            {
+              format: RENDER_TARGET_COLOR_FORMAT,
+              writeMask: COLOR_WRITE_ALL,
+            },
+          ],
+        },
+        primitive: {
+          topology: "triangle-list",
+        },
+        depthStencil: {
+          format: RENDER_TARGET_DEPTH_FORMAT,
+          depthWriteEnabled: true,
+          depthCompare: "less",
+        },
+      });
+      this.#particleBindGroupLayout = bindGroupLayout;
+      this.#particlePipeline = pipeline;
+      return { pipeline, layout: bindGroupLayout };
+    } catch (error: unknown) {
+      this.#particlePipelineFailed = true;
+      if (DEV) {
+        devWarnOnce(
+          "webgpu-picking-particle-compile-failed",
+          "§71: the particle picking id pipeline failed to compile on this " +
+            "device; particle id draws are skipped (§61, §89). " +
+            `${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
    * Packs one id block per draw, records the pass, and submits. Starts from
    * a cleared id target (loadOp clear — this buffer is never composited, so
-   * a whole-attachment clear *is* "nothing there").
+   * a whole-attachment clear *is* "nothing there"). Particle emitters are
+   * instanced after the mesh draws with a distinct uniform block.
    */
   #drawPass(
     device: GpuDevice,
@@ -669,6 +923,8 @@ export class WebgpuPickingService implements PickingService {
     depthView: GpuTextureView,
     rect: PassRect,
     draws: readonly PackedDraw[],
+    particleDraws: readonly PackedParticleDraw[],
+    particleCache: WgpuParticleCache | null,
   ): void {
     if (draws.length > 0) {
       this.#growUniforms(device, layout, draws.length);
@@ -692,6 +948,40 @@ export class WebgpuPickingService implements PickingService {
         staging[idBase + 3] = idScratch[3];
       }
       const buffer = this.#uniformBuffer;
+      if (buffer !== null) {
+        device.queue.writeBuffer(buffer, 0, staging);
+      }
+    }
+
+    if (particleDraws.length > 0 && this.#particleBindGroupLayout !== null) {
+      this.#growParticleUniforms(
+        device,
+        this.#particleBindGroupLayout,
+        particleDraws.length,
+      );
+      const staging = this.#particleUniformStaging;
+      const projection = passProjection.elements;
+      const view = passView.elements;
+      for (let index = 0; index < particleDraws.length; index += 1) {
+        const draw = particleDraws[index];
+        const base = index * UNIFORM_STRIDE_FLOATS;
+        const projectionBase = base + PARTICLE_ID_PROJECTION_OFFSET / 4;
+        const viewBase = base + PARTICLE_ID_VIEW_OFFSET / 4;
+        const modelBase = base + PARTICLE_ID_MODEL_OFFSET / 4;
+        const idBase = base + PARTICLE_ID_PICK_OFFSET / 4;
+        const model = draw.model.elements;
+        for (let element = 0; element < 16; element += 1) {
+          staging[projectionBase + element] = projection[element];
+          staging[viewBase + element] = view[element];
+          staging[modelBase + element] = model[element];
+        }
+        encodePickId(draw.tableIndex, idScratch);
+        staging[idBase] = idScratch[0];
+        staging[idBase + 1] = idScratch[1];
+        staging[idBase + 2] = idScratch[2];
+        staging[idBase + 3] = idScratch[3];
+      }
+      const buffer = this.#particleUniformBuffer;
       if (buffer !== null) {
         device.queue.writeBuffer(buffer, 0, staging);
       }
@@ -734,6 +1024,28 @@ export class WebgpuPickingService implements PickingService {
         }
       }
     }
+
+    const particlePipeline = this.#particlePipeline;
+    const particleBindGroup = this.#particleBindGroup;
+    if (
+      particleDraws.length > 0 &&
+      particlePipeline !== null &&
+      particleBindGroup !== null &&
+      particleCache !== null
+    ) {
+      pass.setPipeline(particlePipeline);
+      for (let index = 0; index < particleDraws.length; index += 1) {
+        const draw = particleDraws[index];
+        if (draw.item.count === 0) {
+          continue;
+        }
+        particleCache.upload(draw.batch, draw.item, this.#updateCount);
+        pass.setBindGroup(0, particleBindGroup, [index * UNIFORM_STRIDE_BYTES]);
+        pass.setVertexBuffer(0, draw.geometry.positionBuffer);
+        pass.setVertexBuffer(1, draw.batch.buffer);
+        pass.draw(6, draw.item.count);
+      }
+    }
     pass.end();
     device.queue.submit([encoder.finish()]);
   }
@@ -763,6 +1075,38 @@ export class WebgpuPickingService implements PickingService {
         {
           binding: 0,
           resource: { buffer, offset: 0, size: ID_UNIFORM_BYTES },
+        },
+      ],
+    });
+  }
+
+  #growParticleUniforms(
+    device: GpuDevice,
+    layout: GpuBindGroupLayout,
+    blocks: number,
+  ): void {
+    if (blocks <= this.#particleUniformCapacity) {
+      return;
+    }
+    const capacity = Math.max(blocks, this.#particleUniformCapacity * 2);
+    this.#particleUniformBuffer?.destroy();
+    const buffer = device.createBuffer({
+      label: "fourJS:pick-particle-id-uniforms",
+      size: capacity * UNIFORM_STRIDE_BYTES,
+      usage: GPU_BUFFER_USAGE.UNIFORM | GPU_BUFFER_USAGE.COPY_DST,
+    });
+    this.#particleUniformBuffer = buffer;
+    this.#particleUniformStaging = new Float32Array(
+      capacity * UNIFORM_STRIDE_FLOATS,
+    );
+    this.#particleUniformCapacity = capacity;
+    this.#particleBindGroup = device.createBindGroup({
+      label: "fourJS:pick-particle-id-uniforms",
+      layout,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer, offset: 0, size: PARTICLE_ID_UNIFORM_BYTES },
         },
       ],
     });

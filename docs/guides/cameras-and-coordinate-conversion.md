@@ -145,8 +145,8 @@ bounds (`ParticleRenderable.computeBounds` returns `false` when nothing
 is alive). `hitTestMode = "bounds"` keeps the AABB path for a live
 system; `"gpu"` is what selects the id pass. WebGPU declares the same
 `registerPickingPipeline` / `createPickingService` seam
-(`fourJS/render-webgpu`); its id pass still skips particles and
-skinned items.
+(`fourJS/render-webgpu`); its id pass draws one id per particle emitter
+(CPU 8-float billboard) and still skips skinned items.
 
 ## Dragging: pixels to world deltas
 
