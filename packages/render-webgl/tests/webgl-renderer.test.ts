@@ -4278,7 +4278,9 @@ describe("ParticleAppearanceProgram — R-32 textured/rotated/soft (opt-in)", ()
     program.setUseMap(false);
     program.setSceneDepth(false);
 
-    expect(uploadsAt(gl, uniforms.get("model"))[0]?.[12]).toBe(4);
+    expect(uploadsAt(gl, uniforms.get("model"))[0]).toEqual([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 4, 0, 0, 1,
+    ]);
     expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1, 0]);
     expect(uploadsAt(gl, uniforms.get("hasSceneDepth"))).toEqual([1, 0]);
     expect(uploadsAt(gl, uniforms.get("depthWidth"))).toEqual([128, 1]);
@@ -4560,7 +4562,9 @@ describe("ParticleTrailProgram — compilation and linking (§36 trail tier)", (
     program.setProjection(new Matrix4());
     program.setView(new Matrix4());
     program.setModel(model);
-    expect(uploadsAt(gl, uniforms.get("model"))[0]?.[14]).toBe(3);
+    expect(uploadsAt(gl, uniforms.get("model"))[0]).toEqual([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 3, 1,
+    ]);
     program.dispose();
 
     const unresolved = createFakeGl({ resolveUniforms: false });

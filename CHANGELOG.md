@@ -33,6 +33,11 @@ stay on the tracker.
   runner the capsule reached `WALL_REACHED_Z` while still sliding into the
   wall. The walk now waits on settled `data-pz`.
 
+- **Particle appearance/trail matrix assertions typecheck under TypeDoc/TS 6.**
+  `uploadsAt(...)[0]?.[12]` indexed `unknown[]` (TS7053). The assertions
+  now compare the full uploaded matrix, matching the existing particle
+  program case.
+
 - **§79 diagnostics no longer interpolate `constructor.name`.** A minified
   `Renderable` reported as `"Ur"`. Messages and context now name authored
   document types (`"scene"`, `"group"`, registered `typeName`) and the
@@ -54,7 +59,9 @@ stay on the tracker.
   itself is unchanged. Oxlint's `**/tests/**` override now also turns off
   `typescript/no-unsafe-*`: Vitest 5's `vi.spyOn` / `MockInstance` types
   trip those rules on suites that were clean under 3.2.7. `tsc -p tests`
-  stays clean.
+  stays clean. Package `tsconfig.json` files (the ones that include
+  tests) now set `"types": ["node"]` — Vitest 3 referenced Node from its
+  own typings; 5 does not, and TypeDoc's TS 6 pass typechecks those tests.
 
 ### Added
 

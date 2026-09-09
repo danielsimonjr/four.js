@@ -47,8 +47,10 @@ readable; never delete the pointer itself.
   guards). physics 97.27%, render-webgl 95.57%, text 100%, render 97.59%.
   `vitest` and `@vitest/coverage-v8` bumped together. Gate unchanged at 95%.
   Oxlint `**/tests/**` now also allows `typescript/no-unsafe-*` — Vitest 5
-  mock types trip them; `tsc -p tests` is still clean. Supersedes the
-  same-day "second measurement / bump still waits" note.
+  mock types trip them; `tsc -p tests` is still clean. Package test
+  tsconfigs set `"types": ["node"]` because Vitest 5 dropped the Node
+  triple-slash that 3.2.7 shipped (TypeDoc/TS 6 typechecks those tests).
+  Supersedes the same-day "second measurement / bump still waits" note.
 
 - **2026-09-09 — Vitest 5 coverage campaign, second measurement.** After
   executing the previously-unrun Rapier init reject path, stale-handle

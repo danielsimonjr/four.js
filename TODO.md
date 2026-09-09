@@ -64,7 +64,9 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
   `bun run lint` is **0 warnings / 0 errors**.
   Follow-up 2026-09-09: the `**/tests/**` override also turns off
   `typescript/no-unsafe-*` so Vitest 5's `vi.spyOn` types do not fail
-  suites that were clean under 3.2.7.
+  suites that were clean under 3.2.7. Package test tsconfigs set
+  `"types": ["node"]` because Vitest 5 no longer references Node from
+  its own typings (TypeDoc's TS 6 pass typechecks those tests).
 
 ### 2 · Hours — one contained fix, already diagnosed
 
