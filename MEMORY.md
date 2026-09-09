@@ -30,6 +30,19 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — Open-TODO first wave, simple → complex.** Thirteen
+  checkboxes remain; four slices landed without pretending the packets
+  closed. (1) Lighting: `Matrix3.setNormalFromMatrix4` + WebGL
+  lit/standard hoist; singular models upload identity; WebGPU stays
+  per-vertex cofactor until `DrawUniforms` widens (144 → ~192).
+  CSS light colors were already shipped (`parseColorRGB`). (2) RFC 0005
+  §86: `benchmarks/pick-latency.mjs` — N=64 id-pass ≈ list (1.03×);
+  10k–100k ≈ 3–4×; fence vs stall is JS+seam only (no host WebGL 2).
+  (3) R-33: `data-simulate` / `data-present` seconds on particles-demo;
+  gate asserts existence, not 16.6 ms. (4) Dogfood cycle 4: the three
+  leftover surfaces work; `digital-twin.md` taught the throwing save.
+  First publish and R-33's §112 exit stay blocked.
+
 - **2026-09-09 — tools/docs must stay on typescript@6.0.3.** Dependabot #82
   bumped it to 7.0.2 with the root. TypeDoc 0.28's peer is 5.0–6.0; CI died
   on `PropertyDeclaration`. Isolation is a version pin, not a directory.

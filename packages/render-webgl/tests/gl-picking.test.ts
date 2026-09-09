@@ -182,6 +182,9 @@ function createFakePickGl(options: FakePickGlOptions = {}): FakePickGl {
     uniformMatrix4fv(location, transpose, data) {
       record("uniformMatrix4fv", location, transpose, data);
     },
+    uniformMatrix3fv(location, transpose, data) {
+      record("uniformMatrix3fv", location, transpose, data);
+    },
     uniform4fv(location, data) {
       record("uniform4fv", location, data);
     },

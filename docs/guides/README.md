@@ -121,7 +121,9 @@ under `/examples/<name>/` on Pages; browser gates live in `tests/browser/`.
 | UI | `examples/ui-demo`; `tests/browser/ui.spec.ts` |
 | Input / picking / dragging | `examples/first-2d-scene`; `tests/browser/interaction.spec.ts`. First-person: `examples/character-controller` |
 | Particles | `examples/particles-demo`; `tests/browser/particles.spec.ts` |
-| Mixed 2D / 3D / physics | `examples/mixed-scene` / `examples/physics-playground`; the §118 flagship |
+| Mixed 2D / 3D / physics | `examples/mixed-scene` / `examples/physics-playground` (a 2D world and a 3D world side by side); the §118 flagship (2D + 3D in **one** scene) |
+| Text / §56 | `examples/first-2d-scene`; `tests/browser/text.spec.ts`. `buildGlyphAtlas` lives on `fourJS/text`; the `Text` node is imported from `fourJS`, not that subpath |
+| Scene save / §79 + §34 snapshot | `examples/flagship/motor-digital-twin`; [digital-twin](digital-twin.md). `registerSceneNodeTypes()` then `serializeScene` / `instantiateScene` — `createDefaultComponentSerializers()` alone refuses a `Renderable`. `PhysicsWorld.createSnapshot()` is the solver half |
 
 ## Beside the guides
 

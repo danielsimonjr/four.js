@@ -70,6 +70,23 @@ stay on the tracker.
 
 ### Added
 
+- **`Matrix3` normal-matrix utility and WebGL hoist.** `transpose()`,
+  `setFromMatrix4Upper3x3()`, `setNormalFromMatrix4()` — the inverse-transpose
+  of a `Matrix4`'s upper 3×3. Lit and standard WebGL vertex stages upload
+  `uniform mat3 normalMatrix` once per draw instead of
+  `transpose(inverse(mat3(model)))` per vertex. WebGPU still uses the
+  per-vertex cofactor until `DrawUniforms` is widened.
+
+- **RFC 0005 pick-latency record.** `benchmarks/pick-latency.mjs` times
+  id-pass vs the render list (flagship-order 64 and R-8 10k/50k/100k) and
+  fence vs stall `pick()` on the counting-GL seam. Not a gate. Particle
+  systems still pick by bounds.
+
+- **R-33 simulate / present split.** `examples/particles-demo` publishes
+  `data-simulate` and `data-present` in seconds on `#status`. The browser
+  gate checks they exist and stay finite; it does not assert a frame budget.
+  §112's rendered exit still needs non-SwiftShader hardware.
+
 - **RFC 0003 prototype measurements.** `benchmarks/skinning-resolve.mjs` records
   the 60-bone ×1/×10 resolve (Bone vs Group) and the 180-channel controller vs
   mixer path. Alternative A does not return on cost. The record proposes a
@@ -82,6 +99,13 @@ stay on the tracker.
 
 
 ### Documented
+
+- **Dogfooding cycle 4.** Consumer seat (`.dogfood/cycle4`) exercised §56
+  `Text`, `.four.json` + §34 snapshot round-trip, and 2D+3D in one scene.
+  `digital-twin.md` no longer teaches the throwing `serializeScene` call;
+  `fourJS/text` header states `Text` lives on the umbrella; guides README
+  distinguishes `examples/mixed-scene` (two worlds) from the one-scene
+  flagship. Architecture API/COMPONENTS samples match.
 
 - **12.8s barrels test vs 5s default timeout.** The suite sets `{ timeout: 30_000 }`;
   the 9809ms application figure is a file-aggregate, not a hidden config.

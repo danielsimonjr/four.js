@@ -9,7 +9,7 @@ box are siblings in the same right-handed, Y-up world (§6, §7a).
 
 `Node` is the base type (§6). It extends the typed `EventEmitter` (§6b), owns a
 `Transform`, a parent, and an ordered child list. `Group` is a plain container;
-`Scene` is the root the application owns; `Renderable` (from `four/render`)
+`Scene` is the root the application owns; `Renderable` (from `fourJS/render`)
 is a node with a geometry and a material.
 
 ```ts

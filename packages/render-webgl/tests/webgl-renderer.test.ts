@@ -409,6 +409,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     uniformMatrix4fv(location, transpose, data) {
       record("uniformMatrix4fv", location, transpose, data);
     },
+    uniformMatrix3fv(location, transpose, data) {
+      record("uniformMatrix3fv", location, transpose, data);
+    },
     uniform4fv(location, data) {
       record("uniform4fv", location, data);
     },
@@ -4953,7 +4956,7 @@ function litRenderable(
 }
 
 describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
-  it("compiles both stages, links, and resolves the nineteen uniforms", () => {
+  it("compiles both stages, links, and resolves the twenty uniforms", () => {
     const gl = createFakeGl();
 
     const program = LitProgram.create(gl);
@@ -4965,6 +4968,7 @@ describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
     ).toEqual([
       "viewProjection",
       "model",
+      "normalMatrix",
       "color",
       "ambientLight",
       "lightDirection",
@@ -5011,6 +5015,9 @@ describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
     expect(String(sources[0])).toContain(
       `layout(location = ${String(NORMAL_ATTRIBUTE_LOCATION)}) in vec3 normal;`,
     );
+    expect(String(sources[0])).toContain("uniform mat3 normalMatrix;");
+    expect(String(sources[0])).toContain("vNormal = normalMatrix * normal;");
+    expect(String(sources[0])).not.toContain("transpose(inverse");
     expect(String(sources[1])).toContain("uniform vec3 ambientLight;");
     expect(String(sources[1])).toContain("uniform vec3 lightDirection;");
     expect(String(sources[1])).toContain("uniform vec3 lightColor;");
@@ -5062,6 +5069,30 @@ describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
 
     expect(gl.countOf("deleteProgram")).toBe(1);
     expect(program.disposed).toBe(true);
+  });
+
+  it("uploads the model matrix and a 9-float normal matrix from setModel", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    program.use();
+    const uniforms = litUniforms(gl);
+
+    const model = new Matrix4().fromArray([
+      2, 0, 0, 0, 0, 4, 0, 0, 0, 0, 8, 0, 1, 2, 3, 1,
+    ]);
+    program.setModel(model);
+
+    expect(uploadsAt(gl, uniforms.get("model"))).toEqual([
+      [2, 0, 0, 0, 0, 4, 0, 0, 0, 0, 8, 0, 1, 2, 3, 1],
+    ]);
+    // Inverse-transpose of diag(2, 4, 8) is diag(1/2, 1/4, 1/8).
+    expect(uploadsAt(gl, uniforms.get("normalMatrix"))).toEqual([
+      [0.5, 0, 0, 0, 0.25, 0, 0, 0, 0.125],
+    ]);
+    const matrix3 = gl.callsOf("uniformMatrix3fv");
+    expect(matrix3).toHaveLength(1);
+    expect(matrix3[0].args[1]).toBe(false);
+    expect((matrix3[0].args[2] as number[]).length).toBe(9);
   });
 });
 
@@ -7986,7 +8017,7 @@ function standardRenderable(
 }
 
 describe("StandardProgram — compilation and linking (§59, §61, §89)", () => {
-  it("compiles both stages, links, and resolves the twenty-five uniforms", () => {
+  it("compiles both stages, links, and resolves the twenty-six uniforms", () => {
     const gl = createFakeGl();
 
     const program = StandardProgram.create(gl);
@@ -7998,6 +8029,7 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
     ).toEqual([
       "viewProjection",
       "model",
+      "normalMatrix",
       "baseColor",
       "metalness",
       "roughness",
@@ -8053,6 +8085,9 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
     expect(sources[0]).toContain(
       `layout(location = ${String(UV_ATTRIBUTE_LOCATION)}) in vec2 uv;`,
     );
+    expect(sources[0]).toContain("uniform mat3 normalMatrix;");
+    expect(sources[0]).toContain("vNormal = normalMatrix * normal;");
+    expect(sources[0]).not.toContain("transpose(inverse");
     // The world position is the one varying the lit stage does not produce.
     expect(sources[0]).toContain("out vec3 vWorldPosition;");
     // §59's parameters, and the BRDF's own constants.
@@ -8079,6 +8114,9 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
 
     expect(uploadsAt(gl, uniforms.get("viewProjection"))).toHaveLength(1);
     expect(uploadsAt(gl, uniforms.get("model"))).toHaveLength(1);
+    expect(uploadsAt(gl, uniforms.get("normalMatrix"))).toEqual([
+      [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    ]);
     // `opacity` multiplies alpha only, exactly as the unlit program does.
     expect(uploadsAt(gl, uniforms.get("baseColor"))).toEqual([
       [1, 0.5, 0.25, 0.25],

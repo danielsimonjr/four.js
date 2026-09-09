@@ -270,6 +270,10 @@ const REQUIRED_CONTEXT_METHODS = [
   // draw, the same courtesy the check extends to every other entry point the
   // backend cannot draw without.
   "uniform3fv",
+  // The lit/standard normal-matrix hoist (2026-09-09): `uniform mat3`. Core
+  // WebGL 1 and 2, listed so an incomplete stub fails at initialize rather
+  // than at the first shaded `setModel`.
+  "uniformMatrix3fv",
   // The render-target path's five (R-4, 2026-08-07). Core WebGL 1 and 2 too,
   // so they discriminate nothing either; they are checked for the same reason
   // as `uniform3fv` — a stub that cannot allocate a framebuffer should say so

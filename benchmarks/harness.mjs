@@ -144,6 +144,11 @@ export const SUITE = Object.freeze(
       record: "skinning-resolve",
       what: "RFC 0003 bones-as-nodes resolve (60 ×1/×10) and 180-channel controller vs mixer",
     },
+    {
+      file: "pick-latency.mjs",
+      record: "pick-latency",
+      what: "RFC 0005 id-pass cost vs the flagship/R-8 list and fence-vs-stall pick latency",
+    },
   ].map((entry) => Object.freeze(entry)),
 );
 

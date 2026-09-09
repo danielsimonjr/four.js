@@ -39,10 +39,13 @@
  * 3. **The inverse-transpose is a hand-written function.** GLSL ES 3.00 has
  *    `inverse()` built in; WGSL does not. {@link NORMAL_MATRIX_WGSL} computes
  *    the same matrix per vertex from the cofactor columns —
- *    `transpose(inverse(A)) = cofactor(A) / det(A)`, exact in exact arithmetic
- *    — so the staged note on `LIT_VERTEX_SHADER_SOURCE` (hoist to a per-draw
- *    uniform when `Matrix3` grows a normal-matrix utility) applies to both
- *    backends at once, and neither has hoisted yet.
+ *    `transpose(inverse(A)) = cofactor(A) / det(A)`, exact in exact arithmetic.
+ *    `Matrix3.setNormalFromMatrix4` now exists and the WebGL lit/standard
+ *    stages hoist it to a per-draw `uniform mat3`. Widening this package's
+ *    144-byte `DrawUniforms` for a `mat3x3` needs std140 padding (typically
+ *    192 bytes) and would retouch every pipeline that splices
+ *    `DRAW_UNIFORM_WGSL`; until that dedicated layout packet, this stage
+ *    keeps the per-vertex cofactor.
  */
 
 import { DRAW_UNIFORM_WGSL } from "./wgpu-bindings.js";
@@ -122,7 +125,9 @@ export function shadedVertexBufferLayouts(
  * `a₁×a₂, a₂×a₀, a₀×a₁`, all over `det(A) = a₀·(a₁×a₂)`. A degenerate model
  * matrix (zero determinant) divides by zero here exactly as GLSL's `inverse()`
  * is undefined on it — flattened-to-nothing geometry is not a shading input
- * either backend defends.
+ * either backend defends. The CPU helper `Matrix3.setNormalFromMatrix4` is
+ * the same inverse-transpose; WebGL uploads it per draw, WebGPU still
+ * evaluates this per vertex until `DrawUniforms` is widened.
  */
 export const NORMAL_MATRIX_WGSL = `fn normalMatrix(model : mat4x4<f32>) -> mat3x3<f32> {
   let a0 = model[0].xyz;

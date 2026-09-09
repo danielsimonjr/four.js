@@ -49,7 +49,7 @@
  */
 
 import { FourError, type Disposable } from "@fourjs/core";
-import type { Matrix4, Vector3 } from "@fourjs/math";
+import { Matrix3, type Matrix4, type Vector3 } from "@fourjs/math";
 import { MAX_PUNCTUAL_LIGHTS, type SceneLights } from "@fourjs/render";
 
 /**
@@ -346,6 +346,21 @@ export interface WebglContext {
   ): GlUniformLocation | null;
   useProgram(program: GlProgramHandle | null): void;
   uniformMatrix4fv(
+    location: GlUniformLocation,
+    transpose: boolean,
+    data: Float32Array,
+  ): void;
+  /**
+   * Uploads one `mat3` uniform, column-major.
+   *
+   * Added with the lit/standard normal-matrix hoist (2026-09-09): those two
+   * vertex stages used to derive `transpose(inverse(mat3(model)))` per vertex,
+   * and now consume a per-draw 9-float upload. Growing this interface is the
+   * same explicit budget bump `uniform1f` documented when §59 landed — a new
+   * entry point rather than packing the 3×3 into a `mat4`. The node-material
+   * pipeline still pads `mat3` to `mat4` so its transcripts stay untouched.
+   */
+  uniformMatrix3fv(
     location: GlUniformLocation,
     transpose: boolean,
     data: Float32Array,
@@ -1283,13 +1298,12 @@ export class ShadowUniforms {
  *
  * The normal is transformed by the **inverse transpose** of the model
  * matrix's upper 3×3 — the standard fix for non-uniform scale, under which
- * the plain 3×3 would bend normals off their surfaces. GLSL ES 3.00 has
- * `inverse()` and `transpose()` built in, so the matrix is derived in the
- * shader per vertex rather than uploaded per draw; staged with a dated note
- * (2026-08-04): when `@fourjs/math`'s `Matrix3` grows a normal-matrix utility,
- * hoisting this to a per-draw uniform saves the per-vertex inversion. MVP
- * vertex counts make the difference unmeasurable, and the shader route needs
- * no new upload path or math surface today.
+ * the plain 3×3 would bend normals off their surfaces. That matrix is
+ * `Matrix3.setNormalFromMatrix4` on the CPU, uploaded once per draw as
+ * `uniform mat3 normalMatrix` (the 2026-08-04 staging note: landed 2026-09-09).
+ * Pixel-identical to the previous per-vertex `transpose(inverse(mat3(model)))`
+ * on any non-singular model; a singular model leaves the scratch identity,
+ * matching invert()'s no-op rather than GLSL's undefined inverse.
  */
 const LIT_VERTEX_SHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 position;
@@ -1298,13 +1312,14 @@ layout(location = 2) in vec2 uv;
 
 uniform mat4 viewProjection;
 uniform mat4 model;
+uniform mat3 normalMatrix;
 
 out vec3 vNormal;
 out vec3 vWorldPosition;
 out vec2 vUv;
 
 void main() {
-  vNormal = transpose(inverse(mat3(model))) * normal;
+  vNormal = normalMatrix * normal;
   vWorldPosition = (model * vec4(position, 1.0)).xyz;
   vUv = uv;
   gl_Position = viewProjection * model * vec4(position, 1.0);
@@ -1422,6 +1437,40 @@ void main() {
  * is consumed by the GL call before the next `set()` can happen.
  */
 export const matrixScratch = new Float32Array(16);
+
+/**
+ * Scratch for the lit/standard `uniform mat3 normalMatrix` upload.
+ *
+ * A dedicated 9-float buffer rather than a view onto {@link matrixScratch}:
+ * `setModel` writes the 4×4 first, and the GL call consumes that buffer
+ * synchronously, but a shared backing store would still make recording
+ * doubles (which keep the argument by reference) rewrite every earlier
+ * `uniformMatrix4fv` line with the 3×3's tail. One extra 36-byte array,
+ * module-level, never per draw.
+ */
+const matrix3Scratch = new Float32Array(9);
+
+/**
+ * Reused {@link Matrix3} for {@link uploadNormalMatrix}. Constructed once;
+ * `setNormalFromMatrix4` mutates in place and allocates nothing (plan D7).
+ */
+const normalMatrixScratch = new Matrix3();
+
+/**
+ * Derives `transpose(inverse(upper 3×3))` of `model` and uploads it as a
+ * column-major `mat3`. Seeds the scratch to identity first so a singular
+ * model (invert no-op) cannot leak the previous draw's inverse-transpose.
+ */
+export function uploadNormalMatrix(
+  gl: WebglContext,
+  location: GlUniformLocation,
+  model: Matrix4,
+): void {
+  normalMatrixScratch.identity();
+  normalMatrixScratch.setNormalFromMatrix4(model);
+  matrix3Scratch.set(normalMatrixScratch.elements);
+  gl.uniformMatrix3fv(location, false, matrix3Scratch);
+}
 
 /** Scratch for {@link UnlitProgram.setColor}; see {@link matrixScratch}. */
 const colorScratch = new Float32Array(4);
@@ -2011,6 +2060,8 @@ export class LitProgram implements Disposable {
 
   readonly #modelLocation: GlUniformLocation;
 
+  readonly #normalMatrixLocation: GlUniformLocation;
+
   readonly #colorLocation: GlUniformLocation;
 
   readonly #ambientLightLocation: GlUniformLocation;
@@ -2039,6 +2090,7 @@ export class LitProgram implements Disposable {
     program: GlProgramHandle,
     viewProjectionLocation: GlUniformLocation,
     modelLocation: GlUniformLocation,
+    normalMatrixLocation: GlUniformLocation,
     colorLocation: GlUniformLocation,
     ambientLightLocation: GlUniformLocation,
     lightDirectionLocation: GlUniformLocation,
@@ -2052,6 +2104,7 @@ export class LitProgram implements Disposable {
     this.#program = program;
     this.#viewProjectionLocation = viewProjectionLocation;
     this.#modelLocation = modelLocation;
+    this.#normalMatrixLocation = normalMatrixLocation;
     this.#colorLocation = colorLocation;
     this.#ambientLightLocation = ambientLightLocation;
     this.#lightDirectionLocation = lightDirectionLocation;
@@ -2081,6 +2134,7 @@ export class LitProgram implements Disposable {
         program,
         requireUniform(gl, program, "viewProjection", "lit"),
         requireUniform(gl, program, "model", "lit"),
+        requireUniform(gl, program, "normalMatrix", "lit"),
         requireUniform(gl, program, "color", "lit"),
         requireUniform(gl, program, "ambientLight", "lit"),
         requireUniform(gl, program, "lightDirection", "lit"),
@@ -2119,10 +2173,11 @@ export class LitProgram implements Disposable {
     );
   }
 
-  /** Uploads one render item's world matrix. See {@link setViewProjection}. */
+  /** Uploads one render item's world matrix and its derived normal matrix. */
   setModel(matrix: Matrix4): void {
     matrixScratch.set(matrix.elements);
     this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
+    uploadNormalMatrix(this.#gl, this.#normalMatrixLocation, matrix);
   }
 
   /**

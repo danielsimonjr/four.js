@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **13 open**, 248 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, and the Vitest 5 coverage campaign (bump landed; particles follow-up the same day after CI caught 92.1% branches). Of the 13, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked — the typedoc/TS 7 pin is no longer a release gate.
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **13 open**, 248 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, and the Vitest 5 coverage campaign (bump landed; particles follow-up the same day after CI caught 92.1% branches). Same-day feature-packet **slices** (checkboxes stay open): WebGL normal-matrix hoist, RFC 0005 pick-latency record, R-33 simulate/present split, dogfood cycle 4. Of the 13, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked — the typedoc/TS 7 pin is no longer a release gate.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -114,17 +114,17 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 
 - Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; ~~spherical wander~~ DONE 2026-09-06; ~~CCD/FABRIK~~ DONE 2026-09-06; ~~path-planning adapters (RFC)~~ **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
-- RFC 0005 residue (staged in source, 2026-08-29):
+- RFC 0005 residue (staged in source, 2026-08-29): §86 pick measurements DONE 2026-09-09 (`benchmarks/pick-latency.mjs`); ParticleIdProgram / WebGPU pick / §72 dispatch remain.
 - RFC 0001 residue (staged in source, 2026-08-28):
 - RFC 0003 residue (staged in source, 2026-08-28):
 - RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
-- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color strings on lights, light layers; hoist the lit shader's per-vertex inverse-transpose to a per-draw normal-matrix uniform when @fourjs/math grows a Matrix3 utility (dated note in gl-program.ts)
+- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL normal-matrix hoist DONE 2026-09-09; WebGPU still per-vertex.
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
 - Follow-ups the R-1 plan explicitly defers
 - PH-11c — character/dynamics push interaction — DONE 2026-09-06 (`pushMass` / reduced-mass impulse / wake).
 - R-32 — textured / rotated / soft particles.
-- R-33 — §112's exit, rendered as well as simulated.
+- R-33 — §112's exit, rendered as well as simulated. Split landed 2026-09-09; exit still needs non-SwiftShader.
 - R-31 — GPU particle simulation integrator tier — DONE 2026-08-29 (`simulation: "gpu"`); §27 GPU fields / depth-buffer collision / GPU snapshots remain under R-31 residue.
 - PH-22 residue (re-read 2026-08-21): PH-22f anchors DONE 2026-09-06; path-planning RFC Proposed.
 - R-8 follow-ups:
@@ -848,8 +848,16 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       message is §10's dropped-time guard on the slower first frame — *"dropped 0.0666s
       … TimeState.droppedTime is now 0.0666s"* — which is the documented behaviour and names
       the field to inspect, not a defect.
-      STILL not exercised: text/§56, serialization/§34 round-trip in the browser, and the
-      2D↔3D mixed-scene story. Those are where the next findings are.
+      **Cycle 4 (2026-09-09, `.dogfood/cycle4`) — the three remaining surfaces,
+      from a consumer seat, in one Scene, in Chrome + Node.** §56 `Text` via
+      `buildGlyphAtlas` (layout 2.240 × 0.280); `.four.json` round-trip 7→7
+      nodes, byte-stable 1939 B; §34 Rapier2D snapshot checksum restored
+      exactly; 2D disc + 3D sphere + Text under one `PerspectiveCamera`.
+      Engine: clean. Docs were the defect: `digital-twin.md` taught the
+      `serializeScene` call that throws (no `nodeTypeOf`); `fourJS/text` does
+      not export `Text` (umbrella only, §3.1); `examples/mixed-scene` is a
+      playground re-export, not one graph. Guides + barrel headers corrected.
+      Standing: next cycle picks a new surface, not these three.
 
 - [x] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
       one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`
@@ -1106,9 +1114,13 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       bumped 44 → 44.5 kB at landing (A/B: the tier riding ui-demo's `pick()`).
 - [ ] **RFC 0005 residue (staged in source, 2026-08-29):** the instanced particle
       id arm (a `ParticleIdProgram` sharing the §36 billboard vertex stage — until
-      then particle systems pick by bounds only); §86 rows still owed: id-pass
-      cost vs the flagship list and measured fence-vs-stall pick latency;
-      WebGPU's `PickingService` (`mapAsync`) is WP-R1.x material; §72
+      then particle systems pick by bounds only); ~~§86 rows still owed: id-pass
+      cost vs the flagship list and measured fence-vs-stall pick latency~~
+      **DONE 2026-09-09** (`benchmarks/pick-latency.mjs`): at flagship-order
+      N=64 the id pass is within noise of the list (1.03×); at 10k–100k it is
+      ~3–4× the list. Fence vs stall timed on the counting-GL seam only
+      (no host WebGL 2 / no WebGPU `PickingService`). WebGPU's
+      `PickingService` (`mapAsync`) is WP-R1.x material; §72
       pointer-event dispatch on a `PickProvider` result is an input packet. The analytic
       `"geometry"` tier + `node.hitTestMode` landed 2026-08-29 — A-11 closed;
       only the render-side residues above remain here.
@@ -1204,10 +1216,13 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 —
       directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas,
       transparent masks and contact shadows remain),
-      §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color
-      strings on lights, light layers; hoist the lit shader's per-vertex
-      inverse-transpose to a per-draw normal-matrix uniform when @fourjs/math grows a
-      Matrix3 utility (dated note in gl-program.ts)
+      §59 StandardMaterial/PBR, §60a color management + tone mapping,
+      ~~CSS color strings on lights~~ **DONE** (`parseColorRGB` on `Light`),
+      light layers; ~~hoist the lit shader's per-vertex inverse-transpose to a
+      per-draw normal-matrix uniform when @fourjs/math grows a Matrix3
+      utility~~ **DONE 2026-09-09 on WebGL** (`Matrix3.setNormalFromMatrix4`
+      + `uniform mat3 normalMatrix` on lit/standard). WebGPU still evaluates
+      the cofactor per vertex until `DrawUniforms` is widened.
 - [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
       family list now names `LitMaterial`
 - [ ] First publish (§94 0.1): Changesets release workflow + the
@@ -1395,8 +1410,12 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       10-float stream (`rotation` + `softness`); default 8-float stream and
       goldens unchanged. WebGL appearance program is lazy.
 - [ ] **R-33 — §112's exit, rendered as well as simulated.** Owner: the browser-gate
-      packet, on non-SwiftShader hardware. Now has headroom (see R-34). Report
-      simulate-ms and present-ms separately.
+      packet, on non-SwiftShader hardware. Now has headroom (see R-34).
+      ~~Report simulate-ms and present-ms separately~~ **DONE 2026-09-09**:
+      `examples/particles-demo` publishes `data-simulate` / `data-present`
+      (seconds, §7a) on `#status`; the browser gate asserts they exist as
+      two finite non-negative attributes. **No fps budget** — SwiftShader is
+      not suitable hardware; the exit itself is still open.
 - [x] **R-31 — GPU particle simulation integrator tier.** DONE 2026-08-29 (WP-R1.8 +
       R-31 residue) — `simulation: "gpu"` on `ParticleEmitter` with a bound
       `ParticleGpuSimulation`; CPU spawn, GPU semi-implicit Euler under constant
@@ -2109,6 +2128,15 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       pre-1.0 PDF.
 
 ## Done
+
+- [x] 2026-09-09 — **Open-TODO first-wave slices (simple → complex).** Did
+      not close any of the 13 checkboxes. Landed: `Matrix3.setNormalFromMatrix4`
+      + WebGL lit/standard `uniform mat3 normalMatrix`; RFC 0005
+      `benchmarks/pick-latency.mjs` (id-pass vs list, fence vs stall);
+      R-33 `data-simulate` / `data-present` on particles-demo (seconds, no
+      fps budget); dogfood cycle 4 (text / `.four.json` + §34 / one-scene
+      mixed 2D+3D) with guide fixes. Still owner/hardware: first publish,
+      R-33 exit. WebGPU normal-matrix and ParticleIdProgram not this wave.
 
 - [x] 2026-09-09 — **Vitest 5 particles follow-up.** CI `bun run coverage`
       after the bump failed `@fourjs/particles` at 92.1% branches. Honest
