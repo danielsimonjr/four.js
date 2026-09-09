@@ -41,11 +41,21 @@ readable; never delete the pointer itself.
   within 0.002 ms of the mixer. Proposed §86: 227 independent 60-bone
   characters inside one 60 Hz step (host-specific, not a gate).
 
+- **2026-09-09 — Vitest 5.0.0 landed.** The coverage campaign closed the
+  last honest gap: physics-rapier branches 95.26% (724/760) after
+  `rapier-defensive-branches.test.ts` (countContacts + snapshot-envelope
+  guards). physics 97.27%, render-webgl 95.57%, text 100%, render 97.59%.
+  `vitest` and `@vitest/coverage-v8` bumped together. Gate unchanged at 95%.
+  Oxlint `**/tests/**` now also allows `typescript/no-unsafe-*` — Vitest 5
+  mock types trip them; `tsc -p tests` is still clean. Supersedes the
+  same-day "second measurement / bump still waits" note.
+
 - **2026-09-09 — Vitest 5 coverage campaign, second measurement.** After
   executing the previously-unrun Rapier init reject path, stale-handle
   context, and R-32 particle appearance/wide-stream/trail branches, four of
   the five failing packages clear 95% under Vitest 5. Remaining: physics-rapier
   global branches 92.1% (adapter defensive paths). Bump still waits.
+  **Superseded the same day — see the 5.0.0 landing entry above.**
 
 - **2026-09-09 — Browser-gate follow-up on the open-TODO PR.** Pause-during-
   grab was not enough: `waitForVirtualFrameCount` pumped the patched rAF and

@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **13 open**, 248 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), and RFC 0003's owed prototype measurements. Of the 13, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked.
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **13 open**, 248 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, and the Vitest 5 coverage campaign (bump landed). Of the 13, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -40,37 +40,18 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
   hidden config raises it. `vitest.coverage.config.ts` (30s) is coverage-only.
   Duration shown ≠ deadline. Headroom on a slow test is that test's own timeout.
 
-- **vitest 3.2.7 -> 5.0.0: ATTEMPTED 2026-09-08, reverted, and it found something.** Split out
-  of the TypeScript/vitest row, which wrongly implied TypeDoc blocked it — vitest declares **no
-  `typescript` peer**. Both majors were bumped together (`vitest` + `@vitest/coverage-v8`, whose
-  peer is an exact `5.0.0`), which is the split-bump trap avoided.
-  · **The runner half is clean.** All **7,246 tests across 282 files pass** on vitest 5, plus
-    `test:suites`. No API breakage at all.
-  · **What blocks it is the COVERAGE GATE, and the gate was the thing that was wrong.** vitest 5
-    reports lower numbers because its v8 provider remaps accurately; the old numbers were
-    inflated. Proven on one file rather than asserted: `render/src/resource-warnings.ts` reports
-    **100% under vitest 3** and **66.66% statements under vitest 5** — and it contains
-    `if (!DEV) return;` which **no test exercises**, because no test sets `DEV` false. 100% was
-    impossible. vitest 3 was over-reporting; vitest 5 is right.
-  · **So the 95% gate is partly illusory today.** Under honest measurement six thresholds fail:
-    global branches in **physics (92.1%)**, **render-webgl (92.1%)** and **text (94.64%)**, plus
-    per-file `physics-rapier/src/init.ts`, `render/src/resource-warnings.ts` and
-    `render-webgl/src/gl-particles.ts`.
-  · **Reverted to 3.2.7 deliberately.** Landing the bump would mean either weakening a coverage
-    gate or running a five-package test campaign — neither belongs inside a compiler migration.
-    The campaign is the real task; the bump falls out of it for free.
-  · **Do the coverage work first, then the bump.** Bumping first turns a real quality gap into
-    a red build with no owner.
-  · Written up with the rest of the toolchain reasoning in `docs/MIGRATION.md` section 5.
-  · **PARTIAL 2026-09-09:** `resource-warnings.ts` now has a `__FOUR_DEV__ = false`
-    test (the file that proved Vitest 3 was over-reporting). Re-measured under
-    Vitest 5.0.0 after adding the Rapier init reject path, stale-handle
-    context, and R-32 particle appearance / wide-stream / trail tests:
-    **physics 97.27%, render-webgl 95.57%, text 100%, render 97.59%** all
-    clear the 95% gate; `init.ts` and `gl-particles.ts` are off the per-file
-    floor. **What remains is physics-rapier global branches at 92.1%**
-    (700/760) — almost all defensive `never` / stale-handle paths in the two
-    adapters. The bump still waits on that last package.
+- **vitest 3.2.7 -> 5.0.0: DONE 2026-09-09.** The 2026-09-08 attempt was
+  reverted because Vitest 5's honest v8 remap dropped six thresholds below
+  95%. The campaign closed those gaps without weakening the gate:
+  `resource-warnings.ts` now exercises `__FOUR_DEV__ = false`; Rapier `init`
+  reject/retry, stale-handle context, and R-32 particle appearance /
+  wide-stream / trail tests lifted physics / render-webgl / text / render;
+  `rapier-defensive-branches.test.ts` covers `countContacts` and the
+  snapshot-envelope guards (unknown mass mode, orphaned Rapier colliders,
+  collider-without-body, stay without body records). Re-measured under
+  5.0.0: **physics 97.27%, render-webgl 95.57%, text 100%, render 97.59%,
+  physics-rapier 95.26%** branches. `vitest` and `@vitest/coverage-v8`
+  bumped together to 5.0.0. Written up in `docs/MIGRATION.md` section 5.
 
 - **Triage the 42 Oxlint warnings the ESLint config never surfaced.** DONE 2026-09-09.
   Count on this tree was **40** (two `no-misused-spread` hits had already gone).
@@ -81,6 +62,9 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
   NUL-delimited guide slots; `no-unsafe-optional-chaining` off under `**/tests/**`
   (every hit was `(optional?.x).y` after an `expect` that the value exists).
   `bun run lint` is **0 warnings / 0 errors**.
+  Follow-up 2026-09-09: the `**/tests/**` override also turns off
+  `typescript/no-unsafe-*` so Vitest 5's `vi.spyOn` types do not fail
+  suites that were clean under 3.2.7.
 
 ### 2 · Hours — one contained fix, already diagnosed
 
@@ -109,6 +93,8 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 - rapier 0.20 adoption — DONE 2026-09-06 (0.20.0; contactPair takes bodies; goldens re-recorded from scenario helpers).
 - Lift the TypeScript/vitest pin once typedoc supports TS 7.
+  Vitest half **DONE 2026-09-09** (5.0.0). TypeDoc isolation still owns the
+  remaining `typescript@6.0.3` in `tools/docs`.
 - PoseTarget scale channel — DONE 2026-09-06 (physical side is identity).
 - Rotational root motion — DONE 2026-09-06 (quaternion track extracts local rotation).
 - A-25 owner decisions before first publish:

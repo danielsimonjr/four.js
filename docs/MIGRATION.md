@@ -21,7 +21,7 @@ separately and not yet put them together. Both halves landed on 2026-09-08.
 | **Lint** | ESLint 9 + typescript-eslint (**pinned root to TS < 6.1**) | **Oxlint + oxlint-tsgolint (requires TS 7)** |
 | **API docs** | TypeDoc at root (**pinned root to TS ≤ 6.0**) | **`tools/docs` workspace package, TS 6.0.3 nested** |
 | Root `typescript` | 6.0.3 | **7.0.2, and nothing constrains it** |
-| Test runner | Vitest 3.2.7 | unchanged — see section 5 |
+| Test runner | Vitest 3.2.7 | **Vitest 5.0.0** — see section 5 |
 
 Everything below is measured on this repository. Commands to re-measure are in
 [section 7](#7-how-to-re-measure).
@@ -38,7 +38,7 @@ they succeed and fail separately, so this document scores them separately.
 | L1 | **Package manager / workspaces** | Bun 1.4.2 | **Yes — already does** |
 | L2 | **Type checking** | TypeScript 7.0.2 | not Bun's job — this is `tsc` |
 | L3 | **Library build (JS + `.d.ts`)** | `tsc -b`, TS 7.0.2 | **No** — section 4.1 |
-| L4 | **Test runner** | Vitest 3.2.7 | **No** — section 4.2 |
+| L4 | **Test runner** | Vitest 5.0.0 | **No** — section 4.2 |
 | L5 | **Example bundling** | Vite 8 | **Probably — but do not** — section 4.3 |
 
 A sixth concern, **API docs and lint**, is not Bun's business at all — but it was the
@@ -540,6 +540,24 @@ plus per-file failures in `physics-rapier/src/init.ts`,
 **Do the coverage work first; the Vitest bump then falls out for free.** Bumping
 first converts a real quality gap into a red build with no owner.
 
+**Landed 2026-09-09.** The five-package campaign closed every honest gap
+without lowering the 95% gate. Re-measured under Vitest 5.0.0:
+
+| Package | Branches |
+|---|---|
+| physics | 97.27% |
+| render-webgl | 95.57% |
+| text | 100% |
+| render | 97.59% |
+| physics-rapier | 95.26% (724/760) |
+
+`physics-rapier` was the last holdout. The remaining adapter misses are
+unreachable through a well-formed public API (`localContactPoint` null,
+`colliderIds` that do not resolve). The tests that got the package over the
+line go through a rewritten snapshot envelope — the only way a Rapier
+collider or mass mode can exist on one side of the boundary and not the
+other. `vitest` and `@vitest/coverage-v8` are both 5.0.0.
+
 ---
 
 ## 6. What is left, and what unblocks it
@@ -549,13 +567,13 @@ The root is done. Three items remain, none of which blocks it:
 | Item | Status | Unblocked when |
 |---|---|---|
 | **Drop `typescript@6.0.3` entirely** | isolated in `tools/docs`; costs one dependency | TypeDoc ships TS 7 support ([#3098](https://github.com/TypeStrong/typedoc/issues/3098), open, no timeline) — or is replaced by API Extractor, which bundles its own compiler |
-| **Vitest 3 → 5** | blocked by a real coverage gap, not by the runner | the five-package coverage campaign in section 5 lands |
+| **Vitest 3 → 5** | **done 2026-09-09** — both packages at 5.0.0 | — |
 | **Triage the 42 Oxlint warnings** | **done 2026-09-09** — 0 warnings | — |
 | `bun build` replaces `tsc -b` | possible, ~107 `isolatedDeclarations` annotations away | not recommended — `tsc -b` on TS 7 builds a package in 211–401 ms and project references are tsc-only |
 | `bun test` replaces Vitest | blocked | three `vi.*` APIs (68 uses) exist **and** `bun test` can fail a build on a coverage threshold |
 
-Only the second and third are ours. The rest are other projects' roadmaps or
-deliberate choices.
+The Vitest bump and the Oxlint triage are done. What remains is other
+projects' roadmaps or deliberate choices.
 
 ---
 

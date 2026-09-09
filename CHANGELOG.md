@@ -48,12 +48,25 @@ stay on the tracker.
   `no-unsafe-optional-chaining` off under `**/tests/**`). `bun run lint` prints
   nothing.
 
+- **Vitest 3.2.7 → 5.0.0.** `vitest` and `@vitest/coverage-v8` bumped
+  together after the five-package coverage campaign cleared the 95% gate
+  under honest v8 remapping (physics-rapier 95.26% branches). The gate
+  itself is unchanged. Oxlint's `**/tests/**` override now also turns off
+  `typescript/no-unsafe-*`: Vitest 5's `vi.spyOn` / `MockInstance` types
+  trip those rules on suites that were clean under 3.2.7. `tsc -p tests`
+  stays clean.
+
 ### Added
 
 - **RFC 0003 prototype measurements.** `benchmarks/skinning-resolve.mjs` records
   the 60-bone ×1/×10 resolve (Bone vs Group) and the 180-channel controller vs
   mixer path. Alternative A does not return on cost. The record proposes a
   skinned-mesh §86 sentence from those numbers; it is not a spec amendment.
+
+- **Rapier snapshot-envelope guards.** `rapier-defensive-branches.test.ts`
+  covers `countContacts` and the paths a rewritten §34 envelope can reach:
+  unknown mass mode, Rapier colliders the metadata dropped, a collider whose
+  body left the envelope, and collisionstay without adapter body records.
 
 ### Documented
 
