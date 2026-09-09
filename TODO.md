@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **13 open**, 248 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, and the Vitest 5 coverage campaign (bump landed; particles follow-up the same day after CI caught 92.1% branches). Same-day feature-packet **slices** (checkboxes stay open): WebGL normal-matrix hoist, RFC 0005 pick-latency record, R-33 simulate/present split, dogfood cycle 4. Of the 13, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked — the typedoc/TS 7 pin is no longer a release gate.
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL normal-matrix hoist, RFC 0005 pick-latency record, R-33 simulate/present split, dogfood cycle 4. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -153,7 +153,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - A-16 remainder (manifest half): DONE 2026-09-06 (`preloadManifestIntoCatalog`).
 - A-19 remainder:
 - §96 residue:
-- R-19/R-20 follow-ups: §52 concave-extrude **DONE** (already on the tree); §55 atlas remains.
+- R-19/R-20 follow-ups — DONE 2026-09-09 (§52 already shipped; §55 authored sprite uvs).
 - Flaky gate — DONE 2026-09-06 (smoothness parity + blending page watches).
 - A-13 — DONE 2026-09-06 (`installAccessibilityMirror` opt-in DOM mirror).
 - Particle trails — PARTIAL 2026-09-06: CPU ring buffer + ribbon path + multi-stop ramps; GPU compute, depth-buffer collision, spatial-hash neighbors still open.
@@ -1882,20 +1882,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       primitives. **R-35 is now unblocked** (data path + vertexColors exist; what's left
       is wiring `DebugDrawBuffer`'s 7-float layout into a `BufferGeometry` — a
       `@fourjs/diagnostics` packet). R-9/R-13/R-22/R-30/R-32 lose their R-19 dependency
-- [ ] **R-19/R-20 follow-ups:** ~~§52 tessellation module (lifts the concave-extrude
-      restriction)~~ **DONE** — `tessellation.ts` + `extrudeGeometry` cap
-      concave outlines (`primitives-3d.test.ts` "caps a concave outline");
-      holes live on `polygonGeometry2D`. §55 atlas packet (retires the sprite
-      `quad` uniform with authored uvs); ~~qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly~~
-      **DONE 2026-09-07** — and it was wrong in the OPPOSITE direction to the one this
-      row assumed. The claim was not overstated; it was UNDER-evidenced: the evidence
-      column named only `boxGeometry`, while `primitives-3d.ts` ships nine more
-      (sphere, cylinder, cone, capsule, torus, lathe, extrude, tube, heightField). Now
-      cites them, and says what actually remains staged (skinning/morph, §52
-      tessellation) rather than implying the primitive set is thin. Two neighbouring
-      defects fell out of reading it: the **basic colliders** row still called §24's
-      shapes "staged" a month after they shipped, and **S-2** still claimed
-      `{ type: "cylinder" }` is "deliberately a compile error". Both corrected
+- [x] **R-19/R-20 follow-ups:** DONE 2026-09-09. §52 already capped concave
+      extrudes (`tessellation.ts` + `extrudeGeometry`); holes live on
+      `polygonGeometry2D`. §55 atlas packet: sprites author `geometry.uvs`
+      from `Sprite.frame` and both backends sample that stream — `uniform vec4
+      quad` / `SPRITE_QUAD_OFFSET` are gone. Frame writes rewrite eight floats
+      in place and bump geometry version (animation clips re-upload the uv
+      buffer, not the texture). AUDIT-120 "basic 3D meshes" honesty pass
+      2026-09-07.
 - [x] **Flaky gate (pre-existing, confirmed at baseline 2026-08-07):**
       DONE 2026-09-06 — RECOVER / ANIMATED / RAGDOLL now watch `data-chain-y`
       until span/floor; smoothness samples on virtual-frame parity. The
@@ -2134,6 +2128,12 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       pre-1.0 PDF.
 
 ## Done
+
+- [x] 2026-09-09 — **R-19/R-20 closed.** §52 concave-extrude was already
+      on the tree. §55 atlas: sprites author `geometry.uvs` from
+      `Sprite.frame`; WebGL/WebGPU sample that stream; `quad` uniform retired.
+      Frame changes re-upload eight uv floats (version bump), not the atlas
+      texture.
 
 - [x] 2026-09-09 — **Open-TODO first-wave slices (simple → complex).** Did
       not close any of the 13 checkboxes. Landed: `Matrix3.setNormalFromMatrix4`

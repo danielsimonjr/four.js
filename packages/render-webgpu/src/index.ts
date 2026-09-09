@@ -102,7 +102,6 @@ export {
 } from "./wgpu-batch.js";
 export {
   SPRITE_MODEL_OFFSET,
-  SPRITE_QUAD_OFFSET,
   SPRITE_SHADER_SOURCE,
   SPRITE_TINT_OFFSET,
   SPRITE_UNIFORM_BYTES,

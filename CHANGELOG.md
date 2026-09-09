@@ -47,6 +47,11 @@ stay on the tracker.
 
 ### Changed
 
+- **§55 sprites author UVs; `quad` uniform retired.** `Sprite.frame` writes
+  the cell into `geometry.uvs`. WebGL and WebGPU sample that attribute.
+  `SPRITE_QUAD_OFFSET` is gone. Changing a frame re-uploads eight floats
+  (geometry version), not the atlas texture. §65 batches copy the stream.
+
 - **Oxlint correctness warnings triaged to zero.** The 40 remaining default-
   category warnings (down from 42) were either one-line fixes (`Array.from`,
   `localeCompare`, computed quaternion `w`, a JSDoc that accidentally contained

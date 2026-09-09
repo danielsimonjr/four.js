@@ -111,7 +111,6 @@ import type {
   SpriteRenderItem,
   UnlitRenderItem,
 } from "./render-list.js";
-import type { SpriteFrame } from "./sprite.js";
 
 /** Floats per vertex in the position stream — always present. */
 const POSITION_FLOATS = 3;
@@ -331,26 +330,6 @@ interface MutableBatch {
   contentVersion: number;
 }
 
-/**
- * An item as this module reads §55's frame — structurally, exactly as
- * `render-list.ts` does, because a sprite item's `frame` is a
- * {@link SpriteFrame} or `null` and a *structurally typed* item built before
- * R-29 has no such property at all.
- */
-interface FramedItem {
-  readonly frame?: SpriteFrame | null;
-}
-
-/**
- * Whether `item` can start or join a batch at all, ignoring what it would join.
- *
- * Three questions, in the order that answers most items with the first: is its
- * pipeline one of the two this planner merges, does it carry a material to
- * merge by, and does its geometry have anything to draw? The last is the same
- * test a backend's geometry cache makes — a disposed geometry has empty arrays
- * (§53) and is skipped rather than drawn — so a run never straddles an item the
- * backend would have declined.
- */
 /** FNV-1a offset basis — the idle-cache mix starts here. */
 const FNV_OFFSET = 2166136261;
 
@@ -398,6 +377,16 @@ function contentVersionOf(
   return hash === 0 ? 1 : hash;
 }
 
+/**
+ * Whether `item` can start or join a batch at all, ignoring what it would join.
+ *
+ * Three questions, in the order that answers most items with the first: is its
+ * pipeline one of the two this planner merges, does it carry a material to
+ * merge by, and does its geometry have anything to draw? The last is the same
+ * test a backend's geometry cache makes — a disposed geometry has empty arrays
+ * (§53) and is skipped rather than drawn — so a run never straddles an item the
+ * backend would have declined.
+ */
 function isBatchable(item: RenderItem): item is BatchableItem {
   if (item.kind !== "unlit" && item.kind !== "sprite") {
     return false;
@@ -408,46 +397,6 @@ function isBatchable(item: RenderItem): item is BatchableItem {
     geometry.vertexCount > 0 &&
     geometry.drawCount > 0
   );
-}
-
-/**
- * The rectangle in **local** space that a sprite item's whole texture maps onto
- * — `(x, y, width, height)` written into `out`.
- *
- * This is the `quad` uniform `@fourjs/render-webgl`'s sprite pipeline uploads,
- * derived here instead so a batched sprite can carry the same mapping *per
- * vertex*: `uv = (position.xy − quad.xy) / quad.zw`. With no frame the
- * rectangle is the geometry's own local bounds; with one it is the (larger,
- * offset) rectangle the whole texture would occupy given that the quad shows
- * `frame` of it — R-29's affine reparametrization, restated here in the same
- * form the shader uses so the two cannot drift apart in meaning.
- *
- * `render-list.ts`'s own note predicted this: "§65 batching is where that
- * changes, and it changes by carrying uv per vertex rather than per draw."
- */
-function spriteQuad(
-  item: RenderItem,
-  material: SpriteMaterial,
-  out: Float64Array,
-): void {
-  const bounds = item.geometry.computeBounds();
-  const minX = bounds.min.x;
-  const minY = bounds.min.y;
-  const width = bounds.max.x - minX;
-  const height = bounds.max.y - minY;
-  const frame = (item as FramedItem).frame ?? null;
-  if (frame === null) {
-    out[0] = minX;
-    out[1] = minY;
-    out[2] = width;
-    out[3] = height;
-    return;
-  }
-  const texture = material.texture;
-  out[0] = minX - (frame.x * width) / frame.width;
-  out[1] = minY - (frame.y * height) / frame.height;
-  out[2] = (width * texture.width) / frame.width;
-  out[3] = (height * texture.height) / frame.height;
 }
 
 /**
@@ -468,9 +417,6 @@ export class RenderBatcher {
 
   /** Index staging array; grows, never shrinks. */
   #indices = new Uint32Array(0);
-
-  /** Scratch for {@link spriteQuad}, so uv derivation allocates nothing. */
-  readonly #quad = new Float64Array(4);
 
   /**
    * The single pooled result record. Constructed with the fields' zero values
@@ -546,11 +492,6 @@ export class RenderBatcher {
       return null;
     }
     const material: BatchableMaterial = first.material;
-    // Narrowed once, here, and carried through the assembly loop: a run's items
-    // all share this material *instance*, so they all draw through this
-    // pipeline. `null` for an unlit run is what tells `#writeVertices` to copy
-    // the geometry's uv instead of deriving §55's.
-    const spriteMaterial = first.kind === "sprite" ? first.material : null;
     // §67's clip for the whole run (R-23) — see `RenderBatch.clip`. `?? null`
     // so a structurally-typed item predating the field compares equal to the
     // builders' own unclipped `null` rather than ending every run at it.
@@ -631,16 +572,12 @@ export class RenderBatcher {
     for (let i = 0; i < count; i += 1) {
       const item = items[from + i];
       const geometry = item.geometry;
-      if (spriteMaterial !== null) {
-        spriteQuad(item, spriteMaterial, this.#quad);
-      }
       floatOffset = this.#writeVertices(
         item,
         floatOffset,
         floatsPerVertex,
         hasUvs,
         hasColors,
-        spriteMaterial !== null,
       );
       indexOffset = this.#writeIndices(geometry, indexOffset, vertexBase);
       vertexBase += geometry.vertexCount;
@@ -708,7 +645,8 @@ export class RenderBatcher {
    * which is precisely what the *unbatched* draw would sample, since a vertex
    * array with no such buffer leaves the attribute disabled. Filling the
    * default rather than refusing the item is therefore not a kindness: it is
-   * what keeps the batch a faithful copy of the draws it replaces.
+   * what keeps the batch a faithful copy of the draws it replaces. Sprites
+   * author their atlas cell on `geometry.uvs`; this path copies that stream.
    */
   #writeVertices(
     item: RenderItem,
@@ -716,7 +654,6 @@ export class RenderBatcher {
     floatsPerVertex: number,
     hasUvs: boolean,
     hasColors: boolean,
-    deriveUvs: boolean,
   ): number {
     const geometry = item.geometry;
     const positions = geometry.positions;
@@ -736,10 +673,6 @@ export class RenderBatcher {
     const m12 = e[12];
     const m13 = e[13];
     const m14 = e[14];
-    const quadX = this.#quad[0];
-    const quadY = this.#quad[1];
-    const quadWidth = this.#quad[2];
-    const quadHeight = this.#quad[3];
     const vertices = this.#vertices;
     let at = offset;
     for (let v = 0; v < vertexCount; v += 1) {
@@ -752,12 +685,7 @@ export class RenderBatcher {
       vertices[at + 2] = m2 * x + m6 * y + m10 * z + m14;
       let stream = at + POSITION_FLOATS;
       if (hasUvs) {
-        if (deriveUvs) {
-          // §55's mapping, per vertex instead of per draw — the same expression
-          // the sprite vertex stage evaluates, over the same *local* position.
-          vertices[stream] = (x - quadX) / quadWidth;
-          vertices[stream + 1] = (y - quadY) / quadHeight;
-        } else if (uvs === undefined) {
+        if (uvs === undefined) {
           vertices[stream] = 0;
           vertices[stream + 1] = 0;
         } else {

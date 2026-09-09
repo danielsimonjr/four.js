@@ -17,7 +17,6 @@ import { createRecordingGpu } from "../../../tests/integration/helpers/recording
 import {
   CLEAR_SHADER_SOURCE,
   COLOR_SHADER_LOCATION,
-  SPRITE_QUAD_OFFSET,
   SPRITE_SHADER_SOURCE,
   SPRITE_TINT_OFFSET,
   SPRITE_UNIFORM_BYTES,
@@ -1120,16 +1119,17 @@ describe("the sprite pipeline family (§55, WP-R1.3)", () => {
     expect(gpu.countOf("device.createBindGroupLayout")).toBe(2);
   });
 
-  it("reads position alone — uv is derived from the quad uniform", () => {
+  it("reads position and the authored uv stream — no quad uniform", () => {
     const { cache, gpu } = spriteCache();
     cache.acquire(SPRITE);
     const descriptor = gpu.callsOf("device.createRenderPipeline")[0]
       ?.args[0] as {
       vertex: { buffers: { arrayStride: number; attributes: unknown[] }[] };
     };
-    expect(descriptor.vertex.buffers).toHaveLength(1);
+    expect(descriptor.vertex.buffers).toHaveLength(2);
     expect(descriptor.vertex.buffers[0]?.arrayStride).toBe(12);
-    expect(descriptor.vertex.buffers[0]?.attributes).toHaveLength(1);
+    expect(descriptor.vertex.buffers[1]?.arrayStride).toBe(8);
+    expect(SPRITE_SHADER_SOURCE).not.toContain("quad");
   });
 
   it("answers null when a provider is missing, and skips rather than throws", () => {
@@ -1359,12 +1359,12 @@ describe("§67's stencil state on a pipeline (WP-R1.3)", () => {
 });
 
 describe("the sprite uniform block, declared as data (§7's discipline)", () => {
-  it("declares the widened binding the WGSL reads, side by side", () => {
-    expect(SPRITE_UNIFORM_BYTES).toBe(160);
+  it("declares the binding the WGSL reads, side by side", () => {
+    expect(SPRITE_UNIFORM_BYTES).toBe(144);
     expect(SPRITE_TINT_OFFSET).toBe(128);
-    expect(SPRITE_QUAD_OFFSET).toBe(144);
     expect(SPRITE_SHADER_SOURCE).toContain(SPRITE_UNIFORM_WGSL);
-    expect(SPRITE_UNIFORM_WGSL).toContain("quad : vec4<f32>");
+    expect(SPRITE_UNIFORM_WGSL).not.toContain("quad");
+    expect(SPRITE_SHADER_SOURCE).not.toContain("draw.quad");
   });
 
   it("asks for a dynamically-offset uniform of the widened size", () => {

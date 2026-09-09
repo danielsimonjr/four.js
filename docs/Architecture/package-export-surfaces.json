@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-07",
+  "generated": "2026-09-09",
   "surfaces": {
     "packages/animation": [
       "Advanceable",
@@ -188,6 +188,7 @@
       "ReadableBodyLike",
       "RegisteredAssetLoader",
       "resolveGlobalDigest",
+      "resolveGlobalFetch",
       "resolveGlobalTextDecoder",
       "ResponseHeadersLike",
       "TexelDecodeLike",
@@ -221,6 +222,7 @@
       "defineCapability",
       "DefineCapabilityOptions",
       "DEV",
+      "DEV_WARNING_PREFIX",
       "devAssert",
       "devWarn",
       "devWarnOnce",
@@ -588,6 +590,7 @@
       "DragManagerOptions",
       "KeyboardInput",
       "KeyboardInputOptions",
+      "KeyboardState",
       "KeyDefaultSuppressor",
       "KeyModifiers",
       "KeySurface",
@@ -1647,6 +1650,7 @@
       "TextureCache",
       "TextureRecord",
       "UnlitProgram",
+      "uploadNormalMatrix",
       "UV_ATTRIBUTE_LOCATION",
       "WebglCanvas",
       "WebglContext",
@@ -1827,7 +1831,6 @@
       "SHADOW_SHADER_SOURCE",
       "SHADOW_UNIFORM_SPARE_BYTES",
       "SPRITE_MODEL_OFFSET",
-      "SPRITE_QUAD_OFFSET",
       "SPRITE_SHADER_SOURCE",
       "SPRITE_TINT_OFFSET",
       "SPRITE_UNIFORM_BYTES",

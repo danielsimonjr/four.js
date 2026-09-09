@@ -1,26 +1,26 @@
 # Complete File Inventory
 
-**Generated**: 2026-09-07 (by tools/create-dependency-graph)
+**Generated**: 2026-09-09 (by tools/create-dependency-graph)
 
 Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-root cross-package `tests/`, `tools/`, build/test `*.config.ts`, `examples/`, and `docs/` reference sources — tagged with a disposition. A completeness census: no `.ts` may be silently missing. The self-check gate (`verifyFileCensus`) does a MAXIMAL, location-agnostic repo walk (broader than this census’s enumerated discovery) and HARD-FAILS `npm run docs:deps` if any `.ts` on disk is unaccounted, or if any `orphan` exists.
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 813
+**Total files**: 817
 
 ## Disposition counts
 
 | Disposition | Count | Meaning |
 | --- | --: | --- |
-| `reachable` | 265 | A `src/` file in the module graph, reachable from a root. |
+| `reachable` | 266 | A `src/` file in the module graph, reachable from a root. |
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 1 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 467 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 470 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
 | `config` | 17 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 14 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **813** | |
+| **Total** | **817** | |
 
 ## Per-area counts
 
@@ -28,8 +28,8 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | --- | --: |
 | `config` | 17 |
 | `examples` | 14 |
-| `src` | 314 |
-| `tests` | 467 |
+| `src` | 315 |
+| `tests` | 470 |
 | `tools` | 1 |
 
 ## Per-package counts
@@ -42,14 +42,14 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@fourjs/core` | 26 |
 | `@fourjs/diagnostics` | 27 |
 | `@fourjs/geometry` | 23 |
-| `@fourjs/input` | 15 |
+| `@fourjs/input` | 17 |
 | `@fourjs/materials` | 22 |
 | `@fourjs/math` | 18 |
 | `@fourjs/motion` | 41 |
 | `@fourjs/particles` | 20 |
 | `@fourjs/physics` | 57 |
 | `@fourjs/physics-box2d` | 2 |
-| `@fourjs/physics-rapier` | 20 |
+| `@fourjs/physics-rapier` | 22 |
 | `@fourjs/physics-soft` | 2 |
 | `@fourjs/render` | 64 |
 | `@fourjs/render-canvas` | 2 |
@@ -60,7 +60,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@fourjs/serialization` | 11 |
 | `@fourjs/text` | 6 |
 | `@fourjs/ui` | 30 |
-| `four` | 52 |
+| `fourJS` | 52 |
 
 ## All files
 
@@ -199,58 +199,58 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/diagnostics/tests/stats.test.ts` | @fourjs/diagnostics | tests | test |
 | `packages/diagnostics/tests/untrusted.test.ts` | @fourjs/diagnostics | tests | test |
 | `packages/diagnostics/tests/validation.test.ts` | @fourjs/diagnostics | tests | test |
-| `packages/fourjs/src/animation.ts` | four | src | build-entry |
-| `packages/fourjs/src/application.ts` | four | src | build-entry |
-| `packages/fourjs/src/assets.ts` | four | src | build-entry |
-| `packages/fourjs/src/capabilities.ts` | four | src | reachable |
-| `packages/fourjs/src/compute-pass.ts` | four | src | reachable |
-| `packages/fourjs/src/core.ts` | four | src | build-entry |
-| `packages/fourjs/src/diagnostics.ts` | four | src | build-entry |
-| `packages/fourjs/src/editor-tools.ts` | four | src | reachable |
-| `packages/fourjs/src/geometry.ts` | four | src | build-entry |
-| `packages/fourjs/src/gltf.ts` | four | src | reachable |
-| `packages/fourjs/src/index.ts` | four | src | build-entry |
-| `packages/fourjs/src/input.ts` | four | src | build-entry |
-| `packages/fourjs/src/live-resource-counts.ts` | four | src | reachable |
-| `packages/fourjs/src/manifest-catalog.ts` | four | src | reachable |
-| `packages/fourjs/src/materials.ts` | four | src | build-entry |
-| `packages/fourjs/src/math.ts` | four | src | build-entry |
-| `packages/fourjs/src/motion.ts` | four | src | build-entry |
-| `packages/fourjs/src/particles.ts` | four | src | build-entry |
-| `packages/fourjs/src/physics-box2d.ts` | four | src | build-entry |
-| `packages/fourjs/src/physics-rapier.ts` | four | src | build-entry |
-| `packages/fourjs/src/physics-soft.ts` | four | src | build-entry |
-| `packages/fourjs/src/physics.ts` | four | src | build-entry |
-| `packages/fourjs/src/pick-provider.ts` | four | src | reachable |
-| `packages/fourjs/src/plugins.ts` | four | src | reachable |
-| `packages/fourjs/src/render-canvas.ts` | four | src | build-entry |
-| `packages/fourjs/src/render-svg.ts` | four | src | build-entry |
-| `packages/fourjs/src/render-webgl.ts` | four | src | build-entry |
-| `packages/fourjs/src/render-webgpu.ts` | four | src | build-entry |
-| `packages/fourjs/src/render.ts` | four | src | build-entry |
-| `packages/fourjs/src/scene-serializers.ts` | four | src | reachable |
-| `packages/fourjs/src/scene.ts` | four | src | build-entry |
-| `packages/fourjs/src/serialization.ts` | four | src | build-entry |
-| `packages/fourjs/src/text-node.ts` | four | src | reachable |
-| `packages/fourjs/src/text.ts` | four | src | build-entry |
-| `packages/fourjs/src/ui.ts` | four | src | build-entry |
-| `packages/fourjs/tests/application.test.ts` | four | tests | test |
-| `packages/fourjs/tests/barrels.test.ts` | four | tests | test |
-| `packages/fourjs/tests/clip-serialization.test.ts` | four | tests | test |
-| `packages/fourjs/tests/compute-pass.test.ts` | four | tests | test |
-| `packages/fourjs/tests/editor-tools.test.ts` | four | tests | test |
-| `packages/fourjs/tests/gltf.test.ts` | four | tests | test |
-| `packages/fourjs/tests/hit-test-mode-serialization.test.ts` | four | tests | test |
-| `packages/fourjs/tests/live-resource-counts.test.ts` | four | tests | test |
-| `packages/fourjs/tests/manifest-catalog.test.ts` | four | tests | test |
-| `packages/fourjs/tests/pick-provider.test.ts` | four | tests | test |
-| `packages/fourjs/tests/plugins.test.ts` | four | tests | test |
-| `packages/fourjs/tests/scene-serializers.test.ts` | four | tests | test |
-| `packages/fourjs/tests/scissor-serialization.test.ts` | four | tests | test |
-| `packages/fourjs/tests/shape-paint-serialization.test.ts` | four | tests | test |
-| `packages/fourjs/tests/shape-serializers.test.ts` | four | tests | test |
-| `packages/fourjs/tests/smoke.test.ts` | four | tests | test |
-| `packages/fourjs/tests/text-node.test.ts` | four | tests | test |
+| `packages/fourjs/src/animation.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/application.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/assets.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/capabilities.ts` | fourJS | src | reachable |
+| `packages/fourjs/src/compute-pass.ts` | fourJS | src | reachable |
+| `packages/fourjs/src/core.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/diagnostics.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/editor-tools.ts` | fourJS | src | reachable |
+| `packages/fourjs/src/geometry.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/gltf.ts` | fourJS | src | reachable |
+| `packages/fourjs/src/index.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/input.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/live-resource-counts.ts` | fourJS | src | reachable |
+| `packages/fourjs/src/manifest-catalog.ts` | fourJS | src | reachable |
+| `packages/fourjs/src/materials.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/math.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/motion.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/particles.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/physics-box2d.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/physics-rapier.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/physics-soft.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/physics.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/pick-provider.ts` | fourJS | src | reachable |
+| `packages/fourjs/src/plugins.ts` | fourJS | src | reachable |
+| `packages/fourjs/src/render-canvas.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/render-svg.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/render-webgl.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/render-webgpu.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/render.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/scene-serializers.ts` | fourJS | src | reachable |
+| `packages/fourjs/src/scene.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/serialization.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/text-node.ts` | fourJS | src | reachable |
+| `packages/fourjs/src/text.ts` | fourJS | src | build-entry |
+| `packages/fourjs/src/ui.ts` | fourJS | src | build-entry |
+| `packages/fourjs/tests/application.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/barrels.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/clip-serialization.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/compute-pass.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/editor-tools.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/gltf.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/hit-test-mode-serialization.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/live-resource-counts.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/manifest-catalog.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/pick-provider.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/plugins.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/scene-serializers.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/scissor-serialization.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/shape-paint-serialization.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/shape-serializers.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/smoke.test.ts` | fourJS | tests | test |
+| `packages/fourjs/tests/text-node.test.ts` | fourJS | tests | test |
 | `packages/geometry/src/buffer-geometry.ts` | @fourjs/geometry | src | reachable |
 | `packages/geometry/src/geometry.ts` | @fourjs/geometry | src | reachable |
 | `packages/geometry/src/index.ts` | @fourjs/geometry | src | build-entry |
@@ -278,10 +278,12 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/input/src/index.ts` | @fourjs/input | src | build-entry |
 | `packages/input/src/key-events.ts` | @fourjs/input | src | reachable |
 | `packages/input/src/keyboard-input.ts` | @fourjs/input | src | reachable |
+| `packages/input/src/keyboard-state.ts` | @fourjs/input | src | reachable |
 | `packages/input/src/pick.ts` | @fourjs/input | src | reachable |
 | `packages/input/src/pointer-events.ts` | @fourjs/input | src | reachable |
 | `packages/input/src/pointer-input.ts` | @fourjs/input | src | reachable |
 | `packages/input/src/propagation.ts` | @fourjs/input | src | reachable |
+| `packages/input/tests/keyboard-state.test.ts` | @fourjs/input | tests | test |
 | `packages/input/tests/keyboard.test.ts` | @fourjs/input | tests | test |
 | `packages/input/tests/pick-alpha.test.ts` | @fourjs/input | tests | test |
 | `packages/input/tests/pick-geometry.test.ts` | @fourjs/input | tests | test |
@@ -402,6 +404,8 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/physics-rapier/src/register.ts` | @fourjs/physics-rapier | src | reachable |
 | `packages/physics-rapier/tests/conversions2d.test.ts` | @fourjs/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/conversions3d.test.ts` | @fourjs/physics-rapier | tests | test |
+| `packages/physics-rapier/tests/init-load.test.ts` | @fourjs/physics-rapier | tests | test |
+| `packages/physics-rapier/tests/rapier-defensive-branches.test.ts` | @fourjs/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier-live-properties.test.ts` | @fourjs/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier-retype.test.ts` | @fourjs/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier-shapes.test.ts` | @fourjs/physics-rapier | tests | test |

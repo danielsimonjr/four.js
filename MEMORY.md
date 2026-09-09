@@ -30,6 +30,16 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — R-19/R-20 closed (§55 authored sprite uvs).** `Sprite`
+  writes a 4-vertex `uvs` stream (`frame / textureSize`, or 0…1 if
+  frameless). WebGL `SpriteProgram` and WebGPU sprite WGSL sample
+  `@location(2) uv`. `uniform vec4 quad` and `SPRITE_QUAD_OFFSET` are
+  gone. `setFrame` is a no-op when unchanged; a real change
+  `markDirty()`s so GeometryCache re-uploads eight floats. Trade-off vs
+  the 2026-08-08 affine-quad design: animation clips no longer get a
+  zero-upload frame flip. Texture/material stay shared. Graph regen
+  dropped the export.
+
 - **2026-09-09 — Stale-item honesty on two follow-ups.** The batching
   "still scene re-uploads every frame" sentence was false:
   `contentVersion` + `#canSkipUpload` already skip `bufferSubData` on

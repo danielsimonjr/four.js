@@ -216,7 +216,6 @@ import {
   createStandardBindGroupLayout,
 } from "./wgpu-standard.js";
 import {
-  SPRITE_QUAD_OFFSET,
   SPRITE_UNIFORM_BYTES,
   createSpriteBindGroupLayout,
 } from "./wgpu-sprite.js";
@@ -302,9 +301,6 @@ type SpriteItem = Extract<RenderItem, { kind: "sprite" }>;
 
 /** A particle render item (§36, WP-R1.8) — one instanced draw per system. */
 type ParticleItem = Extract<RenderItem, { kind: "particles" }>;
-
-/** §55's material as this backend reads it — texture, tint, §57 state. */
-type SpriteMaterialLike = SpriteItem["material"];
 
 /** A shaded render item (§68 lit or §59 standard, WP-R1.5). */
 type ShadedItem = Extract<RenderItem, { kind: "lit" | "standard" }>;
@@ -1724,7 +1720,7 @@ export class WebgpuRenderer implements Renderer {
                   activeTarget,
                   spriteMap,
                 );
-          if (spriteTexture !== null) {
+          if (spriteTexture !== null && record.uvBuffer !== null) {
             stencilReference = this.#drawSprite(
               device,
               pass,
@@ -2782,9 +2778,9 @@ export class WebgpuRenderer implements Renderer {
 
   /**
    * Records one §55 sprite draw (WP-R1.3): the sprite pipeline over the
-   * quad's position stream, §55's uv derived in the vertex stage from the
-   * `quad` uniform, the texture at group 1, the tint and quad in the sprite's
-   * widened uniform block. Returns the stencil reference now in effect.
+   * quad's position stream and authored uv stream, the texture at group 1,
+   * the tint in the sprite uniform block. Returns the stencil reference now
+   * in effect.
    *
    * §55's pipeline blends **by construction** — it did before §57's
    * `transparent` flag existed, and a textured quad with an alpha channel has
@@ -2851,7 +2847,6 @@ export class WebgpuRenderer implements Renderer {
       tint[2],
       tint[3] * opacity,
     );
-    this.#writeQuad(block, item, material);
 
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, this.#acquireSpriteBindGroup(device, uniformBuffer), [
@@ -2867,6 +2862,9 @@ export class WebgpuRenderer implements Renderer {
       );
     }
     pass.setVertexBuffer(0, record.positionBuffer);
+    if (record.uvBuffer !== null) {
+      pass.setVertexBuffer(1, record.uvBuffer);
+    }
     if (record.indexBuffer !== null && record.indexFormat !== null) {
       pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
       pass.drawIndexed(record.count);
@@ -3456,46 +3454,6 @@ export class WebgpuRenderer implements Renderer {
     // and recreated by the next receiving draw, the sprite group's rule.
     this.#shadowBindGroup = null;
     this.#shadowBindGroupView = null;
-  }
-
-  /**
-   * Packs §55's `quad` — the local rectangle the whole texture maps onto —
-   * into the sprite block's last sixteen bytes: the geometry's own bounds for
-   * a frameless sprite, R-29's affine reparametrization for a framed one. The
-   * same two expressions the GL sprite path uploads through `setQuad`, over
-   * the same cached `computeBounds()` (a version comparison per draw, not a
-   * pass over the vertices).
-   */
-  #writeQuad(
-    block: number,
-    item: SpriteItem,
-    material: SpriteMaterialLike,
-  ): void {
-    const bounds = item.geometry.computeBounds();
-    const minX = bounds.min.x;
-    const minY = bounds.min.y;
-    const width = bounds.max.x - minX;
-    const height = bounds.max.y - minY;
-    const staging = this.#uniformStaging;
-    const base = block * UNIFORM_STRIDE_FLOATS + SPRITE_QUAD_OFFSET / 4;
-    // `?? null` for the render list's reason: a structurally typed sprite item
-    // built before frames existed reports `undefined`, which reads "no frame".
-    const frame = item.frame ?? null;
-    if (frame === null) {
-      staging[base] = minX;
-      staging[base + 1] = minY;
-      staging[base + 2] = width;
-      staging[base + 3] = height;
-      return;
-    }
-    // The rectangle the *whole* texture would occupy, given that the quad
-    // shows `frame` of it — `map` is the engine-side texture (its texel size),
-    // not the GPU record this draw binds.
-    const map = material.texture;
-    staging[base] = minX - (frame.x * width) / frame.width;
-    staging[base + 1] = minY - (frame.y * height) / frame.height;
-    staging[base + 2] = (width * map.width) / frame.width;
-    staging[base + 3] = (height * map.height) / frame.height;
   }
 
   /** Packs one `DrawUniforms` block into the staging array at `block`'s stride. */

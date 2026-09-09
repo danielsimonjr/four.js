@@ -261,7 +261,6 @@ const FRAME_BEFORE_R18: readonly string[] = [
   "uniformMatrix4fv(getUniformLocation#23, false, [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1])",
   "uniformMatrix4fv(getUniformLocation#24, false, [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1])",
   "uniform4fv(getUniformLocation#25, [1,1,1,1])",
-  "uniform4fv(getUniformLocation#26, [1,1,1,1])",
   "bindTexture(3553, createTexture#0)",
   "bindVertexArray(createVertexArray#4)",
   "drawElements(4, 6, 5123, 0)",

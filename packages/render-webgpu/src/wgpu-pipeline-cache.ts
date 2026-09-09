@@ -69,6 +69,7 @@ import {
   CLEAR_SHADER_SOURCE,
   FRAGMENT_ENTRY_POINT,
   POSITION_BUFFER_LAYOUT,
+  UV_BUFFER_LAYOUT,
   VERTEX_ENTRY_POINT,
   unlitShaderSource,
   unlitVertexBufferLayouts,
@@ -852,7 +853,8 @@ export class WgpuPipelineCache {
    * The vertex-buffer layouts `descriptor`'s pipeline reads: none for the
    * clear and the effect (their triangles are generated from the vertex
    * index), position alone
-   * for a sprite (uv is derived from the quad uniform) and for §69's caster
+   * for a sprite (position plus the authored uv stream at `@location(2)`)
+   * and for §69's caster
    * (a depth-only stage ignores every other stream, `gl-shadow.ts`'s
    * argument — the vertex arrays' streams-not-declared-are-ignored rule,
    * expressed as a one-buffer layout), the shaded stream
@@ -867,8 +869,11 @@ export class WgpuPipelineCache {
     if (descriptor.kind === "clear" || descriptor.kind === "effect") {
       return [];
     }
-    if (descriptor.kind === "sprite" || descriptor.kind === "shadow") {
+    if (descriptor.kind === "shadow") {
       return [POSITION_BUFFER_LAYOUT];
+    }
+    if (descriptor.kind === "sprite") {
+      return [POSITION_BUFFER_LAYOUT, UV_BUFFER_LAYOUT];
     }
     if (descriptor.kind === "particles") {
       // §36 `simulation: "gpu"` re-sources @location(1) from the

@@ -1246,9 +1246,9 @@ function renderable(
 }
 
 /**
- * A real `Sprite` — `@fourjs/render` is a dependency, and the quad it builds from
- * its anchor and size is exactly what the `quad` uniform assertions are about.
- * Only the material and the texture are doubles.
+ * A real `Sprite` — `@fourjs/render` is a dependency, and the quad it builds
+ * from its anchor, size, and frame is exactly what the authored-uv assertions
+ * are about. Only the material and the texture are doubles.
  */
 function sprite(
   material: TestSpriteMaterial = new TestSpriteMaterial(),
@@ -2990,7 +2990,7 @@ describe("WebglRenderer — disposal (§83)", () => {
 });
 
 describe("SpriteProgram — compilation and linking (§55, §61, §89)", () => {
-  it("compiles both stages, links, and resolves the five uniforms", () => {
+  it("compiles both stages, links, and resolves the four uniforms", () => {
     const gl = createFakeGl();
 
     const program = SpriteProgram.create(gl);
@@ -2999,7 +2999,7 @@ describe("SpriteProgram — compilation and linking (§55, §61, §89)", () => {
     expect(gl.countOf("linkProgram")).toBe(1);
     expect(
       gl.callsOf("getUniformLocation").map((call) => call.args[1]),
-    ).toEqual(["viewProjection", "model", "quad", "tint", "map"]);
+    ).toEqual(["viewProjection", "model", "tint", "map"]);
     expect(program.disposed).toBe(false);
   });
 
@@ -3017,8 +3017,11 @@ describe("SpriteProgram — compilation and linking (§55, §61, §89)", () => {
     expect(String(sources[0])).toContain(
       `layout(location = ${String(POSITION_ATTRIBUTE_LOCATION)}) in vec3 position`,
     );
-    // uv is derived from the quad's local rect, not read from an attribute.
-    expect(String(sources[0])).toContain("uniform vec4 quad");
+    // Atlas UVs are an authored attribute; the retired `quad` uniform is gone.
+    expect(String(sources[0])).toContain(
+      `layout(location = ${String(UV_ATTRIBUTE_LOCATION)}) in vec2 uv`,
+    );
+    expect(String(sources[0])).not.toContain("uniform vec4 quad");
     expect(String(sources[1])).toContain("texture(map, vUv) * tint");
   });
 
@@ -3534,27 +3537,31 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
     expect(gl.countOf("uniform1i")).toBe(0);
   });
 
-  it("uploads the tint, and the quad's local rect the vertex stage maps uv from", async () => {
+  it("uploads the tint; atlas uvs ride the geometry, not a uniform", async () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
-    root.add(
-      sprite(new TestSpriteMaterial(new TestTexture(), [1, 0.5, 0, 0.25]), {
+    const node = sprite(
+      new TestSpriteMaterial(new TestTexture(), [1, 0.5, 0, 0.25]),
+      {
         width: 4,
         height: 2,
         anchor: { x: 0, y: 0 },
-      }),
+      },
     );
+    root.add(node);
     gl.reset();
 
     renderer.render(root, [createView(camera)]);
 
     const uniforms = spriteUniforms(gl);
     expect(uploadsAt(gl, uniforms.get("tint"))).toEqual([[1, 0.5, 0, 0.25]]);
-    // anchor (0, 0) and 4 × 2 ⇒ the quad spans x ∈ [0, 4], y ∈ [0, 2].
-    expect(uploadsAt(gl, uniforms.get("quad"))).toEqual([[0, 0, 4, 2]]);
+    expect(uniforms.has("quad")).toBe(false);
+    expect(Array.from(node.geometry.uvs ?? [])).toEqual([
+      0, 0, 1, 0, 1, 1, 0, 1,
+    ]);
   });
 
-  it("tracks the quad rect when the sprite is resized", async () => {
+  it("keeps whole-texture uvs when the sprite is resized", async () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
     const node = sprite(new TestSpriteMaterial(), { width: 2, height: 2 });
@@ -3565,12 +3572,13 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
     gl.reset();
     renderer.render(root, [createView(camera)]);
 
-    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
-      [-3, -1, 6, 2],
+    expect(Array.from(node.geometry.uvs ?? [])).toEqual([
+      0, 0, 1, 0, 1, 1, 0, 1,
     ]);
+    expect(spriteUniforms(gl).has("quad")).toBe(false);
   });
 
-  it("maps a §55 frame onto the same uniform, with no extra GL call (R-29)", async () => {
+  it("authors a §55 frame onto the uv stream (R-29 / atlas packet)", async () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
     // An 8 × 4 atlas, and the quad shows its top-right 4 × 2 cell.
@@ -3585,23 +3593,15 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
 
     renderer.render(root, [createView(camera)]);
 
-    const uniforms = spriteUniforms(gl);
-    // The rectangle the *whole* 8 × 4 texture maps onto: twice the quad in each
-    // axis, offset so that the quad's own [0, 4] × [0, 2] covers the far cell.
-    expect(uploadsAt(gl, uniforms.get("quad"))).toEqual([[-4, -2, 8, 4]]);
-    // uv at the quad's corners, recomputed here the way the vertex stage does,
-    // is exactly the frame in normalized coordinates — which is the claim.
-    const [minX, minY, width, height] = (
-      uploadsAt(gl, uniforms.get("quad"))[0] as number[]
-    ).map(Number);
-    expect([(0 - minX) / width, (0 - minY) / height]).toEqual([0.5, 0.5]);
-    expect([(4 - minX) / width, (2 - minY) / height]).toEqual([1, 1]);
-    // One `uniform4fv` for the quad and one for the tint, exactly as before:
-    // a frame adds no upload.
-    expect(gl.countOf("uniform4fv")).toBe(2);
+    expect(Array.from(node.geometry.uvs ?? [])).toEqual([
+      0.5, 0.5, 1, 0.5, 1, 1, 0.5, 1,
+    ]);
+    // Tint only — the retired `quad` uniform is gone.
+    expect(gl.countOf("uniform4fv")).toBe(1);
+    expect(spriteUniforms(gl).has("quad")).toBe(false);
   });
 
-  it("uploads the frameless values for an identity frame (R-29 collapse)", async () => {
+  it("authors the frameless uvs for an identity frame", async () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
     const framed = sprite(new TestSpriteMaterial(new TestTexture(8, 4)), {
@@ -3613,23 +3613,20 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
     root.add(framed);
     gl.reset();
     renderer.render(root, [createView(camera)]);
-    const withFrame = uploadsAt(gl, spriteUniforms(gl).get("quad"));
+    const withFrame = Array.from(framed.geometry.uvs ?? []);
 
+    const plain = sprite(new TestSpriteMaterial(new TestTexture(8, 4)), {
+      width: 3,
+      height: 2,
+      anchor: { x: 0.25, y: 0.75 },
+    });
     const plainRoot = createRoot();
-    plainRoot.add(
-      sprite(new TestSpriteMaterial(new TestTexture(8, 4)), {
-        width: 3,
-        height: 2,
-        anchor: { x: 0.25, y: 0.75 },
-      }),
-    );
+    plainRoot.add(plain);
     gl.reset();
     renderer.render(plainRoot, [createView(camera)]);
 
-    // The `else` branch is taken and still produces the `if` branch's numbers —
-    // which is the arithmetic half of "a frameless sprite is byte-identical".
-    expect(withFrame).toEqual(uploadsAt(gl, spriteUniforms(gl).get("quad")));
-    expect(withFrame).toEqual([[-0.75, -1.5, 3, 2]]);
+    expect(withFrame).toEqual(Array.from(plain.geometry.uvs ?? []));
+    expect(withFrame).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
   });
 
   it("maps a bottom-left frame, and a sub-texel inset", async () => {
@@ -3646,9 +3643,9 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
 
     renderer.render(root, [createView(camera)]);
 
-    // Frame at the origin ⇒ the same `min`, and a doubled extent.
-    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
-      [0, 0, 4, 4],
+    // Left half of an 8 × 4 atlas, full height of a 2-texel-tall cell.
+    expect(Array.from(node.geometry.uvs ?? [])).toEqual([
+      0, 0, 0.5, 0, 0.5, 0.5, 0, 0.5,
     ]);
   });
 
@@ -3668,8 +3665,8 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
     gl.reset();
     renderer.render(root, [createView(camera)]);
 
-    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
-      [0, 0, 2, 2],
+    expect(Array.from(node.geometry.uvs ?? [])).toEqual([
+      0, 0, 1, 0, 1, 1, 0, 1,
     ]);
   });
 
@@ -3695,9 +3692,11 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
 
     renderer.render(root, [createView(camera)]);
 
-    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
-      [0, 0, 4, 2],
-      [-2, 0, 4, 2],
+    expect(Array.from(left.geometry.uvs ?? [])).toEqual([
+      0, 0, 0.5, 0, 0.5, 1, 0, 1,
+    ]);
+    expect(Array.from(right.geometry.uvs ?? [])).toEqual([
+      0.5, 0, 1, 0, 1, 1, 0.5, 1,
     ]);
     // One upload and one GL texture for both cells — the point of an atlas.
     expect(gl.countOf("texImage2D")).toBe(1);
@@ -9796,9 +9795,9 @@ describe("WebglRenderer — §65 batching, opt-in (R-9)", () => {
     expect(gl.countOf("drawElements")).toBe(1);
     expect(gl.callsOf("drawElements")[0].args[1]).toBe(12);
     expect(uploadsAt(gl, uniforms.get("color"))).toEqual([[1, 0.5, 0, 1]]);
-    // uv per vertex is what a batched sprite carries instead of the `quad`
-    // uniform, so the sprite program is never used at all.
-    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([]);
+    // Batched sprites already interleave authored uvs, so the sprite program
+    // is never used — and it no longer even declares `quad`.
+    expect(spriteUniforms(gl).has("quad")).toBe(false);
     expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1]);
     expect(gl.countOf("bindTexture")).toBeGreaterThan(0);
   });
