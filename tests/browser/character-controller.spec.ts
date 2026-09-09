@@ -230,8 +230,13 @@ const WALL_REACHED_Z = -2.9;
  */
 const WALK_HOLD_TIMEOUT_SECONDS = 15;
 
-/** Consecutive rAF polls of `|Δpz| ≤ 0.02` that count as "stopped". */
-const WALL_SETTLE_POLLS = 8;
+/**
+ * Consecutive *example* `update` frames (`data-frames`) of `|Δpz| ≤ 0.02`
+ * that count as "stopped". Must not be Playwright rAF polls: on a starved
+ * runner those can re-read the same published attribute eight times between
+ * simulation steps and declare a mid-walk pose settled.
+ */
+const WALL_SETTLE_UPDATES = 8;
 
 /**
  * Jump rise the gate requires, in world units above the standing height.
@@ -444,7 +449,10 @@ async function holdUntilSettledAtMost(
   }
 }
 
-/** Waits until `data-{name}` has stayed within 0.02 for {@link WALL_SETTLE_POLLS} rAF polls. */
+/**
+ * Waits until `data-{name}` has stayed within 0.02 across
+ * {@link WALL_SETTLE_UPDATES} distinct example updates (`data-frames`).
+ */
 async function waitUntilAttributeSettled(
   page: Page,
   name: string,
@@ -458,26 +466,35 @@ async function waitUntilAttributeSettled(
         const element = document.querySelector<HTMLElement>("#status");
         if (element === null) return false;
         const raw = element.dataset[field];
-        if (raw === undefined) return false;
+        const framesRaw = element.dataset["frames"];
+        if (raw === undefined || framesRaw === undefined) return false;
         const value = Number(raw);
-        if (!Number.isFinite(value)) return false;
+        const frames = Number(framesRaw);
+        if (!Number.isFinite(value) || !Number.isFinite(frames)) return false;
         const store = window as Window & {
-          __fourSettle?: { field: string; prev: number; count: number };
+          __fourSettle?: {
+            field: string;
+            prev: number;
+            frame: number;
+            count: number;
+          };
         };
         const state = store.__fourSettle;
         if (state === undefined || state.field !== field) {
-          store.__fourSettle = { field, prev: value, count: 0 };
+          store.__fourSettle = { field, prev: value, frame: frames, count: 0 };
           return false;
         }
+        if (frames === state.frame) return false;
         if (Math.abs(value - state.prev) <= epsilon) {
           state.count += 1;
         } else {
           state.count = 0;
         }
         state.prev = value;
+        state.frame = frames;
         return state.count >= needed;
       },
-      { field: name, epsilon: 0.02, needed: WALL_SETTLE_POLLS },
+      { field: name, epsilon: 0.02, needed: WALL_SETTLE_UPDATES },
       { timeout: WALK_HOLD_TIMEOUT_SECONDS * 1000 },
     )
     .catch(() => undefined);
