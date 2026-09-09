@@ -6,21 +6,21 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 820
+**Total files**: 822
 
 ## Disposition counts
 
 | Disposition | Count | Meaning |
 | --- | --: | --- |
-| `reachable` | 268 | A `src/` file in the module graph, reachable from a root. |
+| `reachable` | 269 | A `src/` file in the module graph, reachable from a root. |
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 1 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 471 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 472 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
 | `config` | 17 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 14 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **820** | |
+| **Total** | **822** | |
 
 ## Per-area counts
 
@@ -28,15 +28,15 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | --- | --: |
 | `config` | 17 |
 | `examples` | 14 |
-| `src` | 317 |
-| `tests` | 471 |
+| `src` | 318 |
+| `tests` | 472 |
 | `tools` | 1 |
 
 ## Per-package counts
 
 | Package | Files |
 | --- | --: |
-| `(root)` | 217 |
+| `(root)` | 218 |
 | `@fourjs/animation` | 32 |
 | `@fourjs/assets` | 20 |
 | `@fourjs/core` | 26 |
@@ -54,7 +54,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@fourjs/render` | 64 |
 | `@fourjs/render-canvas` | 2 |
 | `@fourjs/render-svg` | 2 |
-| `@fourjs/render-webgl` | 27 |
+| `@fourjs/render-webgl` | 28 |
 | `@fourjs/render-webgpu` | 45 |
 | `@fourjs/scene` | 35 |
 | `@fourjs/serialization` | 11 |
@@ -490,6 +490,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgl/src/gl-program.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-render-target.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-shadow.ts` | @fourjs/render-webgl | src | reachable |
+| `packages/render-webgl/src/gl-skinning-glsl.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-skinning-registry.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-skinning.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-standard.ts` | @fourjs/render-webgl | src | reachable |
@@ -828,6 +829,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/integration/helpers/recording-gpu.ts` | (root) | tests | test |
 | `tests/integration/helpers/replay-scenarios.ts` | (root) | tests | test |
 | `tests/integration/helpers/roundtrip-scenarios.ts` | (root) | tests | test |
+| `tests/integration/interpolated-skin-palettes.test.ts` | (root) | tests | test |
 | `tests/integration/look-at.test.ts` | (root) | tests | test |
 | `tests/integration/motion-advanced.test.ts` | (root) | tests | test |
 | `tests/integration/multi-light.test.ts` | (root) | tests | test |

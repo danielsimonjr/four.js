@@ -147,6 +147,12 @@ feeds back** into simulation state (§42), and a per-step measurement (from
 `fixedUpdate`) is the only honest place to look for discontinuities — a
 per-frame number folds several steps together.
 
+Skinned meshes ride the same buffer. `buildInterpolatedRenderList`
+supplies a `worldOf` provider to `Skeleton.update(skinRoot, worldOf)`
+that composes those interpolated locals, then runs the palette product.
+The palette itself is never lerped. Track every bone whose local pose
+moves, the same way you track any other mover.
+
 One consequence worth knowing: the accumulator's floating-point drift can
 fire a timeline marker sitting exactly on a step boundary one step late.
 This is frozen, pinned behaviour (`golden/phase4.json`) — do not place

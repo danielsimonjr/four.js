@@ -166,10 +166,13 @@ describe("Texture — construction and validation (§77, §85)", () => {
     // The dated deviation from §60a's own default (sRGB for colour textures)
     // lives on `TextureSource.colorSpace`: opt-in keeps every already-authored
     // texture, and every pixel golden, byte-identical (R-15, 2026-08-08).
+    // Map roles (R-30c) do not flip this: a source that names no `role` is
+    // still `"linear"`.
     expect(new Texture({ width: 1, height: 1 }).colorSpace).toBe("linear");
-    expect(
-      new Texture({ width: 1, height: 1, colorSpace: "srgb" }).colorSpace,
-    ).toBe("srgb");
+    expect(new Texture({ width: 1, height: 1 }).role).toBeNull();
+    const tagged = new Texture({ width: 1, height: 1, colorSpace: "srgb" });
+    expect(tagged.colorSpace).toBe("srgb");
+    expect(tagged.role).toBeNull();
   });
 
   it("rejects a colour space outside the union (§60a, §85)", () => {
@@ -181,6 +184,69 @@ describe("Texture — construction and validation (§77, §85)", () => {
           colorSpace: "rec2020",
         } as unknown as { width: number; height: number }),
     ).toThrow(/Texture colorSpace "rec2020"/);
+  });
+
+  it("exposes an omitted map role as null — no default is invented (R-30c)", () => {
+    expect(new Texture({ width: 1, height: 1 }).role).toBeNull();
+  });
+
+  it("resolves colorSpace from an explicit colour role when the tag is omitted (§60a, R-30c)", () => {
+    const color = new Texture({ width: 1, height: 1, role: "color" });
+    const data = new Texture({ width: 1, height: 1, role: "data" });
+
+    expect(color.role).toBe("color");
+    expect(color.colorSpace).toBe("srgb");
+    expect(data.role).toBe("data");
+    expect(data.colorSpace).toBe("linear");
+  });
+
+  it("lets an authored colorSpace win over role (§60a, R-30c)", () => {
+    const linearColor = new Texture({
+      width: 1,
+      height: 1,
+      role: "color",
+      colorSpace: "linear",
+    });
+    const srgbData = new Texture({
+      width: 1,
+      height: 1,
+      role: "data",
+      colorSpace: "srgb",
+    });
+
+    expect(linearColor.role).toBe("color");
+    expect(linearColor.colorSpace).toBe("linear");
+    expect(srgbData.role).toBe("data");
+    expect(srgbData.colorSpace).toBe("srgb");
+  });
+
+  it("refuses a map role outside the union rather than substituting one (§85)", () => {
+    expect(
+      () =>
+        new Texture({
+          width: 1,
+          height: 1,
+          role: "albedo",
+        } as unknown as { width: number; height: number }),
+    ).toThrow(/Texture role must be one of "color", "data"; got "albedo"/);
+  });
+
+  it("re-resolves role and colorSpace when a whole source is replaced", () => {
+    const map = new Texture({ width: 1, height: 1, role: "color" });
+    expect(map.colorSpace).toBe("srgb");
+
+    map.source = { width: 1, height: 1, role: "data" };
+
+    expect(map.role).toBe("data");
+    expect(map.colorSpace).toBe("linear");
+    expect(map.version).toBe(1);
+  });
+
+  it("drops the role on a disposed texture's empty source", () => {
+    const map = new Texture({ width: 1, height: 1, role: "color" });
+    map.dispose();
+    expect(map.role).toBeNull();
+    expect(map.colorSpace).toBe("linear");
   });
 
   it("rejects data whose length is not width · height · 4 (§77, §85)", () => {

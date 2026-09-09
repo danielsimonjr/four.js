@@ -129,6 +129,8 @@ app.step(elapsedSeconds)
 │    │     buildInterpolatedRenderList ← §43 render poses:            │
 │    │       poseBuffer.computeRenderPose(node, alpha, out…) =        │
 │    │       lerp(prevPos, currPos, α) + slerp(prevRot, currRot, α)   │
+│    │       skinned: Skeleton.update(mesh, worldOf) composes those   │
+│    │       locals, then the palette product — never lerp palettes   │
 │    │     items pooled per out-array; sort: renderLayer →            │
 │    │     renderOrder → scene-graph order (stable, §33)              │
 │    ├── collectSceneLights — only for frames whose list has a        │

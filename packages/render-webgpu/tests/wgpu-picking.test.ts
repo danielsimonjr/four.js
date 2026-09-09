@@ -31,10 +31,13 @@ import {
   GPU_BUFFER_USAGE,
   ID_PICK_OFFSET,
   ID_SHADER_SOURCE,
+  PARTICLE_ID_PICK_OFFSET,
+  PARTICLE_ID_SHADER_SOURCE,
   UNIFORM_STRIDE_BYTES,
   WebgpuPickingService,
   WebgpuRenderer,
   WgpuGeometryCache,
+  WgpuParticleCache,
   WgpuRenderTargetCache,
   clearRegisteredPickingPipeline,
   registerPickingPipeline,
@@ -132,7 +135,11 @@ function drawable(
  * A structural §36 emitter — not a `Renderable`, so only the particle arm
  * of `collectPickCandidates` / `buildRenderList` claims it.
  */
-function particleEmitter(count: number): {
+function particleEmitter(
+  count: number,
+  instances = new Float32Array(Math.max(count, 1) * 8),
+  id = "test-emitter",
+): {
   readonly isParticleDrawable: true;
   readonly id: string;
   readonly parent: null;
@@ -143,12 +150,13 @@ function particleEmitter(count: number): {
   renderOrder: number;
   particleCount: number;
   particleInstances: Float32Array;
+  particleInstanceFloats?: number;
   transform: { worldMatrix: Matrix4 };
   updateParticleInstances(): void;
 } {
   return {
     isParticleDrawable: true,
-    id: "test-emitter",
+    id,
     parent: null,
     children: [],
     visible: true,
@@ -156,7 +164,7 @@ function particleEmitter(count: number): {
     renderLayer: 0,
     renderOrder: 0,
     particleCount: count,
-    particleInstances: new Float32Array(Math.max(count, 1) * 8),
+    particleInstances: instances,
     transform: { worldMatrix: new Matrix4() },
     updateParticleInstances(): void {
       // repacked elsewhere
@@ -255,6 +263,7 @@ function withMappedTexel(device: GpuDevice, texel: MappedTexel): GpuDevice {
 interface HostState {
   device: GpuDevice | null;
   geometries: WgpuGeometryCache | null;
+  particles: WgpuParticleCache | null;
   renderTargets: WgpuRenderTargetCache | null;
   surfaceWidth: number;
   surfaceHeight: number;
@@ -287,6 +296,7 @@ function createRig(options: { throwOnPipeline?: boolean } = {}): Rig {
   const state: HostState = {
     device,
     geometries: new WgpuGeometryCache(device),
+    particles: new WgpuParticleCache(device),
     renderTargets: new WgpuRenderTargetCache(device, () => ({})),
     surfaceWidth: 64,
     surfaceHeight: 64,
@@ -296,6 +306,7 @@ function createRig(options: { throwOnPipeline?: boolean } = {}): Rig {
   const host: PickingRendererHost = {
     device: () => state.device,
     geometries: () => state.geometries,
+    particles: () => state.particles,
     renderTargets: () => state.renderTargets,
     surfaceWidth: () => state.surfaceWidth,
     surfaceHeight: () => state.surfaceHeight,
@@ -314,26 +325,82 @@ function createRig(options: { throwOnPipeline?: boolean } = {}): Rig {
   };
 }
 
-function idUploads(gpu: RecordingGpu): number[][] {
+function uniformWritesBeforePass(gpu: RecordingGpu): number[][] {
   const names = gpu.calls.map((call) => call.name);
   const passAt = names.indexOf("encoder.beginRenderPass");
-  const uploads = gpu.calls.filter(
-    (call, index) => call.name === "queue.writeBuffer" && index < passAt,
-  );
-  const last = uploads[uploads.length - 1];
-  if (last === undefined) {
+  const strideFloats = UNIFORM_STRIDE_BYTES / 4;
+  const writes: number[][] = [];
+  for (let index = 0; index < gpu.calls.length; index += 1) {
+    if (index >= passAt) {
+      break;
+    }
+    const call = gpu.calls[index];
+    if (call.name !== "queue.writeBuffer") {
+      continue;
+    }
+    const data = call.args[2];
+    if (
+      Array.isArray(data) &&
+      data.length % strideFloats === 0 &&
+      data.length >= strideFloats
+    ) {
+      writes.push(data);
+    }
+  }
+  return writes;
+}
+
+function meshDrawCount(gpu: RecordingGpu): number {
+  let draws = gpu.countOf("pass.drawIndexed");
+  for (const call of gpu.calls) {
+    if (call.name === "pass.draw" && call.args[1] === undefined) {
+      draws += 1;
+    }
+  }
+  return draws;
+}
+
+function particleDrawCount(gpu: RecordingGpu): number {
+  let draws = 0;
+  for (const call of gpu.calls) {
+    if (call.name === "pass.draw" && typeof call.args[1] === "number") {
+      draws += 1;
+    }
+  }
+  return draws;
+}
+
+function idsFromStaging(
+  data: number[] | undefined,
+  pickOffset: number,
+  draws: number,
+): number[][] {
+  if (data === undefined || draws === 0) {
     return [];
   }
-  const data = last.args[2] as number[];
   const stride = UNIFORM_STRIDE_BYTES / 4;
-  const pickFloats = ID_PICK_OFFSET / 4;
+  const pickFloats = pickOffset / 4;
   const ids: number[][] = [];
-  const draws = gpu.countOf("pass.draw") + gpu.countOf("pass.drawIndexed");
   for (let block = 0; block < draws; block += 1) {
     const base = block * stride + pickFloats;
     ids.push([data[base], data[base + 1], data[base + 2], data[base + 3]]);
   }
   return ids;
+}
+
+function idUploads(gpu: RecordingGpu): number[][] {
+  const writes = uniformWritesBeforePass(gpu);
+  return idsFromStaging(writes[0], ID_PICK_OFFSET, meshDrawCount(gpu));
+}
+
+function particleIdUploads(gpu: RecordingGpu): number[][] {
+  const writes = uniformWritesBeforePass(gpu);
+  const particleDraws = particleDrawCount(gpu);
+  if (particleDraws === 0) {
+    return [];
+  }
+  const data = writes[writes.length - 1];
+  return idsFromStaging(data, PARTICLE_ID_PICK_OFFSET, particleDraws);
 }
 
 function expectedIdUpload(index: number): number[] {
@@ -486,7 +553,7 @@ describe("WebgpuPickingService.update — the id pass", () => {
     expect(gpu.countOf("pass.draw")).toBe(1);
   });
 
-  it("skips skinned and particle items — no id draw", () => {
+  it("skips skinned items and draws particles with one id per emitter", () => {
     const { gpu, service, view } = createRig();
     const emitter = particleEmitter(3);
     const skinnedGeometry = triangleGeometry();
@@ -511,9 +578,204 @@ describe("WebgpuPickingService.update — the id pass", () => {
     type PickRoot = Parameters<PickingService["update"]>[0];
 
     service.update(root as unknown as PickRoot, view);
-    expect(gpu.countOf("pass.draw")).toBe(1);
+    // Traversal table: emitter 0, skinned 1, plain 2. Skinned stays in the
+    // table but is never drawn. Particles instance the live quads; the
+    // plain drawable is the one non-instanced `pass.draw`.
+    expect(particleDrawCount(gpu)).toBe(1);
+    expect(meshDrawCount(gpu)).toBe(1);
     expect(gpu.countOf("pass.drawIndexed")).toBe(0);
+    expect(particleIdUploads(gpu)).toEqual([expectedIdUpload(0)]);
     expect(idUploads(gpu)).toEqual([expectedIdUpload(2)]);
+  });
+
+  it("instances a particle system with one id for the whole emitter", () => {
+    const { gpu, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const liveCount = 3;
+    const emitter = particleEmitter(liveCount);
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [emitter] as unknown[],
+    };
+
+    service.update(root as unknown as PickRoot, view);
+
+    expect(particleDrawCount(gpu)).toBe(1);
+    expect(gpu.callsOf("pass.draw")[0]?.args[1]).toBe(liveCount);
+    expect(meshDrawCount(gpu)).toBe(0);
+    expect(particleIdUploads(gpu)).toEqual([expectedIdUpload(0)]);
+
+    const sources = gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => (call.args[0] as { code: string }).code);
+    expect(sources).toContain(PARTICLE_ID_SHADER_SOURCE);
+    expect(PARTICLE_ID_SHADER_SOURCE).toContain(
+      "id.view * id.model * vec4<f32>(instancePosition, 1.0)",
+    );
+    expect(PARTICLE_ID_SHADER_SOURCE).toContain("corner.x * instanceSize");
+    expect(PARTICLE_ID_SHADER_SOURCE).toContain("return id.pickId;");
+
+    service.update(root as unknown as PickRoot, view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(2);
+    expect(particleDrawCount(gpu)).toBe(2);
+  });
+
+  it("skips a particle item when the host has no particle cache", () => {
+    const { gpu, service, state, view } = createRig();
+    state.particles = null;
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [particleEmitter(2)] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(particleDrawCount(gpu)).toBe(0);
+    expect(meshDrawCount(gpu)).toBe(0);
+  });
+
+  it("skips a particle item whose instance buffer has no capacity", () => {
+    const { gpu, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [particleEmitter(1, new Float32Array(0))] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(particleDrawCount(gpu)).toBe(0);
+  });
+
+  it("skips a zero-count emitter — no particle draw", () => {
+    const { gpu, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const empty = particleEmitter(0, new Float32Array(8));
+    const emptyRoot = {
+      visible: true,
+      enabled: true,
+      children: [empty] as unknown[],
+    };
+    service.update(emptyRoot as unknown as PickRoot, view);
+    expect(particleDrawCount(gpu)).toBe(0);
+    expect(meshDrawCount(gpu)).toBe(0);
+  });
+
+  it("assigns a distinct table id per particle system, switching pipelines back to meshes", () => {
+    const { gpu, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const first = particleEmitter(2, undefined, "emitter-a");
+    const second = particleEmitter(4, undefined, "emitter-b");
+    const plain = drawable();
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [first, second, plain] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(particleDrawCount(gpu)).toBe(2);
+    expect(
+      gpu
+        .callsOf("pass.draw")
+        .filter((call) => typeof call.args[1] === "number")
+        .map((call) => call.args[1]),
+    ).toEqual([2, 4]);
+    expect(meshDrawCount(gpu)).toBe(1);
+    expect(particleIdUploads(gpu)).toEqual([
+      expectedIdUpload(0),
+      expectedIdUpload(1),
+    ]);
+    expect(idUploads(gpu)).toEqual([expectedIdUpload(2)]);
+  });
+
+  it("latches a particle-pipeline compile failure and still draws meshes", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {
+      // silenced
+    });
+    try {
+      const { gpu, service, state, view } = createRig();
+      const raw = state.device as GpuDevice;
+      state.device = {
+        ...raw,
+        createRenderPipeline(descriptor) {
+          const label = (descriptor as { label?: string }).label;
+          if (label === "fourJS:pick-particle-id") {
+            throw new Error("particle pipeline refused");
+          }
+          return raw.createRenderPipeline(descriptor);
+        },
+      };
+      type PickRoot = Parameters<PickingService["update"]>[0];
+      const emitter = particleEmitter(1);
+      const plain = drawable();
+      const root = {
+        visible: true,
+        enabled: true,
+        children: [emitter, plain] as unknown[],
+      };
+      service.update(root as unknown as PickRoot, view);
+      service.update(root as unknown as PickRoot, view);
+      expect(particleDrawCount(gpu)).toBe(0);
+      expect(meshDrawCount(gpu)).toBe(2);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("recompiles the particle id pipeline after a new geometry-cache era", () => {
+    const { gpu, service, state, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [particleEmitter(1)] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(2);
+
+    state.geometries = new WgpuGeometryCache(state.device as GpuDevice);
+    service.update(root as unknown as PickRoot, view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(4);
+    expect(particleDrawCount(gpu)).toBe(2);
+  });
+
+  it("compiles the particle pipeline on the first particle item and reuses it", () => {
+    const { gpu, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const triangle = drawable();
+    service.update(triangle, view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(1);
+
+    const emitterRoot = {
+      visible: true,
+      enabled: true,
+      children: [particleEmitter(2)] as unknown[],
+    };
+    service.update(emitterRoot as unknown as PickRoot, view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(2);
+    expect(particleDrawCount(gpu)).toBe(1);
+
+    service.update(emitterRoot as unknown as PickRoot, view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(2);
+    expect(particleDrawCount(gpu)).toBe(2);
+  });
+
+  it("skips a wide-stream emitter that would need a second vertex layout", () => {
+    const { gpu, service, view } = createRig();
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const wide = particleEmitter(2);
+    wide.particleInstanceFloats = 10;
+    const plain = drawable();
+    const root = {
+      visible: true,
+      enabled: true,
+      children: [wide, plain] as unknown[],
+    };
+    service.update(root as unknown as PickRoot, view);
+    expect(particleDrawCount(gpu)).toBe(0);
+    expect(meshDrawCount(gpu)).toBe(1);
+    expect(idUploads(gpu)).toEqual([expectedIdUpload(1)]);
   });
 
   it("draws sprites through the unlit-shaped position layout", () => {

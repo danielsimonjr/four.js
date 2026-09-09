@@ -7,16 +7,18 @@
  * textures; video textures; canvas and image-bitmap sources; and asynchronous
  * upload with residency diagnostics. What is here is the **2D, RGBA8** texture
  * built from a plain byte array — what §55's sprite tier and §56's glyph atlas
- * need in order to draw anything at all — grown three times since: the
+ * need in order to draw anything at all — grown four times since: the
  * **colour-space tag** §60a needs (R-15, 2026-08-08), which the WebGL 2 backend
  * turns into an sRGB internal format; **wrap and filter modes** (R-30,
- * 2026-08-13); and **mipmaps, the min-filter split, and anisotropy** (R-30b,
- * 2026-08-21). What those three have in common is that they are *upload-time
- * state*: a texture is still one image of one size, and the backend still reads
- * every one of them in the same place. The rest are named as deferred on
- * {@link Texture} rather than sketched, because each of them (a cube target, a
- * compressed-format enum) is a public shape the §79 scene format and every
- * backend have to agree on.
+ * 2026-08-13); **mipmaps, the min-filter split, and anisotropy** (R-30b,
+ * 2026-08-21); and **map roles** (R-30c, 2026-09-09) — an optional colour/data
+ * tag so a colour map can default its omitted `colorSpace` to `"srgb"` without
+ * moving goldens that never set `role`. What those four have in common is that
+ * they are *upload-time state*: a texture is still one image of one size, and
+ * the backend still reads every one of them in the same place. The rest are
+ * named as deferred on {@link Texture} rather than sketched, because each of
+ * them (a cube target, a compressed-format enum) is a public shape the §79
+ * scene format and every backend have to agree on.
  *
  * ## Two departures worth stating up front
  *
@@ -152,8 +154,24 @@ export type TextureWrap = MaterialTextureWrap;
  */
 export type TextureDimension = "2d" | "cube" | "array" | "3d";
 
+/**
+ * Whether a texture is a colour map or a data map (§60a, §77; R-30c,
+ * 2026-09-09).
+ *
+ * `"color"` is albedo, emissive, and anything authored in an image editor;
+ * `"data"` is a normal, roughness, occlusion, or mask map whose bytes are the
+ * numbers they are. The tag is optional: omitting it invents no default role,
+ * and leaves {@link TextureSource.colorSpace} at its dated `"linear"` default
+ * so every already-authored texture stays byte-identical. See
+ * {@link TextureSource.role}.
+ */
+export type TextureMapRole = "color" | "data";
+
 /** The legal {@link TextureDimension} values, in the §85 message's order. */
 const DIMENSIONS: readonly TextureDimension[] = ["2d", "cube", "array", "3d"];
+
+/** The legal {@link TextureMapRole} values, in the §85 message's order. */
+const MAP_ROLES: readonly TextureMapRole[] = ["color", "data"];
 
 /** The legal {@link TextureFilter} values, in the §85 message's order. */
 const FILTERS: readonly TextureFilter[] = ["nearest", "linear"];
@@ -263,15 +281,15 @@ export interface TextureSource {
    * ## The dated deviation from §60a's default (owner decision, R-15)
    *
    * §60a defaults *colour* textures to sRGB. This field **defaults to
-   * `"linear"`**, and the reason is the one this repository applies to every
-   * default: nothing in the engine distinguishes a colour map from a data map
-   * (§59's `normalMap`/`occlusionMap` are staged, so every texture here is a
-   * colour map by elimination), so the §60a-faithful default would silently
-   * darken every texture already authored against this engine and move every
-   * pixel golden, for scenes that never asked for colour management. Opt-in
-   * keeps §60a's behaviour available and every existing frame byte-identical.
-   * Flipping it is an owner call, and the day §77's map roles land is the day
-   * it becomes cheap to make.
+   * `"linear"`** when {@link TextureSource.role} is omitted, and the reason is
+   * the one this repository applies to every default: flipping the engine-wide
+   * default would silently darken every texture already authored against this
+   * engine and move every pixel golden, for scenes that never asked for colour
+   * management. Opt-in keeps §60a's behaviour available and every existing
+   * frame byte-identical. Map roles (R-30c, 2026-09-09) made the faithful
+   * default cheap *per texture* — `role: "color"` with no `colorSpace` resolves
+   * to `"srgb"` — without flipping the engine-wide default. An owner call can
+   * still change the omitted-role default later; this packet does not.
    *
    * §77a's `CanvasTexture` deliberately answers the same question differently
    * — its default is `"srgb"` — because a class born after R-15 has no
@@ -280,6 +298,33 @@ export interface TextureSource {
    * recorded at both defaults).
    */
   readonly colorSpace?: ColorSpace;
+
+  /**
+   * Whether these texels are a colour map or a data map (§60a, §77; R-30c,
+   * 2026-09-09). Optional: omitting it invents **no** default role.
+   *
+   * ```ts
+   * // An albedo PNG: sRGB-encoded bytes, decoded on sample.
+   * new Texture({ width, height, data, role: "color" });
+   * // A roughness map: bytes are the numbers they are.
+   * new Texture({ width, height, data, role: "data" });
+   * ```
+   *
+   * ## Colour-space resolution (the cheap default this tag exists to make)
+   *
+   * | `role` | `colorSpace` authored | resolved `colorSpace` |
+   * | --- | --- | --- |
+   * | omitted | omitted | `"linear"` (R-15, goldens unchanged) |
+   * | omitted | `"srgb"` / `"linear"` | the authored tag |
+   * | `"color"` | omitted | `"srgb"` |
+   * | `"data"` | omitted | `"linear"` |
+   * | either | `"srgb"` / `"linear"` | the authored tag wins |
+   *
+   * Backends still read {@link Texture.colorSpace} only. The role never
+   * changes a sampler type, and a source that never sets it is byte-identical
+   * to one built before this field existed.
+   */
+  readonly role?: TextureMapRole;
 
   /**
    * How this texture is sampled between texel centres (§77; R-30,
@@ -474,6 +519,12 @@ function validate(source: TextureSource): void {
   if (source.colorSpace !== undefined) {
     validateColorSpace(source.colorSpace, "Texture");
   }
+  if (source.role !== undefined) {
+    // Caller mistake, same as a misspelled `filter`: RangeError via
+    // `validateEnum`, not `NOT_IMPLEMENTED`. Both roles are implemented;
+    // `"cube"` on `dimension` is the one that is named and refused.
+    validateEnum(source.role, MAP_ROLES, "role");
+  }
   if (source.filter !== undefined) {
     validateEnum(source.filter, FILTERS, "filter");
   }
@@ -552,13 +603,10 @@ function validate(source: TextureSource): void {
  *
  * Cube/array/3D *uploads* (the field is named — {@link TextureSource.dimension}
  * — and non-`"2d"` is refused with `NOT_IMPLEMENTED` rather than sampled as
- * 2D), the §77 *map roles* that
- * would let colour-space metadata carry §60a's own defaults (colour maps sRGB,
- * data maps linear — the tag itself ships, see
- * {@link TextureSource.colorSpace}), compressed containers, render-target textures (§63), video textures,
- * and asynchronous upload with residency diagnostics (§84). Every one of them
- * adds public state that a backend, the §79 scene format, and §76's asset
- * manager all have to agree on.
+ * 2D), compressed containers, render-target textures (§63), video textures
+ * / `ImageBitmap`, and asynchronous upload with residency diagnostics (§84).
+ * Every one of them adds public state that a backend, the §79 scene format,
+ * and §76's asset manager all have to agree on.
  *
  * **Wrap and filter modes left that list on 2026-08-13 (R-30)** — see
  * {@link TextureSource.filter} and {@link TextureSource.wrap}. They were the
@@ -571,11 +619,17 @@ function validate(source: TextureSource): void {
  * {@link TextureSource.mipmaps}, {@link TextureSource.minFilter} and
  * {@link TextureSource.anisotropy} — for the same reason and at the same cost:
  * one more upload-time GL call for the textures that ask, nothing at all for
- * the ones that do not, and no change anywhere on the draw path. What is left
- * on the list are the members that are *not* upload-time state: a cube or array
+ * the ones that do not, and no change anywhere on the draw path.
+ *
+ * **~~Map roles~~ left it on 2026-09-09 (R-30c, the tag)** — see
+ * {@link TextureSource.role}. They are a colour/data annotation, not a
+ * sampler-type change: a colour map can default its omitted `colorSpace` to
+ * `"srgb"` without moving goldens that never set `role`. What is left on the
+ * list are the members that are *not* upload-time state: a cube or array
  * target changes the sampler type in every shader that reads it, a compressed
- * container changes the upload call and needs a §62 format report, and a video
- * source needs per-frame update semantics (§9) rather than a version bump.
+ * container changes the upload call and needs a §62 format report, a video
+ * or `ImageBitmap` source needs per-frame update semantics (§9) rather than a
+ * version bump, and async upload is residency diagnostics (§84).
  */
 export class Texture implements Disposable, SpriteTexture {
   /**
@@ -638,17 +692,31 @@ export class Texture implements Disposable, SpriteTexture {
   }
 
   /**
-   * The colour space of the texels (§60a), `"linear"` when the source names
-   * none — see {@link TextureSource.colorSpace} for the default and its dated
-   * deviation from §60a's own.
+   * Whether this texture is a colour map or a data map (§60a, §77; R-30c).
+   * `null` when the source names none — see {@link TextureSource.role}. No
+   * default is invented: omitting the field is how every pre-R-30c texture
+   * keeps its dated `"linear"` colour space.
+   */
+  get role(): TextureMapRole | null {
+    return this.#source.role ?? null;
+  }
+
+  /**
+   * The colour space of the texels (§60a). Resolved here rather than left
+   * optional so the backend reads one value and never repeats the `??`;
+   * `MaterialTexture.colorSpace` stays optional because a test double and
+   * every pre-R-15 texture satisfy it unchanged.
    *
-   * Resolved here rather than left optional so the backend reads one value and
-   * never repeats the `?? "linear"`; `MaterialTexture.colorSpace` stays
-   * optional because a test double and every pre-R-15 texture satisfy it
-   * unchanged.
+   * **Authored `colorSpace` always wins.** When it is omitted:
+   * {@link TextureSource.role} `"color"` resolves to `"srgb"`, and every
+   * other case — `"data"`, or no role at all — stays `"linear"`, the dated
+   * R-15 default. See {@link TextureSource.role} for the table.
    */
   get colorSpace(): ColorSpace {
-    return this.#source.colorSpace ?? "linear";
+    if (this.#source.colorSpace !== undefined) {
+      return this.#source.colorSpace;
+    }
+    return this.#source.role === "color" ? "srgb" : "linear";
   }
 
   /**

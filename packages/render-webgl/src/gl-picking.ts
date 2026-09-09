@@ -28,9 +28,14 @@
  * - **`material.stencil` (R-7's hand-composed tier) is not applied** — the
  *   id target carries stencil bits only for §67 clips, and a hand-composed
  *   mask is the author's picture, not the engine's to reproduce here;
- * - **skinned items are skipped** — a bind-pose id is a different picture
- *   (the §69 caster exclusion, third application); the bounds tier serves
- *   them;
+ * - **skinned items draw through {@link SkinnedIdProgram}** — the §54
+ *   skin vertex (`SKINNING_GLSL` from `gl-skinning-glsl.ts`, not
+ *   `gl-skinning.ts`, so this module does not link the colour pair) plus
+ *   the id fragment, so a deformed silhouette picks as the colour pass
+ *   does. A compile failure skips (bounds). A bind-pose id remains a
+ *   different picture; this program is the third application of that
+ *   exclusion. WebGPU still skips: that backend has no RFC 0003 skinned
+ *   pipelines;
  * - **particle items write one id for the whole system** — §36's batched
  *   item has one node and no per-particle geometry, so the pass instances
  *   the shared unit quad through {@link ParticleIdProgram} (the §36
@@ -100,6 +105,7 @@ import {
   type WebglContext,
 } from "./gl-program.js";
 import type { RenderTargetRecord } from "./gl-render-target.js";
+import { SKINNING_GLSL } from "./gl-skinning-glsl.js";
 
 /**
  * The subtree root an update draws and the viewport it draws it into — read
@@ -406,6 +412,138 @@ export class ParticleIdProgram {
   }
 }
 
+/**
+ * The skinned id program (§54 + §71; RFC 0005 residue) — {@link SKINNING_GLSL}
+ * spliced into {@link IdPassProgram}'s vertex product, plus the same flat
+ * `pickId` fragment. A deformed silhouette writes the table index; a
+ * bind-pose id would be a different picture (the §69 caster exclusion,
+ * third application).
+ *
+ * Lives here, not in `gl-skinning.ts`: {@link registerPickingPipeline} is
+ * what links this module, and importing the colour-pair module would pull
+ * two unused programs into every picking bundle. Compiled lazily on the
+ * service's **first skinned item**, never at registration or construction.
+ */
+const SKINNED_ID_VERTEX_SHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 position;
+${SKINNING_GLSL}
+uniform mat4 viewProjection;
+uniform mat4 model;
+
+void main() {
+  gl_Position = viewProjection * model * (skinMatrix() * vec4(position, 1.0));
+}
+`;
+
+export class SkinnedIdProgram {
+  readonly #gl: WebglContext;
+
+  readonly #program: GlProgramHandle;
+
+  readonly #viewProjectionLocation: GlUniformLocation;
+
+  readonly #modelLocation: GlUniformLocation;
+
+  readonly #jointMatricesLocation: GlUniformLocation;
+
+  readonly #idLocation: GlUniformLocation;
+
+  #disposed = false;
+
+  private constructor(
+    gl: WebglContext,
+    program: GlProgramHandle,
+    viewProjectionLocation: GlUniformLocation,
+    modelLocation: GlUniformLocation,
+    jointMatricesLocation: GlUniformLocation,
+    idLocation: GlUniformLocation,
+  ) {
+    this.#gl = gl;
+    this.#program = program;
+    this.#viewProjectionLocation = viewProjectionLocation;
+    this.#modelLocation = modelLocation;
+    this.#jointMatricesLocation = jointMatricesLocation;
+    this.#idLocation = idLocation;
+  }
+
+  /**
+   * Compiles and links the skinned id program on `gl` —
+   * {@link IdPassProgram.create}'s contract with `"pick-skinned-id"` in
+   * the messages.
+   */
+  static create(gl: WebglContext): SkinnedIdProgram {
+    const program = createLinkedProgram(
+      gl,
+      "pick-skinned-id",
+      SKINNED_ID_VERTEX_SHADER_SOURCE,
+      ID_FRAGMENT_SHADER_SOURCE,
+    );
+    try {
+      return new SkinnedIdProgram(
+        gl,
+        program,
+        requireUniform(gl, program, "viewProjection", "pick-skinned-id"),
+        requireUniform(gl, program, "model", "pick-skinned-id"),
+        requireUniform(gl, program, "jointMatrices[0]", "pick-skinned-id"),
+        requireUniform(gl, program, "pickId", "pick-skinned-id"),
+      );
+    } catch (error: unknown) {
+      gl.deleteProgram(program);
+      throw error;
+    }
+  }
+
+  /** Whether {@link SkinnedIdProgram.dispose} has run. */
+  get disposed(): boolean {
+    return this.#disposed;
+  }
+
+  /** Makes this the current program. Call before any upload below. */
+  use(): void {
+    this.#gl.useProgram(this.#program);
+  }
+
+  /** Uploads `projection * view` for the pass. Column-major (§7b). */
+  setViewProjection(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(
+      this.#viewProjectionLocation,
+      false,
+      matrixScratch,
+    );
+  }
+
+  /** Uploads one item's world matrix. */
+  setModel(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
+  }
+
+  /**
+   * Uploads the item's joint palette — 16 floats per joint, straight from
+   * the skeleton's own `Float32Array`. Uploading fewer matrices than the
+   * declared `MAX_SKINNING_JOINTS` leaves the dead tail untouched, which
+   * is legal GL (`SkinnedUnlitProgram.setJointMatrices`'s contract).
+   */
+  setJointMatrices(palette: Float32Array): void {
+    this.#gl.uniformMatrix4fv(this.#jointMatricesLocation, false, palette);
+  }
+
+  /** Uploads one encoded id colour (`encodePickId`'s four floats). */
+  setId(encoded: Float32Array): void {
+    this.#gl.uniform4fv(this.#idLocation, encoded);
+  }
+
+  /** Deletes the GL program (§83). Idempotent; live context only. */
+  dispose(): void {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    this.#gl.deleteProgram(this.#program);
+  }
+}
+
 /** One pass's resolved viewport rectangle, in target pixels. */
 interface PassRect {
   x: number;
@@ -523,6 +661,15 @@ export class WebglPickingService implements PickingService {
 
   /** Latched per era, same discipline as `#programFailed`. */
   #particleProgramFailed = false;
+
+  /**
+   * The skinned id program — compiled on the first skinned item of an
+   * era, never at construction. `null` until then.
+   */
+  #skinnedProgram: SkinnedIdProgram | null = null;
+
+  /** Latched per era, same discipline as `#programFailed`. */
+  #skinnedProgramFailed = false;
 
   /** The last successful pass, or `null` — what `pick` reads. */
   #pass: PassState | null = null;
@@ -844,6 +991,14 @@ export class WebglPickingService implements PickingService {
       this.#particleProgram.dispose();
     }
     this.#particleProgram = null;
+    if (
+      this.#skinnedProgram !== null &&
+      live &&
+      host.geometries() === this.#programEra
+    ) {
+      this.#skinnedProgram.dispose();
+    }
+    this.#skinnedProgram = null;
     // Disposing the target bumps its version; asking the cache for it once
     // more is what makes the cache destroy the framebuffer *now* rather than
     // holding it until renderer disposal (the caches' documented lazy
@@ -872,6 +1027,8 @@ export class WebglPickingService implements PickingService {
       this.#programFailed = false;
       this.#particleProgram = null;
       this.#particleProgramFailed = false;
+      this.#skinnedProgram = null;
+      this.#skinnedProgramFailed = false;
       this.#programEra = era;
     }
     if (this.#program !== null) {
@@ -927,6 +1084,36 @@ export class WebglPickingService implements PickingService {
   }
 
   /**
+   * The compiled skinned id program for this era, or `null`. Compiled on
+   * the first skinned item, never at construction — a scene that registers
+   * picking and never submits a skinned mesh issues the mesh id program
+   * only, and never links `gl-skinning.ts`.
+   */
+  #acquireSkinnedProgram(gl: WebglContext): SkinnedIdProgram | null {
+    if (this.#skinnedProgram !== null) {
+      return this.#skinnedProgram;
+    }
+    if (this.#skinnedProgramFailed) {
+      return null;
+    }
+    try {
+      this.#skinnedProgram = SkinnedIdProgram.create(gl);
+      return this.#skinnedProgram;
+    } catch (error: unknown) {
+      this.#skinnedProgramFailed = true;
+      if (DEV) {
+        devWarnOnce(
+          "webgl-picking-skinned-compile-failed",
+          "§71: the skinned picking id program failed to compile on this " +
+            "context; skinned id draws are skipped (§61, §89). " +
+            `${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
    * Draws one id pass. Starts from — and, in its `finally`, returns GL to —
    * the renderer's between-frames baseline (blend off, depth test on, writes
    * on, stencil off with all-bits masks), which is what keeps the next
@@ -952,7 +1139,7 @@ export class WebglPickingService implements PickingService {
     let stencilOn = false;
     let stencilTouched = false;
     let appliedClip: RenderItemClip | null = null;
-    let activeKind: "id" | "particles" = "id";
+    let activeKind: "id" | "particles" | "skinned" = "id";
 
     try {
       gl.bindFramebuffer(GL.FRAMEBUFFER, record.framebuffer);
@@ -973,11 +1160,8 @@ export class WebglPickingService implements PickingService {
 
       for (let index = 0; index < viewItems.length; index += 1) {
         const item = viewItems[index];
-        if (item.kind === "skinned-unlit" || item.kind === "skinned-lit") {
-          // Absence, stated in the module header: no bind-pose ids. The
-          // bounds tier serves them.
-          continue;
-        }
+        const isSkinnedItem =
+          item.kind === "skinned-unlit" || item.kind === "skinned-lit";
 
         const isParticleItem = item.kind === "particles";
         if (isParticleItem && item.count === 0) {
@@ -1028,6 +1212,14 @@ export class WebglPickingService implements PickingService {
           }
           particleProgram = this.#acquireParticleProgram(gl);
           if (particleProgram === null) {
+            continue;
+          }
+        }
+
+        let skinnedProgram: SkinnedIdProgram | null = null;
+        if (isSkinnedItem) {
+          skinnedProgram = this.#acquireSkinnedProgram(gl);
+          if (skinnedProgram === null) {
             continue;
           }
         }
@@ -1131,6 +1323,35 @@ export class WebglPickingService implements PickingService {
             geometry.count,
             item.count,
           );
+          continue;
+        }
+
+        if (isSkinnedItem) {
+          if (skinnedProgram === null) {
+            continue;
+          }
+          if (activeKind !== "skinned") {
+            skinnedProgram.use();
+            skinnedProgram.setViewProjection(passViewProjection);
+            activeKind = "skinned";
+          }
+          if (!maskPass) {
+            encodePickId(tableIndex, idScratch);
+            skinnedProgram.setId(idScratch);
+          }
+          skinnedProgram.setModel(item.worldMatrix);
+          skinnedProgram.setJointMatrices(item.jointMatrices);
+          gl.bindVertexArray(geometry.vertexArray);
+          if (geometry.indexType === null) {
+            gl.drawArrays(geometry.mode, 0, geometry.count);
+          } else {
+            gl.drawElements(
+              geometry.mode,
+              geometry.count,
+              geometry.indexType,
+              0,
+            );
+          }
           continue;
         }
 

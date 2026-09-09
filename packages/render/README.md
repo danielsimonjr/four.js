@@ -7,7 +7,7 @@ Implements the MVP tier of §61–66 in [`docs/SPECIFICATION.md`](../../docs/SPE
 ## What's here
 
 - **`Renderer` (§61)** — the interface every backend implements, with `RendererCapabilities`, `RendererBackend`, resize events (`RendererEventMap`, `ResizeRecord`), and **`NullRenderer`** for headless composition.
-- **Render lists** — `buildRenderList` and `buildInterpolatedRenderList` (§43: draws at `interpolationAlpha` between physics poses), producing typed `RenderItem`s (`isUnlitItem` / `isSpriteItem` / `isParticlesItem`).
+- **Render lists** — `buildRenderList` and `buildInterpolatedRenderList` (§43: draws at `interpolationAlpha` between physics poses, including skinned palettes composed from interpolated local poses — never a lerp of `jointMatrices`), producing typed `RenderItem`s (`isUnlitItem` / `isSpriteItem` / `isParticlesItem` / `isSkinnedUnlitItem` / `isSkinnedLitItem`).
 - **Per-view lists and §87 culling (§64 stages 2–3)** — `buildViewRenderList` derives one viewport's draws from the frame's list by §46's layer mask and an optional `Frustum`, and `computeWorldBoundingSphere` is the world bound it tests. The frame traverses once; a view is a query over what it produced, so §69's shadow map stays frame state no viewport filters.
 - **§66's sort keys as verbs** — `groupRenderListByPipeline` (key 3, for §65 batching) and `sortRenderListByDepth` (key 4, opaque near-to-far and blended far-to-near, on a view's own list). Neither is a default: under §61's `LEQUAL` both permute co-planar opaque draws, which is what a 2D scene is made of.
 - **`Renderable`** — the geometry + material scene attachment.

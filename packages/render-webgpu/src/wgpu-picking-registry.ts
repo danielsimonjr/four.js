@@ -22,6 +22,7 @@ import type { PickingService } from "@fourjs/render";
 
 import type { GpuDevice } from "./webgpu-device.js";
 import type { WgpuGeometryCache } from "./wgpu-geometry.js";
+import type { WgpuParticleCache } from "./wgpu-particles.js";
 import type { WgpuRenderTargetCache } from "./wgpu-render-target.js";
 
 /**
@@ -44,6 +45,12 @@ export interface PickingRendererHost {
   device(): GpuDevice | null;
   /** The renderer's geometry cache, or `null` when the device is down. */
   geometries(): WgpuGeometryCache | null;
+  /**
+   * The renderer's particle-instance cache, or `null` when the device is
+   * down — the live accessor the id pass uses to instance §36 systems
+   * rather than rasterising the shared unit quad.
+   */
+  particles(): WgpuParticleCache | null;
   /** The renderer's render-target cache, or `null` when the device is down. */
   renderTargets(): WgpuRenderTargetCache | null;
   /** Drawing-buffer width in device pixels — what §48 rectangles resolve against. */

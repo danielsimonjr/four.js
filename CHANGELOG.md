@@ -14,6 +14,17 @@ stay on the tracker.
 
 ### Fixed
 
+- **`dev-build-mode` GATED list includes `wgpu-picking.ts`.** Wave 5's
+  WebGPU picking id pipelines wrap compile-failure notices in `if (DEV)`
+  (mesh + particle), matching `gl-picking.ts`, but the §33 gate only
+  listed the WebGL twin. Cross-package suites failed on #87 until the
+  WebGPU file was recorded with the same picking-is-input argument.
+
+- **Size budgets after #86.** CI `bun run size` failed with the browser
+  gate green (107/107): particles-demo 43.04/43 kB (+38 B), ui-demo
+  49.51/49.5 kB (+11 B). Limits 43.5 / 50 kB. first-3d 42.74/43 kB holds.
+  Rationale in `tools/size-budgets.mjs`.
+
 - **WebGPU Playwright gates match the 192-byte `DrawUniforms` block.** After
   the `normalMatrix` hoist, six `[webgpu]` specs still bound
   `minBindingSize: 144` (shader reads 192). Sprites still packed a retired
@@ -59,6 +70,35 @@ stay on the tracker.
 
 ### Changed
 
+- **Texture map roles (R-30c).** Optional `TextureSource.role` /
+  `Texture.role` (`"color"` | `"data"`). Omitting the field invents no
+  default and leaves `colorSpace` at R-15's `"linear"`, so already-
+  authored textures and goldens stay byte-identical. `role: "color"`
+  with no `colorSpace` resolves to `"srgb"`; `"data"` stays linear;
+  an authored `colorSpace` always wins. Backends still read
+  `colorSpace` only. Cube/array/3D, compressed, video/`ImageBitmap`,
+  and async upload remain. R-30c stays open.
+
+- **WebGL skinned id pass (RFC 0005).** `SkinnedIdProgram` draws a
+  deformed silhouette into the picking buffer (`SKINNING_GLSL` spliced
+  into the id fragment). Compiled on the first skinned item; a compile
+  failure skips (bounds). Isolated from `gl-skinning.ts` so
+  `registerPickingPipeline` does not link the colour pair. WebGPU still
+  skips skinned items (no RFC 0003 skinned pipelines). RFC 0005 stays
+  open.
+
+- **WebGPU particle id pass (RFC 0005).** Emitters pick by GPU id — one
+  colour per system — through a private billboard pipeline (CPU 8-float
+  instance stream, 208-byte `PARTICLE_ID_*` block). Trails stay undrawn;
+  GPU-sim / R-32 wide streams skip; skinned items still bounds-only on
+  both backends. RFC 0005 stays open.
+
+- **WebGPU `StandardMaterial.metalRoughnessMap`.** Packed G=roughness /
+  B=metalness, matching WebGL. Bind group 3 when albedo occupies group 2,
+  group 2 when it does not (`shadedMrBindingWgsl`). Scalar-only keys stay
+  byte-identical (`|mr:y` only when true). `normalMap` / `occlusionMap` /
+  `emissiveMap` remain unstaged.
+
 - **§43 interpolated skin palettes.** `Skeleton.update` takes an optional
   `worldOf` provider. The interpolated render list composes bone local
   poses at `interpolationAlpha` then runs the palette product. Palettes
@@ -72,8 +112,8 @@ stay on the tracker.
 
 - **WebGPU `PickingService` (RFC 0005).** `registerPickingPipeline()` from
   `@fourjs/render-webgpu`, then `createPickingService()`. `pick` copies
-  one texel through `mapAsync`. Particles and skinned items are skipped
-  (no `ParticleIdProgram`, no skinned pipelines).
+  one texel through `mapAsync`. Particle emitters now have their own id
+  arm (see the particle id-pass bullet); skinned items stay skipped.
 
 - **WebGPU lit/standard read `draw.normalMatrix`.** `DRAW_UNIFORM_BYTES`
   is 192; `STANDARD_UNIFORM_BYTES` is 224 (`emissive` 192, `surface` 208).
@@ -117,6 +157,12 @@ stay on the tracker.
   97.16%.
 
 ### Added
+
+- **Dogfooding cycle 6 — §43 interpolated skin palettes.** Guides and
+  architecture docs no longer describe interpolated rendering as
+  node-matrix lerp only. Consumer-seat proof:
+  `tests/integration/interpolated-skin-palettes.test.ts`. Engine was
+  clean. The standing dogfood checkbox stays open.
 
 - **`Matrix3` normal-matrix utility and per-draw hoist.** `transpose()`,
   `setFromMatrix4Upper3x3()`, `setNormalFromMatrix4()` — the inverse-transpose

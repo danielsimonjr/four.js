@@ -30,6 +30,79 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — R-30c map roles.** Optional `TextureMapRole` `"color"` |
+  `"data"` on `TextureSource` / `Texture.role`. Omitting `role` invents
+  **no** default and leaves `colorSpace` at R-15's `"linear"` — that is
+  the golden-stability rule, not a missing default. `role: "color"` with
+  no `colorSpace` resolves to `"srgb"`; `"data"` stays linear; an
+  authored `colorSpace` always wins. Backends still sample
+  `texture.colorSpace` only; glTF already passes `"linear"` for
+  metallic-roughness. Invalid role is `RangeError` via `validateEnum`
+  (same as filter/wrap). R-30c checkbox stays `[ ]` (cube/array/3D,
+  compressed, video/`ImageBitmap`, async upload).
+
+- **2026-09-09 — `wgpu-picking.ts` on the `GATED` list.** Wave 5's WebGPU
+  picking id pipelines wrap compile-failure notices in `if (DEV)` (mesh
+  + particle). `gl-picking.ts` was already listed; the WebGPU twin was
+  not, so `tests/integration/dev-build-mode.test.ts` failed on #87.
+  Argument matches the WebGL entry: failure latched in both builds,
+  picking is a §34 input, nothing an id pass draws re-enters simulation
+  (§42/§43).
+
+- **2026-09-09 — RFC 0005 WebGL `SkinnedIdProgram`.** The id pass draws
+  skinned-unlit / skinned-lit items through a deformed silhouette
+  (`SKINNING_GLSL` in `gl-skinning-glsl.ts`, spliced into the id
+  fragment). Lives in `gl-picking.ts` so `registerPickingPipeline` does
+  not link the colour pair. Lazy compile, fail-once skip, same palette
+  upload as the colour pass. WebGPU still skips: no RFC 0003 skinned
+  pipelines there. RFC 0005 checkbox stays `[ ]`.
+
+- **2026-09-09 — Size budgets after #86.** Main CI failed at `bun run size`
+  with the browser gate green (107/107). particles-demo 43.04/43 kB (+38 B),
+  ui-demo 49.51/49.5 kB (+11 B). Limits 43.5 / 50 kB. first-3d holds.
+  PickProvider and the WebGL particle id arm ride those two graphs.
+
+- **2026-09-09 — Open-TODO wave 5, simple → complex.** Twelve checkboxes
+  remain; three slices landed without pretending the packets closed.
+  (1) RFC 0005 WebGPU particle id: one id per emitter, private pipeline
+  (not exported as `ParticleIdProgram`); 208-byte `PARTICLE_ID_*` block;
+  CPU 8-float stream; trails / GPU-sim / wide stream skip. Remaining:
+  WebGPU skinned id pass (needs RFC 0003 skinned pipelines). (2) Lighting leftover: WebGPU
+  samples `StandardMaterial.metalRoughnessMap` (G=roughness, B=metalness);
+  group 3 with albedo, group 2 without (`shadedMrBindingWgsl`). `|mr:y`
+  only when true. Remaining: multi-light / cascades / PBR / §60a / light
+  layers / other texture slots. (3) Dogfood cycle 6 sat on §43 palettes;
+  engine clean; guides patched; standing checkbox stays open. First
+  publish and R-33's §112 exit stay blocked.
+
+- **2026-09-09 — WebGPU particle id arm (RFC 0005 residue).** One id per
+  emitter, mirroring WebGL's `ParticleIdProgram` without exporting that
+  class name (`graph:duplicates`). `PickingRendererHost.particles()` is
+  the live `WgpuParticleCache` accessor. Mesh `IdUniforms` stay 144
+  bytes; the particle id block is 208 bytes (projection 0 / view 64 /
+  model 128 / pickId 192) in the 256-byte stride. Billboard vertex math
+  is `PARTICLE_SHADER_SOURCE`'s. Default 8-float CPU stream only; trails,
+  GPU-sim layouts, and the R-32 wide stream skip. WebGL now draws
+  skinned ids (`SkinnedIdProgram`); WebGPU still skips (no RFC 0003
+  skinned pipelines). RFC 0005 is not closed.
+
+- **2026-09-09 — Dogfood cycle 6: §43 interpolated skin palettes.**
+  Read from a consumer seat. `Skeleton.update(skinRoot, worldOf?)` and
+  `buildInterpolatedRenderList` compose interpolated local poses, then
+  run the palette product. Palettes are never matrix-lerped; scene
+  transforms are unchanged. Engine clean. Evidence:
+  `tests/integration/interpolated-skin-palettes.test.ts` (two-bone, 90°
+  hip; mid-alpha ≠ lerp of endpoints). Guides and architecture docs
+  patched. Standing dogfood checkbox stays open.
+
+- **2026-09-09 — WebGPU samples `StandardMaterial.metalRoughnessMap`.** Packed
+  G=roughness / B=metalness, matching WebGL unit 2. Bind-group index is
+  **3 when albedo occupies group 2, 2 when it does not** (`shadedMrBindingWgsl`).
+  `|mr:y` appends to the pipeline key only when true, so scalar-only
+  transcripts stay byte-identical. Unresolved named maps skip the draw.
+  `normalMap` / `occlusionMap` / `emissiveMap` remain unstaged. Lighting
+  follow-ups stay open.
+
 - **2026-09-09 — WebGPU browser gates follow `DRAW_UNIFORM_BYTES`.** The
   Playwright page programs are not the renderer: they bind their own
   layouts. After `DrawUniforms` grew to 192 bytes (`normalMatrix` at 144)

@@ -544,7 +544,9 @@ describe("WebgpuRenderer.initialize", () => {
     const viewsPass = gpu
       .callsOf("encoder.beginRenderPass")
       .find(
-        (call) => (call.args[0] as { label?: string } | undefined)?.label === "fourJS:views",
+        (call) =>
+          (call.args[0] as { label?: string } | undefined)?.label ===
+          "fourJS:views",
       );
     expect(
       (viewsPass?.args[0] as { timestampWrites?: unknown } | undefined)
@@ -1577,7 +1579,9 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
     const root = createRoot();
     const geometry = texturedTriangle();
     geometry.uvs = new Float32Array([0.5, 0.5, 1, 0.5, 1, 1]);
-    root.add(new SpriteNode(geometry, new TestSpriteMaterial(new TestTexture(4, 4))));
+    root.add(
+      new SpriteNode(geometry, new TestSpriteMaterial(new TestTexture(4, 4))),
+    );
     harness.renderer.render(root, [createView()]);
 
     const buffers = harness.gpu.callsOf("pass.setVertexBuffer");
@@ -2306,6 +2310,8 @@ class TestStandardMaterial {
 
   map?: TestTexture | null;
 
+  metalRoughnessMap?: TestTexture | null;
+
   constructor(baseColor: [number, number, number, number] = [1, 1, 1, 1]) {
     this.baseColor = baseColor;
   }
@@ -2563,7 +2569,10 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     const floats = drawUniformUpload(harness.gpu);
     const base = UNIFORM_STRIDE_BYTES / 4;
     expect(
-      floats.slice(base + DRAW_NORMAL_OFFSET / 4, base + DRAW_NORMAL_OFFSET / 4 + 12),
+      floats.slice(
+        base + DRAW_NORMAL_OFFSET / 4,
+        base + DRAW_NORMAL_OFFSET / 4 + 12,
+      ),
     ).toEqual([0.5, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0.125, 0]);
   });
 
@@ -2616,6 +2625,100 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     expect(lightSlot(lightFloats, 0, LIGHT_CAMERA_OFFSET)).toEqual([
       1, 2, 3, 0,
     ]);
+    // Scalar-only: no `|mr:y` key, no group-3 bind, no extra layout.
+    expect(
+      pipelineLabels(harness.gpu).some((label) => label.includes("|mr:y")),
+    ).toBe(false);
+    expect(bindGroupOffsets(harness.gpu, 3)).toEqual([]);
+    expect(
+      layoutLabels(harness.gpu).some((label) =>
+        label.includes("pipeline-layout:standard:mr"),
+      ),
+    ).toBe(false);
+  });
+
+  it("samples an mr-only standard map at group 2", () => {
+    const root = createRoot();
+    const geometry = litTriangle();
+    geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+    const material = new TestStandardMaterial();
+    material.metalRoughnessMap = new TestTexture();
+    root.add(new Renderable(geometry.asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:standard|n|mr");
+    expect(
+      pipelineLabels(harness.gpu).some((label) => label.endsWith("|mr:y")),
+    ).toBe(true);
+    expect(bindGroupOffsets(harness.gpu, 2)).toHaveLength(1);
+    expect(bindGroupOffsets(harness.gpu, 3)).toEqual([]);
+    expect(mapAllocations(harness.gpu)).toBe(1);
+    const code = harness.gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => call.args[0] as { label?: string; code: string })
+      .find((module) => module.label === "fourJS:standard|n|mr")?.code;
+    expect(code).toContain("textureSample(mrTexture, mrSampler, input.uv)");
+    expect(code).not.toContain("textureSample(mapTexture, mapSampler");
+  });
+
+  it("samples albedo at group 2 and metal-roughness at group 3", () => {
+    const root = createRoot();
+    const geometry = litTriangle();
+    geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+    const material = new TestStandardMaterial();
+    material.map = new TestTexture();
+    material.metalRoughnessMap = new TestTexture();
+    root.add(new Renderable(geometry.asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:standard|n|map|mr");
+    expect(
+      pipelineLabels(harness.gpu).some(
+        (label) => label.includes("|map|") && label.endsWith("|mr:y"),
+      ),
+    ).toBe(true);
+    expect(bindGroupOffsets(harness.gpu, 2)).toHaveLength(1);
+    expect(bindGroupOffsets(harness.gpu, 3)).toHaveLength(1);
+    expect(mapAllocations(harness.gpu)).toBe(2);
+    const code = harness.gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => call.args[0] as { label?: string; code: string })
+      .find((module) => module.label === "fourJS:standard|n|map|mr")?.code;
+    expect(code).toContain("textureSample(mapTexture, mapSampler, input.uv)");
+    expect(code).toContain("textureSample(mrTexture, mrSampler, input.uv)");
+  });
+
+  it("skips a standard draw whose named metal-roughness map will not resolve (§83)", () => {
+    const root = createRoot();
+    const geometry = litTriangle();
+    geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+    const material = new TestStandardMaterial();
+    material.metalRoughnessMap = new TestTexture();
+    material.metalRoughnessMap.dispose();
+    root.add(new Renderable(geometry.asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(
+      moduleLabels(harness.gpu).some((label) => label.includes("standard")),
+    ).toBe(false);
+  });
+
+  it("degrades a metal-roughness standard draw without uvs to the scalar variant", () => {
+    const root = createRoot();
+    const material = new TestStandardMaterial();
+    material.metalRoughnessMap = new TestTexture();
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:standard|n");
+    expect(
+      pipelineLabels(harness.gpu).some((label) => label.includes("|mr:y")),
+    ).toBe(false);
+    expect(mapAllocations(harness.gpu)).toBe(0);
+    expect(harness.gpu.countOf("pass.draw")).toBe(2);
   });
 
   it("packs the punctual set exactly as the GL backend selects it (§68, §84)", () => {
@@ -3184,7 +3287,8 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
         .callsOf("device.createBindGroup")
         .filter(
           (call) =>
-            (call.args[0] as { label?: string }).label === "fourJS:shadow-lights",
+            (call.args[0] as { label?: string }).label ===
+            "fourJS:shadow-lights",
         ).length;
     expect(shadowGroupCount()).toBe(1);
 
@@ -3567,7 +3671,9 @@ describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
     const groups = harness.gpu
       .callsOf("device.createBindGroup")
       .map((call) => call.args[0] as { label?: string; entries: unknown[] })
-      .filter((descriptor_) => descriptor_.label === "fourJS:particle-uniforms");
+      .filter(
+        (descriptor_) => descriptor_.label === "fourJS:particle-uniforms",
+      );
     expect(groups).toHaveLength(1);
     expect(
       (groups[0]?.entries[0] as { resource: { size?: number } }).resource.size,
