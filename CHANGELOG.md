@@ -179,6 +179,26 @@ stay on the tracker.
 
 ### Added
 
+- **RFC 0005 WebGPU skinned id pass.** Private pipeline in `wgpu-picking.ts`
+  (not `SkinnedIdProgram`). Imports `wgpu-skinning-shared.ts` only, so
+  picking does not link the colour pair. 3072-byte palette at group 1;
+  `ID_UNIFORM_BYTES` stays 144. Compile failure skips, never bind-pose.
+  Trails / GPU-sim particle id still skipped.
+
+- **RFC 0003 WebGPU skinned shadow caster.** `acquireShadow()` on the
+  colour pair, compiled on the first skinned caster. One palette buffer
+  sized for casters + later colour draws. Unregistered/failed skip, never
+  bind-pose.
+
+- **RFC 0003 `computeSkinnedBounds`.** `@fourjs/geometry` CPU LBS walk
+  returns a `BoundingVolume` only — no public skinned-position API.
+  Missing joints/weights fall back to bind-pose. Culling and picking stay
+  on bind-pose until a later packet consumes this.
+
+- **RFC 0001 per-node provenance comments.** Both GLSL and WGSL emitters
+  prefix reachable locals with `// node <index> <kind>`. Not a source map
+  (no file:line table). Determinism goldens updated.
+
 - **Dogfooding cycle 6 — §43 interpolated skin palettes.** Guides and
   architecture docs no longer describe interpolated rendering as
   node-matrix lerp only. Consumer-seat proof:
@@ -215,6 +235,10 @@ stay on the tracker.
 
 
 ### Documented
+
+- **RFC 0004 residue is none scheduled.** The deferred table (video /
+  `ImageBitmap` / Canvas 2D stub) is still the whole remaining packet and
+  overlaps R-30c. GPU readback lives on RFC 0009. Not implemented as MVP.
 
 - **Two follow-up rows were already shipped.** The §65 idle-scene batch
   cache (`contentVersion` / `#canSkipUpload`, 0 `bufferSubData` on a still

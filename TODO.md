@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm** + **WebGL `SkinnedIdProgram`**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster** + **WebGPU skinned colour pair**; lighting leftover **WebGPU `metalRoughnessMap`** + **WebGL `emissiveMap`**; R-30c **map roles**; R-33 simulate/present split; dogfood cycles 4–7. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the **WebGPU** skinned id pass.
+Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **12 open**, 249 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm** + **WebGL `SkinnedIdProgram`** + **WebGPU skinned id**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster** + **WebGPU skinned colour pair** + **WebGPU skinned shadow** + **CPU `computeSkinnedBounds`**; RFC 0001 **per-node provenance comments**; RFC 0004 **honesty (none scheduled)**; lighting leftover **WebGPU `metalRoughnessMap`** + **WebGL `emissiveMap`**; R-30c **map roles**; R-33 simulate/present split; dogfood cycles 4–7. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is trails / GPU-sim particle id.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -113,10 +113,10 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's §6 table; these are the post-1.0 roadmap rather than release work.
 
 - Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; ~~spherical wander~~ DONE 2026-09-06; ~~CCD/FABRIK~~ DONE 2026-09-06; ~~path-planning adapters (RFC)~~ **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`); robotic joint commands utility (MAY declined — see prediction.ts staging note)
-- RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
-- RFC 0005 residue (staged in source, 2026-08-29): §86 pick measurements DONE 2026-09-09 (`benchmarks/pick-latency.mjs`); ParticleIdProgram + §72 PickProvider dispatch DONE 2026-09-09; WebGPU `PickingService` (`mapAsync`) + particle id arm DONE 2026-09-09; WebGL `SkinnedIdProgram` DONE 2026-09-09; remaining: WebGPU skinned id pass (colour pair landed).
-- RFC 0001 residue (staged in source, 2026-08-28):
-- RFC 0003 residue (staged in source, 2026-08-28): WebGPU colour pair DONE 2026-09-09; still GPU morph, CPU skinning, bone-texture, WebGPU skinned shadow/id.
+- RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled): honesty note 2026-09-09 (overlaps R-30c; Canvas 2D stub by §2c).
+- RFC 0005 residue (staged in source, 2026-08-29): §86 pick measurements DONE 2026-09-09 (`benchmarks/pick-latency.mjs`); ParticleIdProgram + §72 PickProvider dispatch DONE 2026-09-09; WebGPU `PickingService` (`mapAsync`) + particle id arm DONE 2026-09-09; WebGL `SkinnedIdProgram` DONE 2026-09-09; WebGPU skinned id DONE 2026-09-09; remaining: trails / GPU-sim particle id.
+- RFC 0001 residue (staged in source, 2026-08-28): per-node provenance comments DONE 2026-09-09; still uniform blocks, reusable functions, variants, storage buffers, full source maps, lighting-aware graphs.
+- RFC 0003 residue (staged in source, 2026-08-28): WebGPU colour pair + skinned shadow + CPU `computeSkinnedBounds` DONE 2026-09-09; still GPU morph, bone-texture.
 - RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
 - Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping, light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09. WebGPU `metalRoughnessMap` sampling DONE 2026-09-09. WebGL `emissiveMap` (unit 3) DONE 2026-09-09 (still open: multi-light, cascades, PBR rest, §60a, light layers, `normalMap` / `occlusionMap`, WebGPU emissive).
@@ -1127,7 +1127,11 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       Canvas 2D backend (stays a stub **by decision** — and if ever built,
       refusing a feedback `CanvasTexture` sampling the surface being rendered is
       that packet's named obligation); ~~a docs/guides page carrying the browser adapter~~ (done 2026-08-29:
-      `docs/guides/raster-painting.md`, listed as guide 15).
+      `docs/guides/raster-painting.md`, listed as guide 15). Honesty note
+      2026-09-09: the deferred table is still the whole remaining packet and
+      **none of it is scheduled**. Video/`ImageBitmap` overlap R-30c; the
+      Canvas 2D backend stays a stub by §2c. GPU readback lives on RFC 0009.
+      Do not implement those rows as unfinished MVP.
 
 - [x] **A-11 analytic tier (`"geometry"`) — DONE 2026-08-29** (adopted RFC 0005
       Q3 executed): `node.hitTestMode` (`null` default = engine-selects;
@@ -1159,9 +1163,11 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       the CPU 8-float stream; trails / GPU-sim / wide stream skipped).
       ~~WebGL skinned id pass~~ **DONE 2026-09-09** (`SkinnedIdProgram`:
       `SKINNING_GLSL` spliced into the id fragment; lazy on the first
-      skinned item; compile failure skips, bounds still serve). Remaining:
-      WebGPU skinned id pass (colour pair landed 2026-09-09; caster and
-      id still skip).
+      skinned item; compile failure skips, bounds still serve). ~~WebGPU
+      skinned id pass~~ **DONE 2026-09-09** (private pipeline in
+      `wgpu-picking.ts`; imports `wgpu-skinning-shared.ts` only, not the
+      colour pair; 3072-byte palette group 1; compile failure skips, never
+      bind-pose). Remaining: trails / GPU-sim / wide-stream particle id.
       The analytic `"geometry"` tier + `node.hitTestMode` landed
       2026-08-29 — A-11 closed.
 - [x] **docs/COMPATIBILITY.md §2 — DONE 2026-08-29** (documentation truth
@@ -1198,9 +1204,12 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
       scope + call-site key), conditional variants (a second cache dimension),
-      storage buffers (§82, WebGPU), source maps (per-node provenance; the error
-      path ships source + driver log); lighting-aware graphs (R-17's light-uniform
-      contract first); alternative E (data-declared custom operators — a follow-up
+      storage buffers (§82, WebGPU), ~~source maps (per-node provenance; the error
+      path ships source + driver log)~~ **DONE 2026-09-09 as comments, not a
+      map** (both emitters prefix reachable locals with `// node <index>
+      <kind>`; no file:line table — the source-maps row stays deferred);
+      lighting-aware graphs (R-17's light-uniform
+      contract first — R-17 shipped, the graph work has not); alternative E (data-declared custom operators — a follow-up
       RFC; `SHADER_OPERATORS` token shipped 2026-09-06); ~~an angle operator
       (unlocks §58's conic gradient)~~ **DONE 2026-09-06** (`angle` +
       `registerShapePaints` conic lowering); ~~the §58 Paint-object tier on `Shape2D`~~ (done 2026-08-29).
@@ -1214,12 +1223,16 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       ~~skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
       shadow is a different picture)~~ **DONE 2026-09-09** (WebGL
       `SkinnedShadowProgram` via `acquireShadow()` on the first skinned
-      caster; unregistered still skips; WebGPU colour pair does not add a
-      caster); ~~WebGPU skinned colour pair~~ **DONE 2026-09-09**
+      caster; unregistered still skips); ~~WebGPU skinned colour pair~~ **DONE 2026-09-09**
       (`registerSkinningPipeline()` unlit+lit; 3072-byte palette bind group;
-      skip unregistered/failed, never bind-pose; shadow/id still skip);
-      CPU skinning (Canvas/SVG tiers + the skinned bounds/picking home,
-      with its own `same-runtime` golden); bone-texture palette (unbounds
+      skip unregistered/failed, never bind-pose); ~~WebGPU skinned shadow
+      caster~~ **DONE 2026-09-09** (`acquireShadow()` on the colour pair;
+      one palette buffer sized for casters + later colour draws; skip
+      unregistered/failed, never bind-pose); ~~CPU skinning (Canvas/SVG
+      tiers + the skinned bounds/picking home, with its own `same-runtime`
+      golden)~~ **DONE 2026-09-09 as bounds only** (`computeSkinnedBounds`
+      in `@fourjs/geometry`; no public skinned-position API; Canvas/SVG
+      stay stubs; culling/picking still bind-pose); bone-texture palette (unbounds
       `MAX_SKINNING_JOINTS = 48`; needs a render-target format union +
       vertex texture fetch); ~~§43-interpolated palettes (today the palette
       is the last resolved pose)~~ **DONE 2026-09-09**
@@ -2191,6 +2204,15 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       pre-1.0 PDF.
 
 ## Done
+
+- [x] 2026-09-09 — **RFC residue slices (0001/0003/0004/0005).** Did not
+      close any of the 12 checkboxes. Landed: RFC 0005 WebGPU skinned id
+      (private pipeline; `wgpu-skinning-shared.ts`); RFC 0003 WebGPU
+      skinned shadow (`acquireShadow`) + CPU `computeSkinnedBounds`; RFC
+      0001 per-node provenance comments; RFC 0004 honesty (none scheduled,
+      overlaps R-30c). Remaining: GPU morph / bone-texture; trails /
+      GPU-sim particle id; uniform blocks / variants / lighting-aware
+      graphs.
 
 - [x] 2026-09-09 — **Open-TODO wave 6 slice.** Did not close any of the
       12 checkboxes. Landed: RFC 0005 WebGL `SkinnedIdProgram` (deformed

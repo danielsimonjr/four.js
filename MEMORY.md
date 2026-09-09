@@ -30,6 +30,23 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — RFC residue slices (0001 / 0003 / 0004 / 0005).** Four
+  disjoint packets. RFC 0005: WebGPU skinned id is a private pipeline in
+  `wgpu-picking.ts`; it imports `wgpu-skinning-shared.ts` only (pipeline-cost
+  law — picking must not link the colour pair). Palette is group 1, 3072
+  bytes; `ID_UNIFORM_BYTES` stays 144. Compile failure skips, never
+  bind-pose. Trails / GPU-sim / wide-stream particle id still skip. RFC
+  0003: WebGPU `acquireShadow()` on the colour pair; one palette buffer
+  sized for casters + later colour draws; unregistered/failed skip. CPU
+  `computeSkinnedBounds` in `@fourjs/geometry` returns a `BoundingVolume`
+  only — no `skinPositions()`. Culling/picking still bind-pose. GPU morph
+  and bone-texture remain. RFC 0001: both emitters prefix reachable locals
+  with `// node <index> <kind>` (not a file:line map). Uniform blocks,
+  reusable functions, variants, storage buffers, lighting-aware graphs
+  stay deferred. RFC 0004: honesty only — the §6 table is none scheduled
+  and overlaps R-30c; Canvas 2D stub by §2c. All four RFC checkboxes stay
+  `[ ]`.
+
 - **2026-09-09 — WebGPU skinned colour pair (RFC 0003).** Opt-in
   `registerSkinningPipeline()` from `@fourjs/render-webgpu`. `WebgpuRenderer`
   imports only `wgpu-skinning-registry.ts` (pipeline-cost law). Palette is
