@@ -403,6 +403,20 @@ readable; never delete the pointer itself.
   waves, an anti-hallucination table per plan citing file:line, and "stop and
   report" rules for network-gated steps (harfbuzzjs install, Noto download).
 
+- **2026-09-10 — Accepted RFCs 0001–0006 audited; corrections appended.**
+  Standing facts worth not re-deriving: the RFCs are decision records —
+  drift is recorded in a dated *Post-acceptance corrections* section, never
+  by rewriting the accepted text. `PLUGIN_API_VERSION` is `0.1.0`; all
+  eleven §81 tokens exist; `Bone` and `CanvasViewWidget` carry no `typeName`
+  (node type is the §79 identity); `maximumSkinningJoints` is optional and
+  the limit is the declared constant 48 on both GPU backends; the node-
+  material program cache keys on emitted source; `"uv"` is nameable in the
+  screen domain; RFC 0005 never received a spec amendments row; the
+  display-only scan's umbrella allowlist entry was `"four"` (a directory that
+  does not exist) until this date. Bun in the container was 1.3.11 and could
+  not parse the v2 lockfile — `npm install -g bun@1.4.2` restores parity.
+  Residue plans: `docs/plans/RFC-000{1,3,4,5}-RESIDUE_PLAN.md`.
+
 - **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
   (the exception each golden's `_warning` names). Values came from the
   scenario helpers, not from editing hashes by hand. 0.20 contact persistence

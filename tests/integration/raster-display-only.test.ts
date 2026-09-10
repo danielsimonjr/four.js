@@ -54,15 +54,17 @@ const repositoryRoot = join(import.meta.dirname, "..", "..");
  * The only files permitted to name the §77a raster module (RFC 0004 §3):
  * `@fourjs/render` owns it, `@fourjs/render-webgl` uploads it (through the
  * `MaterialTexture` path it already has — listed so a future explicit read is
- * a decision here, not an accident there), and the `four` umbrella re-exports
- * it. Everything else is a simulation-adjacent package until someone argues
+ * a decision here, not an accident there), and the `fourJS` umbrella
+ * (`packages/fourjs`) re-exports it. Until 2026-09-10 this entry was spelled
+ * `"four"`, which matches no directory; it passed only because the umbrella
+ * never names the raster types. Everything else is a simulation-adjacent package until someone argues
  * otherwise in writing — editing this list is deliberately a visible act, per
  * the §40 precedent.
  */
 const ALLOWED_PACKAGES: ReadonlySet<string> = new Set([
   "render",
   "render-webgl",
-  "four",
+  "fourjs",
 ]);
 
 /** Every `.ts` file under `packages/<name>/src`, repository-relative. */

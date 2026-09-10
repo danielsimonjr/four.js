@@ -90,8 +90,22 @@ specification; until then, entries are grouped by date under **Unreleased**.
   feedback check mechanism (`CanvasTexture.readbackTarget` → `collectSampledTargets`)
   is spelled; RFC 0005's pick-latency numbers cited as landed.
 
+- **Accepted RFCs 0001–0006 audited against the tree.** Each gains a dated
+  *Post-acceptance corrections* section (decision text untouched) recording
+  every statement the tree now contradicts, and the open residue with its plan.
+- **`tests/integration/raster-display-only.test.ts`** — the umbrella allowlist
+  entry was `"four"`, matching no directory; now `"fourjs"` (behaviour unchanged;
+  the umbrella never names the raster types).
+- **`docs/COMPATIBILITY.md` §5** — no longer claims five §81 points lack tokens
+  (all eleven exist since 2026-09-06) or that the umbrella declares them.
+- **RFC 0009** — no longer calls RFC 0005 "closed" (implemented; one residue open).
+
 ### Added
 
+- `docs/plans/RFC-0001-RESIDUE_PLAN.md`, `RFC-0003-RESIDUE_PLAN.md`,
+  `RFC-0004-RESIDUE_PLAN.md`, `RFC-0005-RESIDUE_PLAN.md` — residue plans for the
+  accepted RFCs in the same ≤ 4-agent format, each with a scope table naming what
+  is gated on a decision rather than a packet.
 - `docs/plans/RFC-0007-PATH-PLANNING_PLAN.md`, `RFC-0008-TEXT-SHAPING_PLAN.md`,
   `RFC-0009-GPU-READBACK_PLAN.md` — subagent-driven plans (≤ 4 haiku-class agents,
   disjoint file ownership, waves, per-plan anti-hallucination sheets with file:line

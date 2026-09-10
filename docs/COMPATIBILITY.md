@@ -425,7 +425,7 @@ Notes per row:
 
 **Implemented 2026-08-28 (RFC 0002, gap A-3 closed).** The §81 plugin host lives
 in `@fourjs/core` (`FourPlugin`, `PluginContext`, `PluginHost`, `installPlugins`),
-and the umbrella package `four` declares the six capability tokens
+and the owning packages declare the capability tokens (the first six listed here; the umbrella `fourJS` re-exports them)
 (`SIMULATION_SYSTEMS`, `RENDERER_REGISTRY`, `SOLVER_REGISTRY`,
 `COMPONENT_SERIALIZERS`, `SCENE_MIGRATIONS`, `RENDER_GRAPH`).
 
@@ -441,11 +441,15 @@ consequence worth knowing before publishing a plugin: a caret range below
 `1.0.0` is minor-locked, so `^0.1.0` accepts `0.1.z` and **refuses** `0.2.0` —
 which is exactly the honesty starting at `0.1.0` buys.
 
-Five of §81's eleven extension points (asset formats, materials/shader nodes,
-UI controls, editor tools, compute workloads) have **no capability token, by
-design**: there is no registry to hand over yet, so a plugin asking for one is
-refused by name at install rather than registering into nothing. Adding a token
-later is additive and does not move `PLUGIN_API_VERSION`'s major.
+**All eleven** §81 extension points now have a token (2026-09-06): the six
+above plus `ASSET_LOADERS` (`@fourjs/assets`), `SHADER_OPERATORS`
+(`@fourjs/materials`), `UI_CONTROLS` (`@fourjs/ui`), `COMPUTE_WORKLOADS`
+(`@fourjs/render`) and `EDITOR_TOOLS` (the umbrella), each over a minimal
+registry. Until that date the last five were absent by design (a plugin asking
+for one was refused by name at install). Adding tokens was additive and did not
+move `PLUGIN_API_VERSION`'s major. Tokens are declared in their owning packages
+since 2026-08-29; the umbrella package (`fourJS`, directory `packages/fourjs`)
+re-exports the same objects.
 
 The registries the tokens hand over — `ComponentSerializerRegistry` (§79),
 `SceneMigrationRegistry` (§80), `SystemRegistry` (§39), `RendererRegistry`

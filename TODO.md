@@ -1117,7 +1117,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       painting. **The RFC queue (0001–0005) is COMPLETE** (2026-08-29). R-1
       completed 2026-08-29 (WP-R1.1–R1.9 all landed).
 - [ ] **RFC 0004 residue (all deferred by the RFC's own §6 table, none
-      scheduled):** video textures (frame-arrival signal, DOM-free);
+      scheduled; RFC corrections + plan 2026-09-10:
+      `docs/plans/RFC-0004-RESIDUE_PLAN.md`):** video textures (frame-arrival signal, DOM-free);
       `ImageBitmap`/decoded-image raster sources (A-18's generic
       `FetchLike<TSignal>` half + the §96 decode row); in-place resize +
       partial/dirty-rect upload + mipmaps/filter modes for raster surfaces (all
@@ -1200,7 +1201,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
                                               the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
                                               (screen domain included, for §70 graph effects).
 
-- [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
+- [ ] **RFC 0001 residue (staged in source, 2026-08-28; RFC corrections + plan
+      2026-09-10: `docs/plans/RFC-0001-RESIDUE_PLAN.md`, which also takes the
+      node-material pixel golden the RFC owed):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
       scope + call-site key), conditional variants (a second cache dimension),
       storage buffers (§82, WebGPU), source maps (per-node provenance; the error
@@ -1214,7 +1217,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       GraphEffect, deferred list); samples typechecked against dist and graphs
       validated at runtime.
 
-- [ ] **RFC 0003 residue (staged in source, 2026-08-28):** GPU morph path (the
+- [ ] **RFC 0003 residue (staged in source, 2026-08-28; RFC corrections + plan
+      2026-09-10: `docs/plans/RFC-0003-RESIDUE_PLAN.md`):** GPU morph path (the
       extra-vertex-stream layout decision, stated in `mesh.ts`/`render-list.ts`/§54);
       ~~skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
       shadow is a different picture)~~ **DONE 2026-09-09** (WebGL
@@ -2216,6 +2220,23 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       added 2026-09-06 (no-ops without pandoc). Does not replace the archived
       pre-1.0 PDF.
 
+- [ ] **Record hygiene from the 2026-09-10 RFC audit** (tree text the accepted
+      RFCs' corrections exposed; none is code): RFC 0005 has no spec amendments
+      row (owner: add §71/§79/§86 row or record "not amended"); spec revision
+      1.14 and §91 still say ESLint (Oxlint since the TS 7 move); `pnpm`
+      leftovers in `benchmarks/README.md`, `benchmarks/harness.mjs`,
+      `docs/COMPATIBILITY.md` §1 (`pnpm@10.33.0` `packageManager` claim),
+      `docs/Architecture/TEST_COVERAGE.md`, four example READMEs; MEMORY says
+      "Bun ≥ 1.2" (engines `>=1.4.2`); `renderer.ts:806` attributes a
+      fallback claim to RFC 0005 it does not make; `renderer.ts:726` +
+      MEMORY lines say WebGPU has no skinned pipelines (colour pair landed
+      2026-09-09); `benchmarks/results/pick-latency.json` caveat "WebGPU has
+      no PickingService" predates the same-day landing; `raster.ts:29` and
+      `packages/core/src/index.ts:44` repeat the "no lib.dom" / "four/plugins.ts"
+      stale claims. Fixed this pass: the dead `"four"` allowlist entry in
+      `raster-display-only.test.ts` (→ `"fourjs"`), COMPATIBILITY §5's "five
+      absent tokens" paragraph.
+
 ## Done
 
 - [x] 2026-09-10 — **Open-TODO audit + RFC 0005 close.** Subagent team
@@ -2232,6 +2253,23 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       idle-cache index now names both backends. TypeDoc pin stays in
       tier 4, not a new checkbox. RFC 0007/0009 stay Proposed notes.
 
+- [x] 2026-09-10 — **Accepted-RFC audit (0001–0006) + residue plans.** Five
+      read-only subagents verified every accepted RFC against the tree; each
+      RFC gained a dated *Post-acceptance corrections* section (decision text
+      untouched). Headline drift: 0001 — `angle` and `OutputTransformEffect`
+      widened unions the RFC quotes as closed, `GraphEffect.textures`, `uv`
+      allowed in the screen domain, WGSL emitter shipped, cache keys on
+      emitted source, no pixel golden ever landed; 0002 — all eleven §81
+      tokens exist, ordered binding list not `PluginCapabilityMap`,
+      `PLUGIN_API_VERSION` 0.1.0; 0003 — `Bone` has no `typeName`,
+      `maximumSkinningJoints` optional, limit is the constant 48, four WebGL
+      skinned programs, glTF shipped, measurements done, Q1–Q6 resolved;
+      0004 — `CanvasViewWidget` has no `typeName`, ten controls ship, R-30
+      tiers shipped, `four/application` → `fourJS/application`, prototype
+      measured; 0005 — everything Context calls absent landed, §79 moved,
+      seam costs ~0.15 kB, "one frame late" unmeasured on hardware, no spec
+      row; 0006 — Oxlint, Bun 1.4.2, `tools/docs` workspace. Plans:
+      `docs/plans/RFC-000{1,3,4,5}-RESIDUE_PLAN.md`.
 - [x] 2026-09-10 — **RFC 0007–0009 review pass + subagent plans.** Each
       proposed RFC re-verified against the tree and corrected in place
       (review logs at the foot of each file): 0007 — `DeterminismLevel` is
