@@ -57,6 +57,7 @@ import {
 } from "./webgpu-device.js";
 import { DRAW_UNIFORM_WGSL, MAP_BINDING_WGSL } from "./wgpu-bindings.js";
 import {
+  HEMISPHERE_IRRADIANCE_WGSL,
   LIGHT_UNIFORM_WGSL,
   PUNCTUAL_LIGHT_WGSL,
   SHADED_MAP_BINDING_WGSL,
@@ -78,9 +79,12 @@ import {
   type SkinnedUnlitPipeline,
   type SkinningPipelineHost,
   type WgpuSkinnedDrawDescriptor,
+  type WgpuSkinnedShadowDescriptor,
 } from "./wgpu-skinning-registry.js";
 import {
   FRAGMENT_ENTRY_POINT,
+  POSITION_BUFFER_LAYOUT,
+  POSITION_SHADER_LOCATION,
   VERTEX_ENTRY_POINT,
   unlitFragmentStageWgsl,
   unlitVertexBufferLayouts,
@@ -226,6 +230,60 @@ export function skinnedLitVertexBufferLayouts(
   ];
 }
 
+/**
+ * Vertex layouts for the §69 skinned caster: position, joints, weights.
+ * Colour streams are absent — depth ignores them.
+ */
+export const SKINNED_SHADOW_VERTEX_BUFFER_LAYOUTS: readonly GpuVertexBufferLayout[] =
+  Object.freeze([
+    POSITION_BUFFER_LAYOUT,
+    JOINTS_BUFFER_LAYOUT,
+    WEIGHTS_BUFFER_LAYOUT,
+  ]);
+
+/**
+ * Depth-only skinned caster WGSL — `SHADOW_SHADER_SOURCE` with the position
+ * run through `skinMatrix(joints, weights)` first. The helper is
+ * parameterized so the module is valid WGSL (vertex inputs are not in
+ * scope of a sibling function). Palette at group 1, vertex-only.
+ */
+export function skinnedShadowShaderSource(): string {
+  return `${DRAW_UNIFORM_WGSL}
+
+struct JointPalette {
+  jointMatrices : array<mat4x4<f32>, ${String(MAX_SKINNING_JOINTS)}>,
+};
+
+@group(1) @binding(${String(JOINT_PALETTE_BINDING)}) var<uniform> palette : JointPalette;
+
+fn skinMatrix(joints : vec4<u32>, weights : vec4<f32>) -> mat4x4<f32> {
+  return weights.x * palette.jointMatrices[joints.x]
+       + weights.y * palette.jointMatrices[joints.y]
+       + weights.z * palette.jointMatrices[joints.z]
+       + weights.w * palette.jointMatrices[joints.w];
+}
+
+@vertex
+fn ${VERTEX_ENTRY_POINT}(
+  @location(${String(POSITION_SHADER_LOCATION)}) position : vec3<f32>,
+  @location(${String(JOINTS_SHADER_LOCATION)}) joints : vec4<u32>,
+  @location(${String(WEIGHTS_SHADER_LOCATION)}) weights : vec4<f32>,
+) -> @builtin(position) vec4<f32> {
+  let world = draw.model * (skinMatrix(joints, weights) * vec4<f32>(position, 1.0));
+  let clip = draw.viewProjection * world;
+  return vec4<f32>(clip.x, clip.y, (clip.z + clip.w) * 0.5, clip.w);
+}
+
+@fragment
+fn ${FRAGMENT_ENTRY_POINT}() -> @location(0) vec4<f32> {
+  return vec4<f32>(1.0, 1.0, 1.0, 1.0);
+}
+`;
+}
+
+/** {@link skinnedShadowShaderSource} as a stable module string. */
+export const SKINNED_SHADOW_SHADER_SOURCE = skinnedShadowShaderSource();
+
 function skinnedInfluenceInputs(): string {
   return `
   @location(${String(JOINTS_SHADER_LOCATION)}) joints : vec4<u32>,
@@ -352,7 +410,9 @@ ${input}
   return output;
 }
 
-${PUNCTUAL_LIGHT_WGSL}${
+${PUNCTUAL_LIGHT_WGSL}
+
+${HEMISPHERE_IRRADIANCE_WGSL}${
     shadow
       ? `
 
@@ -420,6 +480,8 @@ class WgpuSkinnedProgramPair implements SkinnedPrograms {
 
   #packed = 0;
 
+  #shadowFailed = false;
+
   #disposed = false;
 
   constructor(host: SkinningPipelineHost, paletteLayout: GpuBindGroupLayout) {
@@ -483,6 +545,74 @@ class WgpuSkinnedProgramPair implements SkinnedPrograms {
     return this.#paletteBindGroup;
   }
 
+  acquireShadow(descriptor: WgpuSkinnedShadowDescriptor): GpuRenderPipeline {
+    if (this.#disposed) {
+      throw new Error("skinned-shadow: pair is disposed");
+    }
+    const key = `shadow|${descriptor.topology}|${descriptor.colorFormat}|${descriptor.depthFormat}`;
+    const existing = this.#pipelines.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    if (this.#shadowFailed) {
+      throw new Error("skinned-shadow previously failed to compile");
+    }
+    const draw = this.#host.drawLayout();
+    const device = this.#host.device();
+    if (draw === null || device === null) {
+      throw new Error("skinned-shadow: missing draw layout or device");
+    }
+    try {
+      const layoutKey = "shadow";
+      let layout = this.#pipelineLayouts.get(layoutKey);
+      if (layout === undefined) {
+        layout = device.createPipelineLayout({
+          label: "fourJS:pipeline-layout:skinned:shadow",
+          bindGroupLayouts: [draw, this.#paletteLayout],
+        });
+        this.#pipelineLayouts.set(layoutKey, layout);
+      }
+      let module = this.#modules.get("shadow");
+      if (module === undefined) {
+        module = device.createShaderModule({
+          label: "fourJS:skinned-shadow",
+          code: SKINNED_SHADOW_SHADER_SOURCE,
+        });
+        this.#modules.set("shadow", module);
+      }
+      const pipeline = device.createRenderPipeline({
+        label: `fourJS:skinned-${key}`,
+        layout,
+        vertex: {
+          module,
+          entryPoint: VERTEX_ENTRY_POINT,
+          buffers: SKINNED_SHADOW_VERTEX_BUFFER_LAYOUTS,
+        },
+        fragment: {
+          module,
+          entryPoint: FRAGMENT_ENTRY_POINT,
+          targets: [
+            {
+              format: descriptor.colorFormat,
+              writeMask: COLOR_WRITE_ALL,
+            },
+          ],
+        },
+        primitive: { topology: descriptor.topology },
+        depthStencil: {
+          format: descriptor.depthFormat,
+          depthWriteEnabled: true,
+          depthCompare: "less",
+        },
+      });
+      this.#pipelines.set(key, pipeline);
+      return pipeline;
+    } catch (error: unknown) {
+      this.#shadowFailed = true;
+      throw error;
+    }
+  }
+
   upload(device: GpuDevice): void {
     const buffer = this.#paletteBuffer;
     if (buffer === null || this.#packed === 0 || this.#disposed) {
@@ -520,6 +650,7 @@ class WgpuSkinnedProgramPair implements SkinnedPrograms {
     this.#paletteStaging = new Float32Array(0);
     this.#paletteCapacity = 0;
     this.#packed = 0;
+    this.#shadowFailed = false;
   }
 
   #acquire(
@@ -665,16 +796,14 @@ class WgpuSkinnedProgramPair implements SkinnedPrograms {
  * registerSkinningPipeline();          // once, at application setup
  * ```
  *
- * Calling it is what links this module — the two skinned colour pipelines
- * and the palette uploader — into the bundle; a build that never calls it
- * carries none of it. The colour pair still compiles **lazily, on each
- * renderer's first skinned colour draw**, never here and never at renderer
- * initialize, so registration alone changes no GPU transcript. Idempotent;
- * calling it twice re-installs the same factory.
+ * Calling it is what links this module — the two skinned colour pipelines,
+ * the §69 caster, and the palette uploader — into the bundle; a build that
+ * never calls it carries none of it. Pipelines still compile **lazily**:
+ * colour on the first skinned colour draw, the caster on the first
+ * skinned caster, never here and never at renderer initialize.
+ * Idempotent; calling it twice re-installs the same factory.
  *
- * This slice does **not** compile a skinned shadow caster; that stays
- * skipped (honest absence, never a bind-pose silhouette). The RFC 0005
- * skinned id pass lives in `wgpu-picking.ts` behind
+ * The RFC 0005 skinned id pass lives in `wgpu-picking.ts` behind
  * `registerPickingPipeline()`.
  */
 export function registerSkinningPipeline(): void {

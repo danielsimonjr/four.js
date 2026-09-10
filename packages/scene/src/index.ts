@@ -54,6 +54,7 @@ export {
 export type {
   ColorRGB,
   DirectionalLightOptions,
+  HemisphereLightOptions,
   LightColorInput,
   DirectionalLightShadowOptions,
   PunctualLightOptions,
@@ -62,6 +63,7 @@ export type {
 export {
   DirectionalLight,
   DirectionalLightShadow,
+  HemisphereLight,
   PointLight,
   PunctualLight,
   SpotLight,

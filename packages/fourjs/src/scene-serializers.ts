@@ -207,6 +207,7 @@ import type {
 import {
   Bone,
   DirectionalLight,
+  HemisphereLight,
   MORPH_WEIGHTS_SERIALIZER,
   MorphWeights,
   NODE_SPACE_SERIALIZER,
@@ -354,6 +355,9 @@ export const POINT_LIGHT_NODE_TYPE = "scene:point-light";
 
 /** The document `type` a {@link SpotLight} serializes as (§68, R-17). */
 export const SPOT_LIGHT_NODE_TYPE = "scene:spot-light";
+
+/** The document `type` a {@link HemisphereLight} serializes as (§68). */
+export const HEMISPHERE_LIGHT_NODE_TYPE = "scene:hemisphere-light";
 
 /** The document `type` a {@link Circle} serializes as (§50; R-23). */
 export const CIRCLE_NODE_TYPE = "render:circle";
@@ -1535,6 +1539,7 @@ export function registerRenderSerializers(
         }
         if (constructor === PointLight) return POINT_LIGHT_NODE_TYPE;
         if (constructor === SpotLight) return SPOT_LIGHT_NODE_TYPE;
+        if (constructor === HemisphereLight) return HEMISPHERE_LIGHT_NODE_TYPE;
         return undefined;
       },
       nodeDataOf: (node: Node): JsonValue | undefined => {
@@ -1694,6 +1699,18 @@ export function registerRenderSerializers(
             range: light.range,
             innerConeAngle: light.innerConeAngle,
             outerConeAngle: light.outerConeAngle,
+          };
+        }
+        if (constructor === HemisphereLight) {
+          const light = node as HemisphereLight;
+          return {
+            color: [light.color[0], light.color[1], light.color[2]],
+            groundColor: [
+              light.groundColor[0],
+              light.groundColor[1],
+              light.groundColor[2],
+            ],
+            intensity: light.intensity,
           };
         }
         return undefined;
@@ -1861,6 +1878,15 @@ export function registerRenderSerializers(
               "outerConeAngle",
             ]),
             ...(color !== undefined ? { color } : {}),
+          });
+        }
+        if (document.type === HEMISPHERE_LIGHT_NODE_TYPE) {
+          const color = readColor(data.color);
+          const groundColor = readColor(data.groundColor);
+          return new HemisphereLight({
+            ...finiteOptions(data, ["intensity"]),
+            ...(color !== undefined ? { color } : {}),
+            ...(groundColor !== undefined ? { groundColor } : {}),
           });
         }
         return undefined;

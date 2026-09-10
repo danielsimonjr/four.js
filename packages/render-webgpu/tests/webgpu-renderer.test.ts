@@ -78,6 +78,7 @@ import {
   createWgpuBatching,
   hostGpu,
   registerSkinningPipeline,
+  type GpuDevice,
 } from "../src/index.js";
 import { setSkinningPipelineFactory } from "../src/wgpu-skinning-registry.js";
 
@@ -4319,7 +4320,7 @@ describe("registerSkinningPipeline — WebgpuRenderer colour pair (RFC 0003)", (
     expect(bufferLabelsOf(harness.gpu, "fourJS:joints:")).toHaveLength(0);
   });
 
-  it("still excludes a registered skinned mesh from the shadow caster pass", () => {
+  it("casts a registered skinned mesh through the skinned shadow pipeline", () => {
     registerSkinningPipeline();
     const { root } = shadowedScene();
     const skinned = new Renderable(
@@ -4340,12 +4341,70 @@ describe("registerSkinningPipeline — WebgpuRenderer colour pair (RFC 0003)", (
     const casterDraws = names
       .slice(shadowStart, viewsStart)
       .filter((name) => name === "pass.draw" || name === "pass.drawIndexed");
-    expect(casterDraws).toHaveLength(1);
+    expect(casterDraws).toHaveLength(2);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("fourJS:skinned-shadow|"),
+      ),
+    ).toBe(true);
     expect(
       pipelineLabels(harness.gpu).some((label) =>
         label.startsWith("fourJS:skinned-lit|"),
       ),
     ).toBe(true);
+    expect(
+      harness.gpu
+        .callsOf("queue.writeBuffer")
+        .some(
+          (call) =>
+            typeof call.args[4] === "number" &&
+            (call.args[4] as number) >= JOINT_PALETTE_FLOATS &&
+            (call.args[4] as number) % JOINT_PALETTE_FLOATS === 0,
+        ),
+    ).toBe(true);
+  });
+
+  it("skips a skinned caster when the caster pipeline fails to compile", () => {
+    registerSkinningPipeline();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const device = harness.gpu.device as GpuDevice;
+      const create = device.createRenderPipeline.bind(device);
+      device.createRenderPipeline = (descriptor) => {
+        const label = (descriptor as { label?: string }).label ?? "";
+        if (label.startsWith("fourJS:skinned-shadow")) {
+          throw new Error("skinned shadow refused");
+        }
+        return create(descriptor);
+      };
+      const { root } = shadowedScene();
+      const skinned = new Renderable(
+        skinnedTriangle(litTriangle()).asGeometry,
+        new TestLitMaterial().asMaterial,
+      );
+      withSkeleton(skinned);
+      root.add(skinned);
+
+      harness.renderer.render(root, [createView()]);
+      harness.renderer.render(root, [createView()]);
+
+      const names = harness.gpu.calls.map((call) => call.name);
+      const shadowStart = names.indexOf("encoder.beginRenderPass");
+      const viewsStart = names.indexOf(
+        "encoder.beginRenderPass",
+        shadowStart + 1,
+      );
+      const casterDraws = names
+        .slice(shadowStart, viewsStart)
+        .filter((name) => name === "pass.draw" || name === "pass.drawIndexed");
+      expect(casterDraws).toHaveLength(1);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain(
+        "skinned shadow pipeline failed",
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("disposes the palette with the renderer and forgets it on device loss", async () => {

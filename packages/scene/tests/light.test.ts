@@ -5,6 +5,7 @@ import {
   DirectionalLight,
   DirectionalLightShadow,
   Group,
+  HemisphereLight,
   PointLight,
   PunctualLight,
   Scene,
@@ -601,6 +602,76 @@ describe("DirectionalLight — §69 shadows (R-18)", () => {
       // The module scratch is rewritten, never handed out: two calls agree.
       expect([...first.elements]).toEqual([...second.elements]);
     });
+  });
+});
+
+describe("HemisphereLight (§68)", () => {
+  it("defaults to white sky, black ground, intensity 1", () => {
+    const light = new HemisphereLight();
+    expect(light.color).toEqual([1, 1, 1]);
+    expect(light.groundColor).toEqual([0, 0, 0]);
+    expect(light.intensity).toBe(1);
+    expect(light.isHemisphereLight).toBe(true);
+    expect("castShadow" in light).toBe(false);
+  });
+
+  it("is an ordinary scene node", () => {
+    const scene = new Scene();
+    const light = new HemisphereLight();
+    scene.add(light);
+    expect(light.parent).toBe(scene);
+    expect(scene.findByType(HemisphereLight)).toBe(light);
+  });
+
+  it("copies supplied colours instead of holding the caller's arrays", () => {
+    const sky: [number, number, number] = [0.6, 0.7, 1];
+    const ground: [number, number, number] = [0.3, 0.2, 0.1];
+    const light = new HemisphereLight({
+      color: sky,
+      groundColor: ground,
+      intensity: 0.4,
+    });
+    expect(light.color).toEqual(sky);
+    expect(light.color).not.toBe(sky);
+    expect(light.groundColor).toEqual(ground);
+    expect(light.groundColor).not.toBe(ground);
+    sky[0] = 1;
+    expect(light.color[0]).toBe(0.6);
+  });
+
+  it("accepts CSS strings and stores linear RGB (§60a)", () => {
+    const light = new HemisphereLight({
+      color: "#ff0000",
+      groundColor: "rgb(0,128,0)",
+    });
+    expect(light.color).toEqual([1, 0, 0]);
+    expect(light.groundColor[1]).toBeCloseTo(srgbToLinear(128 / 255), 12);
+  });
+
+  it("rejects non-finite parameters (§85)", () => {
+    expect(() => new HemisphereLight({ color: [Number.NaN, 0, 0] })).toThrow(
+      RangeError,
+    );
+    expect(
+      () => new HemisphereLight({ groundColor: [0, Number.POSITIVE_INFINITY, 0] }),
+    ).toThrow(/must be finite/);
+    expect(() => new HemisphereLight({ intensity: Number.NaN })).toThrow(
+      RangeError,
+    );
+  });
+
+  it("orients sky along +Y when unrotated", () => {
+    const out = new HemisphereLight().getWorldUp(new Vector3());
+    expect([out.x, out.y, out.z]).toEqual([0, 1, 0]);
+  });
+
+  it("follows the node's rotation — −π/2 about X puts sky on −Z", () => {
+    const light = new HemisphereLight();
+    light.transform.rotation.setFromAxisAngle(AXIS_X, -HALF_PI);
+    const out = light.getWorldUp(new Vector3());
+    expect(out.x).toBeCloseTo(0, 12);
+    expect(out.y).toBeCloseTo(0, 12);
+    expect(out.z).toBeCloseTo(-1, 12);
   });
 });
 

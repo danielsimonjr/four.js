@@ -2360,6 +2360,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                 // same shared uniform classes, so the skip rules agree.
                 skinnedProgram.setViewProjection(viewProjection);
                 skinnedProgram.setAmbientLight(sceneLights.ambientColor);
+                skinnedProgram.setHemisphereLight(sceneLights);
                 skinnedProgram.setDirectionalLight(
                   sceneLights.direction,
                   sceneLights.directionalColor,
@@ -2699,6 +2700,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               // Lambert term in the shader (no variants, no branch here).
               litProgram.setViewProjection(viewProjection);
               litProgram.setAmbientLight(sceneLights.ambientColor);
+              litProgram.setHemisphereLight(sceneLights);
               litProgram.setDirectionalLight(
                 sceneLights.direction,
                 sceneLights.directionalColor,
@@ -2761,6 +2763,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               // other pipelines run in between.
               standardProgram.setViewProjection(viewProjection);
               standardProgram.setAmbientLight(sceneLights.ambientColor);
+              standardProgram.setHemisphereLight(sceneLights);
               standardProgram.setDirectionalLight(
                 sceneLights.direction,
                 sceneLights.directionalColor,

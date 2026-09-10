@@ -29,6 +29,8 @@ import {
   litFragmentStageWgsl,
   registerSkinningPipeline,
   resolveSkinningPipelineFactory,
+  SKINNED_SHADOW_SHADER_SOURCE,
+  SKINNED_SHADOW_VERTEX_BUFFER_LAYOUTS,
   skinnedLitShaderSource,
   skinnedLitVertexBufferLayouts,
   skinnedPaletteBindGroupIndex,
@@ -286,6 +288,31 @@ describe("WgpuSkinnedProgramPair", () => {
     expect(data[13]).toBe(5);
     expect(data).toHaveLength(JOINT_PALETTE_FLOATS);
     expect(data.slice(16).every((value) => value === 0)).toBe(true);
+  });
+
+  it("compiles the skinned caster lazily on acquireShadow, not with the colour pair", () => {
+    const { device: gpuDevice, gpu } = device();
+    const programs = pair(gpuDevice);
+    gpu.reset();
+    const first = programs.acquireShadow({
+      topology: "triangle-list",
+      colorFormat: "rgba8unorm",
+      depthFormat: "depth32float",
+    });
+    expect(first).toBeTruthy();
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(1);
+    expect(gpu.countOf("device.createShaderModule")).toBe(1);
+    expect(SKINNED_SHADOW_SHADER_SOURCE).toContain("skinMatrix(");
+    expect(SKINNED_SHADOW_SHADER_SOURCE).toContain("jointMatrices");
+    expect(SKINNED_SHADOW_VERTEX_BUFFER_LAYOUTS).toHaveLength(3);
+    expect(
+      programs.acquireShadow({
+        topology: "triangle-list",
+        colorFormat: "rgba8unorm",
+        depthFormat: "depth32float",
+      }),
+    ).toBe(first);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(1);
   });
 
   it("grows the palette buffer before the pass and destroys the previous one", () => {

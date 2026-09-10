@@ -17,6 +17,9 @@
  *   still: further directional lights are ignored, deterministically
  *   (scene-graph order decides which one wins, §33), for the reason
  *   `@fourjs/scene`'s `light.ts` records;
+ * - the first visible, enabled **hemisphere** light — a two-colour
+ *   directional ambient (sky / ground) beside the scene term. Exactly
+ *   one, the same first-match rule;
  * - up to {@link MAX_PUNCTUAL_LIGHTS} **point and spot** lights, flattened
  *   into the four packed arrays a backend uploads as uniform arrays.
  *
@@ -26,9 +29,10 @@
  * compare against it. Only the *directional* light casts at this tier — see
  * `@fourjs/scene`'s `DirectionalLightShadow` for §69's staged remainder.
  *
- * §68's hemisphere and rectangular-area types are staged, and so are light
- * layers, IBL, and the clustered/forward-plus path for *many* lights — see
- * `@fourjs/scene`'s `light.ts`, which owns that list.
+ * §68's rectangular-area type is still staged, and so are light layers,
+ * IBL, and the clustered/forward-plus path for *many* lights — see
+ * `@fourjs/scene`'s `light.ts`, which owns that list. Hemisphere ships
+ * (2026-09-10) as the fields on {@link SceneLights} below.
  *
  * ## Order, and what happens past the bound
  *
@@ -250,6 +254,37 @@ export interface AmbientLightSource {
 }
 
 /**
+ * What the collector reads from a hemisphere light node — the structural
+ * contract `@fourjs/scene`'s `HemisphereLight` satisfies (§68).
+ *
+ * A two-colour directional ambient (sky above, ground below), not a
+ * punctual lamp: no position, no falloff, no shadow. The sky axis is the
+ * node's +Y in world space.
+ */
+export interface HemisphereLightSource {
+  /** The brand {@link collectSceneLights} recognises. A literal `true`. */
+  readonly isHemisphereLight: true;
+
+  /** Sky colour, straight RGB in 0…1 — premultiplied by intensity in the record. */
+  readonly color: readonly [number, number, number];
+
+  /** Ground colour, straight RGB in 0…1 — premultiplied by intensity in the record. */
+  readonly groundColor: readonly [number, number, number];
+
+  /**
+   * Scalar multiplier on both colours: the irradiance, over π, of a
+   * surface facing that colour's hemisphere (§68; R-13).
+   */
+  readonly intensity: number;
+
+  /**
+   * Writes the world-space unit vector toward the sky into `out` — the
+   * node's +Y axis, §7a's world up on an unrotated node.
+   */
+  getWorldUp(out: Vector3): Vector3;
+}
+
+/**
  * The frame's flattened lighting (§68), as a backend consumes it. One
  * mutable record, rewritten in place by every {@link collectSceneLights}
  * call — the pooling policy every per-frame structure in this package
@@ -373,6 +408,38 @@ export interface SceneLights {
 
   /** Normal-space bias, in metres (§69, §40); `0` when nothing casts. */
   shadowNormalBias: number;
+
+  /**
+   * Whether a hemisphere light was found. When `false` the three
+   * hemisphere fields hold their documented no-light values (zeros), so a
+   * backend may upload them unconditionally — or, on GL, upload nothing
+   * at all: a `bool` uniform's initial value is `false`, the same
+   * compatibility contract {@link SceneLights.punctualCount} states.
+   */
+  hasHemisphereLight: boolean;
+
+  /**
+   * Sky colour premultiplied by intensity. `[0, 0, 0]` when there is no
+   * hemisphere, which makes the mix vanish.
+   */
+  readonly hemisphereSky: [number, number, number];
+
+  /**
+   * Ground colour premultiplied by intensity. `[0, 0, 0]` when there is
+   * no hemisphere.
+   */
+  readonly hemisphereGround: [number, number, number];
+
+  /**
+   * World-space unit vector toward the sky; `(0, 1, 0)` — §7a's world up,
+   * the direction an unrotated hemisphere faces — when there is no
+   * hemisphere. Owned by the record and rewritten by the next collection.
+   *
+   * The no-light up is the identity axis rather than zero so a backend
+   * that uploads unconditionally still has a finite, documented vector;
+   * the zero sky and ground are what make the mix contribute nothing.
+   */
+  readonly hemisphereUp: Vector3;
 }
 
 /** Narrows any value to a {@link DirectionalLightSource} — see `isParticleDrawable`. */
@@ -412,6 +479,19 @@ function isAmbientLightSource(value: unknown): value is AmbientLightSource {
  * Narrows any value to a {@link PunctualLightSource} — the point/spot brand,
  * checked exactly as {@link isDirectionalLightSource} checks its own.
  */
+export function isHemisphereLightSource(
+  value: unknown,
+): value is HemisphereLightSource {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const candidate = value as Partial<HemisphereLightSource>;
+  return (
+    candidate.isHemisphereLight === true &&
+    typeof candidate.getWorldUp === "function"
+  );
+}
+
 export function isPunctualLightSource(
   value: unknown,
 ): value is PunctualLightSource {
@@ -445,6 +525,10 @@ export function createSceneLights(): SceneLights {
     shadowMapSize: 0,
     shadowBias: 0,
     shadowNormalBias: 0,
+    hasHemisphereLight: false,
+    hemisphereSky: [0, 0, 0],
+    hemisphereGround: [0, 0, 0],
+    hemisphereUp: new Vector3(0, 1, 0),
   };
 }
 
@@ -476,6 +560,14 @@ function clearSceneLights(out: SceneLights): void {
   out.shadowMapSize = 0;
   out.shadowBias = 0;
   out.shadowNormalBias = 0;
+  out.hasHemisphereLight = false;
+  out.hemisphereSky[0] = 0;
+  out.hemisphereSky[1] = 0;
+  out.hemisphereSky[2] = 0;
+  out.hemisphereGround[0] = 0;
+  out.hemisphereGround[1] = 0;
+  out.hemisphereGround[2] = 0;
+  out.hemisphereUp.set(0, 1, 0);
 }
 
 /** Scratch for the world position and axis reads below (plan D7). */
@@ -536,6 +628,21 @@ function writePunctualLight(
   }
 }
 
+/** Packs the first hemisphere into `out` — sky, ground, and +Y axis. */
+function writeHemisphereLight(
+  light: HemisphereLightSource,
+  out: SceneLights,
+): void {
+  out.hasHemisphereLight = true;
+  light.getWorldUp(out.hemisphereUp);
+  out.hemisphereSky[0] = light.color[0] * light.intensity;
+  out.hemisphereSky[1] = light.color[1] * light.intensity;
+  out.hemisphereSky[2] = light.color[2] * light.intensity;
+  out.hemisphereGround[0] = light.groundColor[0] * light.intensity;
+  out.hemisphereGround[1] = light.groundColor[1] * light.intensity;
+  out.hemisphereGround[2] = light.groundColor[2] * light.intensity;
+}
+
 /**
  * One depth-first, insertion-ordered walk (§6) gathering the sun and the
  * light set — `render-list.ts`'s `collect` filtering exactly: `visible` and
@@ -564,6 +671,10 @@ function collectFrom(
   let directional: DirectionalLightSource | null = null;
   if (isDirectionalLightSource(node)) {
     directional = node;
+  } else if (isHemisphereLightSource(node)) {
+    if (!out.hasHemisphereLight) {
+      writeHemisphereLight(node, out);
+    }
   } else if (isPunctualLightSource(node)) {
     walkPunctualFound += 1;
     if (out.punctualCount < MAX_PUNCTUAL_LIGHTS) {

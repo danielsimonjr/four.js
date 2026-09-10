@@ -20,9 +20,11 @@
  * different picture, and the recorded rule is that a value must not become
  * one.
  *
- * This slice ships the **colour pair** only (skinned unlit + skinned lit).
- * The §69 caster stays absent — skipped, never drawn in bind pose. The
- * RFC 0005 skinned id pass lives in `wgpu-picking.ts`.
+ * This slice ships the colour pair (skinned unlit + skinned lit) and the
+ * §69 caster through {@link SkinnedPrograms.acquireShadow} — compiled on
+ * the first skinned caster, never with the colour pair. Unregistered or
+ * failed casters skip, never bind-pose. The RFC 0005 skinned id pass
+ * lives in `wgpu-picking.ts`.
  */
 
 import type {
@@ -93,6 +95,17 @@ export interface WgpuSkinnedDrawDescriptor {
 }
 
 /**
+ * Everything a skinned **caster** pipeline bakes in — topology plus the
+ * shadow target's colour and depth formats. Structural, so the renderer
+ * never names the class that compiles it (`graph:duplicates`).
+ */
+export interface WgpuSkinnedShadowDescriptor {
+  readonly topology: "triangle-list" | "line-list";
+  readonly colorFormat: string;
+  readonly depthFormat: string;
+}
+
+/**
  * The surface the renderer's draw loop needs from the skinned **unlit**
  * family — a lazy pipeline cache keyed by {@link WgpuSkinnedDrawDescriptor}.
  */
@@ -144,6 +157,13 @@ export interface SkinnedPrograms {
   packPalette(palette: Float32Array): number;
   /** The palette bind group, or `null` before {@link SkinnedPrograms.prepare}. */
   paletteBindGroup(): GpuBindGroup | null;
+  /**
+   * Compiles the §69 skinned caster on first call and returns it.
+   * Subsequent calls reuse the pipeline for the same descriptor.
+   * Throws on compile failure — the renderer latches that and skips
+   * skinned casters on this device. A bind-pose shadow is never drawn.
+   */
+  acquireShadow(descriptor: WgpuSkinnedShadowDescriptor): GpuRenderPipeline;
   /**
    * Uploads packed palettes after the pass, before submit — the draw
    * uniforms' one-upload-per-frame shape. Absent to the byte when nothing

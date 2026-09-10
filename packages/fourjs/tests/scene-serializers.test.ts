@@ -34,6 +34,7 @@ import { Mesh, Renderable, Sprite, Texture } from "@fourjs/render";
 import {
   Bone,
   DirectionalLight,
+  HemisphereLight,
   MorphWeights,
   NodeSpace,
   PointLight,
@@ -74,6 +75,7 @@ import {
   BUTTON_NODE_TYPE,
   CHECKBOX_NODE_TYPE,
   DIRECTIONAL_LIGHT_NODE_TYPE,
+  HEMISPHERE_LIGHT_NODE_TYPE,
   POINT_LIGHT_NODE_TYPE,
   SPOT_LIGHT_NODE_TYPE,
   IMAGE_NODE_TYPE,
@@ -1393,6 +1395,9 @@ describe("registerRenderSerializers — the drawing tier survives §79 (A-16)", 
     );
     expect(io.write.nodeTypeOf(new PointLight())).toBe(POINT_LIGHT_NODE_TYPE);
     expect(io.write.nodeTypeOf(new SpotLight())).toBe(SPOT_LIGHT_NODE_TYPE);
+    expect(io.write.nodeTypeOf(new HemisphereLight())).toBe(
+      HEMISPHERE_LIGHT_NODE_TYPE,
+    );
     // A `Sprite` is a `Renderable` to `instanceof` and not to this pair, which
     // is what keeps an application's own subclass from being written out as
     // its base and reloaded as one.
@@ -1788,6 +1793,30 @@ describe("registerRenderSerializers — defensive reads", () => {
     expect([...spot.color]).toEqual([1, 0, 0]);
     expect([spot.intensity, spot.range]).toEqual([2, 5]);
     expect([spot.innerConeAngle, spot.outerConeAngle]).toEqual([0.25, 0.5]);
+  });
+
+  it("round-trips a hemisphere light's two colours", () => {
+    const light = io.read.nodeFactory({
+      type: HEMISPHERE_LIGHT_NODE_TYPE,
+      data: {
+        color: [0.6, 0.7, 1],
+        groundColor: [0.2, 0.1, 0.05],
+        intensity: 0.4,
+      },
+    }) as HemisphereLight;
+    expect(light).toBeInstanceOf(HemisphereLight);
+    expect([...light.color]).toEqual([0.6, 0.7, 1]);
+    expect([...light.groundColor]).toEqual([0.2, 0.1, 0.05]);
+    expect(light.intensity).toBe(0.4);
+
+    const written = io.write.nodeDataOf(light) as {
+      color: number[];
+      groundColor: number[];
+      intensity: number;
+    };
+    expect(written.color).toEqual([0.6, 0.7, 1]);
+    expect(written.groundColor).toEqual([0.2, 0.1, 0.05]);
+    expect(written.intensity).toBe(0.4);
   });
 });
 

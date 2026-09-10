@@ -62,6 +62,7 @@ export type {
   AmbientLightSource,
   DirectionalLightSource,
   DirectionalShadowSource,
+  HemisphereLightSource,
   PointLightSource,
   PunctualLightSource,
   PunctualLightSourceBase,
@@ -73,6 +74,7 @@ export {
   collectSceneLights,
   createSceneLights,
   isDirectionalLightSource,
+  isHemisphereLightSource,
   isPunctualLightSource,
 } from "./lights.js";
 export type { ParticleDrawable } from "./particles.js";

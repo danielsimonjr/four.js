@@ -119,7 +119,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - RFC 0003 residue (staged in source, 2026-08-28): WebGPU colour pair DONE 2026-09-09; WebGL shadow caster DONE 2026-09-09; WebGPU skinned id DONE 2026-09-10 (lives in `wgpu-picking.ts`); still GPU morph, CPU skinning, bone-texture; WebGPU skinned shadow still skips.
 - RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
-- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): ~~point/spot multi-light~~ **DONE 2026-08-09** (R-17, 8 punctual); still multi-directional + hemisphere/area + clustered path, shadows (§69 — directional tier shipped; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 PBR rest, §60a tone-mapping operator + IBL (sRGB encode + color grade shipped), light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09. WebGPU `metalRoughnessMap` sampling DONE 2026-09-09. WebGL `emissiveMap` (unit 3) DONE 2026-09-09 (still open: extra directionals / hemisphere / area / clustered, cascades, PBR rest, tone-map operator, light layers, `normalMap` / `occlusionMap`, WebGPU emissive).
+- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): ~~point/spot multi-light~~ **DONE 2026-08-09** (R-17, 8 punctual); ~~hemisphere~~ **DONE 2026-09-10** (`HemisphereLight`, first-match, +Y sky); still multi-directional + area + clustered path, shadows (§69 — directional tier shipped; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 PBR rest, §60a tone-mapping operator + IBL (sRGB encode + color grade shipped), light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09. WebGPU `metalRoughnessMap` sampling DONE 2026-09-09. WebGL `emissiveMap` (unit 3) DONE 2026-09-09 (still open: extra directionals / area / clustered, cascades, PBR rest, tone-map operator, light layers, `normalMap` / `occlusionMap`, WebGPU emissive).
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
 - Follow-ups the R-1 plan explicitly defers
 - PH-11c — character/dynamics push interaction — DONE 2026-09-06 (`pushMass` / reduced-mass impulse / wake).
@@ -1219,10 +1219,12 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       ~~skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
       shadow is a different picture)~~ **DONE 2026-09-09** (WebGL
       `SkinnedShadowProgram` via `acquireShadow()` on the first skinned
-      caster; unregistered still skips; WebGPU colour pair does not add a
-      caster); ~~WebGPU skinned colour pair~~ **DONE 2026-09-09**
+      caster; unregistered still skips); ~~WebGPU skinned colour pair~~ **DONE 2026-09-09**
       (`registerSkinningPipeline()` unlit+lit; 3072-byte palette bind group;
-      skip unregistered/failed, never bind-pose; caster still skips;
+      skip unregistered/failed, never bind-pose;
+      ~~WebGPU skinned shadow caster still skips~~ **DONE 2026-09-10**
+      (`acquireShadow()` on the registered pair; lazy compile, fail-once
+      skip, never bind-pose; palette at group 1);
       RFC 0005 skinned id lives in `wgpu-picking.ts`);
       CPU skinning (Canvas/SVG tiers + the skinned bounds/picking home,
       with its own `same-runtime` golden); bone-texture palette (unbounds
@@ -1273,7 +1275,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 - [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done):
       ~~point/spot multi-light~~ **DONE 2026-08-09** (R-17: `MAX_PUNCTUAL_LIGHTS`
       = 8; one directional still wins by scene-graph order). Remaining light
-      types: extra directionals, hemisphere, rectangular area, clustered /
+      types: extra directionals, ~~hemisphere~~ **DONE 2026-09-10**, rectangular area, clustered /
       forward-plus. Shadows (§69 — directional tier shipped 2026-08-09;
       cascades, point/spot maps, the atlas, transparent masks and contact
       shadows remain),
@@ -1292,7 +1294,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       albedo occupies group 2). ~~WebGL `emissiveMap` staged~~ **DONE
       2026-09-09** (unit 3, glTF factor × texture; WebGPU unsampled —
       groups 2/3 already hold albedo/MR). Remaining: extra directionals /
-      hemisphere / area / clustered, cascades, PBR rest, tone-map operator,
+      area / clustered, cascades, PBR rest, tone-map operator,
       light layers, `normalMap` / `occlusionMap`, WebGPU emissive.
 - [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
       family list now names `LitMaterial`

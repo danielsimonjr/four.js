@@ -31,7 +31,7 @@
  * V        = 0.5 / (NdotL·√(NdotV²(1−α²)+α²) + NdotV·√(NdotL²(1−α²)+α²))
  * F        = F0 + (1 − F0)(1 − VdotH)⁵           Schlick
  * emit     = emissive × emissiveMap
- * out.rgb  = ambient·diffuse + (diffuse + D·V·F)·lightColor·NdotL + emit
+ * out.rgb  = (ambient+hemi)·diffuse + (diffuse + D·V·F)·lightColor·NdotL + emit
  * out.a    = albedo.a
  * ```
  *
@@ -82,6 +82,8 @@ import {
   EMISSIVE_TEXTURE_UNIT,
   MAP_TEXTURE_UNIT,
   METAL_ROUGHNESS_TEXTURE_UNIT,
+  HEMISPHERE_LIGHT_GLSL,
+  HemisphereLightUniforms,
   PUNCTUAL_LIGHT_GLSL,
   PunctualLightUniforms,
   SHADOW_GLSL,
@@ -218,6 +220,7 @@ const float DIELECTRIC_F0 = 0.04;
 const float MIN_ROUGHNESS = 0.045;
 
 ${PUNCTUAL_LIGHT_GLSL}
+${HEMISPHERE_LIGHT_GLSL}
 ${SHADOW_GLSL}
 vec3 directLobe(
   vec3 n,
@@ -268,11 +271,12 @@ void main() {
   vec3 albedo = base.rgb;
   vec3 diffuseColor = albedo * (1.0 - metal);
   vec3 f0 = mix(vec3(DIELECTRIC_F0), albedo, metal);
-  vec3 shaded = ambientLight * diffuseColor;
-
   float normalLength = length(vNormal);
+  vec3 n = normalLength > 0.0 ? vNormal / normalLength : vec3(0.0);
+  vec3 shaded =
+    (ambientLight + hemisphereAmbient(normalLength, n)) * diffuseColor;
+
   if (normalLength > 0.0) {
-    vec3 n = vNormal / normalLength;
     vec3 v = normalize(cameraPosition - vWorldPosition);
 
     float alpha = max(rough, MIN_ROUGHNESS);
@@ -377,6 +381,8 @@ export class StandardProgram implements Disposable {
 
   readonly #punctual: PunctualLightUniforms;
 
+  readonly #hemisphere: HemisphereLightUniforms;
+
   readonly #shadow: ShadowUniforms;
 
   /** CPU mirror of `useMap`; see `UnlitProgram`'s for the contract. */
@@ -399,11 +405,13 @@ export class StandardProgram implements Disposable {
     program: GlProgramHandle,
     locations: readonly GlUniformLocation[],
     punctual: PunctualLightUniforms,
+    hemisphere: HemisphereLightUniforms,
     shadow: ShadowUniforms,
   ) {
     this.#gl = gl;
     this.#program = program;
     this.#punctual = punctual;
+    this.#hemisphere = hemisphere;
     this.#shadow = shadow;
     // Positionally, from the one array `create` builds: seventeen uniforms is
     // more than a constructor parameter list can carry without every call site
@@ -467,6 +475,7 @@ export class StandardProgram implements Disposable {
         program,
         names.map((name) => requireUniform(gl, program, name, "standard")),
         PunctualLightUniforms.resolve(gl, program, "standard"),
+        HemisphereLightUniforms.resolve(gl, program, "standard"),
         ShadowUniforms.resolve(gl, program, "standard"),
       );
     } catch (error: unknown) {
@@ -587,6 +596,14 @@ export class StandardProgram implements Disposable {
    */
   setPunctualLights(lights: SceneLights): void {
     this.#punctual.upload(lights);
+  }
+
+  /**
+   * Uploads the frame's hemisphere (§68) — or nothing, for a scene that
+   * has none. See `HemisphereLightUniforms` for the contract.
+   */
+  setHemisphereLight(lights: SceneLights): void {
+    this.#hemisphere.upload(lights);
   }
 
   /**
