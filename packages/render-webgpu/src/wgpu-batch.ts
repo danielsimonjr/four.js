@@ -224,6 +224,13 @@ interface BatchSlot {
   lastContentVersion: number;
   lastVertexCount: number;
   lastIndexCount: number;
+  /**
+   * Last uploaded {@link RenderBatch.floatsPerVertex}. `contentVersion` is
+   * geometry + transform only (`batch.ts`); a material-driven stream-shape
+   * change (UVs / vertex colours) keeps that stamp and the vertex/index
+   * counts while the interleaved layout moves.
+   */
+  lastFloatsPerVertex: number;
 }
 
 /**
@@ -338,6 +345,7 @@ export class WgpuBatching implements WgpuRenderBatching {
         lastContentVersion: 0,
         lastVertexCount: -1,
         lastIndexCount: -1,
+        lastFloatsPerVertex: -1,
       };
       this.#slots[index] = slot;
       return slot;
@@ -362,6 +370,9 @@ export class WgpuBatching implements WgpuRenderBatching {
    * planner's "versions unavailable" signal and always misses. Per-slot,
    * not per-frame: WebGPU keeps a buffer pair per batch index, so slot *k*
    * of a still scene is the same bytes as last frame's slot *k*.
+   * `floatsPerVertex` is part of the key: the planner stamp does not see
+   * material stream shape, and a skipped upload of the wrong stride would
+   * leave stale vertex bytes under a different pipeline.
    */
   #canSkipUpload(batch: RenderBatch, slot: BatchSlot): boolean {
     const version = batch.contentVersion ?? 0;
@@ -369,7 +380,8 @@ export class WgpuBatching implements WgpuRenderBatching {
       version !== 0 &&
       slot.lastContentVersion === version &&
       slot.lastVertexCount === batch.vertexCount &&
-      slot.lastIndexCount === batch.indexCount
+      slot.lastIndexCount === batch.indexCount &&
+      slot.lastFloatsPerVertex === batch.floatsPerVertex
     );
   }
 
@@ -377,6 +389,7 @@ export class WgpuBatching implements WgpuRenderBatching {
     slot.lastContentVersion = batch.contentVersion ?? 0;
     slot.lastVertexCount = batch.vertexCount;
     slot.lastIndexCount = batch.indexCount;
+    slot.lastFloatsPerVertex = batch.floatsPerVertex;
   }
 
   #createVertexBuffer(

@@ -165,6 +165,47 @@ describe("WgpuBatching.draw — slots, growth, devices", () => {
     expect(gpu.countOf("queue.writeBuffer")).toBe(4);
   });
 
+  it("re-uploads when floatsPerVertex changes under a stable contentVersion", () => {
+    const { gpu, device, pass } = rig();
+    const batching = new WgpuBatching();
+    const positionOnly = batch({
+      contentVersion: 7,
+      floatsPerVertex: 3,
+    });
+
+    batching.beginFrame();
+    batching.draw(device, pass, positionOnly);
+    expect(gpu.countOf("queue.writeBuffer")).toBe(2);
+
+    batching.beginFrame();
+    batching.draw(
+      device,
+      pass,
+      batch({
+        contentVersion: 7,
+        vertexCount: 4,
+        indexCount: 6,
+        floatsPerVertex: 5,
+      }),
+    );
+    expect(gpu.countOf("queue.writeBuffer")).toBe(4);
+    const uploads = gpu.callsOf("queue.writeBuffer");
+    expect(uploads[2]?.args[4]).toBe(20);
+
+    batching.beginFrame();
+    batching.draw(
+      device,
+      pass,
+      batch({
+        contentVersion: 7,
+        vertexCount: 4,
+        indexCount: 6,
+        floatsPerVertex: 5,
+      }),
+    );
+    expect(gpu.countOf("queue.writeBuffer")).toBe(4);
+  });
+
   it("uploads exactly the used floats and indices, not the staging arrays", () => {
     const { gpu, device, pass } = rig();
     const batching = new WgpuBatching();

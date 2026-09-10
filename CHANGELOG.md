@@ -23,7 +23,12 @@ specification; until then, entries are grouped by date under **Unreleased**.
 - **WebGPU batch idle-skip.** `WgpuBatching.draw` skips `writeBuffer` when
   the planner's `contentVersion` is unchanged on that slot (`#canSkipUpload`,
   the GL twin). `contentVersion === 0` still always uploads. A still scene
-  now issues the uniform rewrite only.
+  now issues the uniform rewrite only. Skip key includes `floatsPerVertex`
+  so a UV/vertex-colour stream-shape change cannot reuse the old stride.
+
+- **WebGPU skinned id palettes upload the packed region only**, matching
+  `wgpu-skinning.ts` (`packed * SKINNED_ID_PALETTE_FLOATS`), not the grown
+  staging buffer.
 
 - **TODO.md recount: 11 open / 260 closed.** RFC 0005 residue closed.
   Hygiene: RFC 0008 Proposed note on the live Priority index; PH-11c

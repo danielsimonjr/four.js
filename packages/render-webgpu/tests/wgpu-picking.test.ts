@@ -423,11 +423,25 @@ function particleIdUploads(gpu: RecordingGpu): number[][] {
 }
 
 function paletteUploads(gpu: RecordingGpu): number[][] {
-  const writes = uniformWritesBeforePass(gpu);
   const paletteFloats = SKINNED_ID_PALETTE_BYTES / 4;
-  return writes.filter(
-    (data) => data.length % paletteFloats === 0 && data.length >= paletteFloats,
-  );
+  return gpu
+    .callsOf("queue.writeBuffer")
+    .filter((call) => {
+      const size = call.args[4];
+      return typeof size === "number" && size > 0 && size % paletteFloats === 0;
+    })
+    .map((call) => call.args[2] as number[]);
+}
+
+function paletteUploadSizes(gpu: RecordingGpu): number[] {
+  const paletteFloats = SKINNED_ID_PALETTE_BYTES / 4;
+  return gpu
+    .callsOf("queue.writeBuffer")
+    .map((call) => call.args[4])
+    .filter(
+      (size): size is number =>
+        typeof size === "number" && size > 0 && size % paletteFloats === 0,
+    );
 }
 
 function expectedIdUpload(index: number): number[] {
@@ -615,10 +629,35 @@ describe("WebgpuPickingService.update — the id pass", () => {
     const palettes = paletteUploads(gpu);
     expect(palettes).toHaveLength(1);
     expect(palettes[0].slice(0, 16)).toEqual(Array.from(palette));
+    expect(paletteUploadSizes(gpu)).toEqual([SKINNED_ID_PALETTE_BYTES / 4]);
 
     service.update(root as unknown as PickRoot, view);
     expect(gpu.countOf("device.createRenderPipeline")).toBe(3);
     expect(meshDrawCount(gpu)).toBe(4);
+  });
+
+  it("uploads only packed skinned palettes after the staging buffer has grown", () => {
+    const { gpu, service, view } = createRig();
+    const a = skinnedDrawable(new Float32Array(16));
+    const b = skinnedDrawable(new Float32Array(16));
+    type PickRoot = Parameters<PickingService["update"]>[0];
+    const two = {
+      visible: true,
+      enabled: true,
+      children: [a, b] as unknown[],
+    };
+    service.update(two as unknown as PickRoot, view);
+    const paletteFloats = SKINNED_ID_PALETTE_BYTES / 4;
+    expect(paletteUploadSizes(gpu)).toEqual([2 * paletteFloats]);
+
+    gpu.reset();
+    const one = {
+      visible: true,
+      enabled: true,
+      children: [a] as unknown[],
+    };
+    service.update(one as unknown as PickRoot, view);
+    expect(paletteUploadSizes(gpu)).toEqual([paletteFloats]);
   });
 
   it("latches a skinned-pipeline compile failure and still draws meshes", () => {

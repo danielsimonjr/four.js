@@ -1241,7 +1241,13 @@ export class WebgpuPickingService implements PickingService {
       }
       const buffer = this.#skinnedPaletteBuffer;
       if (buffer !== null) {
-        device.queue.writeBuffer(buffer, 0, staging);
+        device.queue.writeBuffer(
+          buffer,
+          0,
+          staging,
+          0,
+          packed * SKINNED_ID_PALETTE_FLOATS,
+        );
       }
     }
 
