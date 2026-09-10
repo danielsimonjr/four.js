@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — open-TODO audit + RFC 0005 close (2026-09-10)
+
+### Added
+
+- **WebGPU skinned id pass (RFC 0005 residue, last named slice).** Private
+  pipeline in `wgpu-picking.ts` (not a `SkinnedIdProgram` class —
+  `graph:duplicates`). `skinMatrix(joints, weights)` over a 3072-byte
+  palette bind group (`hasDynamicOffset`, vertex stage), joints
+  `@location(4)` `uint16x4`, weights `@location(5)` `float32x4`. Lazy on
+  the first skinned item; compile failure skips, never bind-pose. Mesh
+  `IdUniforms` stay 144 bytes. RFC 0005 checkbox closed.
+
+### Changed
+
+- **WebGPU batch idle-skip.** `WgpuBatching.draw` skips `writeBuffer` when
+  the planner's `contentVersion` is unchanged on that slot (`#canSkipUpload`,
+  the GL twin). `contentVersion === 0` still always uploads. A still scene
+  now issues the uniform rewrite only. Skip key includes `floatsPerVertex`
+  so a UV/vertex-colour stream-shape change cannot reuse the old stride.
+
+- **WebGPU skinned id palettes upload the packed region only**, matching
+  `wgpu-skinning.ts` (`packed * SKINNED_ID_PALETTE_FLOATS`), not the grown
+  staging buffer.
+
+- **TODO.md recount: 11 open / 260 closed.** RFC 0005 residue closed.
+  Hygiene: RFC 0008 Proposed note on the live Priority index; PH-11c
+  “owner-gated” struck on closed rows; idle-cache index names both
+  backends.
+
+- **Doc-drift follow-up from the same audit.** §96 decompression limits
+  are **partial** in the security guide (`createTextureLoader` bounds;
+  gzip/Draco/Basis still absent). `fields.ts` records radial GPU fields
+  as shipped on `simulation: "gpu"`. Custom-shaders / `NodeMaterial`
+  stop claiming R-17's light-uniform contract is missing; `angle` and
+  the §58 paint tier leave the deferred list. Spec revision **1.15**
+  matches that §60 honesty.
+
 ## Unreleased — RFC 0007–0009 review pass (2026-09-10)
 
 ### Changed

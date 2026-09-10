@@ -34,8 +34,8 @@
  *   the id fragment, so a deformed silhouette picks as the colour pass
  *   does. A compile failure skips (bounds). A bind-pose id remains a
  *   different picture; this program is the third application of that
- *   exclusion. WebGPU still skips: that backend has no RFC 0003 skinned
- *   pipelines;
+ *   exclusion. WebGPU draws the same silhouette through a private skinned
+ *   id pipeline in `wgpu-picking.ts` (not a `SkinnedIdProgram` class);
  * - **particle items write one id for the whole system** — §36's batched
  *   item has one node and no per-particle geometry, so the pass instances
  *   the shared unit quad through {@link ParticleIdProgram} (the §36

@@ -21,8 +21,8 @@
  * one.
  *
  * This slice ships the **colour pair** only (skinned unlit + skinned lit).
- * The §69 caster and the RFC 0005 id pass stay absent — skipped, never
- * drawn in bind pose.
+ * The §69 caster stays absent — skipped, never drawn in bind pose. The
+ * RFC 0005 skinned id pass lives in `wgpu-picking.ts`.
  */
 
 import type {

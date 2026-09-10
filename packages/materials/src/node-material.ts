@@ -15,9 +15,9 @@
  * A node material does not see §68's directional light or the scene ambient
  * term (RFC 0001 §6, the MVP's sharpest limitation): enough for §70 effects,
  * procedural colour, exact §58 gradients, UV animation and screen-space work
- * — not enough for R-13's PBR path. Lighting-aware graphs wait on a
- * light-uniform contract §68's tier does not have (sequencing R-14 → R-17 →
- * R-13).
+ * — not enough for R-13's PBR path. R-17's light-uniform contract landed
+ * 2026-08-09; node emitters still do not bind it. Lighting-aware graphs
+ * remain RFC 0001 residue.
  *
  * ## Uniform ownership is per material (RFC 0001 Q3, decided)
  *

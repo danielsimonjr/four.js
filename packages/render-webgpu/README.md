@@ -12,7 +12,7 @@ This package was a reserved stub until WP-R1.1 landed 2026-08-21. The barrel no 
 - **`registerWebgpuRenderer` / `isWebgpuSupported`** — §62's opt-in registry seam.
 - **Testing seams** — the structural device surface, pipeline cache, bind-group layouts, and WGSL builders, so the backend can be unit-tested against a fake device with no GPU and no browser (Node has no `navigator.gpu`; see `tests/integration/helpers/recording-gpu.ts`).
 
-Absent, not stubbed: RFC 0003's skinned pipelines. §71 picking is opt-in via `registerPickingPipeline()` (`createPickingService` throws until registered); particle systems pick as one id per emitter (CPU 8-float stream); skinned items and trails stay skipped.
+Absent, not stubbed: RFC 0003's skinned **shadow caster**. §71 picking is opt-in via `registerPickingPipeline()` (`createPickingService` throws until registered); particle systems pick as one id per emitter (CPU 8-float stream); skinned items pick through a private skinned id pipeline; trails stay skipped.
 
 Unit tests are colocated in `tests/` per §92. Browser-pixel coverage lives under `tests/browser/webgpu/`.
 

@@ -46,17 +46,18 @@
  * **opt-in** behind `registerSkinningPipeline()` — the pipeline-cost law's
  * registration seam, matching WebGL: the renderer imports only the registry
  * slot, and an unregistered (or failed) skinned draw is skipped, never
- * shown in bind pose. The §69 skinned caster and the RFC 0005 skinned id
- * pass stay *absent*: those items skip, and an invisible surface must not
- * cast or pick as its bind pose. An *unregistered* node material is skipped
- * on the same terms. §71 picking is **opt-in**: `createPickingService()` is
- * declared (presence is the capability, matching WebGL) and throws until
- * `registerPickingPipeline()` links `wgpu-picking.ts`. The id pass draws
- * particle systems with one colour per emitter (the §36 billboard, CPU
- * 8-float instance stream); trails stay undrawn and skinned items stay
- * skipped. The one exception is deliberate and narrow: a §67 **mask** is
- * coverage, not shading, so a clip node of any material family masks
- * correctly today through the flat unlit pipeline with colour writes off.
+ * shown in bind pose. The §69 skinned caster stays *absent*: those items
+ * skip, and an invisible surface must not cast as its bind pose. An
+ * *unregistered* node material is skipped on the same terms. §71 picking is
+ * **opt-in**: `createPickingService()` is declared (presence is the
+ * capability, matching WebGL) and throws until `registerPickingPipeline()`
+ * links `wgpu-picking.ts`. The id pass draws particle systems with one
+ * colour per emitter (the §36 billboard, CPU 8-float instance stream) and
+ * skinned meshes through a private skinned id pipeline (deformed
+ * silhouette, never bind pose); trails stay undrawn. The one exception is
+ * deliberate and narrow: a §67 **mask** is coverage, not shading, so a clip
+ * node of any material family masks correctly today through the flat unlit
+ * pipeline with colour writes off.
  *
  * ## `initialize()` finally earns its `Promise`
  *
@@ -1706,8 +1707,9 @@ export class WebgpuRenderer implements Renderer {
         ) {
           // Remaining kinds this colour pass does not draw. Skinned items
           // continued above when registered; unregistered ones fell through
-          // the `skinnedPrograms === null` skip. The §69 caster and RFC 0005
-          // id pass still absent — skipped, never bind-pose.
+          // the `skinnedPrograms === null` skip. The §69 caster still
+          // absent — skipped, never bind-pose. The RFC 0005 skinned id
+          // pass lives on the picking service.
           continue;
         }
         if (!maskPass && item.kind === "node") {
@@ -3778,8 +3780,8 @@ export class WebgpuRenderer implements Renderer {
       // The caster filter — `wgpu-shadow.ts`'s header owns the list: §49's
       // opt-out, sprites (a quad would cast its rectangle), and every kind
       // this backend has no caster pipeline for (skinned — colour pair behind
-      // `registerSkinningPipeline()`; shadow caster and id pass still absent,
-      // and an invisible surface must not cast). Masks and particle items carry `castShadow: false`
+      // `registerSkinningPipeline()`; shadow caster still absent, and an
+      // invisible surface must not cast). Masks and particle items carry `castShadow: false`
       // from the list builder — a §36 billboard has no surface to project,
       // drawn (WP-R1.8) or not. §60 (WP-R1.9): a node material with **no**
       // displacement casts its geometry exactly — depth ignores colour, so

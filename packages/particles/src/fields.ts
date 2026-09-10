@@ -43,7 +43,7 @@
  * | turbulence/noise        | **ships** — {@link turbulenceField}, with the honesty note below |
  * | spring field            | **staged** — a spring field wants a rest *target* per particle (§27 gives none) and reads as an attractor with a linear law; {@link radialField} is inverse-square only, so shipping "spring" as a relabelled radial would be a lie |
  * | user-defined callback   | **already possible** — an object literal with a `sample` method *is* the interface; no wrapper is shipped because there is nothing for it to do |
- * | GPU field               | **staged** (2026-08-02) — needs the WebGPU compute path, itself staged by plan P9-1 |
+ * | GPU field               | **partial** — `radialField` ships on `simulation: "gpu"` (`gpuField` brand, `resolveGpuRadial` in `emitter.ts`, R-31 2026-08-29). Vortex, wind, drag, turbulence, and callback GPU fields remain staged |
  * | volume inclusion/filtering | **ships, MVP** — {@link volumeField}: axis-aligned sphere and box, with an edge fade. Rotated boxes, cylinders, capsules, meshes, and inversion are staged |
  *
  * Nothing here is accepted-and-ignored: an option that silently does nothing is

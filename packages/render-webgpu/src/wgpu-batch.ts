@@ -34,10 +34,12 @@
  * it is the one contract member the GL interface does not need.
  *
  * The steady state is the GL one's: one `writeBuffer` pair per batch per
- * frame, zero allocations. §65's *"persistent mapped or staged buffers"* —
- * a staging ring that would collapse the per-batch uploads into one — becomes
- * reachable at this seam for the first time and is deliberately **noted, not
- * built**: it is its own packet (R-1 plan, WP-R1.3).
+ * frame when the planner's `contentVersion` moves, **and zero uploads on a
+ * still scene** (`#canSkipUpload`, the GL twin's `#canSkipUpload`). §65's
+ * *"persistent mapped or staged buffers"* — a staging ring that would
+ * collapse the per-batch uploads into one — becomes reachable at this seam
+ * for the first time and is deliberately **noted, not built**: it is its
+ * own packet (R-1 plan, WP-R1.3).
  *
  * ## Growth is safe mid-frame, and the reason is worth stating
  *
@@ -215,6 +217,20 @@ interface BatchSlot {
   indexBuffer: GpuBuffer;
   /** Indices the index buffer's allocation holds. */
   indexCount: number;
+  /**
+   * Last uploaded {@link RenderBatch.contentVersion}. `0` is the planner's
+   * "versions unavailable" signal and never skips.
+   */
+  lastContentVersion: number;
+  lastVertexCount: number;
+  lastIndexCount: number;
+  /**
+   * Last uploaded {@link RenderBatch.floatsPerVertex}. `contentVersion` is
+   * geometry + transform only (`batch.ts`); a material-driven stream-shape
+   * change (UVs / vertex colours) keeps that stamp and the vertex/index
+   * counts while the interleaved layout moves.
+   */
+  lastFloatsPerVertex: number;
 }
 
 /**
@@ -266,15 +282,18 @@ export class WgpuBatching implements WgpuRenderBatching {
     const slot = this.#acquireSlot(device, batch, this.#slot);
     this.#slot += 1;
 
-    const floats = batch.vertexCount * batch.floatsPerVertex;
-    device.queue.writeBuffer(slot.vertexBuffer, 0, batch.vertices, 0, floats);
-    device.queue.writeBuffer(
-      slot.indexBuffer,
-      0,
-      batch.indices,
-      0,
-      batch.indexCount,
-    );
+    if (!this.#canSkipUpload(batch, slot)) {
+      const floats = batch.vertexCount * batch.floatsPerVertex;
+      device.queue.writeBuffer(slot.vertexBuffer, 0, batch.vertices, 0, floats);
+      device.queue.writeBuffer(
+        slot.indexBuffer,
+        0,
+        batch.indices,
+        0,
+        batch.indexCount,
+      );
+      this.#rememberUpload(batch, slot);
+    }
     pass.setVertexBuffer(0, slot.vertexBuffer);
     // Always 32-bit: the planner widens every source index (`batch.ts`).
     pass.setIndexBuffer(slot.indexBuffer, "uint32");
@@ -323,6 +342,10 @@ export class WgpuBatching implements WgpuRenderBatching {
         vertexFloats: batch.vertices.length,
         indexBuffer: this.#createIndexBuffer(device, batch, index),
         indexCount: batch.indices.length,
+        lastContentVersion: 0,
+        lastVertexCount: -1,
+        lastIndexCount: -1,
+        lastFloatsPerVertex: -1,
       };
       this.#slots[index] = slot;
       return slot;
@@ -331,13 +354,42 @@ export class WgpuBatching implements WgpuRenderBatching {
       slot.vertexBuffer.destroy();
       slot.vertexBuffer = this.#createVertexBuffer(device, batch, index);
       slot.vertexFloats = batch.vertices.length;
+      slot.lastContentVersion = 0;
     }
     if (slot.indexCount < batch.indexCount) {
       slot.indexBuffer.destroy();
       slot.indexBuffer = this.#createIndexBuffer(device, batch, index);
       slot.indexCount = batch.indices.length;
+      slot.lastContentVersion = 0;
     }
     return slot;
+  }
+
+  /**
+   * Whether this slot already holds `batch`. `contentVersion === 0` is the
+   * planner's "versions unavailable" signal and always misses. Per-slot,
+   * not per-frame: WebGPU keeps a buffer pair per batch index, so slot *k*
+   * of a still scene is the same bytes as last frame's slot *k*.
+   * `floatsPerVertex` is part of the key: the planner stamp does not see
+   * material stream shape, and a skipped upload of the wrong stride would
+   * leave stale vertex bytes under a different pipeline.
+   */
+  #canSkipUpload(batch: RenderBatch, slot: BatchSlot): boolean {
+    const version = batch.contentVersion ?? 0;
+    return (
+      version !== 0 &&
+      slot.lastContentVersion === version &&
+      slot.lastVertexCount === batch.vertexCount &&
+      slot.lastIndexCount === batch.indexCount &&
+      slot.lastFloatsPerVertex === batch.floatsPerVertex
+    );
+  }
+
+  #rememberUpload(batch: RenderBatch, slot: BatchSlot): void {
+    slot.lastContentVersion = batch.contentVersion ?? 0;
+    slot.lastVertexCount = batch.vertexCount;
+    slot.lastIndexCount = batch.indexCount;
+    slot.lastFloatsPerVertex = batch.floatsPerVertex;
   }
 
   #createVertexBuffer(

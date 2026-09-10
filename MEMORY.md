@@ -17,7 +17,7 @@ readable; never delete the pointer itself.
   `render-webgpu` left that list 2026-08-21…29 (the R-1 plan; standing-fact wording
   corrected 2026-08-30).
 - `docs/SPECIFICATION.md` is the working reference — the current revision is whatever tops
-  its amendments table (1.13 as of 2026-08-30; do not freeze the number in other files)
+  its amendments table (1.15 as of 2026-09-10; do not freeze the number in other files)
   (amendments table at its top; § numbering 1–120 frozen, lettered sections for insertions).
   `docs/archive/four-js-specification.pdf` is the unmodified original, frozen at the pre-1.0
   text, and still contains the old duplicate numbering — translate its references via the map
@@ -29,6 +29,27 @@ readable; never delete the pointer itself.
   above `render-*` backends; the logical scene never depends on a concrete backend.
 
 ## Decisions
+
+- **2026-09-10 — Open-TODO audit: 11 still open, 260 closed.** A
+  subagent-team review of every `- [ ]` row against source. Closed
+  **RFC 0005 residue**: WebGPU skinned id pass (`wgpu-picking.ts`,
+  private pipeline, `skinMatrix()` + 3072-byte palette group at bind
+  group 1, fail-once skip, never bind-pose). Same-day slice on the
+  still-open batching row: WebGPU idle-skip (`WgpuBatching.#canSkipUpload`,
+  per-slot `contentVersion`; `0` always uploads). The other 11 cannot
+  close: dogfood is standing; first publish is owner-gated (no git tag,
+  nothing on npm); R-33 still needs non-SwiftShader; RFC 0001/0003/0004,
+  lighting, R-1 deferred, batching, R-30c, and §96 each still have named
+  remaining slices (GPU morph / CPU skinning / bone-texture / WebGPU
+  skinned shadow; cube/array/3D and compressed/video/async; extra
+  directionals / cascades / PBR rest). TypeDoc/`typescript@6.0.3`
+  isolation stays in Priority-index tier 4, not a new checkbox. RFC
+  0007/0008/0009 stay Proposed. Do not re-triage the 11 as quick wins.
+  Same-day doc-drift follow-up (not a packet close): §96 decompression
+  guide row absent → partial; GPU radial field no longer called staged;
+  lighting-aware graphs no longer wait on a missing R-17 contract;
+  `angle` / §58 paint struck from the custom-shaders deferred list;
+  spec revision 1.15.
 
 - **2026-09-09 — Open-TODO audit: 12 still open, 257 closed.** A
   subagent-team review of every `- [ ]` row against source. None of the 12

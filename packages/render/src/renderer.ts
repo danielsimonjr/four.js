@@ -723,7 +723,8 @@ export interface Renderer extends Disposable {
    * disposes it (§83). WebGL draws particle systems (one id per emitter)
    * and skinned meshes (deformed silhouette via `SkinnedIdProgram`).
    * WebGPU draws particle systems the same way (CPU 8-float billboard)
-   * and still skips skinned items (no RFC 0003 skinned pipelines).
+   * and skinned meshes through a private skinned id pipeline (never bind
+   * pose).
    */
   createPickingService?(): PickingService;
 

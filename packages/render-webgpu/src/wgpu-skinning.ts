@@ -672,8 +672,10 @@ class WgpuSkinnedProgramPair implements SkinnedPrograms {
  * initialize, so registration alone changes no GPU transcript. Idempotent;
  * calling it twice re-installs the same factory.
  *
- * This slice does **not** compile a skinned shadow caster or a skinned id
- * pass; those stay skipped (honest absence, never a bind-pose silhouette).
+ * This slice does **not** compile a skinned shadow caster; that stays
+ * skipped (honest absence, never a bind-pose silhouette). The RFC 0005
+ * skinned id pass lives in `wgpu-picking.ts` behind
+ * `registerPickingPipeline()`.
  */
 export function registerSkinningPipeline(): void {
   setSkinningPipelineFactory({

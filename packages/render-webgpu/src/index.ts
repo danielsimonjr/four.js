@@ -332,6 +332,8 @@ export {
   PARTICLE_ID_SHADER_SOURCE,
   PARTICLE_ID_UNIFORM_BYTES,
   PARTICLE_ID_VIEW_OFFSET,
+  SKINNED_ID_PALETTE_BYTES,
+  SKINNED_ID_SHADER_SOURCE,
   WebgpuPickingService,
   registerPickingPipeline,
 } from "./wgpu-picking.js";

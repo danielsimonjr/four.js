@@ -93,8 +93,8 @@
  * particles carry `castShadow: false` from the list builder; masks likewise.
  * The two GL exclusions with a WebGPU twist: skinned items are excluded
  * from the caster pass **by absence of a skinned caster** — the colour
- * pair lives behind `registerSkinningPipeline()`; the shadow caster and
- * id pass still absent. An invisible surface must not cast a bind-pose
+ * pair lives behind `registerSkinningPipeline()`; the shadow caster
+ * still absent. An invisible surface must not cast a bind-pose
  * silhouette. `node` items: an undisplaced graph casts its geometry
  * exactly (depth ignores colour), while a displacing graph would cast
  * its *undisplaced* silhouette, a different picture, so those casters

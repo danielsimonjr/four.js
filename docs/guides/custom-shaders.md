@@ -195,8 +195,10 @@ A node material does not see §68's directional light, the punctual lights, or
 the scene ambient term — RFC 0001 §6 records this as the MVP's sharpest
 limitation. It is enough for §70 effects, procedural colour, exact §58
 gradients, UV animation and screen-space work; it is not the PBR path. For lit
-surfaces use `LitMaterial` or `StandardMaterial`; lighting-aware graphs wait
-on a light-uniform contract §68's tier does not have yet.
+surfaces use `LitMaterial` or `StandardMaterial`. R-17's light-uniform
+contract exists (`PunctualLightUniforms`, WebGPU `LIGHT_UNIFORM_*`); node
+emitters still do not consume it. Lighting-aware graphs remain RFC 0001
+residue, not a missing-contract blocker.
 
 ## What stays deferred (RFC 0001 residue, staged in source 2026-08-28)
 
@@ -207,12 +209,15 @@ on a light-uniform contract §68's tier does not have yet.
   dimension).
 - **Storage buffers** (§82, WebGPU) and **source maps** (per-node provenance;
   today the error path ships the emitted source plus the driver log).
-- **Lighting-aware graphs** (above).
+- **Lighting-aware graphs** (above — R-17's contract landed; graphs stay unlit).
 - **Data-declared custom operators** (RFC 0001's alternative E — a follow-up
-  RFC, and the gate on §81's `materials/shader nodes` plugin token).
-- **An angle operator**, which is what unlocks §58's conic gradient; and the
-  §58 Paint-object tier on `Shape2D` (R-16's shape-paint packet, unblocked by
-  this landing but not part of it).
+  RFC, and the gate on §81's `materials/shader nodes` plugin token). The
+  `SHADER_OPERATORS` token is the named factory hook only (2026-09-06); it
+  does not widen the closed union.
+
+Shipped after this guide's first draft, so they are **not** residue: the
+`angle` operator (2026-09-06) and the §58 Paint-object tier on `Shape2D`
+(2026-08-29, including conic lowering behind `registerShapePaints()`).
 
 ## Cross-references
 

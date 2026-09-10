@@ -146,10 +146,10 @@ is alive). `hitTestMode = "bounds"` keeps the AABB path for a live
 system; `"gpu"` is what selects the id pass. WebGPU declares the same
 `registerPickingPipeline` / `createPickingService` seam
 (`fourJS/render-webgpu`); its id pass draws one id per particle emitter
-(CPU 8-float billboard) and still skips skinned items — that backend has
-no RFC 0003 skinned pipelines. WebGL draws skinned meshes through
-`SkinnedIdProgram` (deformed silhouette, same palette the colour pass
-uploads).
+(CPU 8-float billboard) and skinned meshes through a private skinned id
+pipeline (`skinMatrix()`, never bind pose). WebGL draws skinned meshes
+through `SkinnedIdProgram` (deformed silhouette, same palette the colour
+pass uploads).
 
 ## Dragging: pixels to world deltas
 
