@@ -396,6 +396,33 @@ describe("instantiateGltf: materials and textures", () => {
     warn.mockRestore();
   });
 
+  it("hands an emissiveTexture to emissiveMap as sRGB", async () => {
+    const encoded = new Uint8Array([1, 1, 9, 9, 9, 255]);
+    const document = triangleDocument((c) => {
+      c["images"] = [{ uri: `data:image/png;base64,${b64(encoded)}` }];
+      c["textures"] = [{ source: 0 }];
+      c["materials"] = [{ emissiveTexture: { index: 0 } }];
+      const meshes = c["meshes"] as {
+        primitives: { material?: number }[];
+      }[];
+      meshes[0].primitives[0].material = 0;
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const asset = await parse(document, (data) => {
+      const bytes = new Uint8Array(data);
+      return { width: bytes[0], height: bytes[1], data: bytes.slice(2) };
+    });
+    warn.mockClear();
+    const instance = instantiateGltf(asset);
+    expect(instance.materials[0].emissiveMap).not.toBeNull();
+    expect(instance.materials[0].emissiveMap?.colorSpace).toBe("srgb");
+    expect(instance.materials[0].map).toBeNull();
+    expect(
+      warn.mock.calls.map((call) => String(call[0])).join("\n"),
+    ).not.toMatch(/emissiveTexture/);
+    warn.mockRestore();
+  });
+
   it("§85-warns once for the tier's ignored texture slots", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const asset = await parse(

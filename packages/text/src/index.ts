@@ -13,26 +13,31 @@
  *    quads (`text-layout.ts`).
  *
  * ```ts
+ * import { buildGlyphAtlas } from "fourJS/text";
+ * import { Texture } from "fourJS/render";
+ * import { UnlitMaterial } from "fourJS/materials";
+ * import { Text } from "fourJS"; // not this subpath — see below
+ *
  * const atlas = buildGlyphAtlas();
- * const texture = new Texture(atlas);                 // @fourjs/render
- * const material = new SpriteMaterial({ texture });   // @fourjs/materials
- * for (const quad of layoutText("Motor 42", atlas, { size: 0.25 }).quads) {
- *   // one textured rectangle, baseline-left origin, +Y up
- * }
+ * const font = new Texture({ ...atlas, filter: "nearest" });
+ * const ink = new UnlitMaterial({ map: font, transparent: true });
+ * const label = new Text(atlas, ink, { text: "Motor 42", size: 0.25 });
  * ```
  *
  * **This package produces data, never nodes.** Its dependencies are `core`,
  * `math`, and `geometry` (plan §3.1, frozen) — not `render`, not `materials`,
  * not `scene` — so it cannot construct a `Texture`, a material, or a `Text`
- * node, and it does not try. The atlas is emitted in exactly the shape
+ * node, and it does not try. `fourJS/text` re-exports this barrel; `Text` is
+ * not on it. The atlas is emitted in exactly the shape
  * `@fourjs/render`'s `TextureSource` accepts, and the layout in the shape a quad
  * builder wants; the package that owns nodes assembles the two. See
  * `glyph-atlas.ts` for why that seam is structural rather than an import.
  *
- * **The package that owns nodes is the umbrella `four`, since 2026-08-13**
+ * **The package that owns nodes is the umbrella `fourJS`, since 2026-08-13**
  * (R-28): `new Text(atlas, material, { text, size })` is a §49 `Renderable`
  * that draws a whole string as one geometry over one atlas material. This
- * package is still what computes where the glyphs go.
+ * package is still what computes where the glyphs go. `layoutText` remains
+ * public for callers who want the quads without a node.
  */
 
 export const PACKAGE_NAME = "@fourjs/text";

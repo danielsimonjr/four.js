@@ -50,6 +50,7 @@ const CONTEXT_METHODS = [
   "getUniformLocation",
   "useProgram",
   "uniformMatrix4fv",
+  "uniformMatrix3fv",
   "uniform4fv",
   "uniform3fv",
   "uniform1f",

@@ -191,6 +191,70 @@ describe("ParticleEmitter — options", () => {
       () =>
         new ParticleEmitter({
           maxParticles: 1,
+          size: { start: 1, end: 0, stops: [{ t: 0, value: 0.5 }] },
+        }),
+    ).toThrow(/size\.stops\[0\]\.t must be in \(0, 1\)/);
+    expect(
+      () =>
+        new ParticleEmitter({
+          maxParticles: 1,
+          size: { start: 1, end: 0, stops: [{ t: 1, value: 0.5 }] },
+        }),
+    ).toThrow(/size\.stops\[0\]\.t must be in \(0, 1\)/);
+    expect(
+      () =>
+        new ParticleEmitter({
+          maxParticles: 1,
+          size: {
+            start: 1,
+            end: 0,
+            stops: [
+              { t: 0.6, value: 0.4 },
+              { t: 0.4, value: 0.2 },
+            ],
+          },
+        }),
+    ).toThrow(/size\.stops must be sorted ascending by t/);
+    expect(
+      () =>
+        new ParticleEmitter({
+          maxParticles: 1,
+          color: {
+            start: { r: 1, g: 1, b: 1, a: 1 },
+            end: { r: 0, g: 0, b: 0, a: 0 },
+            stops: [{ t: 0, value: { r: 0, g: 1, b: 0, a: 1 } }],
+          },
+        }),
+    ).toThrow(/color\.stops\[0\]\.t must be in \(0, 1\)/);
+    expect(
+      () =>
+        new ParticleEmitter({
+          maxParticles: 1,
+          color: {
+            start: { r: 1, g: 1, b: 1, a: 1 },
+            end: { r: 0, g: 0, b: 0, a: 0 },
+            stops: [{ t: 1, value: { r: 0, g: 1, b: 0, a: 1 } }],
+          },
+        }),
+    ).toThrow(/color\.stops\[0\]\.t must be in \(0, 1\)/);
+    expect(
+      () =>
+        new ParticleEmitter({
+          maxParticles: 1,
+          color: {
+            start: { r: 1, g: 1, b: 1, a: 1 },
+            end: { r: 0, g: 0, b: 0, a: 0 },
+            stops: [
+              { t: 0.6, value: { r: 0, g: 1, b: 0, a: 1 } },
+              { t: 0.4, value: { r: 0, g: 0, b: 1, a: 1 } },
+            ],
+          },
+        }),
+    ).toThrow(/color\.stops must be sorted ascending by t/);
+    expect(
+      () =>
+        new ParticleEmitter({
+          maxParticles: 1,
           position: new Vector3(Number.NaN, 0, 0),
         }),
     ).toThrow(/position\.x/);

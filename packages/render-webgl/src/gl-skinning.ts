@@ -52,7 +52,11 @@
 
 import type { Disposable } from "@fourjs/core";
 import type { Matrix4 } from "@fourjs/math";
-import { MAX_SKINNING_JOINTS, type SceneLights } from "@fourjs/render";
+import type { SceneLights } from "@fourjs/render";
+
+import { SKINNING_GLSL } from "./gl-skinning-glsl.js";
+
+export { SKINNING_GLSL };
 
 import {
   FRAGMENT_SHADER_SOURCE,
@@ -71,32 +75,9 @@ import {
   setSkinningPipelineFactory,
   type SkinnedLitPipeline,
   type SkinnedPrograms,
+  type SkinnedShadowPipeline,
   type SkinnedUnlitPipeline,
 } from "./gl-skinning-registry.js";
-
-/**
- * The vertex-stage chunk both skinned programs splice in: the two influence
- * attributes at their fixed locations (4 joints, 5 weights — `gl-geometry.ts`
- * binds them), the palette, and the blended skin matrix.
- *
- * Linear blend skinning, the four influences summed in attribute order —
- * a fixed association order, though the result never re-enters the §33
- * envelope either way. Dual-quaternion skinning is deferred (RFC 0003 §8).
- */
-const SKINNING_GLSL = `const int MAX_SKINNING_JOINTS = ${String(
-  MAX_SKINNING_JOINTS,
-)};
-layout(location = 4) in vec4 joints;
-layout(location = 5) in vec4 weights;
-uniform mat4 jointMatrices[MAX_SKINNING_JOINTS];
-
-mat4 skinMatrix() {
-  return weights.x * jointMatrices[int(joints.x)]
-       + weights.y * jointMatrices[int(joints.y)]
-       + weights.z * jointMatrices[int(joints.z)]
-       + weights.w * jointMatrices[int(joints.w)];
-}
-`;
 
 /**
  * The skinned unlit vertex stage: `gl-program.ts`'s unlit stage with the
@@ -513,15 +494,153 @@ export class SkinnedLitProgram implements SkinnedLitPipeline, Disposable {
 }
 
 /**
- * Both skinned programs for one context, with the paired disposal the
- * renderer's `dispose()` calls (§83).
+ * The skinned caster vertex stage: `gl-shadow.ts`'s depth-only product with
+ * the position run through the skin matrix first, so a `castShadow` skinned
+ * mesh writes its **deformed** silhouette rather than the bind pose.
+ *
+ * The fragment stage is the shadow program's constant, copied rather than
+ * imported — `gl-shadow.ts` must not name this module (pipeline-cost law),
+ * and this module must not name `gl-shadow.ts` (no cycle).
+ */
+const SKINNED_SHADOW_VERTEX_SHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 position;
+${SKINNING_GLSL}
+uniform mat4 shadowViewProjection;
+uniform mat4 model;
+
+void main() {
+  gl_Position = shadowViewProjection * model * (skinMatrix() * vec4(position, 1.0));
+}
+`;
+
+/** Copied from `gl-shadow.ts` — see {@link SKINNED_SHADOW_VERTEX_SHADER_SOURCE}. */
+const SKINNED_SHADOW_FRAGMENT_SHADER_SOURCE = `#version 300 es
+precision highp float;
+
+out vec4 fragColor;
+
+void main() {
+  fragColor = vec4(1.0);
+}
+`;
+
+/**
+ * The depth-only skinned caster pipeline (§69, RFC 0003 residue) —
+ * `ShadowProgram`'s contract plus {@link SkinnedShadowProgram.setJointMatrices}.
+ *
+ * Compiled lazily on the first skinned caster, never with the colour pair
+ * and never at initialize: a skinned mesh that does not cast must not add a
+ * third `createProgram`.
+ */
+export class SkinnedShadowProgram implements SkinnedShadowPipeline, Disposable {
+  readonly #gl: WebglContext;
+
+  readonly #program: GlProgramHandle;
+
+  readonly #viewProjectionLocation: GlUniformLocation;
+
+  readonly #modelLocation: GlUniformLocation;
+
+  readonly #jointMatricesLocation: GlUniformLocation;
+
+  #disposed = false;
+
+  private constructor(
+    gl: WebglContext,
+    program: GlProgramHandle,
+    viewProjectionLocation: GlUniformLocation,
+    modelLocation: GlUniformLocation,
+    jointMatricesLocation: GlUniformLocation,
+  ) {
+    this.#gl = gl;
+    this.#program = program;
+    this.#viewProjectionLocation = viewProjectionLocation;
+    this.#modelLocation = modelLocation;
+    this.#jointMatricesLocation = jointMatricesLocation;
+  }
+
+  /**
+   * Compiles and links the skinned caster on `gl`.
+   *
+   * Fails exactly as `ShadowProgram.create` does — the messages name
+   * `"skinned-shadow"` and the §89 code is the same.
+   */
+  static create(gl: WebglContext): SkinnedShadowProgram {
+    const program = createLinkedProgram(
+      gl,
+      "skinned-shadow",
+      SKINNED_SHADOW_VERTEX_SHADER_SOURCE,
+      SKINNED_SHADOW_FRAGMENT_SHADER_SOURCE,
+    );
+    try {
+      return new SkinnedShadowProgram(
+        gl,
+        program,
+        requireUniform(gl, program, "shadowViewProjection", "skinned-shadow"),
+        requireUniform(gl, program, "model", "skinned-shadow"),
+        requireUniform(gl, program, "jointMatrices[0]", "skinned-shadow"),
+      );
+    } catch (error: unknown) {
+      gl.deleteProgram(program);
+      throw error;
+    }
+  }
+
+  /** Whether {@link SkinnedShadowProgram.dispose} has run. */
+  get disposed(): boolean {
+    return this.#disposed;
+  }
+
+  use(): void {
+    this.#gl.useProgram(this.#program);
+  }
+
+  setViewProjection(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(
+      this.#viewProjectionLocation,
+      false,
+      matrixScratch,
+    );
+  }
+
+  setModel(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
+  }
+
+  setJointMatrices(palette: Float32Array): void {
+    uploadPalette(this.#gl, this.#jointMatricesLocation, palette);
+  }
+
+  /** Deletes the GL program (§83). Idempotent; live context only. */
+  dispose(): void {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    this.#gl.deleteProgram(this.#program);
+  }
+}
+
+/**
+ * Both skinned colour programs for one context, with the paired disposal the
+ * renderer's `dispose()` calls (§83). The caster is compiled on
+ * {@link SkinnedProgramPair.acquireShadow}, not here.
  */
 class SkinnedProgramPair implements SkinnedPrograms {
   readonly unlit: SkinnedUnlitProgram;
 
   readonly lit: SkinnedLitProgram;
 
+  readonly #gl: WebglContext;
+
+  #shadow: SkinnedShadowProgram | null = null;
+
+  #shadowFailed = false;
+
   constructor(gl: WebglContext) {
+    this.#gl = gl;
     const unlit = SkinnedUnlitProgram.create(gl);
     try {
       this.lit = SkinnedLitProgram.create(gl);
@@ -532,9 +651,31 @@ class SkinnedProgramPair implements SkinnedPrograms {
     this.unlit = unlit;
   }
 
+  acquireShadow(): SkinnedShadowPipeline {
+    const existing = this.#shadow;
+    if (existing !== null) {
+      return existing;
+    }
+    // A refusing driver must not be asked again: `createProgram` indices
+    // advance, so a `failProgramAt` latch would succeed on the retry and
+    // silently ship a program the first attempt established as unusable.
+    if (this.#shadowFailed) {
+      throw new Error("skinned-shadow previously failed to compile");
+    }
+    try {
+      const compiled = SkinnedShadowProgram.create(this.#gl);
+      this.#shadow = compiled;
+      return compiled;
+    } catch (error: unknown) {
+      this.#shadowFailed = true;
+      throw error;
+    }
+  }
+
   dispose(): void {
     this.unlit.dispose();
     this.lit.dispose();
+    this.#shadow?.dispose();
   }
 }
 
@@ -546,10 +687,11 @@ class SkinnedProgramPair implements SkinnedPrograms {
  * registerSkinningPipeline();          // once, at application setup
  * ```
  *
- * Calling it is what links this module — the two skinned programs and their
- * GLSL — into the bundle; a build that never calls it carries none of it
- * (grep-proven in the packet's A/B). The programs still compile **lazily, on
- * each renderer's first skinned draw**, never here and never at renderer
+ * Calling it is what links this module — the two skinned colour programs, the
+ * lazy caster, and their GLSL — into the bundle; a build that never calls it
+ * carries none of it (grep-proven in the packet's A/B). The colour pair still
+ * compiles **lazily, on each renderer's first skinned colour draw**, and the
+ * caster on the first skinned caster, never here and never at renderer
  * initialize, so registration alone changes no GL transcript. Idempotent;
  * calling it twice re-installs the same factory.
  */

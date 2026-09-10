@@ -109,6 +109,7 @@ function createFakeGl(options: { compileStatus?: boolean } = {}): FakeGl {
     },
     useProgram: noop("useProgram"),
     uniformMatrix4fv: noop("uniformMatrix4fv"),
+    uniformMatrix3fv: noop("uniformMatrix3fv"),
     uniform4fv: noop("uniform4fv"),
     uniform3fv: noop("uniform3fv"),
     uniform1f: noop("uniform1f"),

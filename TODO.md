@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, counted not estimated (`grep -c '^- \[ \]' TODO.md`): **14 open**, 247 closed. Closed this pass: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), and A-19 (merged into R-30c). Of the 14, **1 is a standing assignment that never closes** (the dogfooding coverage map), **1 is owner-gated** (first publish), and the rest are post-1.0 feature packets or hardware-blocked — the typedoc/TS 7 pin is no longer a release gate.
+Counts as of **2026-09-10**, recounted not estimated (`grep -c '^- \[ \]'` / `'^- \[x\]'`): **12 open**, **258 closed** (2026-09-09 audit: header had 249; seven `[x]` rows were never added to the tally, plus that audit's Done row; +1 for the 2026-09-10 RFC review row). Closed this pass: none of the 12 packets. Audit confirmed every open checkbox still has remaining work or is standing/owner-gated. Tracker hygiene the same day: stale “remaining” prose on closed rows (rigs, PH-11c, scissor, `recording-gl` adopt, flagship §46 layers, `maximumSkinningJoints` on WebGPU) and Priority-index leftovers (A-4/A-5/A-19, R-32, camera-rig residue, particle-trail spatial-hash). Closed this *burndown*: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm** + **WebGL `SkinnedIdProgram`**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster** + **WebGPU skinned colour pair**; lighting leftover **WebGPU `metalRoughnessMap`** + **WebGL `emissiveMap`**; R-30c **map roles**; R-33 simulate/present split; dogfood cycles 4–7. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the **WebGPU** skinned id pass.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -40,31 +40,24 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
   hidden config raises it. `vitest.coverage.config.ts` (30s) is coverage-only.
   Duration shown ≠ deadline. Headroom on a slow test is that test's own timeout.
 
-- **vitest 3.2.7 -> 5.0.0: ATTEMPTED 2026-09-08, reverted, and it found something.** Split out
-  of the TypeScript/vitest row, which wrongly implied TypeDoc blocked it — vitest declares **no
-  `typescript` peer**. Both majors were bumped together (`vitest` + `@vitest/coverage-v8`, whose
-  peer is an exact `5.0.0`), which is the split-bump trap avoided.
-  · **The runner half is clean.** All **7,246 tests across 282 files pass** on vitest 5, plus
-    `test:suites`. No API breakage at all.
-  · **What blocks it is the COVERAGE GATE, and the gate was the thing that was wrong.** vitest 5
-    reports lower numbers because its v8 provider remaps accurately; the old numbers were
-    inflated. Proven on one file rather than asserted: `render/src/resource-warnings.ts` reports
-    **100% under vitest 3** and **66.66% statements under vitest 5** — and it contains
-    `if (!DEV) return;` which **no test exercises**, because no test sets `DEV` false. 100% was
-    impossible. vitest 3 was over-reporting; vitest 5 is right.
-  · **So the 95% gate is partly illusory today.** Under honest measurement six thresholds fail:
-    global branches in **physics (92.1%)**, **render-webgl (92.1%)** and **text (94.64%)**, plus
-    per-file `physics-rapier/src/init.ts`, `render/src/resource-warnings.ts` and
-    `render-webgl/src/gl-particles.ts`.
-  · **Reverted to 3.2.7 deliberately.** Landing the bump would mean either weakening a coverage
-    gate or running a five-package test campaign — neither belongs inside a compiler migration.
-    The campaign is the real task; the bump falls out of it for free.
-  · **Do the coverage work first, then the bump.** Bumping first turns a real quality gap into
-    a red build with no owner.
-  · Written up with the rest of the toolchain reasoning in `docs/MIGRATION.md` section 5.
-  · **PARTIAL 2026-09-09:** `resource-warnings.ts` now has a `__FOUR_DEV__ = false`
-    test (the file that proved Vitest 3 was over-reporting). The other five
-    honest-coverage gaps remain; the bump still waits on that campaign.
+- **vitest 3.2.7 -> 5.0.0: DONE 2026-09-09.** The 2026-09-08 attempt was
+  reverted because Vitest 5's honest v8 remap dropped six thresholds below
+  95%. The campaign closed those gaps without weakening the gate:
+  `resource-warnings.ts` now exercises `__FOUR_DEV__ = false`; Rapier `init`
+  reject/retry, stale-handle context, and R-32 particle appearance /
+  wide-stream / trail tests lifted physics / render-webgl / text / render;
+  `rapier-defensive-branches.test.ts` covers `countContacts` and the
+  snapshot-envelope guards (unknown mass mode, orphaned Rapier colliders,
+  collider-without-body, stay without body records). Re-measured under
+  5.0.0: **physics 97.27%, render-webgl 95.57%, text 100%, render 97.59%,
+  physics-rapier 95.26%** branches. `vitest` and `@vitest/coverage-v8`
+  bumped together to 5.0.0. Written up in `docs/MIGRATION.md` section 5.
+  Follow-up the same day: CI `bun run coverage` then failed on
+  **`@fourjs/particles` at 92.1% branches** — the original campaign only
+  re-measured the five named failures. Honest tests for ramp-stop
+  validation, empty/NaN lifetime ramps, trail store guards, and
+  `computeBounds` non-positive lifetime lifted particles to **97.16%**
+  (480/494). Gate unchanged.
 
 - **Triage the 42 Oxlint warnings the ESLint config never surfaced.** DONE 2026-09-09.
   Count on this tree was **40** (two `no-misused-spread` hits had already gone).
@@ -75,6 +68,11 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
   NUL-delimited guide slots; `no-unsafe-optional-chaining` off under `**/tests/**`
   (every hit was `(optional?.x).y` after an `expect` that the value exists).
   `bun run lint` is **0 warnings / 0 errors**.
+  Follow-up 2026-09-09: the `**/tests/**` override also turns off
+  `typescript/no-unsafe-*` so Vitest 5's `vi.spyOn` types do not fail
+  suites that were clean under 3.2.7. Package test tsconfigs set
+  `"types": ["node"]` because Vitest 5 no longer references Node from
+  its own typings (TypeDoc's TS 6 pass typechecks those tests).
 
 ### 2 · Hours — one contained fix, already diagnosed
 
@@ -93,7 +91,7 @@ Bounded work with a clear shape, but more than a single edit.
 
 - The browser gate on Windows — DONE 2026-09-06 (WebGPU 22/22 via platform argv; `animation.spec` simulation-bound `#status` sampling; Windows timeout 180 s; `smoothness.spec` uses `page.evaluate` parity wait per #72).
 - Unlit materials render with GL_BLEND off — DONE 2026-09-06 (alpha / `transparent` enables SRC_ALPHA blend).
-- Size budgets are thin after R-36 — DONE 2026-09-07 (re-measured after #76: 43 / 43 / 49.5 kB and 2.05 / 1.25 / 1.20 MB; rationale in `tools/size-budgets.mjs`).
+- Size budgets are thin after R-36 — DONE 2026-09-07 (re-measured after #76: 43 / 43 / 49.5 kB and 2.05 / 1.25 / 1.20 MB; rationale in `tools/size-budgets.mjs`). Follow-up 2026-09-09 after #86: particles-demo 43 → 43.5 kB, ui-demo 49.5 → 50 kB (CI 43.04 / 49.51 kB).
 - Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` — DONE 2026-09-06 (package `moduleResolution: bundler`; upstream type aliases).
 - Extend `tools/check-docs.mjs` — DONE 2026-09-06 (24 packages, suite counts, AUDIT-120 census).
 
@@ -103,40 +101,42 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 - rapier 0.20 adoption — DONE 2026-09-06 (0.20.0; contactPair takes bodies; goldens re-recorded from scenario helpers).
 - Lift the TypeScript/vitest pin once typedoc supports TS 7.
+  Vitest half **DONE 2026-09-09** (5.0.0). TypeDoc isolation still owns the
+  remaining `typescript@6.0.3` in `tools/docs`.
 - PoseTarget scale channel — DONE 2026-09-06 (physical side is identity).
 - Rotational root motion — DONE 2026-09-06 (quaternion track extracts local rotation).
-- A-25 owner decisions before first publish:
-- A-25 remainder:
+- A-25 owner decisions before first publish: DONE 2026-09-06 (stubs publish as 0.x; `NPM_TOKEN` stays owner secret; Pages enabled).
+- A-25 remainder: DONE 2026-09-06 (guides on Pages, demos on `website/`). Publish itself is the First-publish row.
 
 ### 5 · Feature packets — multi-day, deliberately deferred
 
 The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's §6 table; these are the post-1.0 roadmap rather than release work.
 
-- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; ~~spherical wander~~ DONE 2026-09-06; ~~CCD/FABRIK~~ DONE 2026-09-06; ~~path-planning adapters (RFC)~~ **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`); robotic joint commands utility (MAY declined — see prediction.ts staging note)
+- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; ~~spherical wander~~ DONE 2026-09-06; ~~CCD/FABRIK~~ DONE 2026-09-06; ~~path-planning adapters (RFC)~~ **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`; corrected 2026-09-10, four-agent plan `docs/plans/RFC-0007-PATH-PLANNING_PLAN.md`); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
-- RFC 0005 residue (staged in source, 2026-08-29):
+- RFC 0005 residue (staged in source, 2026-08-29): §86 pick measurements DONE 2026-09-09 (`benchmarks/pick-latency.mjs`); ParticleIdProgram + §72 PickProvider dispatch DONE 2026-09-09; WebGPU `PickingService` (`mapAsync`) + particle id arm DONE 2026-09-09; WebGL `SkinnedIdProgram` DONE 2026-09-09; remaining: WebGPU skinned id pass (colour pair landed).
 - RFC 0001 residue (staged in source, 2026-08-28):
-- RFC 0003 residue (staged in source, 2026-08-28):
-- RFC 0003 prototype measurements still owed:
+- RFC 0003 residue (staged in source, 2026-08-28): WebGPU colour pair DONE 2026-09-09; WebGL shadow caster DONE 2026-09-09; still GPU morph, CPU skinning, bone-texture; WebGPU skinned shadow/id still skip.
+- RFC 0003 prototype measurements — DONE 2026-09-09 (`benchmarks/skinning-resolve.mjs`):
 - Tokens for the five absent §81 extension points — DONE 2026-09-06 (`ASSET_LOADERS`, `SHADER_OPERATORS`, `UI_CONTROLS`, `EDITOR_TOOLS`, `COMPUTE_WORKLOADS`)
-- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light + point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 — directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color strings on lights, light layers; hoist the lit shader's per-vertex inverse-transpose to a per-draw normal-matrix uniform when @fourjs/math grows a Matrix3 utility (dated note in gl-program.ts)
+- Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): ~~point/spot multi-light~~ **DONE 2026-08-09** (R-17, 8 punctual); still multi-directional + hemisphere/area + clustered path, shadows (§69 — directional tier shipped; cascades, point/spot maps, the atlas, transparent masks and contact shadows remain), §59 PBR rest, §60a tone-mapping operator + IBL (sRGB encode + color grade shipped), light layers. CSS light colors + WebGL/WebGPU normal-matrix hoist DONE 2026-09-09. WebGPU `metalRoughnessMap` sampling DONE 2026-09-09. WebGL `emissiveMap` (unit 3) DONE 2026-09-09 (still open: extra directionals / hemisphere / area / clustered, cascades, PBR rest, tone-map operator, light layers, `normalMap` / `occlusionMap`, WebGPU emissive).
 - First publish (§94 0.1): Changesets release workflow + the @danielsimonjr/fourjs publish-name mapping — owner step
 - Follow-ups the R-1 plan explicitly defers
 - PH-11c — character/dynamics push interaction — DONE 2026-09-06 (`pushMass` / reduced-mass impulse / wake).
-- R-32 — textured / rotated / soft particles.
-- R-33 — §112's exit, rendered as well as simulated.
+- R-32 — textured / rotated / soft particles — DONE 2026-09-06 (opt-in 10-float stream).
+- R-33 — §112's exit, rendered as well as simulated. Split landed 2026-09-09; exit still needs non-SwiftShader.
 - R-31 — GPU particle simulation integrator tier — DONE 2026-08-29 (`simulation: "gpu"`); §27 GPU fields / depth-buffer collision / GPU snapshots remain under R-31 residue.
 - PH-22 residue (re-read 2026-08-21): PH-22f anchors DONE 2026-09-06; path-planning RFC Proposed.
 - R-8 follow-ups:
 - §8 node-level `NodeSpace` component — DONE 2026-09-06.
 - §21 `"local-plane"` simulation frame — DONE 2026-09-06.
 - §27 field torque and field-driven waking — DONE 2026-09-06 (`sampleTorque` + per-entry `wakesSleepingBodies`).
-- Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals); glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas material batch as they are); texture-atlas _grouping_ of distinct textures (needs a packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's idle-scene row — today a batched run re-uploads every frame); making batching the default, which needs A-4's build-time pipeline-selection seam (the opt-in seam already costs every bundle +0.17 kB).
+- Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22`); texture-atlas grouping; making batching the default (A-4). Idle-cache + glyph batching already shipped.
 - `buildRenderList` optimization — DONE 2026-09-06 (homogeneous sort skip + sprite fast path; benchmark re-recorded).
-- R-30c — the rest of §77, scoped by why each is not ordinary work:
+- R-30c — the rest of §77, scoped by why each is not ordinary work: map roles DONE 2026-09-09; still cube/array/3D, compressed, video/`ImageBitmap`, async upload.
 - §12 character controllers + first-person look — DONE (PH-11/PH-11b 2026-08-21; `examples/character-controller` browser gate 2026-08-29).
-- Staged rigs (R-36/R-37 residue, 2026-08-09):
-- §44/§47 camera rigs residue
+- Staged rigs (R-36/R-37 residue, 2026-08-09): DONE 2026-09-06 (trackball, fly snippet, `CameraShake`).
+- §44/§47 camera rigs residue — DONE 2026-09-06 (orbit/follow/spring/look-at/trackball/fly/shake).
 - R-23 follow-ups (solid-fill tier shipped 2026-08-09):
 - R-26 follow-ups (path-data tier shipped 2026-08-09):
 - Auto-selection follow-ups: **CLOSED 2026-09-06** — ui-demo budget reviewed
@@ -145,18 +145,18 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - R-6 follow-ups (§70 tier 2):
 - §40 follow-ups:
 - PH-1 follow-ups:
-- A-4 remainder — PARTIAL 2026-09-06: §85 validation catalogue + §83 dev warnings (disposed-in-use, detached listeners, per-frame allocations); FinalizationRegistry wiring DONE 2026-09-06; systematic `devAssert` migration still open.
-- A-5 remainder — PARTIAL 2026-09-06: duplicate-load DONE; `RenderTarget.byteLength` format-aware; materials/solver live counts; leak audit extended; constructor-site FinalizationRegistry DONE 2026-09-06.
+- A-4 remainder — CLOSED 2026-09-07: step 2 DONE (§85 catalogue); step 3 WON'T-DO (§33 simulation envelope — scene/physics must not import `DEV`).
+- A-5 remainder — CLOSED 2026-09-09: opt-in leak audit is the design (`auditFinalizedLeaks`).
 - A-5 follow-ups: materials + solver handles accounted at count tier — DONE 2026-09-06; `RenderTarget.byteLength` moved with §67 formats.
 - A-1 follow-ups: contacts wired via `SolverStatistics.contactCount` → `app.stats.contacts` (2026-09-06); `physicsStepTime` already via A-6; `gpuFrameTime` copies `Renderer.lastGpuFrameTimeSeconds` (2026-09-06).
 - A-18 remainder — DONE 2026-09-06 (progress, stream, dependency graph, injected worker decode, injected watch).
 - A-16 remainder (manifest half): DONE 2026-09-06 (`preloadManifestIntoCatalog`).
-- A-19 remainder:
+- A-19 remainder: MERGED 2026-09-09 into R-30c.
 - §96 residue:
-- R-19/R-20 follow-ups:
+- R-19/R-20 follow-ups — DONE 2026-09-09 (§52 already shipped; §55 authored sprite uvs).
 - Flaky gate — DONE 2026-09-06 (smoothness parity + blending page watches).
 - A-13 — DONE 2026-09-06 (`installAccessibilityMirror` opt-in DOM mirror).
-- Particle trails — PARTIAL 2026-09-06: CPU ring buffer + ribbon path + multi-stop ramps; GPU compute, depth-buffer collision, spatial-hash neighbors still open.
+- Particle trails — PARTIAL 2026-09-06: CPU ring buffer + ribbon path + multi-stop ramps DONE; GPU trail compute refused in GPU mode; true depth-texture collide-and-kill still open (ground-rest stub DONE). Spatial-hash neighbors is a separate closed row (`SpatialHash` in `@fourjs/motion`).
 - §24 remaining shapes — DONE (PH-22a, 2026-08-02); compound = multiple colliders by design.
 
 ## Now
@@ -848,8 +848,41 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       message is §10's dropped-time guard on the slower first frame — *"dropped 0.0666s
       … TimeState.droppedTime is now 0.0666s"* — which is the documented behaviour and names
       the field to inspect, not a defect.
-      STILL not exercised: text/§56, serialization/§34 round-trip in the browser, and the
-      2D↔3D mixed-scene story. Those are where the next findings are.
+      **Cycle 4 (2026-09-09, `.dogfood/cycle4`) — the three remaining surfaces,
+      from a consumer seat, in one Scene, in Chrome + Node.** §56 `Text` via
+      `buildGlyphAtlas` (layout 2.240 × 0.280); `.four.json` round-trip 7→7
+      nodes, byte-stable 1939 B; §34 Rapier2D snapshot checksum restored
+      exactly; 2D disc + 3D sphere + Text under one `PerspectiveCamera`.
+      Engine: clean. Docs were the defect: `digital-twin.md` taught the
+      `serializeScene` call that throws (no `nodeTypeOf`); `fourJS/text` does
+      not export `Text` (umbrella only, §3.1); `examples/mixed-scene` is a
+      playground re-export, not one graph. Guides + barrel headers corrected.
+      Standing: next cycle picks a new surface, not these three.
+      **Cycle 5 (2026-09-09, `.dogfood/cycle5`) — GPU picking / PickProvider.**
+      Headless + Chrome WebGL 2: `registerPickingPipeline` →
+      `createPickingService` → `createPickProvider` → `PointerInput`
+      dispatched the front id. Engine: clean. Docs were stale (cameras
+      guide described only the sync ray path); patched. No Pages demo
+      calls `registerPickingPipeline()` (only `tests/browser/fixtures/picking-page.ts`).
+      Standing checkbox stays open.
+      **Cycle 6 (2026-09-09) — §43 interpolated skin palettes.** Consumer
+      seat, public `@fourjs/*` APIs: two-bone hip+knee, hip rotated 90°
+      about +Z. `Skeleton.update(mesh, worldOf)` at alpha 0 / 0.5 / 1
+      (consumer `worldOf` composes `PoseBuffer.computeRenderPose` locals)
+      matches `buildInterpolatedRenderList`. Palettes at 0 and 1 differ;
+      mid-alpha is a 45° slerp (`cos(π/4)`), **not** the lerp of the
+      endpoint palettes (`0.5`). Scene transforms unchanged. Engine: **clean**.
+      Docs were the defect: guides and architecture still described §43 as
+      node-matrix lerp only. Patched. Checkbox stays `[ ]`.
+      **Cycle 7 (2026-09-09) — WebGL skinned GPU picking.** Consumer
+      seat: `registerPickingPipeline` + `registerSkinningPipeline` then
+      `createPickingService`. One-bone 2×2 plane translated +1 Y. Id pass
+      compiles `skinMatrix()` + `pickId`, uploads the live palette
+      (`jointMatrices[13] === 1`, not bind pose), unskinned control
+      transcripts identical with/without the skinning seam. Recording GL
+      cannot rasterise; staged texels still resolve through the §33 table.
+      Engine: **clean**. Guide index patched. WebGPU still skips skinned
+      items. Checkbox stays `[ ]`.
 
 - [x] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
       one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`
@@ -1090,7 +1123,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       partial/dirty-rect upload + mipmaps/filter modes for raster surfaces (all
       R-30); ~~GPU readback as a raster source (wants its own RFC)~~ **Proposed
       2026-09-06** (`docs/rfcs/0009-gpu-readback-raster-source.md` — display-only
-      snapshot, not riding 0004/0005); the §62
+      snapshot, not riding 0004/0005; corrected 2026-09-10, plan
+      `docs/plans/RFC-0009-GPU-READBACK_PLAN.md`); the §62
       Canvas 2D backend (stays a stub **by decision** — and if ever built,
       refusing a feedback `CanvasTexture` sampling the surface being rendered is
       that packet's named obligation); ~~a docs/guides page carrying the browser adapter~~ (done 2026-08-29:
@@ -1104,14 +1138,33 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       byte-identical), §85 refusals, §33 pure-math determinism pinned. 36 new
       tests; input/four/geometry 100×4. **A-11 is closed.** ui-demo budget
       bumped 44 → 44.5 kB at landing (A/B: the tier riding ui-demo's `pick()`).
-- [ ] **RFC 0005 residue (staged in source, 2026-08-29):** the instanced particle
+- [ ] **RFC 0005 residue (staged in source, 2026-08-29):** ~~the instanced particle
       id arm (a `ParticleIdProgram` sharing the §36 billboard vertex stage — until
-      then particle systems pick by bounds only); §86 rows still owed: id-pass
-      cost vs the flagship list and measured fence-vs-stall pick latency;
-      WebGPU's `PickingService` (`mapAsync`) is WP-R1.x material; §72
-      pointer-event dispatch on a `PickProvider` result is an input packet. The analytic
-      `"geometry"` tier + `node.hitTestMode` landed 2026-08-29 — A-11 closed;
-      only the render-side residues above remain here.
+      then particle systems pick by bounds only)~~ **DONE 2026-09-09**
+      (`ParticleIdProgram` + `collectPickCandidates` includes
+      `isParticleDrawable`; one id per emitter, trails skipped; WebGL
+      skinned id landed the same day — WebGPU skinned still bounds-only); ~~§86 rows still owed: id-pass
+      cost vs the flagship list and measured fence-vs-stall pick latency~~
+      **DONE 2026-09-09** (`benchmarks/pick-latency.mjs`): at flagship-order
+      N=64 the id pass is within noise of the list (1.03×); at 10k–100k it is
+      ~3–4× the list. Fence vs stall timed on the counting-GL seam only
+      (no host WebGL 2 / no WebGPU `PickingService`). ~~§72
+      pointer-event dispatch on a `PickProvider` result is an input packet~~
+      **DONE 2026-09-09** (      `PointerInputOptions.pickProvider`; default
+      handlers stay synchronous; provider path serializes per `pointerId`).
+      ~~WebGPU's `PickingService` (`mapAsync`)~~ **DONE 2026-09-09**
+      (`registerPickingPipeline()` from `@fourjs/render-webgpu`;
+      `createPickingService` throws until registered; `mapAsync` 1×1
+      readback). ~~WebGPU `ParticleIdProgram` remainder~~ **DONE
+      2026-09-09** (private particle id pipeline, one id per emitter on
+      the CPU 8-float stream; trails / GPU-sim / wide stream skipped).
+      ~~WebGL skinned id pass~~ **DONE 2026-09-09** (`SkinnedIdProgram`:
+      `SKINNING_GLSL` spliced into the id fragment; lazy on the first
+      skinned item; compile failure skips, bounds still serve). Remaining:
+      WebGPU skinned id pass (colour pair landed 2026-09-09; caster and
+      id still skip).
+      The analytic `"geometry"` tier + `node.hitTestMode` landed
+      2026-08-29 — A-11 closed.
 - [x] **docs/COMPATIBILITY.md §2 — DONE 2026-08-29** (documentation truth
       sweep): §2 rewritten to the tip — seven init pipelines + three registered
       seams, punctual lights, opt-in §65 batching, §69/§70 rows, all-eleven
@@ -1124,6 +1177,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `WebgpuRenderer`'s absent `maximumSkinningJoints`; the phantom
       `MAX_VERTEX_UNIFORM_VECTORS` conversion aside is deleted. Comment-only;
       `@fourjs/render` 627 tests and `pnpm run docs` (0 warnings) green.
+      **Superseded 2026-09-09:** WebGPU now reports `maximumSkinningJoints: 48`
+      via the RFC 0003 colour pair (`webgpu-renderer.ts`; `renderer.ts` doc
+      already names it). The 2026-08-29 comment-fix was correct for that day.
 - [x] **docs/guides/materials-and-render-graph.md — DONE 2026-08-29**: rewritten
       to the tip (§60 RFC 0001, §62 R-1 complete, §65 opt-in R-9, §68–§70
       R-17/R-18/R-6, §55 `frame` R-29), every claim verified in source; four
@@ -1149,7 +1205,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       storage buffers (§82, WebGPU), source maps (per-node provenance; the error
       path ships source + driver log); lighting-aware graphs (R-17's light-uniform
       contract first); alternative E (data-declared custom operators — a follow-up
-      RFC; `SHADER_OPERATORS` token shipped 2026-09-06); ~~an angle operator
+      RFC; ~~`SHADER_OPERATORS` token~~ **DONE 2026-09-06**); ~~an angle operator
       (unlocks §58's conic gradient)~~ **DONE 2026-09-06** (`angle` +
       `registerShapePaints` conic lowering); ~~the §58 Paint-object tier on `Shape2D`~~ (done 2026-08-29).
 - [x] **docs/guides/custom-shaders.md — DONE 2026-08-29**: rewritten around the
@@ -1159,16 +1215,29 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 
 - [ ] **RFC 0003 residue (staged in source, 2026-08-28):** GPU morph path (the
       extra-vertex-stream layout decision, stated in `mesh.ts`/`render-list.ts`/§54);
-      skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
-      shadow is a different picture); CPU skinning (Canvas/SVG tiers + the skinned
-      bounds/picking home, with its own `same-runtime` golden); bone-texture palette
-      (unbounds `MAX_SKINNING_JOINTS = 48`; needs a render-target format union +
-      vertex texture fetch); §43-interpolated palettes (today the palette is the
-      last resolved pose).
-- [ ] **RFC 0003 prototype measurements still owed:** bones-as-nodes resolve cost at
-      60 bones ×1/×10 (the number that decides whether alternative A ever returns)
-      and controller channel cost at 180 channels. §86 has no skinned-mesh
-      performance target yet — propose one from those measurements.
+      ~~skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
+      shadow is a different picture)~~ **DONE 2026-09-09** (WebGL
+      `SkinnedShadowProgram` via `acquireShadow()` on the first skinned
+      caster; unregistered still skips; WebGPU colour pair does not add a
+      caster); ~~WebGPU skinned colour pair~~ **DONE 2026-09-09**
+      (`registerSkinningPipeline()` unlit+lit; 3072-byte palette bind group;
+      skip unregistered/failed, never bind-pose; shadow/id still skip);
+      CPU skinning (Canvas/SVG tiers + the skinned bounds/picking home,
+      with its own `same-runtime` golden); bone-texture palette (unbounds
+      `MAX_SKINNING_JOINTS = 48`; needs a render-target format union +
+      vertex texture fetch); ~~§43-interpolated palettes (today the palette
+      is the last resolved pose)~~ **DONE 2026-09-09**
+      (`Skeleton.update(skinRoot, worldOf?)`; interpolated list composes
+      local poses then the palette product — palettes are never lerped).
+- [x] **RFC 0003 prototype measurements still owed:** DONE 2026-09-09.
+      `benchmarks/skinning-resolve.mjs` records bones-as-nodes resolve at 60 ×1
+      and ×10 versus the same Group topology, `Skeleton.update` beside that
+      walk, and the 180-channel clip through both `AnimationMixer` and
+      `AnimationController`. Alternative A does **not** return: at ×10 a Bone
+      chain is within noise of Groups. Proposed §86 sentence (not a spec
+      amendment, not a gate): *227 independently animated 60-bone characters
+      inside one 60 Hz fixed step on the recording host (resolve + palette +
+      controller)*. Record: `benchmarks/results/skinning-resolve.json`.
 - [x] **glTF loader (§78) shipped 2026-08-29** — `createGltfLoader`/`GltfAsset`
       (`@fourjs/assets`) + `instantiateGltf` (`four`), glTF 2.0 core tier: both
       containers, all six §53 attributes, §59 factors + base-colour texture,
@@ -1178,10 +1247,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `tests/browser/gltf.spec.ts`.
 - [x] **§59 second texture unit** (R-13 follow-up, flagged by the §78 packet):
       DONE 2026-09-06 — `StandardMaterial.metalRoughnessMap` (glTF G=roughness,
-      B=metalness). WebGL binds unit 2. WebGPU field is staged inert.
+      B=metalness). WebGL binds unit 2. ~~WebGPU field is staged inert.~~
+      **WebGPU samples it 2026-09-09** (group 2 mr-only, group 3 with albedo).
       The glTF loader decodes that slot as linear and drops `ignoredTextures`
-      for it. Normal/occlusion/emissive remain warned-inert until further
-      units land.
+      for it. ~~Normal/occlusion/emissive remain warned-inert until further
+      units land.~~ **WebGL `emissiveMap` (unit 3) 2026-09-09** — glTF
+      `emissiveTexture` decoded sRGB, assigned, dropped from `ignoredTextures`.
+      WebGPU leaves it unsampled (four-group budget). `normalMap` /
+      `occlusionMap` stay staged (tangents / AO term).
 
 - [x] **Move the six capability tokens to their owning packages — DONE
       2026-08-29** (RFC 0002 §2's spelling executed): each owner declares its
@@ -1195,14 +1268,30 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 
 ### Post-plan backlog (final exit verifier, 2026-08-02)
 
-- [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light +
-      point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 —
-      directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas,
-      transparent masks and contact shadows remain),
-      §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color
-      strings on lights, light layers; hoist the lit shader's per-vertex
-      inverse-transpose to a per-draw normal-matrix uniform when @fourjs/math grows a
-      Matrix3 utility (dated note in gl-program.ts)
+- [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done):
+      ~~point/spot multi-light~~ **DONE 2026-08-09** (R-17: `MAX_PUNCTUAL_LIGHTS`
+      = 8; one directional still wins by scene-graph order). Remaining light
+      types: extra directionals, hemisphere, rectangular area, clustered /
+      forward-plus. Shadows (§69 — directional tier shipped 2026-08-09;
+      cascades, point/spot maps, the atlas, transparent masks and contact
+      shadows remain),
+      §59 StandardMaterial/PBR rest (`normalMap` / `occlusionMap` staged;
+      IBL / PhysicalMaterial extensions absent), §60a tone-mapping operator
+      (sRGB encode + `ColorGradeEffect` shipped; operator waits on float
+      targets),
+      ~~CSS color strings on lights~~ **DONE** (`parseColorRGB` on `Light`),
+      light layers; ~~hoist the lit shader's per-vertex inverse-transpose to a
+      per-draw normal-matrix uniform when @fourjs/math grows a Matrix3
+      utility~~ **DONE 2026-09-09** — WebGL `uniform mat3 normalMatrix`;
+      WebGPU `DrawUniforms.normalMatrix` (192-byte block, standard extras
+      shifted to 192/208). `Matrix3.setNormalFromMatrix4` on CPU; singular
+      models upload identity. ~~WebGPU `metalRoughnessMap` staged inert~~
+      **DONE 2026-09-09** (sampled at group 2 when `!map`, group 3 when
+      albedo occupies group 2). ~~WebGL `emissiveMap` staged~~ **DONE
+      2026-09-09** (unit 3, glTF factor × texture; WebGPU unsampled —
+      groups 2/3 already hold albedo/MR). Remaining: extra directionals /
+      hemisphere / area / clustered, cascades, PBR rest, tone-map operator,
+      light layers, `normalMap` / `occlusionMap`, WebGPU emissive.
 - [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
       family list now names `LitMaterial`
 - [ ] First publish (§94 0.1): Changesets release workflow + the
@@ -1319,8 +1408,10 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       declares the tier absent.
 - [ ] **Follow-ups the R-1 plan explicitly defers** (each needs its own filing): §63
       transient-target pooling and barrier scheduling (must land on both backends or
-      neither); §65's persistent-mapped/staging-ring buffers; §27 GPU fields and §36
-      `collisions: "depth-buffer"`; ~~RFC 0005's `Rectangle2` prerequisite for a regional
+      neither); §65's persistent-mapped/staging-ring buffers; §27 GPU fields
+      (radial-only stub on `simulation: "gpu"`; generic GPU field stack staged)
+      and §36 `collisions: "depth-buffer"` (CPU kill-below-ground + GPU
+      `y=ground` rest; true depth-texture collide-and-kill still open); ~~RFC 0005's `Rectangle2` prerequisite for a regional
       `readPixels`~~ **DONE 2026-08-29** — `render/src/renderer.ts:464` states it outright
       (*"`readPixels` joined the interface when `Rectangle2` landed in `@fourjs/math`
       (2026-08-29; RFC 0005's recorded prerequisite, cleared)"*), `Rectangle2` is exported
@@ -1390,8 +1481,12 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       10-float stream (`rotation` + `softness`); default 8-float stream and
       goldens unchanged. WebGL appearance program is lazy.
 - [ ] **R-33 — §112's exit, rendered as well as simulated.** Owner: the browser-gate
-      packet, on non-SwiftShader hardware. Now has headroom (see R-34). Report
-      simulate-ms and present-ms separately.
+      packet, on non-SwiftShader hardware. Now has headroom (see R-34).
+      ~~Report simulate-ms and present-ms separately~~ **DONE 2026-09-09**:
+      `examples/particles-demo` publishes `data-simulate` / `data-present`
+      (seconds, §7a) on `#status`; the browser gate asserts they exist as
+      two finite non-negative attributes. **No fps budget** — SwiftShader is
+      not suitable hardware; the exit itself is still open.
 - [x] **R-31 — GPU particle simulation integrator tier.** DONE 2026-08-29 (WP-R1.8 +
       R-31 residue) — `simulation: "gpu"` on `ParticleEmitter` with a bound
       `ParticleGpuSimulation`; CPU spawn, GPU semi-implicit Euler under constant
@@ -1410,8 +1505,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       §73's scroll view now waits only on §74 overflow/scroll extent + a gesture
       source (staging note updated in `widget.ts`); §119's section views unblocked
       (a section view = a clip whose source is a §50 shape). Staged with named
-      owners in `clip.ts`: alpha masks, 3D clip planes; the scissor fast-path
-      bullet below is unchanged and still open.
+      owners in `clip.ts`: alpha masks, 3D clip planes; ~~the scissor fast-path
+      bullet below is unchanged and still open~~ **DONE 2026-09-06**
+      (`Renderable.scissor` / `RenderItem.scissor` — see the scissor row).
 - [x] **render-webgpu ignores `item.clip`** — closed by WP-R1.3 (2026-08-28): masks
       write bit planes / content tests them, `item.clip` outranks `material.stencil`,
       batch runs break on record identity; `depth24plus-stencil8` chosen per frame
@@ -1513,10 +1609,16 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `four/src/text-node.ts:71` repeats it, adding that the residue is grouping labels
       that do NOT share a material — which is the atlas-grouping sub-part already listed
       separately below, not a second open claim; texture-atlas _grouping_ of distinct textures (needs a
-      packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's
-      idle-scene row — today a batched run re-uploads every frame); making batching the
-      default, which needs A-4's build-time pipeline-selection seam (the opt-in seam
-      already costs every bundle +0.17 kB).
+      packer); ~~a change-detecting batch cache so a still scene re-uploads nothing (§86's
+      idle-scene row — today a batched run re-uploads every frame)~~ **DONE
+      (already on the tree):** `RenderBatch.contentVersion` +
+      `createGlBatching` `#canSkipUpload`;
+      `webgl-renderer.test.ts` asserts a still scene issues **0**
+      `bufferSubData` and a transform bump re-uploads. WebGPU
+      `WgpuBatching.draw` still `writeBuffer`s every frame — idle skip is
+      GL-only. Making batching the
+      default still needs A-4's build-time pipeline-selection seam (the opt-in
+      seam already costs every bundle +0.17 kB).
 - [x] **`buildRenderList` is now ~40% of a 100 000-sprite frame's preparation**
       DONE 2026-09-06 — homogeneous sort skip, sprite fast path, and
       `ALL_LAYERS` layer test. `benchmarks/results/render-batching.json`
@@ -1527,7 +1629,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       as every node's forward, world-space target with the parent rotation divided out,
       §85 refusals, `same-runtime` determinism. `getWorldDirection` hoisted off the two
       light classes; `Matrix4.decompose` now shares one Shepperd implementation (goldens
-      bit-identical, `matrix4.ts` to 100%). 36 tests. **Rig half still open.**
+      bit-identical, `matrix4.ts` to 100%). 36 tests. **Rig half closed
+      2026-08-09 / 2026-09-06** (orbit/follow/spring/look-at/trackball/fly/`CameraShake`).
 - [x] **R-28 DONE 2026-08-13 (bitmap-label tier)** — the `Text` node in `four`
       (dependency matrix forbids `render`↔`text`), one geometry over one atlas material,
       one draw per label; §65 glyph batching closed by construction; §56 alignment on
@@ -1548,8 +1651,12 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 - [ ] **R-30c — the rest of §77, scoped by why each is not ordinary work:**
       ~~`capabilities.maxAnisotropy` / texture-format report~~ **DONE 2026-09-06**
       (lazy after init; `textureFormats` already shipped). `TextureSource.dimension`
-      refuses non-2d. Still open: cube/array/3D uploads, compressed containers,
-      video/`ImageBitmap`, map roles, async upload.
+      refuses non-2d. ~~map roles~~ **DONE 2026-09-09** (`TextureMapRole`
+      `"color"` | `"data"`; omitted role keeps R-15 `"linear"` so goldens
+      do not move; `role: "color"` defaults omitted `colorSpace` to `"srgb"`;
+      authored `colorSpace` always wins; backends still read `colorSpace`
+      only). Still open: cube/array/3D uploads, compressed containers,
+      video/`ImageBitmap`, async upload.
 
       · **OVERLAP, closed 2026-09-09:** "A-19 remainder" described the SAME remaining
         work. A-19 is now marked merged; this is the surviving item. GlTF residue
@@ -1573,8 +1680,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `SweptCharacterController` + `SweptCharacterSystem` in `@fourjs/physics`
       (PH-11b, same date), and `examples/character-controller` as the tenth
       browser-gate site (2026-08-29). First-person closed by composition
-      (character yaw + child-eye pitch), not a new rig class. PH-11c
-      (kinematic→dynamic push) remains the only staged half.
+      (character yaw + child-eye pitch), not a new rig class. ~~PH-11c
+      (kinematic→dynamic push) remains the only staged half~~ **PH-11c
+      DONE 2026-09-06** (`pushMass` / reduced-mass impulse / wake).
 - [x] **Staged rigs — trackball and fly DONE 2026-09-06.** `TrackballRig` verified
       in `@fourjs/scene` (`packages/scene/src/trackball.ts`,
       `packages/scene/tests/trackball.test.ts`, R-37 2026-08-21). Fly documented as
@@ -1595,7 +1703,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       `camera-rigs.test.ts`, `FirstPersonLook` + `CharacterController`),
       `TrackballRig` (`@fourjs/scene`, R-37), fly (guide snippet in
       `docs/guides/cameras-and-coordinate-conversion.md`). Remaining:
-      shake/impulse (`CameraShake`, staged under "Staged rigs" above).
+      none — `CameraShake` **DONE 2026-09-06** (additive offset over
+      interpolated hash value-noise at `simulationTime`).
 - [x] **Examples onto `lookAt` — DONE 2026-08-21.** Camera and sun in
       `first-3d-scene`; the aim moved 2×10⁻⁴ rad, no golden at risk, thresholds
       held. Rigs declined on merit (nothing moves).
@@ -1675,8 +1784,9 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       whole union. The two pre-existing prettier warnings
       (`packages/render/package.json`,
       `tests/integration/examples-build-coverage.test.ts`) formatted.
-      Remaining: adopt `tests/integration/helpers/recording-gl.ts` in
-      `render-to-texture.test.ts` (mechanical dedupe; helper header still
+      ~~Remaining: adopt `tests/integration/helpers/recording-gl.ts` in
+      `render-to-texture.test.ts`~~ **DONE** (the suite already imports
+      `createRecordingGl` / `RecordingCanvas`; helper header still
       warns against rewriting a landed gate); §63's on-screen pass-output
       debug view waits on §70's full-screen blit.
 - [x] **PH-5 CLOSED 2026-08-07:** `PhysicsWorld.addCollider`/`removeCollider` — one
@@ -1745,8 +1855,10 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       captures nested paths (`flagship/one-scene-everything-moves`,
       `flagship/motor-digital-twin`); the original `[a-z0-9-]+` capture
       collapsed both to `"flagship"`. Remaining: (a) per-dimension Rapier
-      registration; (c) `collectBodyOrigins` default cross size; (d) §46
-      layers for the panel viewport.
+      registration; (c) `collectBodyOrigins` default cross size (flagship
+      passes `size: 0.55` because the 0.1 default is shorter than the
+      meshes). ~~(d) §46 layers for the panel viewport~~ **DONE**
+      (`applyLayers(uiRoot, UI_LAYER)` in the one-scene flagship).
 - [x] **A-5 partial DONE 2026-08-07 (accounting tier):** byte + live-instance
       accounting on BufferGeometry/Texture/RenderTarget; §84's two memory counters
       live. A-1 follow-up (b) closed
@@ -1840,8 +1952,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       multi-texture-unit widening `gl-program.ts` records (R-13 follow-up) —
       metallic-roughness landed 2026-09-06; normal/occlusion/emissive remain.
       The loader parses them already and widens without a format change.
-- [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust boundary still open (RFC 0001's, not A-3's — shading is a graph of
-      closed operators and a new operator is out of scope in both RFCs). **Plugin trust
+- [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust **runtime** boundary is the closed operator union (shipped); **extensible** data-declared operators remain a follow-up RFC (0001 alternative E — `SHADER_OPERATORS` is the named hook only). **Plugin trust
       boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a
       document; enforced by `tests/integration/plugin-boundary.test.ts`; explicitly not a
       sandbox. Guide row moved absent → partial
@@ -1854,18 +1965,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       primitives. **R-35 is now unblocked** (data path + vertexColors exist; what's left
       is wiring `DebugDrawBuffer`'s 7-float layout into a `BufferGeometry` — a
       `@fourjs/diagnostics` packet). R-9/R-13/R-22/R-30/R-32 lose their R-19 dependency
-- [ ] **R-19/R-20 follow-ups:** §52 tessellation module (lifts the concave-extrude
-      restriction); §55 atlas packet (retires the sprite `quad` uniform with authored
-      uvs); ~~qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly~~
-      **DONE 2026-09-07** — and it was wrong in the OPPOSITE direction to the one this
-      row assumed. The claim was not overstated; it was UNDER-evidenced: the evidence
-      column named only `boxGeometry`, while `primitives-3d.ts` ships nine more
-      (sphere, cylinder, cone, capsule, torus, lathe, extrude, tube, heightField). Now
-      cites them, and says what actually remains staged (skinning/morph, §52
-      tessellation) rather than implying the primitive set is thin. Two neighbouring
-      defects fell out of reading it: the **basic colliders** row still called §24's
-      shapes "staged" a month after they shipped, and **S-2** still claimed
-      `{ type: "cylinder" }` is "deliberately a compile error". Both corrected
+- [x] **R-19/R-20 follow-ups:** DONE 2026-09-09. §52 already capped concave
+      extrudes (`tessellation.ts` + `extrudeGeometry`); holes live on
+      `polygonGeometry2D`. §55 atlas packet: sprites author `geometry.uvs`
+      from `Sprite.frame` and both backends sample that stream — `uniform vec4
+      quad` / `SPRITE_QUAD_OFFSET` are gone. Frame writes rewrite eight floats
+      in place and bump geometry version (animation clips re-upload the uv
+      buffer, not the texture). AUDIT-120 "basic 3D meshes" honesty pass
+      2026-09-07.
 - [x] **Flaky gate (pre-existing, confirmed at baseline 2026-08-07):**
       DONE 2026-09-06 — RECOVER / ANIMATED / RAGDOLL now watch `data-chain-y`
       until span/floor; smoothness samples on virtual-frame parity. The
@@ -2094,7 +2201,8 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       shipped; `groupSpritesByTexture` consecutive-run helper DONE 2026-09-06.
       Atlas *packing* of distinct textures remains.
 - [x] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
-      — **Proposed 2026-09-06** (`docs/rfcs/0008-text-shaping-engine.md`). Owner
+      — **Proposed 2026-09-06** (`docs/rfcs/0008-text-shaping-engine.md`; corrected
+      2026-09-10, plan `docs/plans/RFC-0008-TEXT-SHAPING_PLAN.md`). Owner
       decision pending; default stays the identity pen walk.
 
 ### Documentation
@@ -2104,6 +2212,86 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       pre-1.0 PDF.
 
 ## Done
+
+- [x] 2026-09-10 — **RFC 0007–0009 review pass + subagent plans.** Each
+      proposed RFC re-verified against the tree and corrected in place
+      (review logs at the foot of each file): 0007 — `DeterminismLevel` is
+      physics-owned, so a motion-local `PathPlannerDeterminism` is spelled;
+      `followWaypoints` gained the radius options its prose required;
+      `PATH_PLANNERS` non-revocability stated against `defineCapability`'s
+      default. 0008 — umbrella specifier is `fourJS/…`; `layoutText` walks
+      code points; shaper hook is a `TextLayoutOptions` field; vertical text
+      refuses with the existing `NOT_IMPLEMENTED`; Roboto is Apache-2.0 (Noto
+      Sans named); new §7 rule for glyph-id → atlas quad (`glyphsById`).
+      0009 — no `beginFrame`/`endFrame` exists; the source carries its own
+      `maximumBytes`; the display-only scan's `FORBIDDEN` list must grow; the
+      feedback mechanism (`CanvasTexture.readbackTarget` →
+      `collectSampledTargets`) is spelled. Plans (≤ 4 haiku agents, disjoint
+      files, waves, anti-hallucination sheets):
+      `docs/plans/RFC-0007-PATH-PLANNING_PLAN.md`,
+      `RFC-0008-TEXT-SHAPING_PLAN.md`, `RFC-0009-GPU-READBACK_PLAN.md`.
+      Implementation still waits on owner acceptance.
+
+- [x] 2026-09-09 — **Open-TODO audit (subagent team).** Recounted
+      `grep -c '^- \[ \]'` / `'^- \[x\]'`: **12 open, 257 closed** (header
+      said 249; 256 before this row). No packet closed. Code review of every remaining slice:
+      WebGPU skinned id/shadow still skip; GPU morph / CPU skinning /
+      bone-texture absent; lighting leftover (multi-light, cascades, PBR,
+      §60a, layers, normal/occlusion, WebGPU emissive) absent; R-30c
+      cube/array/3D / compressed / video / async absent; R-33 still
+      needs non-SwiftShader; first publish still no tag/npm; dogfood
+      standing. Hygiene: struck leftover “remaining” on closed rows
+      (rigs, PH-11c, scissor, `recording-gl` adopt, flagship §46 layers,
+      WebGPU `maximumSkinningJoints`) and the Priority-index leftovers
+      (A-4/A-5/A-19, R-32, camera-rig residue, particle-trail spatial-hash).
+
+- [x] 2026-09-09 — **Open-TODO wave 6 slice.** Did not close any of the
+      12 checkboxes. Landed: RFC 0005 WebGL `SkinnedIdProgram` (deformed
+      silhouette; `SKINNING_GLSL` isolated so picking does not link the
+      colour pair). Remaining on that row: WebGPU skinned id (needs RFC
+      0003 skinned pipelines). Colour pair landed later the same day;
+      WebGPU id still skips.
+
+- [x] 2026-09-09 — **Open-TODO wave 4 slices (simple → complex).**
+      Did not close any of the 12 checkboxes. Landed: RFC 0003
+      interpolated palettes (`worldOf`) and WebGL `SkinnedShadowProgram`;
+      RFC 0005 WebGPU `PickingService` (`mapAsync`); dogfood cycle 5
+      (GPU pick / PickProvider guides). Still open on those rows:
+      GPU morph / CPU skinning / bone-texture; WebGPU
+      `ParticleIdProgram` *(landed later the same day — see RFC 0005
+      body)*. Still owner/hardware: first publish, R-33
+      exit.
+
+- [x] 2026-09-09 — **Open-TODO second-wave slices (simple → complex).**
+      Did not close any of the 12 checkboxes. Landed: WebGPU
+      `DrawUniforms.normalMatrix` (192 bytes; standard 224);
+      RFC 0005 `ParticleIdProgram` (one id per emitter); §72
+      `PointerInputOptions.pickProvider` (sync default path). Still
+      open on those rows: WebGPU `mapAsync` picking *(landed later the
+      same day)*, multi-light / shadows / PBR / §60a. Still
+      owner/hardware: first publish, R-33 exit.
+
+- [x] 2026-09-09 — **R-19/R-20 closed.** §52 concave-extrude was already
+      on the tree. §55 atlas: sprites author `geometry.uvs` from
+      `Sprite.frame`; WebGL/WebGPU sample that stream; `quad` uniform retired.
+      Frame changes re-upload eight uv floats (version bump), not the atlas
+      texture.
+
+- [x] 2026-09-09 — **Open-TODO first-wave slices (simple → complex).** Did
+      not close any of the 13 checkboxes *(R-19/R-20 closed later that day;
+      recount is 12)*. Landed: `Matrix3.setNormalFromMatrix4`
+      + WebGL lit/standard `uniform mat3 normalMatrix`; RFC 0005
+      `benchmarks/pick-latency.mjs` (id-pass vs list, fence vs stall);
+      R-33 `data-simulate` / `data-present` on particles-demo (seconds, no
+      fps budget); dogfood cycle 4 (text / `.four.json` + §34 / one-scene
+      mixed 2D+3D) with guide fixes. Still owner/hardware: first publish,
+      R-33 exit. WebGPU normal-matrix and ParticleIdProgram not this wave.
+
+- [x] 2026-09-09 — **Vitest 5 particles follow-up.** CI `bun run coverage`
+      after the bump failed `@fourjs/particles` at 92.1% branches. Honest
+      tests for ramp-stop validation, empty/NaN lifetime ramps, trail
+      store guards, and `computeBounds` non-positive lifetime. Re-measured
+      97.16% (480/494). Gate unchanged.
 
 - [x] 2026-09-07 — **CI after #76.** Allowlisted R-32 wide particle offsets
       (particles↔render duck-type); TypeDoc fixtures for NodeSpace,
@@ -2152,7 +2340,9 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 - [x] 2026-09-06 — **§83 dev warnings (A-5 remainder, #73).** `warnDisposedInUse`,
       `rejectStalePhysicsHandle`, `auditFrameAllocations`, detached-node listener
-      warn on `Node.#detach`. Leaked-resource / FinalizationRegistry tier still open.
+      warn on `Node.#detach`. Leaked-resource / FinalizationRegistry tier
+      still open *(closed 2026-09-09 — opt-in `auditFinalizedLeaks` is
+      the design)*.
 
 - [x] 2026-09-06 — **RenderTarget.byteLength (A-5, #73).** `render-target-bytes.ts`
       for depth/stencil/samplable-depth accounting.
@@ -2162,7 +2352,8 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 - [x] 2026-09-06 — **Auto-selection §62 (#73).** Real WebGPU rung in integration tests.
 
-- [x] 2026-09-06 — **Camera rigs docs (#73).** Trackball + fly snippet; shake open.
+- [x] 2026-09-06 — **Camera rigs docs (#73).** Trackball + fly snippet; shake open
+      *(CameraShake landed later the same day)*.
 
 - [x] 2026-09-06 — **Platform and repository hygiene.** `js-yaml >=5` ignored
       (#68 — vendored graph tool needs default export). ESLint ignores

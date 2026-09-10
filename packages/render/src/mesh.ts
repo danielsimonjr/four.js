@@ -52,8 +52,11 @@
  *   `frustumCulled = false` on such a mesh, or wait for the authored
  *   bounds-expansion factor RFC 0003 names and defers. The same bind-pose
  *   caveat applies to a §67 `clip` on a skinned mesh (the mask is the
- *   bind-pose shape) and to the §69 caster pass, which skips skinned draws
- *   rather than casting a bind-pose shadow.
+ *   bind-pose shape). The §69 WebGL caster pass deforms skinned casters
+ *   when `registerSkinningPipeline()` is linked; without it the draw is
+ *   skipped rather than casting a bind-pose shadow. WebGPU draws the
+ *   skinned colour pair behind the same registration; its caster and id
+ *   pass still skip (never a bind-pose shadow or pick).
  */
 
 import { FourError } from "@fourjs/core";

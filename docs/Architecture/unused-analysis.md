@@ -1,6 +1,6 @@
 # Unused Files and Exports Analysis
 
-**Generated**: 2026-09-07
+**Generated**: 2026-09-09
 
 ## Summary
 
@@ -52,6 +52,10 @@ interfaces typing live guards and per-package API completeness, not rot.
 
 - `CANVAS_VIEW_NODE_TYPE` (constant) — 3 in-file refs
 
+### `packages/geometry/src/svg-document.ts`
+
+- `parseTransform` (function) — 1 in-file ref
+
 ### `packages/geometry/src/geometry.ts`
 
 - `nextGeometryIdentifier` (function) — 1 in-file ref
@@ -59,8 +63,4 @@ interfaces typing live guards and per-package API completeness, not rot.
 ### `packages/geometry/src/path-boolean.ts`
 
 - `ringsContain` (function) — 2 in-file refs
-
-### `packages/geometry/src/svg-document.ts`
-
-- `parseTransform` (function) — 1 in-file ref
 

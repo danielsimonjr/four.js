@@ -28,12 +28,20 @@
  * - **`material.stencil` (R-7's hand-composed tier) is not applied** — the
  *   id target carries stencil bits only for §67 clips, and a hand-composed
  *   mask is the author's picture, not the engine's to reproduce here;
- * - **skinned items are skipped** — a bind-pose id is a different picture
- *   (the §69 caster exclusion, third application); the bounds tier serves
- *   them;
- * - **particle items are skipped** — §36's batched item has one node and no
- *   per-particle geometry the flat program could transform; the instanced id
- *   variant is RFC 0005's staged residue, recorded in `TODO.md` at landing.
+ * - **skinned items draw through {@link SkinnedIdProgram}** — the §54
+ *   skin vertex (`SKINNING_GLSL` from `gl-skinning-glsl.ts`, not
+ *   `gl-skinning.ts`, so this module does not link the colour pair) plus
+ *   the id fragment, so a deformed silhouette picks as the colour pass
+ *   does. A compile failure skips (bounds). A bind-pose id remains a
+ *   different picture; this program is the third application of that
+ *   exclusion. WebGPU still skips: that backend has no RFC 0003 skinned
+ *   pipelines;
+ * - **particle items write one id for the whole system** — §36's batched
+ *   item has one node and no per-particle geometry, so the pass instances
+ *   the shared unit quad through {@link ParticleIdProgram} (the §36
+ *   billboard vertex, a flat `pickId` fragment) and encodes the emitter's
+ *   table index. Trails are not drawn. The bounds tier still serves a
+ *   zero-count system, which issues no instanced draw.
  *
  * ## The read-back is asynchronous, honestly (§61; RFC 0005 §4)
  *
@@ -79,6 +87,11 @@ import {
 
 import type { GeometryCache } from "./gl-geometry.js";
 import {
+  PARTICLE_VERTEX_SHADER_SOURCE,
+  type ParticleBatchCache,
+  type ParticleGlContext,
+} from "./gl-particles.js";
+import {
   setPickingServiceFactory,
   type PickingRendererHost,
 } from "./gl-picking-registry.js";
@@ -92,6 +105,7 @@ import {
   type WebglContext,
 } from "./gl-program.js";
 import type { RenderTargetRecord } from "./gl-render-target.js";
+import { SKINNING_GLSL } from "./gl-skinning-glsl.js";
 
 /**
  * The subtree root an update draws and the viewport it draws it into — read
@@ -290,6 +304,246 @@ export class IdPassProgram {
   }
 }
 
+/**
+ * The instanced id program for §36 particle systems — the billboard vertex
+ * {@link PARTICLE_VERTEX_SHADER_SOURCE} shares with `ParticleProgram`, and
+ * the id fragment's flat `pickId`. One colour for the whole emitter, never a
+ * per-particle id. Compiled lazily on the service's **first particle item**,
+ * never at registration or construction.
+ */
+export class ParticleIdProgram {
+  readonly #gl: WebglContext;
+
+  readonly #program: GlProgramHandle;
+
+  readonly #projectionLocation: GlUniformLocation;
+
+  readonly #viewLocation: GlUniformLocation;
+
+  readonly #modelLocation: GlUniformLocation;
+
+  readonly #idLocation: GlUniformLocation;
+
+  #disposed = false;
+
+  private constructor(
+    gl: WebglContext,
+    program: GlProgramHandle,
+    projectionLocation: GlUniformLocation,
+    viewLocation: GlUniformLocation,
+    modelLocation: GlUniformLocation,
+    idLocation: GlUniformLocation,
+  ) {
+    this.#gl = gl;
+    this.#program = program;
+    this.#projectionLocation = projectionLocation;
+    this.#viewLocation = viewLocation;
+    this.#modelLocation = modelLocation;
+    this.#idLocation = idLocation;
+  }
+
+  /**
+   * Compiles and links the particle id program on `gl` —
+   * {@link IdPassProgram.create}'s contract with `"pick-particle-id"` in
+   * the messages.
+   */
+  static create(gl: WebglContext): ParticleIdProgram {
+    const program = createLinkedProgram(
+      gl,
+      "pick-particle-id",
+      PARTICLE_VERTEX_SHADER_SOURCE,
+      ID_FRAGMENT_SHADER_SOURCE,
+    );
+    try {
+      return new ParticleIdProgram(
+        gl,
+        program,
+        requireUniform(gl, program, "projection", "pick-particle-id"),
+        requireUniform(gl, program, "view", "pick-particle-id"),
+        requireUniform(gl, program, "model", "pick-particle-id"),
+        requireUniform(gl, program, "pickId", "pick-particle-id"),
+      );
+    } catch (error: unknown) {
+      gl.deleteProgram(program);
+      throw error;
+    }
+  }
+
+  /** Whether {@link ParticleIdProgram.dispose} has run. */
+  get disposed(): boolean {
+    return this.#disposed;
+  }
+
+  /** Makes this the current program. Call before any upload below. */
+  use(): void {
+    this.#gl.useProgram(this.#program);
+  }
+
+  /** Uploads the camera's projection. Column-major (§7b). */
+  setProjection(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(this.#projectionLocation, false, matrixScratch);
+  }
+
+  /** Uploads the camera's view matrix. See {@link ParticleIdProgram.setProjection}. */
+  setView(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(this.#viewLocation, false, matrixScratch);
+  }
+
+  /** Uploads one particle system's world matrix. */
+  setModel(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
+  }
+
+  /** Uploads one encoded id colour (`encodePickId`'s four floats). */
+  setId(encoded: Float32Array): void {
+    this.#gl.uniform4fv(this.#idLocation, encoded);
+  }
+
+  /** Deletes the GL program (§83). Idempotent; live context only. */
+  dispose(): void {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    this.#gl.deleteProgram(this.#program);
+  }
+}
+
+/**
+ * The skinned id program (§54 + §71; RFC 0005 residue) — {@link SKINNING_GLSL}
+ * spliced into {@link IdPassProgram}'s vertex product, plus the same flat
+ * `pickId` fragment. A deformed silhouette writes the table index; a
+ * bind-pose id would be a different picture (the §69 caster exclusion,
+ * third application).
+ *
+ * Lives here, not in `gl-skinning.ts`: {@link registerPickingPipeline} is
+ * what links this module, and importing the colour-pair module would pull
+ * two unused programs into every picking bundle. Compiled lazily on the
+ * service's **first skinned item**, never at registration or construction.
+ */
+const SKINNED_ID_VERTEX_SHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 position;
+${SKINNING_GLSL}
+uniform mat4 viewProjection;
+uniform mat4 model;
+
+void main() {
+  gl_Position = viewProjection * model * (skinMatrix() * vec4(position, 1.0));
+}
+`;
+
+export class SkinnedIdProgram {
+  readonly #gl: WebglContext;
+
+  readonly #program: GlProgramHandle;
+
+  readonly #viewProjectionLocation: GlUniformLocation;
+
+  readonly #modelLocation: GlUniformLocation;
+
+  readonly #jointMatricesLocation: GlUniformLocation;
+
+  readonly #idLocation: GlUniformLocation;
+
+  #disposed = false;
+
+  private constructor(
+    gl: WebglContext,
+    program: GlProgramHandle,
+    viewProjectionLocation: GlUniformLocation,
+    modelLocation: GlUniformLocation,
+    jointMatricesLocation: GlUniformLocation,
+    idLocation: GlUniformLocation,
+  ) {
+    this.#gl = gl;
+    this.#program = program;
+    this.#viewProjectionLocation = viewProjectionLocation;
+    this.#modelLocation = modelLocation;
+    this.#jointMatricesLocation = jointMatricesLocation;
+    this.#idLocation = idLocation;
+  }
+
+  /**
+   * Compiles and links the skinned id program on `gl` —
+   * {@link IdPassProgram.create}'s contract with `"pick-skinned-id"` in
+   * the messages.
+   */
+  static create(gl: WebglContext): SkinnedIdProgram {
+    const program = createLinkedProgram(
+      gl,
+      "pick-skinned-id",
+      SKINNED_ID_VERTEX_SHADER_SOURCE,
+      ID_FRAGMENT_SHADER_SOURCE,
+    );
+    try {
+      return new SkinnedIdProgram(
+        gl,
+        program,
+        requireUniform(gl, program, "viewProjection", "pick-skinned-id"),
+        requireUniform(gl, program, "model", "pick-skinned-id"),
+        requireUniform(gl, program, "jointMatrices[0]", "pick-skinned-id"),
+        requireUniform(gl, program, "pickId", "pick-skinned-id"),
+      );
+    } catch (error: unknown) {
+      gl.deleteProgram(program);
+      throw error;
+    }
+  }
+
+  /** Whether {@link SkinnedIdProgram.dispose} has run. */
+  get disposed(): boolean {
+    return this.#disposed;
+  }
+
+  /** Makes this the current program. Call before any upload below. */
+  use(): void {
+    this.#gl.useProgram(this.#program);
+  }
+
+  /** Uploads `projection * view` for the pass. Column-major (§7b). */
+  setViewProjection(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(
+      this.#viewProjectionLocation,
+      false,
+      matrixScratch,
+    );
+  }
+
+  /** Uploads one item's world matrix. */
+  setModel(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
+  }
+
+  /**
+   * Uploads the item's joint palette — 16 floats per joint, straight from
+   * the skeleton's own `Float32Array`. Uploading fewer matrices than the
+   * declared `MAX_SKINNING_JOINTS` leaves the dead tail untouched, which
+   * is legal GL (`SkinnedUnlitProgram.setJointMatrices`'s contract).
+   */
+  setJointMatrices(palette: Float32Array): void {
+    this.#gl.uniformMatrix4fv(this.#jointMatricesLocation, false, palette);
+  }
+
+  /** Uploads one encoded id colour (`encodePickId`'s four floats). */
+  setId(encoded: Float32Array): void {
+    this.#gl.uniform4fv(this.#idLocation, encoded);
+  }
+
+  /** Deletes the GL program (§83). Idempotent; live context only. */
+  dispose(): void {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    this.#gl.deleteProgram(this.#program);
+  }
+}
+
 /** One pass's resolved viewport rectangle, in target pixels. */
 interface PassRect {
   x: number;
@@ -398,6 +652,24 @@ export class WebglPickingService implements PickingService {
 
   /** The cache era `#program` was compiled in. */
   #programEra: GeometryCache | null = null;
+
+  /**
+   * The instanced particle id program — compiled on the first particle
+   * item of an era, never at construction. `null` until then.
+   */
+  #particleProgram: ParticleIdProgram | null = null;
+
+  /** Latched per era, same discipline as `#programFailed`. */
+  #particleProgramFailed = false;
+
+  /**
+   * The skinned id program — compiled on the first skinned item of an
+   * era, never at construction. `null` until then.
+   */
+  #skinnedProgram: SkinnedIdProgram | null = null;
+
+  /** Latched per era, same discipline as `#programFailed`. */
+  #skinnedProgramFailed = false;
 
   /** The last successful pass, or `null` — what `pick` reads. */
   #pass: PassState | null = null;
@@ -542,7 +814,16 @@ export class WebglPickingService implements PickingService {
     // buffer's ids no longer describe the table just built, and a pick
     // against them would resolve wrong nodes rather than refusing.
     this.#pass = null;
-    this.#drawPass(gl, geometries, program, record, rect, viewItems);
+    this.#drawPass(
+      gl,
+      geometries,
+      host.particleBatches(),
+      program,
+      record,
+      rect,
+      viewItems,
+      view,
+    );
 
     this.#pass = {
       viewport: view,
@@ -702,6 +983,22 @@ export class WebglPickingService implements PickingService {
       this.#program.dispose();
     }
     this.#program = null;
+    if (
+      this.#particleProgram !== null &&
+      live &&
+      host.geometries() === this.#programEra
+    ) {
+      this.#particleProgram.dispose();
+    }
+    this.#particleProgram = null;
+    if (
+      this.#skinnedProgram !== null &&
+      live &&
+      host.geometries() === this.#programEra
+    ) {
+      this.#skinnedProgram.dispose();
+    }
+    this.#skinnedProgram = null;
     // Disposing the target bumps its version; asking the cache for it once
     // more is what makes the cache destroy the framebuffer *now* rather than
     // holding it until renderer disposal (the caches' documented lazy
@@ -728,6 +1025,10 @@ export class WebglPickingService implements PickingService {
       // once more on the new one.
       this.#program = null;
       this.#programFailed = false;
+      this.#particleProgram = null;
+      this.#particleProgramFailed = false;
+      this.#skinnedProgram = null;
+      this.#skinnedProgramFailed = false;
       this.#programEra = era;
     }
     if (this.#program !== null) {
@@ -753,6 +1054,66 @@ export class WebglPickingService implements PickingService {
   }
 
   /**
+   * The compiled particle id program for this era, or `null`. Compiled on
+   * the first particle item, never at construction — a scene that registers
+   * picking and never submits a particle system issues the mesh id program
+   * only.
+   */
+  #acquireParticleProgram(gl: WebglContext): ParticleIdProgram | null {
+    if (this.#particleProgram !== null) {
+      return this.#particleProgram;
+    }
+    if (this.#particleProgramFailed) {
+      return null;
+    }
+    try {
+      this.#particleProgram = ParticleIdProgram.create(gl);
+      return this.#particleProgram;
+    } catch (error: unknown) {
+      this.#particleProgramFailed = true;
+      if (DEV) {
+        devWarnOnce(
+          "webgl-picking-particle-compile-failed",
+          "§71: the particle picking id program failed to compile on this " +
+            "context; particle id draws are skipped (§61, §89). " +
+            `${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
+   * The compiled skinned id program for this era, or `null`. Compiled on
+   * the first skinned item, never at construction — a scene that registers
+   * picking and never submits a skinned mesh issues the mesh id program
+   * only, and never links `gl-skinning.ts`.
+   */
+  #acquireSkinnedProgram(gl: WebglContext): SkinnedIdProgram | null {
+    if (this.#skinnedProgram !== null) {
+      return this.#skinnedProgram;
+    }
+    if (this.#skinnedProgramFailed) {
+      return null;
+    }
+    try {
+      this.#skinnedProgram = SkinnedIdProgram.create(gl);
+      return this.#skinnedProgram;
+    } catch (error: unknown) {
+      this.#skinnedProgramFailed = true;
+      if (DEV) {
+        devWarnOnce(
+          "webgl-picking-skinned-compile-failed",
+          "§71: the skinned picking id program failed to compile on this " +
+            "context; skinned id draws are skipped (§61, §89). " +
+            `${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
    * Draws one id pass. Starts from — and, in its `finally`, returns GL to —
    * the renderer's between-frames baseline (blend off, depth test on, writes
    * on, stencil off with all-bits masks), which is what keeps the next
@@ -762,19 +1123,23 @@ export class WebglPickingService implements PickingService {
   #drawPass(
     gl: WebglContext,
     geometries: GeometryCache,
+    particleBatches: ParticleBatchCache | null,
     program: IdPassProgram,
     record: RenderTargetRecord,
     rect: PassRect,
     viewItems: readonly RenderItem[],
+    view: PickView,
   ): void {
     // The local mirror of the three states this pass may move, all starting
-    // at the baseline.
+    // at the baseline. `activeKind` tracks which id program is bound, the
+    // way the frame renderer tracks `activeKind` across unlit/particle.
     let colorWrite = true;
     let depthTest = true;
     let depthWrite = true;
     let stencilOn = false;
     let stencilTouched = false;
     let appliedClip: RenderItemClip | null = null;
+    let activeKind: "id" | "particles" | "skinned" = "id";
 
     try {
       gl.bindFramebuffer(GL.FRAMEBUFFER, record.framebuffer);
@@ -795,13 +1160,11 @@ export class WebglPickingService implements PickingService {
 
       for (let index = 0; index < viewItems.length; index += 1) {
         const item = viewItems[index];
-        if (
-          item.kind === "particles" ||
-          item.kind === "skinned-unlit" ||
-          item.kind === "skinned-lit"
-        ) {
-          // Absence, stated in the module header: no bind-pose ids, no
-          // emitter-quad ids. The bounds tier serves both.
+        const isSkinnedItem =
+          item.kind === "skinned-unlit" || item.kind === "skinned-lit";
+
+        const isParticleItem = item.kind === "particles";
+        if (isParticleItem && item.count === 0) {
           continue;
         }
 
@@ -831,6 +1194,34 @@ export class WebglPickingService implements PickingService {
         if (geometry === null) {
           // Nothing to draw, or GL refused — the frame skips it too (§61).
           continue;
+        }
+
+        // §36's instance stream lives on ParticleBatchCache, keyed off the
+        // shared quad's position buffer. Drawing the geometry record itself
+        // would rasterise the unit quad at the emitter — a wrong picture.
+        let particleBatch = null;
+        let particleProgram: ParticleIdProgram | null = null;
+        const batches = particleBatches;
+        if (isParticleItem) {
+          if (batches === null) {
+            continue;
+          }
+          particleBatch = batches.acquire(item, geometry.positionBuffer);
+          if (particleBatch === null) {
+            continue;
+          }
+          particleProgram = this.#acquireParticleProgram(gl);
+          if (particleProgram === null) {
+            continue;
+          }
+        }
+
+        let skinnedProgram: SkinnedIdProgram | null = null;
+        if (isSkinnedItem) {
+          skinnedProgram = this.#acquireSkinnedProgram(gl);
+          if (skinnedProgram === null) {
+            continue;
+          }
         }
 
         // §67's stencil state, by record identity (R-23: every item under
@@ -867,11 +1258,26 @@ export class WebglPickingService implements PickingService {
         // mask draw forces colour, depth write and depth test off (R-23's
         // rule); a content draw follows its material's §57 depth/colour
         // state, read defensively (`!== false`) for the structural-double
-        // reason every item snapshot is.
-        const material = item.material;
-        const wantColor = maskPass ? false : material.colorWrite !== false;
-        const wantDepthTest = maskPass ? false : material.depthTest !== false;
-        const wantDepthWrite = maskPass ? false : material.depthWrite !== false;
+        // reason every item snapshot is. Particle items have
+        // `material === undefined` — branch before reading `colorWrite` or
+        // the pass throws. Default depth/colour (all on) unless a clip mask
+        // says otherwise, matching the frame's particle clip handling.
+        let wantColor: boolean;
+        let wantDepthTest: boolean;
+        let wantDepthWrite: boolean;
+        if (isParticleItem) {
+          wantColor = !maskPass;
+          wantDepthTest = !maskPass;
+          wantDepthWrite = !maskPass;
+        } else {
+          const material = item.material;
+          // Not a particle item: a surface always carries a material. The
+          // `?.` is the structural-double defence, not a particle path —
+          // `item.material.colorWrite` on a particle item would throw.
+          wantColor = maskPass ? false : material?.colorWrite !== false;
+          wantDepthTest = maskPass ? false : material?.depthTest !== false;
+          wantDepthWrite = maskPass ? false : material?.depthWrite !== false;
+        }
         if (wantColor !== colorWrite) {
           gl.colorMask(wantColor, wantColor, wantColor, wantColor);
           colorWrite = wantColor;
@@ -889,6 +1295,71 @@ export class WebglPickingService implements PickingService {
           depthWrite = wantDepthWrite;
         }
 
+        if (isParticleItem) {
+          if (
+            particleProgram === null ||
+            particleBatch === null ||
+            batches === null
+          ) {
+            continue;
+          }
+          if (activeKind !== "particles") {
+            particleProgram.use();
+            const camera = view.camera;
+            particleProgram.setProjection(camera.projectionMatrix);
+            particleProgram.setView(camera.viewMatrix);
+            activeKind = "particles";
+          }
+          if (!maskPass) {
+            encodePickId(tableIndex, idScratch);
+            particleProgram.setId(idScratch);
+          }
+          particleProgram.setModel(item.worldMatrix);
+          batches.upload(particleBatch, item);
+          gl.bindVertexArray(particleBatch.vertexArray);
+          (gl as ParticleGlContext).drawArraysInstanced(
+            geometry.mode,
+            0,
+            geometry.count,
+            item.count,
+          );
+          continue;
+        }
+
+        if (isSkinnedItem) {
+          if (skinnedProgram === null) {
+            continue;
+          }
+          if (activeKind !== "skinned") {
+            skinnedProgram.use();
+            skinnedProgram.setViewProjection(passViewProjection);
+            activeKind = "skinned";
+          }
+          if (!maskPass) {
+            encodePickId(tableIndex, idScratch);
+            skinnedProgram.setId(idScratch);
+          }
+          skinnedProgram.setModel(item.worldMatrix);
+          skinnedProgram.setJointMatrices(item.jointMatrices);
+          gl.bindVertexArray(geometry.vertexArray);
+          if (geometry.indexType === null) {
+            gl.drawArrays(geometry.mode, 0, geometry.count);
+          } else {
+            gl.drawElements(
+              geometry.mode,
+              geometry.count,
+              geometry.indexType,
+              0,
+            );
+          }
+          continue;
+        }
+
+        if (activeKind !== "id") {
+          program.use();
+          program.setViewProjection(passViewProjection);
+          activeKind = "id";
+        }
         if (!maskPass) {
           encodePickId(tableIndex, idScratch);
           program.setId(idScratch);

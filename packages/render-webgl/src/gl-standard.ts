@@ -30,7 +30,8 @@
  * D        = α² / (NdotH²(α² − 1) + 1)²          GGX, with 1/π folded out
  * V        = 0.5 / (NdotL·√(NdotV²(1−α²)+α²) + NdotV·√(NdotL²(1−α²)+α²))
  * F        = F0 + (1 − F0)(1 − VdotH)⁵           Schlick
- * out.rgb  = ambient·diffuse + (diffuse + D·V·F)·lightColor·NdotL + emissive
+ * emit     = emissive × emissiveMap
+ * out.rgb  = ambient·diffuse + (diffuse + D·V·F)·lightColor·NdotL + emit
  * out.a    = albedo.a
  * ```
  *
@@ -78,6 +79,7 @@ import type { Matrix4, Vector3 } from "@fourjs/math";
 import type { SceneLights } from "@fourjs/render";
 
 import {
+  EMISSIVE_TEXTURE_UNIT,
   MAP_TEXTURE_UNIT,
   METAL_ROUGHNESS_TEXTURE_UNIT,
   PUNCTUAL_LIGHT_GLSL,
@@ -87,6 +89,7 @@ import {
   createLinkedProgram,
   matrixScratch,
   requireUniform,
+  uploadNormalMatrix,
   type GlProgramHandle,
   type GlUniformLocation,
   type WebglContext,
@@ -104,10 +107,15 @@ import {
  * world position is computed once rather than twice.
  *
  * The normal is transformed by the **inverse transpose** of the model matrix's
- * upper 3×3, the standard fix for non-uniform scale, derived in the shader for
- * the reason `LIT_VERTEX_SHADER_SOURCE` records — and staged with it: when
- * `@fourjs/math`'s `Matrix3` grows a normal-matrix utility both stages hoist it
- * to a per-draw uniform together.
+ * upper 3×3, the standard fix for non-uniform scale. That matrix is
+ * `Matrix3.setNormalFromMatrix4` on the CPU, uploaded once per draw as
+ * `uniform mat3 normalMatrix` — the same hoist `LIT_VERTEX_SHADER_SOURCE`
+ * landed (2026-09-09), so both shaded stages stay in lockstep.
+ *
+ * `vUv` is written unconditionally: the fragment stage samples albedo, the
+ * packed metallic-roughness map, and/or the emissive map from it under
+ * uniform switches (R-19). A draw with *only* `emissiveMap` still interpolates
+ * the stream, matching `useMetalRoughnessMap` without `useMap`.
  */
 const STANDARD_VERTEX_SHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 position;
@@ -116,6 +124,7 @@ layout(location = 2) in vec2 uv;
 
 uniform mat4 viewProjection;
 uniform mat4 model;
+uniform mat3 normalMatrix;
 
 out vec3 vNormal;
 out vec3 vWorldPosition;
@@ -124,7 +133,7 @@ out vec2 vUv;
 void main() {
   vec4 world = model * vec4(position, 1.0);
   vWorldPosition = world.xyz;
-  vNormal = transpose(inverse(mat3(model))) * normal;
+  vNormal = normalMatrix * normal;
   vUv = uv;
   gl_Position = viewProjection * world;
 }
@@ -189,6 +198,8 @@ uniform sampler2D map;
 uniform bool useMap;
 uniform sampler2D metalRoughnessMap;
 uniform bool useMetalRoughnessMap;
+uniform sampler2D emissiveMap;
+uniform bool useEmissiveMap;
 uniform float metalness;
 uniform float roughness;
 uniform vec3 emissive;
@@ -249,6 +260,11 @@ void main() {
     rough *= mr.g;
   }
 
+  vec3 emit = emissive;
+  if (useEmissiveMap) {
+    emit *= texture(emissiveMap, vUv).rgb;
+  }
+
   vec3 albedo = base.rgb;
   vec3 diffuseColor = albedo * (1.0 - metal);
   vec3 f0 = mix(vec3(DIELECTRIC_F0), albedo, metal);
@@ -285,7 +301,7 @@ void main() {
     }
   }
 
-  fragColor = vec4(shaded + emissive, base.a);
+  fragColor = vec4(shaded + emit, base.a);
 }
 `;
 
@@ -329,6 +345,8 @@ export class StandardProgram implements Disposable {
 
   readonly #modelLocation: GlUniformLocation;
 
+  readonly #normalMatrixLocation: GlUniformLocation;
+
   readonly #baseColorLocation: GlUniformLocation;
 
   readonly #metalnessLocation: GlUniformLocation;
@@ -353,6 +371,10 @@ export class StandardProgram implements Disposable {
 
   readonly #useMetalRoughnessMapLocation: GlUniformLocation;
 
+  readonly #emissiveMapLocation: GlUniformLocation;
+
+  readonly #useEmissiveMapLocation: GlUniformLocation;
+
   readonly #punctual: PunctualLightUniforms;
 
   readonly #shadow: ShadowUniforms;
@@ -365,6 +387,10 @@ export class StandardProgram implements Disposable {
   #useMetalRoughnessMap = false;
 
   #metalRoughnessSamplerUploaded = false;
+
+  #useEmissiveMap = false;
+
+  #emissiveSamplerUploaded = false;
 
   #disposed = false;
 
@@ -379,24 +405,27 @@ export class StandardProgram implements Disposable {
     this.#program = program;
     this.#punctual = punctual;
     this.#shadow = shadow;
-    // Positionally, from the one array `create` builds: twelve uniforms is more
-    // than a constructor parameter list can carry without every call site
+    // Positionally, from the one array `create` builds: seventeen uniforms is
+    // more than a constructor parameter list can carry without every call site
     // becoming a puzzle, and the array is written once, next to the names it
     // resolves.
     this.#viewProjectionLocation = locations[0];
     this.#modelLocation = locations[1];
-    this.#baseColorLocation = locations[2];
-    this.#metalnessLocation = locations[3];
-    this.#roughnessLocation = locations[4];
-    this.#emissiveLocation = locations[5];
-    this.#ambientLightLocation = locations[6];
-    this.#lightDirectionLocation = locations[7];
-    this.#lightColorLocation = locations[8];
-    this.#cameraPositionLocation = locations[9];
-    this.#mapLocation = locations[10];
-    this.#useMapLocation = locations[11];
-    this.#metalRoughnessMapLocation = locations[12];
-    this.#useMetalRoughnessMapLocation = locations[13];
+    this.#normalMatrixLocation = locations[2];
+    this.#baseColorLocation = locations[3];
+    this.#metalnessLocation = locations[4];
+    this.#roughnessLocation = locations[5];
+    this.#emissiveLocation = locations[6];
+    this.#ambientLightLocation = locations[7];
+    this.#lightDirectionLocation = locations[8];
+    this.#lightColorLocation = locations[9];
+    this.#cameraPositionLocation = locations[10];
+    this.#mapLocation = locations[11];
+    this.#useMapLocation = locations[12];
+    this.#metalRoughnessMapLocation = locations[13];
+    this.#useMetalRoughnessMapLocation = locations[14];
+    this.#emissiveMapLocation = locations[15];
+    this.#useEmissiveMapLocation = locations[16];
   }
 
   /**
@@ -417,6 +446,7 @@ export class StandardProgram implements Disposable {
       const names = [
         "viewProjection",
         "model",
+        "normalMatrix",
         "baseColor",
         "metalness",
         "roughness",
@@ -429,6 +459,8 @@ export class StandardProgram implements Disposable {
         "useMap",
         "metalRoughnessMap",
         "useMetalRoughnessMap",
+        "emissiveMap",
+        "useEmissiveMap",
       ];
       return new StandardProgram(
         gl,
@@ -466,10 +498,11 @@ export class StandardProgram implements Disposable {
     );
   }
 
-  /** Uploads one render item's world matrix. See {@link setViewProjection}. */
+  /** Uploads one render item's world matrix and its derived normal matrix. */
   setModel(matrix: Matrix4): void {
     matrixScratch.set(matrix.elements);
     this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
+    uploadNormalMatrix(this.#gl, this.#normalMatrixLocation, matrix);
   }
 
   /**
@@ -591,11 +624,19 @@ export class StandardProgram implements Disposable {
 
   /**
    * Selects whether this draw samples the bound base-colour texture (§59's
-   * `map`). Identical in contract to `LitProgram.setFeatures` — mirrored on the
-   * CPU, uploaded only on change, sampler unit uploaded lazily the first time
-   * this program draws a texture at all.
+   * `map`), the packed metallic-roughness map, and/or the emissive map.
+   * Identical in contract to `LitProgram.setFeatures` — mirrored on the
+   * CPU, uploaded only on change, sampler units uploaded lazily the first
+   * time this program draws that texture at all. Extra booleans default
+   * `false` so a one-argument call stays the untextured-MR/emissive draw
+   * it was before those maps existed (R-19: a uniform switch, not a
+   * shader variant).
    */
-  setFeatures(useMap: boolean, useMetalRoughnessMap = false): void {
+  setFeatures(
+    useMap: boolean,
+    useMetalRoughnessMap = false,
+    useEmissiveMap = false,
+  ): void {
     if (useMap !== this.#useMap) {
       if (useMap && !this.#samplerUploaded) {
         this.#gl.uniform1i(this.#mapLocation, MAP_TEXTURE_UNIT);
@@ -617,6 +658,17 @@ export class StandardProgram implements Disposable {
         useMetalRoughnessMap ? 1 : 0,
       );
       this.#useMetalRoughnessMap = useMetalRoughnessMap;
+    }
+    if (useEmissiveMap !== this.#useEmissiveMap) {
+      if (useEmissiveMap && !this.#emissiveSamplerUploaded) {
+        this.#gl.uniform1i(this.#emissiveMapLocation, EMISSIVE_TEXTURE_UNIT);
+        this.#emissiveSamplerUploaded = true;
+      }
+      this.#gl.uniform1i(
+        this.#useEmissiveMapLocation,
+        useEmissiveMap ? 1 : 0,
+      );
+      this.#useEmissiveMap = useEmissiveMap;
     }
   }
 

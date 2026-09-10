@@ -28,11 +28,12 @@ import { defineConfig } from "vitest/config";
 //    file's percentage is too volatile for a per-file branch gate. The package
 //    95% still covers branches in aggregate.
 //
-// Why a reporter, not `thresholds.perFile: true`: Vitest 3.2.7 applies that
-// flag to the *same* numbers as the package gate, so enabling it would require
-// every file ≥ 95% (or would force the package numbers down). The object form
-// (`perFile: { lines: 80 }`) is a later Vitest API. The Istanbul reporter in
-// `tools/per-file-coverage-floor.cjs` is the 3.2.7-compatible split.
+// Why a reporter, not `thresholds.perFile: true`: Vitest applies that flag to
+// the *same* numbers as the package gate, so enabling it would require every
+// file ≥ 95% (or would force the package numbers down). The Istanbul reporter
+// in `tools/per-file-coverage-floor.cjs` keeps the 80% per-file floor as a
+// separate check. The split dates from the 3.2.7 pin; it is still the one
+// this repo uses on Vitest 5.0.0.
 //
 // Weakest intentional file: `physics-rapier/src/init.ts` at 86.95% lines — the
 // transcribed Rapier wasm typings / load cache (§37). 80% sits just below that

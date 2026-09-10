@@ -43,14 +43,15 @@
  *
  * ## Uniform transport (a deliberate padding rule)
  *
- * This backend's GL budget (`WebglContext`) deliberately has no `uniform2fv`
- * and no `uniformMatrix3fv`. Rather than grow the budget — and every recorded
- * double with it — a `vec2` uniform is **declared `vec4`** and read `.xy`,
- * and a `mat3` uniform is **declared `mat4`** and read `mat3(...)`; uploads
- * pad with zeroes (identity in the mat4's last column). The IR type, the
- * reflection, and `setUniform`'s validation all stay `vec2`/`mat3`; only the
- * GLSL declaration and the upload widen. Deterministic, driver-portable, and
- * invisible to authors.
+ * This backend's GL budget (`WebglContext`) has `uniformMatrix3fv` for the
+ * lit/standard normal-matrix hoist; it still has no `uniform2fv`. A `vec2`
+ * uniform is **declared `vec4`** and read `.xy`, and a node-material `mat3`
+ * uniform is still **declared `mat4`** and read `mat3(...)` so this pipeline's
+ * transcripts stay padded rather than growing a second 3×3 upload path.
+ * Uploads pad with zeroes (identity in the mat4's last column). The IR type,
+ * the reflection, and `setUniform`'s validation all stay `vec2`/`mat3`; only
+ * the GLSL declaration and the upload widen. Deterministic, driver-portable,
+ * and invisible to authors.
  */
 
 import { DEV, devWarnOnce, type Disposable } from "@fourjs/core";

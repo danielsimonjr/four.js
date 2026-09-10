@@ -26,7 +26,7 @@
  * exactly as `packages/render-webgl/tests/webgl-renderer.test.ts` does.
  */
 
-import { isFourError, type FourError } from "@fourjs/core";
+import { isFourError, resetDevWarnings, type FourError } from "@fourjs/core";
 import { Matrix4, type Vector3 } from "@fourjs/math";
 import {
   PARTICLE_INSTANCE_FLOATS,
@@ -37,7 +37,7 @@ import {
   type Renderer,
   type UnlitRenderItem,
 } from "@fourjs/render";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createRecordingGpu,
@@ -47,6 +47,7 @@ import {
 import {
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  DRAW_NORMAL_OFFSET,
   LIGHT_AMBIENT_OFFSET,
   LIGHT_CAMERA_OFFSET,
   LIGHT_COLOR_OFFSET,
@@ -67,15 +68,18 @@ import {
   SHADOW_LIGHT_UNIFORM_BYTES,
   SHADOW_MATRIX_OFFSET,
   SHADOW_PARAMS_OFFSET,
-  SPRITE_QUAD_OFFSET,
   SPRITE_TINT_OFFSET,
   STANDARD_EMISSIVE_OFFSET,
   STANDARD_SURFACE_OFFSET,
   UNIFORM_STRIDE_BYTES,
   WebgpuRenderer,
+  JOINT_PALETTE_FLOATS,
+  clearRegisteredSkinningPipeline,
   createWgpuBatching,
   hostGpu,
+  registerSkinningPipeline,
 } from "../src/index.js";
+import { setSkinningPipelineFactory } from "../src/wgpu-skinning-registry.js";
 
 type RenderView = Parameters<Renderer["render"]>[1][number];
 type RenderCamera = RenderView["camera"];
@@ -544,7 +548,9 @@ describe("WebgpuRenderer.initialize", () => {
     const viewsPass = gpu
       .callsOf("encoder.beginRenderPass")
       .find(
-        (call) => (call.args[0] as { label?: string } | undefined)?.label === "fourJS:views",
+        (call) =>
+          (call.args[0] as { label?: string } | undefined)?.label ===
+          "fourJS:views",
       );
     expect(
       (viewsPass?.args[0] as { timestampWrites?: unknown } | undefined)
@@ -637,6 +643,7 @@ describe("WebgpuRenderer.initialize", () => {
       shaderPrecision: "none",
       maxUniformBufferBytes: 0,
       maxBindings: 0,
+      maximumSkinningJoints: 48,
     });
   });
 
@@ -736,6 +743,7 @@ describe("WebgpuRenderer.render", () => {
   let harness: Harness;
 
   beforeEach(async () => {
+    clearRegisteredSkinningPipeline();
     harness = await initialized();
   });
 
@@ -850,6 +858,16 @@ describe("WebgpuRenderer.render", () => {
     const model = stride + DRAW_MODEL_OFFSET / 4;
     expect(data[model]).toBe(1);
     expect(data[model + 5]).toBe(1);
+    // Clear (model null) and the triangle (identity mat4) both pack identity
+    // `normalMatrix` — three columns padded to vec4.
+    const clearNormal = DRAW_NORMAL_OFFSET / 4;
+    expect(data.slice(clearNormal, clearNormal + 12)).toEqual([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0,
+    ]);
+    const drawNormal = stride + DRAW_NORMAL_OFFSET / 4;
+    expect(data.slice(drawNormal, drawNormal + 12)).toEqual([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0,
+    ]);
   });
 
   it("copies retained typed arrays at record time (the recording gotcha)", () => {
@@ -1183,11 +1201,12 @@ describe("WebgpuRenderer.render", () => {
   it("skips an item this tier has no pipeline for", () => {
     const root = createRoot();
     // A skinned item (RFC 0003): a renderable with a structural skeleton over
-    // a geometry carrying joints and weights builds as `"skinned-unlit"`,
-    // which needs the joint-palette pipeline this backend does not stage. It
-    // must be skipped, never approximated — and skipped before the geometry
-    // cache uploads buffers nothing will bind (WP-R1.4's pinned rule; before
-    // WP-R1.5 this test pinned the `"lit"` kind, which now draws).
+    // a geometry carrying joints and weights builds as `"skinned-unlit"`.
+    // Colour pipelines live behind `registerSkinningPipeline()`; unregistered
+    // (this test) the draw is skipped, never approximated as a bind pose —
+    // and skipped before the geometry cache uploads buffers nothing will bind
+    // (WP-R1.4's pinned rule; before WP-R1.5 this test pinned the `"lit"`
+    // kind, which now draws). Shadow caster and id pass stay absent.
     const geometry = triangle();
     geometry.joints = new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     geometry.weights = new Float32Array(12).fill(0.25);
@@ -1521,7 +1540,7 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
 
   it("draws a sprite through the sprite pipeline, texture at group 1", () => {
     const root = createRoot();
-    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    root.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
     harness.renderer.render(root, [createView()]);
 
     // Clear plus the sprite.
@@ -1542,14 +1561,14 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
     expect(groups).toContain(1);
   });
 
-  it("uploads tint × opacity and the quad rectangle in the sprite block", () => {
+  it("uploads tint × opacity in the sprite block; uvs are a vertex stream", () => {
     const root = createRoot();
     const material = new TestSpriteMaterial(
       new TestTexture(),
       [1, 0.5, 0.25, 0.8],
     );
     material.opacity = 0.5;
-    root.add(new SpriteNode(triangle(), material));
+    root.add(new SpriteNode(texturedTriangle(), material));
     harness.renderer.render(root, [createView()]);
 
     const data = uniformUpload(harness.gpu);
@@ -1557,29 +1576,28 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
     const tint = stride + SPRITE_TINT_OFFSET / 4;
     expect(data.slice(tint, tint + 3)).toEqual([1, 0.5, 0.25]);
     expect(data[tint + 3]).toBeCloseTo(0.4);
-    // The triangle's local bounds: x, y ∈ [-0.5, 0.5].
-    const quad = stride + SPRITE_QUAD_OFFSET / 4;
-    expect(data.slice(quad, quad + 4)).toEqual([-0.5, -0.5, 1, 1]);
+    // Two vertex buffers: position then the authored uv stream.
+    expect(harness.gpu.countOf("pass.setVertexBuffer")).toBeGreaterThanOrEqual(
+      2,
+    );
   });
 
-  it("reparametrizes the quad for §55's frame, exactly as the GL path does", () => {
+  it("binds the authored uv stream at slot 1, not a quad uniform", () => {
     const root = createRoot();
-    const material = new TestSpriteMaterial(new TestTexture(4, 4));
-    const sprite = new SpriteNode(triangle(), material);
-    sprite.frame = { x: 2, y: 2, width: 2, height: 2 };
-    root.add(sprite);
+    const geometry = texturedTriangle();
+    geometry.uvs = new Float32Array([0.5, 0.5, 1, 0.5, 1, 1]);
+    root.add(
+      new SpriteNode(geometry, new TestSpriteMaterial(new TestTexture(4, 4))),
+    );
     harness.renderer.render(root, [createView()]);
 
-    const data = uniformUpload(harness.gpu);
-    const quad = UNIFORM_STRIDE_BYTES / 4 + SPRITE_QUAD_OFFSET / 4;
-    // The rectangle the whole 4×4 texture would occupy so that the quad shows
-    // the (2, 2, 2, 2) frame of it — R-29's affine reparametrization.
-    expect(data.slice(quad, quad + 4)).toEqual([-1.5, -1.5, 2, 2]);
+    const buffers = harness.gpu.callsOf("pass.setVertexBuffer");
+    expect(buffers.map((call) => call.args[0])).toEqual([0, 1]);
   });
 
   it("blends by construction, whatever `transparent` says (§55)", () => {
     const root = createRoot();
-    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    root.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
     harness.renderer.render(root, [createView()]);
 
     const descriptor = pipelineDescriptor(harness.gpu, "fourJS:sprite|") as {
@@ -1617,6 +1635,7 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
       ]),
       new Uint16Array([0, 1, 2, 0, 2, 3]),
     );
+    quad.uvs = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
     root.add(new SpriteNode(quad, new TestSpriteMaterial()));
     harness.renderer.render(root, [createView()]);
     expect(harness.gpu.callsOf("pass.drawIndexed")[0]?.args[0]).toBe(6);
@@ -1624,7 +1643,7 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
 
   it("reuses the sprite bind group until the uniform buffer regrows", () => {
     const root = createRoot();
-    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    root.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
     harness.renderer.render(root, [createView()]);
     harness.gpu.reset();
     harness.renderer.render(root, [createView()]);
@@ -1646,7 +1665,7 @@ describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
     const statistics = createRenderStatistics();
     harness.renderer.statistics = statistics;
     const root = createRoot();
-    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    root.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
     harness.renderer.render(root, [createView()]);
     expect(statistics.drawCalls).toBe(1);
     expect(statistics.triangles).toBe(1);
@@ -1854,7 +1873,7 @@ describe("WebgpuRenderer clipping (§67, WP-R1.3)", () => {
     const root = createRoot();
     const panel = renderable(triangle());
     panel.clip = true;
-    panel.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    panel.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
     root.add(panel);
     harness.renderer.render(root, [createView()]);
 
@@ -1867,7 +1886,7 @@ describe("WebgpuRenderer clipping (§67, WP-R1.3)", () => {
 
   it("clips a sprite subtree — the mask is coverage, not shading", () => {
     const root = createRoot();
-    const panel = new SpriteNode(triangle(), new TestSpriteMaterial());
+    const panel = new SpriteNode(texturedTriangle(), new TestSpriteMaterial());
     panel.clip = true;
     panel.add(renderable(triangle()));
     root.add(panel);
@@ -2298,6 +2317,8 @@ class TestStandardMaterial {
 
   map?: TestTexture | null;
 
+  metalRoughnessMap?: TestTexture | null;
+
   constructor(baseColor: [number, number, number, number] = [1, 1, 1, 1]) {
     this.baseColor = baseColor;
   }
@@ -2536,6 +2557,32 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
     ]);
   });
 
+  it("packs a scaled model's inverse-transpose into the padded mat3 slot", () => {
+    const root = createRoot();
+    const mesh = new Renderable(
+      litTriangle().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    // Scale (2, 4, 8): inverse-transpose is the reciprocal diagonal. Translation
+    // does not participate. Column-major, matching `Matrix3.setNormalFromMatrix4`.
+    // Culling off so the scaled triangle is not dropped by an identity frustum.
+    mesh.frustumCulled = false;
+    mesh.transform.worldMatrix.fromArray([
+      2, 0, 0, 0, 0, 4, 0, 0, 0, 0, 8, 0, 1, 2, 3, 1,
+    ]);
+    root.add(mesh);
+
+    harness.renderer.render(root, [createView()]);
+    const floats = drawUniformUpload(harness.gpu);
+    const base = UNIFORM_STRIDE_BYTES / 4;
+    expect(
+      floats.slice(
+        base + DRAW_NORMAL_OFFSET / 4,
+        base + DRAW_NORMAL_OFFSET / 4 + 12,
+      ),
+    ).toEqual([0.5, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0.125, 0]);
+  });
+
   it("draws a standard item through the widened block and its own group 0", () => {
     const root = createRoot();
     const material = new TestStandardMaterial([0.5, 0.25, 0.125, 1]);
@@ -2573,11 +2620,112 @@ describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
         base + STANDARD_SURFACE_OFFSET / 4 + 4,
       ),
     ).toEqual([0.75, Math.fround(0.3), 0, 0]);
+    // Identity model → identity normal matrix in the padded mat3x3 slot.
+    expect(
+      floats.slice(
+        base + DRAW_NORMAL_OFFSET / 4,
+        base + DRAW_NORMAL_OFFSET / 4 + 12,
+      ),
+    ).toEqual([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]);
     // The eye rides the light block, for the specular lobe.
     const { floats: lightFloats } = lightsUpload(harness.gpu);
     expect(lightSlot(lightFloats, 0, LIGHT_CAMERA_OFFSET)).toEqual([
       1, 2, 3, 0,
     ]);
+    // Scalar-only: no `|mr:y` key, no group-3 bind, no extra layout.
+    expect(
+      pipelineLabels(harness.gpu).some((label) => label.includes("|mr:y")),
+    ).toBe(false);
+    expect(bindGroupOffsets(harness.gpu, 3)).toEqual([]);
+    expect(
+      layoutLabels(harness.gpu).some((label) =>
+        label.includes("pipeline-layout:standard:mr"),
+      ),
+    ).toBe(false);
+  });
+
+  it("samples an mr-only standard map at group 2", () => {
+    const root = createRoot();
+    const geometry = litTriangle();
+    geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+    const material = new TestStandardMaterial();
+    material.metalRoughnessMap = new TestTexture();
+    root.add(new Renderable(geometry.asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:standard|n|mr");
+    expect(
+      pipelineLabels(harness.gpu).some((label) => label.endsWith("|mr:y")),
+    ).toBe(true);
+    expect(bindGroupOffsets(harness.gpu, 2)).toHaveLength(1);
+    expect(bindGroupOffsets(harness.gpu, 3)).toEqual([]);
+    expect(mapAllocations(harness.gpu)).toBe(1);
+    const code = harness.gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => call.args[0] as { label?: string; code: string })
+      .find((module) => module.label === "fourJS:standard|n|mr")?.code;
+    expect(code).toContain("textureSample(mrTexture, mrSampler, input.uv)");
+    expect(code).not.toContain("textureSample(mapTexture, mapSampler");
+  });
+
+  it("samples albedo at group 2 and metal-roughness at group 3", () => {
+    const root = createRoot();
+    const geometry = litTriangle();
+    geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+    const material = new TestStandardMaterial();
+    material.map = new TestTexture();
+    material.metalRoughnessMap = new TestTexture();
+    root.add(new Renderable(geometry.asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:standard|n|map|mr");
+    expect(
+      pipelineLabels(harness.gpu).some(
+        (label) => label.includes("|map|") && label.endsWith("|mr:y"),
+      ),
+    ).toBe(true);
+    expect(bindGroupOffsets(harness.gpu, 2)).toHaveLength(1);
+    expect(bindGroupOffsets(harness.gpu, 3)).toHaveLength(1);
+    expect(mapAllocations(harness.gpu)).toBe(2);
+    const code = harness.gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => call.args[0] as { label?: string; code: string })
+      .find((module) => module.label === "fourJS:standard|n|map|mr")?.code;
+    expect(code).toContain("textureSample(mapTexture, mapSampler, input.uv)");
+    expect(code).toContain("textureSample(mrTexture, mrSampler, input.uv)");
+  });
+
+  it("skips a standard draw whose named metal-roughness map will not resolve (§83)", () => {
+    const root = createRoot();
+    const geometry = litTriangle();
+    geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+    const material = new TestStandardMaterial();
+    material.metalRoughnessMap = new TestTexture();
+    material.metalRoughnessMap.dispose();
+    root.add(new Renderable(geometry.asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(
+      moduleLabels(harness.gpu).some((label) => label.includes("standard")),
+    ).toBe(false);
+  });
+
+  it("degrades a metal-roughness standard draw without uvs to the scalar variant", () => {
+    const root = createRoot();
+    const material = new TestStandardMaterial();
+    material.metalRoughnessMap = new TestTexture();
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+    expect(moduleLabels(harness.gpu)).toContain("fourJS:standard|n");
+    expect(
+      pipelineLabels(harness.gpu).some((label) => label.includes("|mr:y")),
+    ).toBe(false);
+    expect(mapAllocations(harness.gpu)).toBe(0);
+    expect(harness.gpu.countOf("pass.draw")).toBe(2);
   });
 
   it("packs the punctual set exactly as the GL backend selects it (§68, §84)", () => {
@@ -3146,7 +3294,8 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
         .callsOf("device.createBindGroup")
         .filter(
           (call) =>
-            (call.args[0] as { label?: string }).label === "fourJS:shadow-lights",
+            (call.args[0] as { label?: string }).label ===
+            "fourJS:shadow-lights",
         ).length;
     expect(shadowGroupCount()).toBe(1);
 
@@ -3529,7 +3678,9 @@ describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
     const groups = harness.gpu
       .callsOf("device.createBindGroup")
       .map((call) => call.args[0] as { label?: string; entries: unknown[] })
-      .filter((descriptor_) => descriptor_.label === "fourJS:particle-uniforms");
+      .filter(
+        (descriptor_) => descriptor_.label === "fourJS:particle-uniforms",
+      );
     expect(groups).toHaveLength(1);
     expect(
       (groups[0]?.entries[0] as { resource: { size?: number } }).resource.size,
@@ -3907,5 +4058,351 @@ describe("WebgpuRenderer GPU particle simulations (§36, R-31)", () => {
       .callsOf("device.createRenderPipeline")
       .map((call) => (call.args[0] as { label?: string }).label ?? "");
     expect(labels.some((label) => label.includes("|gi:y"))).toBe(false);
+  });
+});
+
+function skinnedTriangle(source: TestGeometry = triangle()): TestGeometry {
+  source.joints = new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  source.weights = new Float32Array(12).fill(0.25);
+  return source;
+}
+
+function withSkeleton(
+  node: Renderable,
+  palette = new Float32Array(16),
+): { palette: Float32Array; updates: number } {
+  const state = { palette, updates: 0 };
+  (node as unknown as { skeleton: unknown }).skeleton = {
+    update: (): void => {
+      state.updates += 1;
+    },
+    jointMatrices: palette,
+    bones: [null],
+  };
+  return state;
+}
+
+function bufferLabelsOf(gpu: RecordingGpu, prefix: string): string[] {
+  return gpu
+    .callsOf("device.createBuffer")
+    .map((call) => String((call.args[0] as { label?: string }).label))
+    .filter((label) => label.startsWith(prefix));
+}
+
+function paletteUploads(gpu: RecordingGpu): number[][] {
+  return gpu
+    .callsOf("queue.writeBuffer")
+    .filter((call) => call.args[4] === JOINT_PALETTE_FLOATS)
+    .map((call) => call.args[2] as number[]);
+}
+
+describe("registerSkinningPipeline — WebgpuRenderer colour pair (RFC 0003)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    resetDevWarnings();
+    clearRegisteredSkinningPipeline();
+    harness = await initialized();
+  });
+
+  afterEach(() => {
+    clearRegisteredSkinningPipeline();
+    resetDevWarnings();
+  });
+
+  it("reports the declared joint limit as a §62 capability", () => {
+    expect(harness.renderer.capabilities.maximumSkinningJoints).toBe(48);
+  });
+
+  it("skips unregistered skinned draws with one warning and no joint upload", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const root = createRoot();
+      const node = renderable(skinnedTriangle());
+      withSkeleton(node);
+      root.add(node);
+
+      harness.renderer.render(root, [createView()]);
+      harness.renderer.render(root, [createView()]);
+
+      expect(harness.gpu.countOf("pass.draw")).toBe(2);
+      expect(bufferLabelsOf(harness.gpu, "fourJS:joints:")).toHaveLength(0);
+      expect(bufferLabelsOf(harness.gpu, "fourJS:weights:")).toHaveLength(0);
+      expect(
+        pipelineLabels(harness.gpu).some((label) => label.includes("skinned")),
+      ).toBe(false);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain(
+        "registerSkinningPipeline",
+      );
+      expect(String(warn.mock.calls[0]?.[0])).toContain("webgpu");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("is byte-identical with and without an unregistered skinned node", async () => {
+    const shared = triangle();
+    (shared as unknown as { id: string }).id = "shared-plain";
+    const tapeOf = async (withSkinned: boolean): Promise<string[]> => {
+      const gpu = createRecordingGpu();
+      const renderer = new WebgpuRenderer();
+      await withHostGpu(gpu.gpu, async () => {
+        await renderer.initialize({ canvas: gpu.canvas });
+      });
+      renderer.resize(256, 256, 1);
+      const group = new TestGroup();
+      group.addRenderables(renderable(shared));
+      if (withSkinned) {
+        const node = renderable(skinnedTriangle());
+        withSkeleton(node);
+        group.addRenderables(node);
+      }
+      renderer.render(group.asNode, [createView()]);
+      const transcript = gpu.transcript();
+      renderer.dispose();
+      return transcript;
+    };
+    expect(await tapeOf(true)).toEqual(await tapeOf(false));
+  });
+
+  it("keeps a skinless frame byte-identical under registration", async () => {
+    const shared = triangle();
+    (shared as unknown as { id: string }).id = "shared-skinless";
+    const tapeOf = async (): Promise<string[]> => {
+      const gpu = createRecordingGpu();
+      const renderer = new WebgpuRenderer();
+      await withHostGpu(gpu.gpu, async () => {
+        await renderer.initialize({ canvas: gpu.canvas });
+      });
+      renderer.resize(256, 256, 1);
+      renderer.render(renderable(shared), [createView()]);
+      const transcript = gpu.transcript();
+      renderer.dispose();
+      return transcript;
+    };
+    const before = await tapeOf();
+    registerSkinningPipeline();
+    expect(await tapeOf()).toEqual(before);
+  });
+
+  it("compiles lazily on the first skinned draw, uploads the palette, and reuses the pipeline", () => {
+    registerSkinningPipeline();
+    const root = createRoot();
+    const node = renderable(skinnedTriangle());
+    const { palette } = withSkeleton(node);
+    palette[13] = 5;
+    root.add(node);
+    const views = [createView()];
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+
+    harness.renderer.render(root, views);
+
+    expect(statistics.drawCalls).toBe(1);
+
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("fourJS:skinned-unlit|"),
+      ),
+    ).toBe(true);
+    expect(bufferLabelsOf(harness.gpu, "fourJS:joints:")).toHaveLength(1);
+    expect(bufferLabelsOf(harness.gpu, "fourJS:weights:")).toHaveLength(1);
+    expect(bufferLabelsOf(harness.gpu, "fourJS:joint-palette")).toHaveLength(1);
+    const palettes = paletteUploads(harness.gpu);
+    expect(palettes).toHaveLength(1);
+    expect(palettes[0]?.[13]).toBe(5);
+    expect(harness.gpu.countOf("pass.draw")).toBe(2);
+    expect(bindGroupOffsets(harness.gpu, 1)).toContainEqual([0]);
+
+    harness.gpu.reset();
+    harness.renderer.render(root, views);
+    expect(harness.gpu.countOf("device.createRenderPipeline")).toBe(0);
+    expect(harness.gpu.countOf("device.createShaderModule")).toBe(0);
+    expect(harness.gpu.countOf("pass.draw")).toBe(2);
+    expect(paletteUploads(harness.gpu)[0]?.[13]).toBe(5);
+  });
+
+  it("shades a skinned-lit draw with the frame's lights", () => {
+    registerSkinningPipeline();
+    const root = new AmbientRoot([0.2, 0.3, 0.4]);
+    const node = new Renderable(
+      skinnedTriangle(litTriangle()).asGeometry,
+      new TestLitMaterial([1, 0, 0, 1]).asMaterial,
+    );
+    withSkeleton(node);
+    root.add(node);
+
+    harness.renderer.render(root, [createView()]);
+
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("fourJS:skinned-lit|"),
+      ),
+    ).toBe(true);
+    expect(
+      moduleLabels(harness.gpu).some((label) => label.includes("skinned-lit")),
+    ).toBe(true);
+    expect(paletteUploads(harness.gpu)).toHaveLength(1);
+    expect(bindGroupOffsets(harness.gpu, 2).length).toBeGreaterThan(0);
+    expect(harness.gpu.countOf("pass.draw")).toBe(2);
+  });
+
+  it("binds joints and weights after the family's vertex streams", () => {
+    registerSkinningPipeline();
+    const root = createRoot();
+    const node = renderable(skinnedTriangle());
+    withSkeleton(node);
+    root.add(node);
+    harness.renderer.render(root, [createView()]);
+    const slots = harness.gpu
+      .callsOf("pass.setVertexBuffer")
+      .map((call) => call.args[0] as number);
+    // Clear uses slot 0; the skinned unlit draw binds position, joints, weights.
+    expect(slots.slice(-3)).toEqual([0, 1, 2]);
+  });
+
+  it("draws an indexed skinned mesh through drawIndexed", () => {
+    registerSkinningPipeline();
+    const geometry = skinnedTriangle(
+      new TestGeometry(
+        new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0, 0.5, 0]),
+        new Uint16Array([0, 1, 2]),
+      ),
+    );
+    const node = renderable(geometry);
+    withSkeleton(node);
+    harness.renderer.render(node, [createView()]);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
+  });
+
+  it("latches a factory failure: one warning, no bind-pose, no retry", () => {
+    setSkinningPipelineFactory({
+      create(): never {
+        throw new Error("skinning factory exploded");
+      },
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const root = createRoot();
+      const node = renderable(skinnedTriangle());
+      withSkeleton(node);
+      root.add(node);
+      const views = [createView()];
+
+      harness.renderer.render(root, views);
+      harness.renderer.render(root, views);
+
+      expect(harness.gpu.countOf("pass.draw")).toBe(2);
+      expect(bufferLabelsOf(harness.gpu, "fourJS:joints:")).toHaveLength(0);
+      expect(paletteUploads(harness.gpu)).toHaveLength(0);
+      expect(
+        pipelineLabels(harness.gpu).some((label) => label.includes("skinned")),
+      ).toBe(false);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain("failed to initialise");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("skips a zero-count skinned geometry before uploading joints", () => {
+    registerSkinningPipeline();
+    const empty = new TestGeometry(new Float32Array(0));
+    empty.joints = new Uint16Array(0);
+    empty.weights = new Float32Array(0);
+    const node = renderable(empty);
+    withSkeleton(node);
+    harness.renderer.render(node, [createView()]);
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(bufferLabelsOf(harness.gpu, "fourJS:joints:")).toHaveLength(0);
+  });
+
+  it("still excludes a registered skinned mesh from the shadow caster pass", () => {
+    registerSkinningPipeline();
+    const { root } = shadowedScene();
+    const skinned = new Renderable(
+      skinnedTriangle(litTriangle()).asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    withSkeleton(skinned);
+    root.add(skinned);
+
+    harness.renderer.render(root, [createView()]);
+
+    const names = harness.gpu.calls.map((call) => call.name);
+    const shadowStart = names.indexOf("encoder.beginRenderPass");
+    const viewsStart = names.indexOf(
+      "encoder.beginRenderPass",
+      shadowStart + 1,
+    );
+    const casterDraws = names
+      .slice(shadowStart, viewsStart)
+      .filter((name) => name === "pass.draw" || name === "pass.drawIndexed");
+    expect(casterDraws).toHaveLength(1);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("fourJS:skinned-lit|"),
+      ),
+    ).toBe(true);
+  });
+
+  it("disposes the palette with the renderer and forgets it on device loss", async () => {
+    registerSkinningPipeline();
+    const live = await initialized();
+    const node = renderable(skinnedTriangle());
+    withSkeleton(node);
+    live.renderer.render(node, [createView()]);
+    live.gpu.reset();
+    live.renderer.dispose();
+    expect(live.gpu.callsOf("buffer.destroy").length).toBeGreaterThan(0);
+
+    const lost = await initialized();
+    const lostNode = renderable(skinnedTriangle());
+    withSkeleton(lostNode);
+    lost.renderer.render(lostNode, [createView()]);
+    lost.gpu.reset();
+    lost.gpu.loseDevice();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(lost.renderer.deviceLost).toBe(true);
+    expect(lost.gpu.countOf("buffer.destroy")).toBe(0);
+    lost.renderer.dispose();
+    expect(lost.gpu.countOf("buffer.destroy")).toBe(0);
+  });
+
+  it("draws a vertex-coloured skinned-unlit mesh", () => {
+    registerSkinningPipeline();
+    const geometry = skinnedTriangle(triangle(new Float32Array(12).fill(1)));
+    const material = new TestMaterial();
+    material.vertexColors = true;
+    const node = renderable(geometry, material);
+    withSkeleton(node);
+    harness.renderer.render(node, [createView()]);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("fourJS:skinned-unlit|vc|"),
+      ),
+    ).toBe(true);
+  });
+
+  it("samples a map on a skinned-unlit draw and skips a disposed map", () => {
+    registerSkinningPipeline();
+    const material = new TestMaterial();
+    material.map = new TestTexture();
+    const node = renderable(skinnedTriangle(texturedTriangle()), material);
+    withSkeleton(node);
+    harness.renderer.render(node, [createView()]);
+    expect(
+      pipelineLabels(harness.gpu).some(
+        (label) => label.includes("skinned-unlit|") && label.includes("|map|"),
+      ),
+    ).toBe(true);
+    expect(bindGroupOffsets(harness.gpu, 2).length).toBeGreaterThan(0);
+
+    material.map.dispose();
+    harness.gpu.reset();
+    harness.renderer.render(node, [createView()]);
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
   });
 });

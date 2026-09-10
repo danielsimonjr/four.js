@@ -17,7 +17,6 @@ import { createRecordingGpu } from "../../../tests/integration/helpers/recording
 import {
   CLEAR_SHADER_SOURCE,
   COLOR_SHADER_LOCATION,
-  SPRITE_QUAD_OFFSET,
   SPRITE_SHADER_SOURCE,
   SPRITE_TINT_OFFSET,
   SPRITE_UNIFORM_BYTES,
@@ -27,6 +26,7 @@ import {
   createTextureBindGroupLayout,
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  DRAW_NORMAL_OFFSET,
   DRAW_UNIFORM_BYTES,
   DRAW_UNIFORM_FLOATS,
   DRAW_UNIFORM_WGSL,
@@ -153,6 +153,11 @@ describe("pipelineKey", () => {
     expect(pipelineKey({ ...BASE, vertexColors: true })).toContain("|vc|");
     expect(pipelineKey({ ...BASE, map: true })).toContain("|map|");
     expect(pipelineKey({ ...BASE, depthFormat: null })).toMatch(/\|-$/u);
+    expect(pipelineKey({ ...BASE, metalRoughness: true })).toMatch(/\|mr:y$/u);
+    expect(pipelineKey(BASE)).not.toContain("|mr:y");
+    expect(pipelineKey({ ...BASE, metalRoughness: false })).toBe(
+      pipelineKey(BASE),
+    );
   });
 
   it("separates every field that a pipeline bakes in", () => {
@@ -540,14 +545,16 @@ describe("the bind-group layout, declared as data (§7)", () => {
   });
 
   it("keeps the block size and the stride distinct", () => {
-    // Conflating them would bind 112 bytes of the next draw's block into this
+    // Conflating them would bind 64 bytes of the next draw's block into this
     // draw's shader — see `wgpu-bindings.ts`.
-    expect(DRAW_UNIFORM_BYTES).toBe(144);
-    expect(DRAW_UNIFORM_FLOATS).toBe(36);
+    expect(DRAW_UNIFORM_BYTES).toBe(192);
+    expect(DRAW_UNIFORM_FLOATS).toBe(48);
     expect(UNIFORM_STRIDE_BYTES).toBe(256);
     expect(DRAW_VIEW_PROJECTION_OFFSET).toBe(0);
     expect(DRAW_MODEL_OFFSET).toBe(64);
     expect(DRAW_COLOR_OFFSET).toBe(128);
+    expect(DRAW_NORMAL_OFFSET).toBe(144);
+    expect(DRAW_UNIFORM_WGSL).toContain("normalMatrix : mat3x3<f32>");
   });
 
   it("is the same declaration the WGSL reads", () => {
@@ -1120,16 +1127,17 @@ describe("the sprite pipeline family (§55, WP-R1.3)", () => {
     expect(gpu.countOf("device.createBindGroupLayout")).toBe(2);
   });
 
-  it("reads position alone — uv is derived from the quad uniform", () => {
+  it("reads position and the authored uv stream — no quad uniform", () => {
     const { cache, gpu } = spriteCache();
     cache.acquire(SPRITE);
     const descriptor = gpu.callsOf("device.createRenderPipeline")[0]
       ?.args[0] as {
       vertex: { buffers: { arrayStride: number; attributes: unknown[] }[] };
     };
-    expect(descriptor.vertex.buffers).toHaveLength(1);
+    expect(descriptor.vertex.buffers).toHaveLength(2);
     expect(descriptor.vertex.buffers[0]?.arrayStride).toBe(12);
-    expect(descriptor.vertex.buffers[0]?.attributes).toHaveLength(1);
+    expect(descriptor.vertex.buffers[1]?.arrayStride).toBe(8);
+    expect(SPRITE_SHADER_SOURCE).not.toContain("quad");
   });
 
   it("answers null when a provider is missing, and skips rather than throws", () => {
@@ -1359,12 +1367,12 @@ describe("§67's stencil state on a pipeline (WP-R1.3)", () => {
 });
 
 describe("the sprite uniform block, declared as data (§7's discipline)", () => {
-  it("declares the widened binding the WGSL reads, side by side", () => {
-    expect(SPRITE_UNIFORM_BYTES).toBe(160);
+  it("declares the binding the WGSL reads, side by side", () => {
+    expect(SPRITE_UNIFORM_BYTES).toBe(144);
     expect(SPRITE_TINT_OFFSET).toBe(128);
-    expect(SPRITE_QUAD_OFFSET).toBe(144);
     expect(SPRITE_SHADER_SOURCE).toContain(SPRITE_UNIFORM_WGSL);
-    expect(SPRITE_UNIFORM_WGSL).toContain("quad : vec4<f32>");
+    expect(SPRITE_UNIFORM_WGSL).not.toContain("quad");
+    expect(SPRITE_SHADER_SOURCE).not.toContain("draw.quad");
   });
 
   it("asks for a dynamically-offset uniform of the widened size", () => {

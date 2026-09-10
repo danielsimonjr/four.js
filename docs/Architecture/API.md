@@ -152,6 +152,7 @@ browser driver; `examples/first-2d-scene/main.ts` is the compiling version.
 | `DirectionalLight`                              | §68 MVP light — a node shining along its **−Z world axis**; color + intensity.                                                                                   |
 | `resolveWorldTransforms(scene)`                 | The §7 world-matrix resolver `Application` calls for you.                                                                                                        |
 | `PoseBuffer` / `PoseTarget`                     | §43/§37 previous+current pose store; interpolation is opt-in per node via `poses.track(node)`.                                                                   |
+| `Bone` / `Skeleton`                             | §54 joints. `Skeleton.update(skinRoot, worldOf?)` writes the palette; omit `worldOf` for resolved worlds. The interpolated list supplies a composer.             |
 | `NodeEventMap`                                  | The typed event map; `four/input` and physics augment it (`click`, collision events, …).                                                                         |
 
 The one-graph principle (§6): 2D shapes, 3D meshes, sprites, text glyphs, UI
@@ -206,7 +207,8 @@ not node subclasses.
 | `UnlitMaterial` / `LitMaterial` (`four/materials`)                     | Flat color vs. Lambert-diffuse + scene-ambient color (§68 MVP); both carry a `readonly kind` discriminant that selects the pipeline. |
 | `SpriteMaterial`                                                       | Texture + tint for sprites; sprites and particles are the only blended passes (§66).                                                 |
 | `boxGeometry` / `planeGeometry` / `circleGeometry2D` (`four/geometry`) | Procedural primitives returning `BufferGeometry` (box/plane carry per-face normals for the lit path).                                |
-| `buildRenderList` / `buildInterpolatedRenderList`                      | The scene→draw-list step (§64–§66); called by the backend, public for custom pipelines.                                              |
+| `buildRenderList` / `buildInterpolatedRenderList`                      | The scene→draw-list step (§64–§66); interpolated path also refreshes skin palettes from composed §43 poses (never a lerp of `jointMatrices`).                    |
+| `Mesh`                                                                     | §54 renderable that can carry a `Skeleton`; skinned when geometry has `joints`/`weights`.                                            |
 | `collectSceneLights`                                                   | §68 light discovery: first `DirectionalLight` in DFS order + `Scene.ambientLight`.                                                   |
 
 ```typescript
@@ -579,7 +581,7 @@ app-supplied** through the `WidgetSkin` seam (the dependency matrix keeps
 
 ## Serialization and assets
 
-**Packages:** `four/serialization`, `four/assets` · **Guide:**
+**Packages:** `fourJS/serialization`, `fourJS/assets` · **Guide:**
 [digital-twin](../guides/digital-twin.md) · **Spec:** §76, §79–§80
 
 **Scene documents (§79):** canonical, versioned (`SCENE_FORMAT_VERSION`),
@@ -587,30 +589,40 @@ byte-stable text (§33).
 
 ```typescript
 import {
-  createDefaultComponentSerializers,
   decodeSceneDocument,
   encodeSceneDocument,
   instantiateScene,
   serializeScene,
 } from "fourJS/serialization";
+import { registerSceneNodeTypes, resourceCatalog } from "fourJS";
 
-const registry = createDefaultComponentSerializers(); // PoseTarget built in
-registry.register(RigidBody, myRigidBodySerializer); // components YOUR app uses
-
-const document = serializeScene(app.scene, registry);
+const io = registerSceneNodeTypes({
+  atlas,
+  geometries: resourceCatalog(geometries),
+  materials: resourceCatalog(materials),
+});
+const document = serializeScene(app.scene, io.components, io.write);
 const saved = encodeSceneDocument(document); // canonical text
-const restored = instantiateScene(decodeSceneDocument(saved), registry);
+const restored = instantiateScene(
+  decodeSceneDocument(saved),
+  io.components,
+  io.read,
+);
 ```
 
-Serializers are keyed by component **class**; an unregistered component fails
-the save loudly (`unknownComponents: "throw"`, the A-15 default since
-2026-08-06 — this line said "silently unsaved (known boundary)" until
+`createDefaultComponentSerializers()` only knows `PoseTarget` and the built-in
+`"scene"` / `"group"` node types. A scene holding a `Renderable` or `Text`
+throws until `nodeTypeOf` / `nodeFactory` are supplied — `registerSceneNodeTypes()`
+is that pair. Serializers are keyed by component **class**; an unregistered
+component fails the save loudly (`unknownComponents: "throw"`, the A-15 default
+since 2026-08-06 — this line said "silently unsaved (known boundary)" until
 2026-08-07, which stopped being true with that change; `"skip"` restores the
 old tolerance, minus the silence). Versioned migrations (§80) run on load via
 `SceneMigrationRegistry` / `migrateSceneDocument`, with warnings surfaced.
 Reference `RigidBody`/`Collider` serializers live in
 `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`, shipped from `@fourjs/physics` since
-2026-08-06 (previously reference code in the test helpers). The §79/§34 boundary is
+2026-08-06 (previously reference code in the test helpers), and are registered
+by `registerSceneNodeTypes()`. The §79/§34 boundary is
 measured: a contact-free save round-trips bit-identically; resuming
 mid-contact exactly requires pairing the document with a §34 snapshot.
 
@@ -621,14 +633,14 @@ mid-contact exactly requires pairing the document with a §34 snapshot.
 | `AssetManager`                                                     | Coalescing, ref-counted cache: `load<T>(url, loader): Promise<T>`, `release`, `refCount`, `clear`, `dispose`. |
 | `jsonLoader` / `textLoader` / `binaryLoader` / `createImageLoader` | The shipped `AssetLoader<T>` implementations; `ImageAsset` is the disposal wrapper.                           |
 
-glTF loading is staged (needs §55 textures + non-unlit materials) — 3D
-geometry today is procedural (`four/geometry`) or custom-loaded.
+glTF loading ships (`createGltfLoader` + `instantiateGltf`;
+`examples/gltf-model`). Procedural geometry (`fourJS/geometry`) is the other path.
 
 ---
 
 ## Diagnostics: checksums, replay, debug draw
 
-**Package:** `four/diagnostics` · **Guide:**
+**Package:** `fourJS/diagnostics` · **Guide:**
 [digital-twin](../guides/digital-twin.md) · **Spec:** §33–§34, §113
 
 | Symbol                                                                                                                                          | Contract                                                                                                                                                                                                                              |

@@ -1482,6 +1482,7 @@ describe("materials (§59 tier)", () => {
     expect(material.doubleSided).toBe(false);
     expect(material.baseColorTexture).toBeNull();
     expect(material.metallicRoughnessTexture).toBeNull();
+    expect(material.emissiveTexture).toBeNull();
   });
 
   it("carries factors, alpha mode, double-sidedness, and extras", async () => {
@@ -1585,13 +1586,11 @@ describe("materials (§59 tier)", () => {
         delete pbr["baseColorTexture"];
         materials[0]["normalTexture"] = { index: 0 };
         materials[0]["occlusionTexture"] = { index: 0 };
-        materials[0]["emissiveTexture"] = { index: 0 };
       }),
     );
     expect(asset.materials[0].ignoredTextures).toEqual([
       "normalTexture",
       "occlusionTexture",
-      "emissiveTexture",
     ]);
     expect(asset.textures).toEqual([null]);
     expect(asset.ignored.join("\n")).toMatch(/texture slot/);
@@ -1615,6 +1614,26 @@ describe("materials (§59 tier)", () => {
     expect(asset.textures[0]).not.toBeNull();
     expect(asset.textures[0]?.colorSpace).toBe("linear");
     expect(asset.ignored.join("\n")).not.toMatch(/metallicRoughnessTexture/);
+  });
+
+  it("decodes an emissiveTexture as sRGB and does not warn it ignored", async () => {
+    const asset = await load(
+      corrupt(texturedDocument(), (c) => {
+        const materials = c["materials"] as Record<string, unknown>[];
+        const pbr = materials[0]["pbrMetallicRoughness"] as Record<
+          string,
+          unknown
+        >;
+        delete pbr["baseColorTexture"];
+        materials[0]["emissiveTexture"] = { index: 0 };
+      }),
+      { decodeTexture: fakeDecode },
+    );
+    expect(asset.materials[0].ignoredTextures).toEqual([]);
+    expect(asset.materials[0].emissiveTexture).toBe(0);
+    expect(asset.textures[0]).not.toBeNull();
+    expect(asset.textures[0]?.colorSpace).toBe("srgb");
+    expect(asset.ignored.join("\n")).not.toMatch(/emissiveTexture/);
   });
 
   it("refuses an ignored slot naming a missing texture (§96)", async () => {

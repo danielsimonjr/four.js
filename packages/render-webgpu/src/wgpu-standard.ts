@@ -41,27 +41,43 @@
  * group are created lazily by the first standard draw, so an application that
  * never shades a standard material records the transcript it always did. The
  * spare stride bytes were already allocated; a standard block reads 32 more of
- * them.
+ * them. The `normalMatrix` member sits at the same offset as
+ * `DrawUniforms.normalMatrix` so `shadedVertexStageWgsl` can read
+ * `draw.normalMatrix` on both structs.
  *
  * ```text
  * offset  member          contents
  *      0  viewProjection  as DrawUniforms
  *     64  model           as DrawUniforms
  *    128  baseColor       §59 base colour × opacity   (DrawUniforms.color's slot)
- *    144  emissive        rgb (§59);                   w unused, written 0
- *    160  surface         x metalness, y roughness;    z, w unused, written 0
- *    176  = STANDARD_UNIFORM_BYTES
+ *    144  normalMatrix    as DrawUniforms             (3 columns × vec4 stride)
+ *    192  emissive        rgb (§59);                   w unused, written 0
+ *    208  surface         x metalness, y roughness;    z, w unused, written 0
+ *    224  = STANDARD_UNIFORM_BYTES
  * ```
  *
- * All-`vec4` slots for `wgpu-lights.ts`'s alignment reason: every byte named,
- * none implied. The lights, the eye position and §57's `map` bind exactly as
- * the lit family's do (`wgpu-lights.ts`).
+ * 16-byte slots for `wgpu-lights.ts`'s alignment reason: every byte named,
+ * none implied (`mat3x3` is three padded columns). The lights, the eye
+ * position and §57's `map` bind exactly as the lit family's do
+ * (`wgpu-lights.ts`).
  *
- * ## Second texture unit — staged on this backend (2026-09-06)
+ * ## Packed metallic-roughness map (§59)
  *
- * `StandardMaterial.metalRoughnessMap` is a real field and WebGL samples it.
- * This family still shades from the scalar factors only. `normalMap` /
- * `occlusionMap` / `emissiveMap` remain unstaged on both backends.
+ * `StandardMaterial.metalRoughnessMap` is sampled here as on WebGL: G is
+ * roughness, B is metalness, each a multiply on the scalar factor. Bind-group
+ * index is **not** a constant — WebGPU pipeline layouts are an array whose
+ * index *is* the group, so an empty slot 2 would make `@group(3)` invalid.
+ * Rule, documented also on `wgpu-lights.ts`: **MR at group 3 when albedo
+ * occupies group 2, at group 2 when there is no albedo.**
+ * `shadedMrBindingWgsl` is the one helper; {@link standardShaderSource}
+ * passes `map ? 3 : 2`. Vertex uvs are written when *either* texture is
+ * sampled (`shadedVertexStageWgsl(normals, map || metalRoughness)`), matching
+ * GL's `useMetalRoughnessMap` without `useMap`. `normalMap` /
+ * `occlusionMap` remain unstaged on both backends. `emissiveMap` is sampled
+ * on WebGL 2 (texture unit 3) this slice; WebGPU leaves it unsampled —
+ * groups 2 and 3 already hold albedo and metallic-roughness when both maps
+ * exist, and the four-group budget is full. Do not add a fifth bind group
+ * for it.
  */
 
 import {
@@ -72,7 +88,10 @@ import {
 import {
   LIGHT_UNIFORM_WGSL,
   PUNCTUAL_LIGHT_WGSL,
+  SHADED_MAP_BIND_GROUP_INDEX,
   SHADED_MAP_BINDING_WGSL,
+  SHADED_MR_BIND_GROUP_INDEX,
+  shadedMrBindingWgsl,
 } from "./wgpu-lights.js";
 import { shadedVertexStageWgsl } from "./wgpu-lit.js";
 import {
@@ -90,17 +109,20 @@ export const STANDARD_MODEL_OFFSET = 64;
 /** Byte offset of `StandardUniforms.baseColor` — `DrawUniforms.color`'s slot, renamed. */
 export const STANDARD_BASE_COLOR_OFFSET = 128;
 
+/** Byte offset of `StandardUniforms.normalMatrix` — `DrawUniforms.normalMatrix`'s slot. */
+export const STANDARD_NORMAL_OFFSET = 144;
+
 /** Byte offset of `StandardUniforms.emissive` (rgb; w unused, written 0). */
-export const STANDARD_EMISSIVE_OFFSET = 144;
+export const STANDARD_EMISSIVE_OFFSET = 192;
 
 /** Byte offset of `StandardUniforms.surface` (x metalness, y roughness; zw 0). */
-export const STANDARD_SURFACE_OFFSET = 160;
+export const STANDARD_SURFACE_OFFSET = 208;
 
 /**
  * Size of the `StandardUniforms` block in bytes — the binding size, not the
  * 256-byte stride (`SPRITE_UNIFORM_BYTES`' distinction, restated).
  */
-export const STANDARD_UNIFORM_BYTES = 176;
+export const STANDARD_UNIFORM_BYTES = 224;
 
 /**
  * The standard draw's group-0 layout: binding 0, a dynamically-offset uniform
@@ -140,6 +162,7 @@ export const STANDARD_UNIFORM_WGSL = `struct StandardUniforms {
   viewProjection : mat4x4<f32>,
   model : mat4x4<f32>,
   baseColor : vec4<f32>,
+  normalMatrix : mat3x3<f32>,
   emissive : vec4<f32>,
   surface : vec4<f32>,
 };
@@ -147,11 +170,13 @@ export const STANDARD_UNIFORM_WGSL = `struct StandardUniforms {
 @group(0) @binding(0) var<uniform> draw : StandardUniforms;`;
 
 /**
- * The standard WGSL module for one variant triple — the same variant axes as
- * the lit family (`normals`, `map`, WP-R1.7's `shadow`), for the same reasons
- * (`wgpu-lit.ts`'s departures 2 and 3 apply verbatim; the vertex stage *is*
- * the lit family's, over this module's own uniform block; `shadow` defaults
- * false and the default's text is byte-identical to what WP-R1.5 landed).
+ * The standard WGSL module for one variant quadruple — the lit family's
+ * (`normals`, `map`, WP-R1.7's `shadow`) plus §59's packed metallic-roughness
+ * map. `metalRoughness` defaults false so every landed scalar-only module is
+ * byte-identical. The vertex stage is the lit family's, over this module's
+ * own uniform block, and writes uvs when *either* texture is sampled; both
+ * structs carry `normalMatrix` at the same offset so the shared vertex stage
+ * reads `draw.normalMatrix` unchanged.
  *
  * The fragment stage is `STANDARD_FRAGMENT_SHADER_SOURCE`'s arithmetic in its
  * order: the base sample, the diffuse/F0 split, ambient into the diffuse lobe,
@@ -165,6 +190,7 @@ export function standardShaderSource(
   normals: boolean,
   map: boolean,
   shadow = false,
+  metalRoughness = false,
 ): string {
   return `${STANDARD_UNIFORM_WGSL}
 
@@ -174,9 +200,17 @@ ${shadow ? SHADOW_LIGHT_UNIFORM_WGSL : LIGHT_UNIFORM_WGSL}${
 
 ${SHADED_MAP_BINDING_WGSL}`
       : ""
+  }${
+    metalRoughness
+      ? `
+
+${shadedMrBindingWgsl(
+  map ? SHADED_MR_BIND_GROUP_INDEX : SHADED_MAP_BIND_GROUP_INDEX,
+)}`
+      : ""
   }
 
-${shadedVertexStageWgsl(normals, map)}
+${shadedVertexStageWgsl(normals, map || metalRoughness)}
 
 ${PUNCTUAL_LIGHT_WGSL}${
     shadow
@@ -224,8 +258,17 @@ fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
   base = base * textureSample(mapTexture, mapSampler, input.uv);`
       : ""
   }
-  let albedo = base.rgb;
-  let metalness = draw.surface.x;
+  let albedo = base.rgb;${
+    metalRoughness
+      ? `
+  var metalness = draw.surface.x;
+  var roughness = draw.surface.y;
+  let mr = textureSample(mrTexture, mrSampler, input.uv);
+  metalness = metalness * mr.b;
+  roughness = roughness * mr.g;`
+      : `
+  let metalness = draw.surface.x;`
+  }
   let diffuseColor = albedo * (1.0 - metalness);
   let f0 = mix(vec3<f32>(DIELECTRIC_F0), albedo, metalness);
   var shaded = lights.ambientColor.xyz * diffuseColor;
@@ -235,7 +278,7 @@ fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
     let n = input.normal / normalLength;
     let v = normalize(lights.cameraPosition.xyz - input.worldPosition);
 
-    var alpha = max(draw.surface.y, MIN_ROUGHNESS);
+    var alpha = max(${metalRoughness ? "roughness" : "draw.surface.y"}, MIN_ROUGHNESS);
     alpha = alpha * alpha;
     let alpha2 = alpha * alpha;
 

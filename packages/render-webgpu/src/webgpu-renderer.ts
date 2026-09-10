@@ -42,16 +42,21 @@
  * materials** and §70's **`"graph"` effect** (RFC 0001's WGSL emitter,
  * `wgpu-node-program.ts`, reached only through the
  * `registerWebgpuNodeMaterialPipeline()` seam in `wgpu-node-registry.ts`).
- * The remaining pipelines (RFC 0003's `skinned-unlit`/`skinned-lit`, which
- * need a joint-palette pipeline this backend does not stage yet) are
- * *absent*, not stubbed: an item this tier cannot draw is skipped, exactly
- * as a draw with no geometry record is, because a pipeline that silently
- * draws the wrong thing is worse than one that does not exist yet (the
- * recorded WP-9.1 rule, applied to a backend) — and an *unregistered* node
- * material is skipped on the same terms. The one exception is deliberate and
- * narrow: a §67 **mask** is coverage, not shading, so a clip node of any
- * material family masks correctly today through the flat unlit pipeline with
- * colour writes off.
+ * RFC 0003's skinned colour pair (`skinned-unlit` / `skinned-lit`) is
+ * **opt-in** behind `registerSkinningPipeline()` — the pipeline-cost law's
+ * registration seam, matching WebGL: the renderer imports only the registry
+ * slot, and an unregistered (or failed) skinned draw is skipped, never
+ * shown in bind pose. The §69 skinned caster and the RFC 0005 skinned id
+ * pass stay *absent*: those items skip, and an invisible surface must not
+ * cast or pick as its bind pose. An *unregistered* node material is skipped
+ * on the same terms. §71 picking is **opt-in**: `createPickingService()` is
+ * declared (presence is the capability, matching WebGL) and throws until
+ * `registerPickingPipeline()` links `wgpu-picking.ts`. The id pass draws
+ * particle systems with one colour per emitter (the §36 billboard, CPU
+ * 8-float instance stream); trails stay undrawn and skinned items stay
+ * skipped. The one exception is deliberate and narrow: a §67 **mask** is
+ * coverage, not shading, so a clip node of any material family masks
+ * correctly today through the flat unlit pipeline with colour writes off.
  *
  * ## `initialize()` finally earns its `Promise`
  *
@@ -102,20 +107,24 @@
  */
 
 import { DEV, EventEmitter, FourError, devWarnOnce } from "@fourjs/core";
-import { Frustum, Matrix4, type Rectangle2 } from "@fourjs/math";
+import { Frustum, Matrix3, Matrix4, type Rectangle2 } from "@fourjs/math";
 import {
   COLOR_GRADE_DEFAULTS,
   RenderTarget,
   buildInterpolatedRenderList,
   buildRenderList,
   buildViewRenderList,
+  MAX_SKINNING_JOINTS,
   collectSceneLights,
   createSceneLights,
   isRenderTargetTexture,
+  isSkinnedLitItem,
+  isSkinnedUnlitItem,
   intersectScissor,
   validateReadbackRegion,
   type EffectRenderPass,
   type RenderBatch,
+  type PickingService,
   type RenderInterpolation,
   type RenderItem,
   type RenderStatistics,
@@ -147,6 +156,7 @@ import {
 import {
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  DRAW_NORMAL_OFFSET,
   DRAW_UNIFORM_BYTES,
   DRAW_VIEW_PROJECTION_OFFSET,
   MAP_BIND_GROUP_INDEX,
@@ -173,6 +183,7 @@ import {
   LIGHT_UNIFORM_STRIDE_BYTES,
   LIGHT_UNIFORM_STRIDE_FLOATS,
   SHADED_MAP_BIND_GROUP_INDEX,
+  SHADED_MR_BIND_GROUP_INDEX,
   createLightsBindGroupLayout,
   writeLightUniforms,
 } from "./wgpu-lights.js";
@@ -216,7 +227,6 @@ import {
   createStandardBindGroupLayout,
 } from "./wgpu-standard.js";
 import {
-  SPRITE_QUAD_OFFSET,
   SPRITE_UNIFORM_BYTES,
   createSpriteBindGroupLayout,
 } from "./wgpu-sprite.js";
@@ -245,6 +255,21 @@ import {
   type WgpuNodeFrameState,
   type WgpuNodeMaterialPipelines,
 } from "./wgpu-node-registry.js";
+import {
+  resolvePickingServiceFactory,
+  type PickingRendererHost,
+} from "./wgpu-picking-registry.js";
+// The registry slot only, deliberately (the GL backend's skinning seam,
+// restated): a value import of `wgpu-skinning.ts` would link the two
+// skinned colour pipelines and the palette uploader into every bundle that
+// carries this renderer. `registerSkinningPipeline` is what links the
+// heavy module; see `wgpu-skinning-registry.ts` for the seam.
+import {
+  resolveSkinningPipelineFactory,
+  type SkinnedPrograms,
+  type SkinningPipelineHost,
+  type WgpuSkinnedDrawDescriptor,
+} from "./wgpu-skinning-registry.js";
 import { CLEAR_VERTEX_COUNT } from "./wgpu-unlit.js";
 
 /** Error code for use-after-dispose, mirroring the other two backends (§83, §89). */
@@ -285,6 +310,15 @@ const DEPTH_FORMAT = "depth24plus";
  */
 const DEPTH_STENCIL_FORMAT = "depth24plus-stencil8";
 
+/**
+ * Scratch for the per-draw `normalMatrix` pack in {@link WebgpuRenderer}.
+ * Constructed once; `setNormalFromMatrix4` mutates in place and allocates
+ * nothing (plan D7). Seeded to identity before each use so a singular model
+ * (invert no-op) cannot leak the previous draw's inverse-transpose — the
+ * math helper's documented policy, not a second one.
+ */
+const normalMatrixScratch = new Matrix3();
+
 /** The swap-chain format used when the host will not name a preferred one. */
 const FALLBACK_CANVAS_FORMAT = "bgra8unorm";
 
@@ -302,9 +336,6 @@ type SpriteItem = Extract<RenderItem, { kind: "sprite" }>;
 
 /** A particle render item (§36, WP-R1.8) — one instanced draw per system. */
 type ParticleItem = Extract<RenderItem, { kind: "particles" }>;
-
-/** §55's material as this backend reads it — texture, tint, §57 state. */
-type SpriteMaterialLike = SpriteItem["material"];
 
 /** A shaded render item (§68 lit or §59 standard, WP-R1.5). */
 type ShadedItem = Extract<RenderItem, { kind: "lit" | "standard" }>;
@@ -444,6 +475,11 @@ function readCapabilities(device: GpuDevice): RendererCapabilities {
     shaderPrecision: "highp",
     maxUniformBufferBytes: limit("maxUniformBufferBindingSize"),
     maxBindings: limit("maxBindingsPerBindGroup"),
+    // RFC 0003's declared joint limit — the same constant WebGL reports.
+    // Registration (`registerSkinningPipeline`) is the application opting
+    // in to paying for the pipelines; the capability says what this
+    // backend *can* do.
+    maximumSkinningJoints: MAX_SKINNING_JOINTS,
     // WebGPU exposes no standard anisotropy limit; 16 is the clamp
     // `wgpu-texture.ts` already uses when `limits.maxAnisotropy` is absent.
     // Reading a property of the device's existing `limits` record is not a
@@ -545,6 +581,12 @@ function resolveFrameTexture(
   return renderTargets.sample(source);
 }
 
+function metalRoughnessMapOf(material: {
+  metalRoughnessMap?: WgpuCacheableTexture | null;
+}): WgpuCacheableTexture | null {
+  return material.metalRoughnessMap ?? null;
+}
+
 /** Adds one *submitted* draw to §84's counters — the twin of the GL backend's. */
 function countDraw(
   statistics: RenderStatistics,
@@ -626,6 +668,9 @@ export class WebgpuRenderer implements Renderer {
     shaderPrecision: "none",
     maxUniformBufferBytes: 0,
     maxBindings: 0,
+    // Declared joint limit, not a device query — same constant after
+    // initialize. Registration is what compiles the pipelines.
+    maximumSkinningJoints: MAX_SKINNING_JOINTS,
   } satisfies RendererCapabilities);
 
   #canvas: WebgpuCanvas | null = null;
@@ -666,8 +711,9 @@ export class WebgpuRenderer implements Renderer {
   /**
    * The sprite draws' bind group over {@link WebgpuRenderer.#uniformBuffer} —
    * the same strided blocks, bound at {@link SPRITE_UNIFORM_BYTES} instead of
-   * 144. Dropped (not destroyed — bind groups have no `destroy`) whenever the
-   * buffer is regrown, and recreated by the next sprite draw.
+   * {@link DRAW_UNIFORM_BYTES}. Dropped (not destroyed — bind groups have no
+   * `destroy`) whenever the buffer is regrown, and recreated by the next
+   * sprite draw.
    */
   #spriteBindGroup: GpuBindGroup | null = null;
 
@@ -731,6 +777,22 @@ export class WebgpuRenderer implements Renderer {
    * after device loss (WebGPU has no restore; a next frame never runs).
    */
   #nodePipelines: WgpuNodeMaterialPipelines | null = null;
+
+  /**
+   * RFC 0003's registered skinned colour pair (`wgpu-skinning.ts` through
+   * the `wgpu-skinning-registry.ts` slot), or `null` — before the first
+   * skinned draw, when nothing is registered (those draws are then skipped
+   * with a one-time §85 warning, never a bind pose), after a compile
+   * failure (the latch), and again after device loss.
+   */
+  #skinnedPrograms: SkinnedPrograms | null = null;
+
+  /**
+   * Set when `factory.create` throws. A later skinned item on this device
+   * must not retry — a refusing factory asked once per item would otherwise
+   * succeed on a subsequent call.
+   */
+  #skinnedProgramsFailed = false;
 
   /**
    * The pooled per-draw state handed to node draws (plan D7: the frame loop
@@ -937,8 +999,7 @@ export class WebgpuRenderer implements Renderer {
       );
     }
 
-    const timestampQueries =
-      adapter.features?.has("timestamp-query") === true;
+    const timestampQueries = adapter.features?.has("timestamp-query") === true;
     const device = timestampQueries
       ? await adapter.requestDevice({
           requiredFeatures: ["timestamp-query"],
@@ -1145,9 +1206,19 @@ export class WebgpuRenderer implements Renderer {
     const nodePipelines = hasNodeItems
       ? this.#acquireNodePipelines(device, geometries, textures, renderTargets)
       : null;
+    // RFC 0003: a registered skinned item is a real colour draw whose §57
+    // stencil must reach `frameWantsStencil`; an unregistered one stays
+    // format-invisible (the node-scan rule, second application). The
+    // factory is read here — compiling still waits for the first skinned
+    // draw — so a skinless frame records not one call more or less for it.
+    const skinningRegistered = resolveSkinningPipelineFactory() !== null;
     const frameStencil =
       targetRecord === null
-        ? frameWantsStencil(items, nodePipelines !== null)
+        ? frameWantsStencil(
+            items,
+            nodePipelines !== null,
+            skinningRegistered,
+          )
         : targetRecord.stencil;
     const frameClips = wantsClips && frameStencil;
     // §67's exhaustion case, reachable here only off screen (the on-screen
@@ -1180,18 +1251,26 @@ export class WebgpuRenderer implements Renderer {
     }
 
     // §68 (WP-R1.5): does this frame shade at all? One `kind` comparison per
-    // item, the GL backend's scan — minus the skinned-lit kind it includes
-    // there, deliberately: a skinned item is transcript-invisible on this
-    // backend (WP-R1.4's pinned claim), and collecting lights for draws that
-    // will be skipped would allocate the light block into that byte-identical
-    // tape. Collected once per call, not per view — lights are frame state,
-    // like the render list; the eye is the per-view half, packed per view
-    // below.
+    // item, the GL backend's scan — including `skinned-lit` **when the
+    // colour pair is registered**, so a receiving/shaded skinned draw gets
+    // the light block, while an unregistered skinned-lit item stays
+    // transcript-invisible (WP-R1.4's pinned claim: collecting lights for
+    // draws that will be skipped would allocate the light block into that
+    // byte-identical tape). Collected once per call, not per view — lights
+    // are frame state, like the render list; the eye is the per-view half,
+    // packed per view below.
     let hasLitItems = false;
+    let skinnedCount = 0;
     for (const item of items) {
-      if (item.kind === "lit" || item.kind === "standard") {
+      if (
+        item.kind === "lit" ||
+        item.kind === "standard" ||
+        (item.kind === "skinned-lit" && skinningRegistered)
+      ) {
         hasLitItems = true;
-        break;
+      }
+      if (item.kind === "skinned-unlit" || item.kind === "skinned-lit") {
+        skinnedCount += 1;
       }
     }
     if (hasLitItems) {
@@ -1224,6 +1303,17 @@ export class WebgpuRenderer implements Renderer {
     // dead device.
     if (nodePipelines !== null && this.#disposed) {
       return;
+    }
+
+    // RFC 0003: resolve the colour pair *before* the pass, so the palette
+    // buffer can be sized (a mid-pass grow would orphan the bound group)
+    // and a factory failure is a skip for every skinned item, never a
+    // bind pose. Unregistered: warned once inside `#acquireSkinnedPrograms`
+    // and `skinnedPrograms` stays null — the draw arm continues past.
+    const skinnedPrograms =
+      skinnedCount > 0 ? this.#acquireSkinnedPrograms() : null;
+    if (skinnedPrograms !== null) {
+      skinnedPrograms.prepare(device, skinnedCount * views.length);
     }
 
     // Sized before recording: one clear block per view plus, at worst, one
@@ -1471,7 +1561,12 @@ export class WebgpuRenderer implements Renderer {
       for (let index = 0; index < viewItems.length; index += 1) {
         const item = viewItems[index];
         if (itemScissorActive) {
-          pass.setScissorRect(viewScissor.x, top, viewScissor.width, viewScissor.height);
+          pass.setScissorRect(
+            viewScissor.x,
+            top,
+            viewScissor.width,
+            viewScissor.height,
+          );
           itemScissorActive = false;
         }
 
@@ -1549,6 +1644,59 @@ export class WebgpuRenderer implements Renderer {
         }
         if (
           !maskPass &&
+          (isSkinnedUnlitItem(item) || isSkinnedLitItem(item))
+        ) {
+          // §54's skinned colour draws (RFC 0003) — a self-contained arm
+          // ending in `continue`, like the particle arm below, because the
+          // pipeline must be resolved *before* the geometry upload: a draw
+          // skipped for an unregistered pipeline (or a failed compile)
+          // contributes nothing at all — not even a buffer upload. The
+          // failure direction is absence with a one-time warning, never a
+          // bind pose (a character standing in T-pose is a different
+          // picture).
+          if (skinnedPrograms === null) {
+            continue;
+          }
+          const skinnedLit = isSkinnedLitItem(item);
+          const record = geometries.acquire(
+            item.geometry,
+            skinnedLit,
+            true,
+          );
+          if (
+            record === null ||
+            record.jointBuffer === null ||
+            record.weightBuffer === null
+          ) {
+            continue;
+          }
+          const drawn = this.#drawSkinned(
+            pass,
+            skinnedPrograms,
+            bindGroup,
+            textures,
+            renderTargets,
+            activeTarget,
+            item,
+            record,
+            skinnedLit,
+            block,
+            depthFormat,
+            frameStencil,
+            clip,
+            stencilReference,
+            statistics,
+            shadowGroup,
+            lightBase,
+          );
+          stencilReference = drawn.stencilReference;
+          if (drawn.drew) {
+            block += 1;
+          }
+          continue;
+        }
+        if (
+          !maskPass &&
           item.kind !== "unlit" &&
           item.kind !== "sprite" &&
           item.kind !== "lit" &&
@@ -1556,11 +1704,10 @@ export class WebgpuRenderer implements Renderer {
           item.kind !== "particles" &&
           item.kind !== "node"
         ) {
-          // RFC 0003's skinned kinds until a joint-palette pipeline exists
-          // here. Skipped, never approximated — and skipped *before* the
-          // geometry cache uploads buffers nothing will bind. (`"particles"`
-          // left this list in WP-R1.8, `"node"` in WP-R1.9 — each the
-          // deliberate flip of an earlier recorded absence.)
+          // Remaining kinds this colour pass does not draw. Skinned items
+          // continued above when registered; unregistered ones fell through
+          // the `skinnedPrograms === null` skip. The §69 caster and RFC 0005
+          // id pass still absent — skipped, never bind-pose.
           continue;
         }
         if (!maskPass && item.kind === "node") {
@@ -1724,7 +1871,7 @@ export class WebgpuRenderer implements Renderer {
                   activeTarget,
                   spriteMap,
                 );
-          if (spriteTexture !== null) {
+          if (spriteTexture !== null && record.uvBuffer !== null) {
             stencilReference = this.#drawSprite(
               device,
               pass,
@@ -1774,6 +1921,31 @@ export class WebgpuRenderer implements Renderer {
             continue;
           }
           const useMap = mapBindGroup !== null;
+          // §59's packed metallic-roughness map: same resolve/skip/degrade
+          // contract as albedo (`map`). Named + uvs + unresolved (disposed
+          // or a feedback loop) skips the draw; named without a uv stream
+          // degrades to the scalar factors. Lit items have no such field.
+          const metalRoughnessSource =
+            item.kind === "standard"
+              ? metalRoughnessMapOf(item.material)
+              : null;
+          const metalRoughnessBindGroup =
+            metalRoughnessSource === null || record.uvBuffer === null
+              ? null
+              : resolveFrameTexture(
+                  textures,
+                  renderTargets,
+                  activeTarget,
+                  metalRoughnessSource,
+                );
+          if (
+            metalRoughnessSource !== null &&
+            record.uvBuffer !== null &&
+            metalRoughnessBindGroup === null
+          ) {
+            continue;
+          }
+          const useMetalRoughness = metalRoughnessBindGroup !== null;
           // The lights group is read off the *field*, not a frame local, and
           // read here — after the material's getters have run — so a
           // reentrant mid-frame `dispose()` inside application code (the
@@ -1827,6 +1999,7 @@ export class WebgpuRenderer implements Renderer {
             batch: null,
             normals,
             shadow: receiving,
+            metalRoughness: useMetalRoughness,
           });
           if (pipeline === null) {
             // Unreachable given the class invariant — the unlit arm's
@@ -1887,17 +2060,27 @@ export class WebgpuRenderer implements Renderer {
           }
           // Slots are positional, in `shadedVertexBufferLayouts`' order:
           // position, then normals if the variant shades with them, then uvs
-          // if it samples. One counter, both sides.
+          // if it samples albedo *or* the packed metallic-roughness map.
           let slot = 0;
           pass.setVertexBuffer(slot, record.positionBuffer);
           if (normals) {
             slot += 1;
             pass.setVertexBuffer(slot, record.normalBuffer);
           }
-          if (mapBindGroup !== null) {
+          if (useMap || useMetalRoughness) {
             slot += 1;
             pass.setVertexBuffer(slot, record.uvBuffer);
+          }
+          if (mapBindGroup !== null) {
             pass.setBindGroup(SHADED_MAP_BIND_GROUP_INDEX, mapBindGroup);
+          }
+          if (metalRoughnessBindGroup !== null) {
+            // Group 3 when albedo occupies 2; group 2 when it does not
+            // (`wgpu-lights.ts` / `wgpu-standard.ts`).
+            pass.setBindGroup(
+              useMap ? SHADED_MR_BIND_GROUP_INDEX : SHADED_MAP_BIND_GROUP_INDEX,
+              metalRoughnessBindGroup,
+            );
           }
           if (record.indexBuffer !== null && record.indexFormat !== null) {
             pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
@@ -2048,6 +2231,7 @@ export class WebgpuRenderer implements Renderer {
     // beside the two above and before the submit that reads it (queue
     // order); absent to the byte on a frame that recorded no node draw.
     nodeFrame?.endFrame();
+    skinnedPrograms?.upload(device);
     gpuTimer?.resolve(encoder);
     device.queue.submit([encoder.finish()]);
     gpuTimer?.afterSubmit();
@@ -2243,6 +2427,49 @@ export class WebgpuRenderer implements Renderer {
       // was submitted, exactly as a scene draw is.
       countDraw(statistics, "triangle-list", EFFECT_PASS_VERTEX_COUNT, 1);
     }
+  }
+
+  /**
+   * Builds a `PickingService` over this renderer — §71's `"gpu"` tier
+   * (RFC 0005), gated on `registerPickingPipeline()` exactly as node-material
+   * draws are gated on `registerWebgpuNodeMaterialPipeline()`: this method
+   * resolves the registry slot and refuses (§85) when nothing registered, so
+   * the id pipeline, the service, and its `mapAsync` read-back live only in
+   * bundles that opted in (the pipeline-cost law; `wgpu-picking-registry.ts`).
+   *
+   * What the service receives is a **live window** onto exactly the renderer
+   * state an id pass needs — device, the three shared caches (geometry,
+   * particles, render targets), the surface size, and the two lifecycle
+   * flags — as accessors, so a §61 loss's dropped caches are seen rather
+   * than captured stale (`PickingRendererHost`). Each call builds an
+   * independent service; the caller owns and disposes it (§83). No GPU call
+   * is issued here — the id pipeline compiles on the service's first pass.
+   *
+   * @throws FourError `INVALID_APPLICATION_STATE` on a disposed renderer, or
+   * when no picking pipeline is registered.
+   */
+  createPickingService(): PickingService {
+    this.#assertUsable("createPickingService");
+    const factory = resolvePickingServiceFactory();
+    if (factory === null) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "§71: call registerPickingPipeline() from @fourjs/render-webgpu " +
+          "before createPickingService() (§85).",
+        { context: { registered: false } },
+      );
+    }
+    const host: PickingRendererHost = {
+      device: () => this.#device,
+      geometries: () => this.#geometries,
+      particles: () => this.#particles,
+      renderTargets: () => this.#renderTargets,
+      surfaceWidth: () => Math.round(this.#width * this.#resolution),
+      surfaceHeight: () => Math.round(this.#height * this.#resolution),
+      deviceLost: () => this.#deviceLost,
+      disposed: () => this.#disposed,
+    };
+    return factory.create(host);
   }
 
   /**
@@ -2554,6 +2781,227 @@ export class WebgpuRenderer implements Renderer {
     return created;
   }
 
+  /**
+   * The registered skinning pipeline's colour pair for this device, created
+   * on first use, or `null` when there is nothing to draw skinned with (§54;
+   * RFC 0003).
+   *
+   * Three answers, all §61-safe (never a throw from inside the frame):
+   *
+   * - **created already** — the pair, one field read;
+   * - **nothing registered** — `null`, with a one-time §85 development
+   *   warning naming `registerSkinningPipeline()`; the skinned draw is
+   *   skipped rather than shown in bind pose (RFC 0003 §5);
+   * - **the factory threw** — `null` forever on this device (the latch),
+   *   with a one-time warning; a lost device drops the latch because a
+   *   fresh device may succeed.
+   */
+  #acquireSkinnedPrograms(): SkinnedPrograms | null {
+    const existing = this.#skinnedPrograms;
+    if (existing !== null) {
+      return existing;
+    }
+    if (this.#skinnedProgramsFailed) {
+      return null;
+    }
+    const factory = resolveSkinningPipelineFactory();
+    if (factory === null) {
+      if (DEV) {
+        devWarnOnce(
+          "webgpu-skinning-unregistered",
+          "§54: this scene contains a skinned mesh but no skinning pipeline " +
+            "is registered, so its draws are skipped (a bind pose would be " +
+            "a different picture). Call registerSkinningPipeline() from " +
+            "@fourjs/render-webgpu" +
+            " at application setup (RFC 0003).",
+        );
+      }
+      return null;
+    }
+    const host: SkinningPipelineHost = {
+      device: () => this.#device,
+      drawLayout: () => this.#bindGroupLayout,
+      textureLayout: () => this.#textures?.bindGroupLayout ?? null,
+      lightsLayout: () => {
+        const device = this.#device;
+        return device === null ? null : this.#acquireLightsLayout(device);
+      },
+      shadowLightsLayout: () => {
+        const device = this.#device;
+        return device === null ? null : this.#acquireShadowLightsLayout(device);
+      },
+    };
+    try {
+      const compiled = factory.create(host);
+      this.#skinnedPrograms = compiled;
+      return compiled;
+    } catch (error: unknown) {
+      this.#skinnedProgramsFailed = true;
+      if (DEV) {
+        devWarnOnce(
+          "webgpu-skinning-compile-failed",
+          "§54: the skinning pipeline failed to initialise on this device; " +
+            `skinned draws are skipped (§61, §89). ${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Draws one skinned colour item through the registered pair. Returns
+   * whether a uniform block was consumed so the caller can keep `block`
+   * honest — a skip must not increment it, or the next draw's offset would
+   * land on unwritten staging bytes.
+   */
+  #drawSkinned(
+    pass: GpuRenderPassEncoder,
+    programs: SkinnedPrograms,
+    bindGroup: GpuBindGroup,
+    textures: WgpuTextureCache,
+    renderTargets: WgpuRenderTargetCache,
+    activeTarget: RenderTarget | null,
+    item: Extract<RenderItem, { kind: "skinned-unlit" | "skinned-lit" }>,
+    record: WgpuGeometryRecord,
+    lit: boolean,
+    block: number,
+    depthFormat: string | null,
+    frameStencil: boolean,
+    clip: ItemClip | null,
+    stencilReference: number,
+    statistics: RenderStatistics | null,
+    shadowGroup: GpuBindGroup | null,
+    lightBase: number,
+  ): { stencilReference: number; drew: boolean } {
+    const skipped = { stencilReference, drew: false };
+    const joints = record.jointBuffer;
+    const weights = record.weightBuffer;
+    if (joints === null || weights === null) {
+      return skipped;
+    }
+    const material = item.material;
+    const map = material.map ?? null;
+    const mapBindGroup =
+      map === null || record.uvBuffer === null
+        ? null
+        : resolveFrameTexture(textures, renderTargets, activeTarget, map);
+    if (map !== null && record.uvBuffer !== null && mapBindGroup === null) {
+      return skipped;
+    }
+    const useMap = mapBindGroup !== null;
+    const vertexColors =
+      !lit &&
+      "vertexColors" in material &&
+      material.vertexColors === true &&
+      record.colorBuffer !== null;
+    const normals = lit && record.normalBuffer !== null;
+    let receiving = false;
+    let shadedLights: GpuBindGroup | null = null;
+    if (lit) {
+      const lightsBindGroup = this.#lightsBindGroup;
+      if (lightsBindGroup === null) {
+        return skipped;
+      }
+      shadedLights = lightsBindGroup;
+      if (shadowGroup !== null && item.receiveShadow) {
+        receiving = true;
+        shadedLights = shadowGroup;
+      }
+    }
+    const stencilRecord = frameStencil
+      ? clip !== null
+        ? clip.stencil
+        : material.stencil
+      : undefined;
+    const descriptor: WgpuSkinnedDrawDescriptor = {
+      vertexColors,
+      map: useMap,
+      normals,
+      shadow: receiving,
+      blend:
+        material.transparent === true
+          ? (material.blendMode ?? "normal")
+          : "none",
+      depthTest: depthFormat !== null && material.depthTest !== false,
+      depthWrite: depthFormat !== null && material.depthWrite !== false,
+      colorWrite: material.colorWrite !== false,
+      topology: record.topology,
+      colorFormat: this.#frameFormat,
+      depthFormat,
+      stencil:
+        stencilRecord === undefined ? null : stencilDescriptor(stencilRecord),
+    };
+    const pipeline = lit
+      ? programs.lit.acquire(descriptor)
+      : programs.unlit.acquire(descriptor);
+    const paletteGroup = programs.paletteBindGroup();
+    if (pipeline === null || paletteGroup === null) {
+      return skipped;
+    }
+    const opacity = material.opacity ?? 1;
+    const color = material.color;
+    this.#writeBlock(
+      block,
+      this.#viewProjection,
+      item.worldMatrix,
+      color[0],
+      color[1],
+      color[2],
+      color[3] * opacity,
+    );
+    const paletteOffset = programs.packPalette(item.jointMatrices);
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup, [block * UNIFORM_STRIDE_BYTES]);
+    if (lit && shadedLights !== null) {
+      pass.setBindGroup(LIGHTS_BIND_GROUP_INDEX, shadedLights, [lightBase]);
+    }
+    if (useMap && mapBindGroup !== null) {
+      pass.setBindGroup(
+        lit ? SHADED_MAP_BIND_GROUP_INDEX : MAP_BIND_GROUP_INDEX,
+        mapBindGroup,
+      );
+    }
+    pass.setBindGroup(programs.paletteGroup(lit, useMap), paletteGroup, [
+      paletteOffset,
+    ]);
+    let nextStencil = stencilReference;
+    if (stencilRecord !== undefined) {
+      nextStencil = applyStencilReference(
+        pass,
+        stencilReference,
+        stencilRecord.ref,
+      );
+    }
+    let slot = 0;
+    pass.setVertexBuffer(slot, record.positionBuffer);
+    if (lit && normals && record.normalBuffer !== null) {
+      slot += 1;
+      pass.setVertexBuffer(slot, record.normalBuffer);
+    }
+    if (!lit && vertexColors && record.colorBuffer !== null) {
+      slot += 1;
+      pass.setVertexBuffer(slot, record.colorBuffer);
+    }
+    if (useMap && record.uvBuffer !== null) {
+      slot += 1;
+      pass.setVertexBuffer(slot, record.uvBuffer);
+    }
+    slot += 1;
+    pass.setVertexBuffer(slot, joints);
+    slot += 1;
+    pass.setVertexBuffer(slot, weights);
+    if (record.indexBuffer !== null && record.indexFormat !== null) {
+      pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
+      pass.drawIndexed(record.count);
+    } else {
+      pass.draw(record.count);
+    }
+    if (statistics !== null) {
+      countDraw(statistics, record.topology, record.count, 1);
+    }
+    return { stencilReference: nextStencil, drew: true };
+  }
+
   /** Builds the pipeline descriptor for one §70 effect draw (WP-R1.6). */
   #effectDescriptor(
     kind: WgpuEffectKind,
@@ -2673,6 +3121,9 @@ export class WebgpuRenderer implements Renderer {
     // here would be the unreachable re-check the coverage rule forbids).
     this.#nodePipelines?.dispose();
     this.#nodePipelines = null;
+    this.#skinnedPrograms?.dispose();
+    this.#skinnedPrograms = null;
+    this.#skinnedProgramsFailed = false;
     // §69's target is engine-side state this renderer owns (R-18): disposed
     // on both branches — its GPU rows were released (or died) with the cache
     // above, and the §83 accounting closes with the object.
@@ -2782,9 +3233,9 @@ export class WebgpuRenderer implements Renderer {
 
   /**
    * Records one §55 sprite draw (WP-R1.3): the sprite pipeline over the
-   * quad's position stream, §55's uv derived in the vertex stage from the
-   * `quad` uniform, the texture at group 1, the tint and quad in the sprite's
-   * widened uniform block. Returns the stencil reference now in effect.
+   * quad's position stream and authored uv stream, the texture at group 1,
+   * the tint in the sprite uniform block. Returns the stencil reference now
+   * in effect.
    *
    * §55's pipeline blends **by construction** — it did before §57's
    * `transparent` flag existed, and a textured quad with an alpha channel has
@@ -2851,7 +3302,6 @@ export class WebgpuRenderer implements Renderer {
       tint[2],
       tint[3] * opacity,
     );
-    this.#writeQuad(block, item, material);
 
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, this.#acquireSpriteBindGroup(device, uniformBuffer), [
@@ -2867,6 +3317,9 @@ export class WebgpuRenderer implements Renderer {
       );
     }
     pass.setVertexBuffer(0, record.positionBuffer);
+    if (record.uvBuffer !== null) {
+      pass.setVertexBuffer(1, record.uvBuffer);
+    }
     if (record.indexBuffer !== null && record.indexFormat !== null) {
       pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
       pass.drawIndexed(record.count);
@@ -3324,8 +3777,9 @@ export class WebgpuRenderer implements Renderer {
     for (const item of items) {
       // The caster filter — `wgpu-shadow.ts`'s header owns the list: §49's
       // opt-out, sprites (a quad would cast its rectangle), and every kind
-      // this backend has no pipeline for (skinned — an invisible surface
-      // must not cast). Masks and particle items carry `castShadow: false`
+      // this backend has no caster pipeline for (skinned — colour pair behind
+      // `registerSkinningPipeline()`; shadow caster and id pass still absent,
+      // and an invisible surface must not cast). Masks and particle items carry `castShadow: false`
       // from the list builder — a §36 billboard has no surface to project,
       // drawn (WP-R1.8) or not. §60 (WP-R1.9): a node material with **no**
       // displacement casts its geometry exactly — depth ignores colour, so
@@ -3398,7 +3852,7 @@ export class WebgpuRenderer implements Renderer {
   /**
    * Packs §59's two extra vec4s — the emissive term, then metalness and
    * roughness — into the spare bytes of `block`'s stride, after the
-   * `DrawUniforms`-shaped 144 `#writeBlock` wrote (`wgpu-standard.ts`'s
+   * 192-byte `DrawUniforms` `#writeBlock` wrote (`wgpu-standard.ts`'s
    * layout). The unused slots are written, not assumed: the staging array is
    * reused across frames, and an uploaded byte nobody wrote this frame is a
    * transcript that depends on history.
@@ -3458,46 +3912,6 @@ export class WebgpuRenderer implements Renderer {
     this.#shadowBindGroupView = null;
   }
 
-  /**
-   * Packs §55's `quad` — the local rectangle the whole texture maps onto —
-   * into the sprite block's last sixteen bytes: the geometry's own bounds for
-   * a frameless sprite, R-29's affine reparametrization for a framed one. The
-   * same two expressions the GL sprite path uploads through `setQuad`, over
-   * the same cached `computeBounds()` (a version comparison per draw, not a
-   * pass over the vertices).
-   */
-  #writeQuad(
-    block: number,
-    item: SpriteItem,
-    material: SpriteMaterialLike,
-  ): void {
-    const bounds = item.geometry.computeBounds();
-    const minX = bounds.min.x;
-    const minY = bounds.min.y;
-    const width = bounds.max.x - minX;
-    const height = bounds.max.y - minY;
-    const staging = this.#uniformStaging;
-    const base = block * UNIFORM_STRIDE_FLOATS + SPRITE_QUAD_OFFSET / 4;
-    // `?? null` for the render list's reason: a structurally typed sprite item
-    // built before frames existed reports `undefined`, which reads "no frame".
-    const frame = item.frame ?? null;
-    if (frame === null) {
-      staging[base] = minX;
-      staging[base + 1] = minY;
-      staging[base + 2] = width;
-      staging[base + 3] = height;
-      return;
-    }
-    // The rectangle the *whole* texture would occupy, given that the quad
-    // shows `frame` of it — `map` is the engine-side texture (its texel size),
-    // not the GPU record this draw binds.
-    const map = material.texture;
-    staging[base] = minX - (frame.x * width) / frame.width;
-    staging[base + 1] = minY - (frame.y * height) / frame.height;
-    staging[base + 2] = (width * map.width) / frame.width;
-    staging[base + 3] = (height * map.height) / frame.height;
-  }
-
   /** Packs one `DrawUniforms` block into the staging array at `block`'s stride. */
   #writeBlock(
     block: number,
@@ -3525,6 +3939,23 @@ export class WebgpuRenderer implements Renderer {
     staging[colorBase + 1] = green;
     staging[colorBase + 2] = blue;
     staging[colorBase + 3] = alpha;
+    // Inverse-transpose of the model's upper 3×3, packed as a WGSL uniform
+    // `mat3x3` (three columns padded to vec4). Identity when the mat4 upload
+    // was identity (`model === null`) or when the upper 3×3 is singular.
+    normalMatrixScratch.identity();
+    if (model !== null) {
+      normalMatrixScratch.setNormalFromMatrix4(model);
+    }
+    const n = normalMatrixScratch.elements;
+    const normalBase = base + DRAW_NORMAL_OFFSET / 4;
+    for (let column = 0; column < 3; column += 1) {
+      const dst = normalBase + column * 4;
+      const src = column * 3;
+      staging[dst] = n[src];
+      staging[dst + 1] = n[src + 1];
+      staging[dst + 2] = n[src + 2];
+      staging[dst + 3] = 0;
+    }
   }
 
   /**
@@ -3649,6 +4080,9 @@ export class WebgpuRenderer implements Renderer {
       // with the device — dropped, never destroyed.
       this.#nodePipelines?.forget();
       this.#nodePipelines = null;
+      this.#skinnedPrograms?.forget();
+      this.#skinnedPrograms = null;
+      this.#skinnedProgramsFailed = false;
       this.#spriteLayout = null;
       this.#spriteBindGroup = null;
       this.#particleLayout = null;

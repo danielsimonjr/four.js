@@ -141,8 +141,9 @@ export type RendererBackend = "webgpu" | "webgl2" | "canvas2d" | "svg" | "null";
  * capability query must be lazy if the alternative moves recorded
  * transcripts*, applies verbatim to the two extra `getParameter` calls, and
  * nothing in the engine reads either number yet (see `webgl-renderer.ts`);
- * `WebgpuRenderer` answers from the device's own limits but omits
- * `maximumSkinningJoints`, having no skinned pipeline (RFC 0003). This
+ * `WebgpuRenderer` answers from the device's own limits and reports
+ * `maximumSkinningJoints` (RFC 0003's colour pair behind
+ * `registerSkinningPipeline()`). This
  * paragraph claimed the three backends "answer **all** of them" until
  * 2026-08-29; the omissions above were deliberate from the day each backend's
  * record landed.
@@ -713,12 +714,16 @@ export interface Renderer extends Disposable {
    * result *quality* vary by backend, and the owner's decision on RFC 0005 Q6
    * is that the tier is declared absent there instead.
    *
-   * The WebGL 2 backend declares it, gated on its `registerPickingPipeline()`
-   * (the skinning seam's shape): the member says what the backend *can* do,
-   * registration is the application opting in to paying for it, and calling
-   * this without registering is refused with `INVALID_APPLICATION_STATE`
-   * (§85) naming the fix. Each call builds an independent service with its
-   * own id buffer; the caller owns it and disposes it (§83).
+   * The WebGL 2 and WebGPU backends declare it, gated on each package's
+   * `registerPickingPipeline()` (the skinning seam's shape): the member says
+   * what the backend *can* do, registration is the application opting in to
+   * paying for it, and calling this without registering is refused with
+   * `INVALID_APPLICATION_STATE` (§85) naming the fix. Each call builds an
+   * independent service with its own id buffer; the caller owns it and
+   * disposes it (§83). WebGL draws particle systems (one id per emitter)
+   * and skinned meshes (deformed silhouette via `SkinnedIdProgram`).
+   * WebGPU draws particle systems the same way (CPU 8-float billboard)
+   * and still skips skinned items (no RFC 0003 skinned pipelines).
    */
   createPickingService?(): PickingService;
 

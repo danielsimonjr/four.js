@@ -63,6 +63,7 @@ import { FourError } from "@fourjs/core";
 import type { Matrix4 } from "@fourjs/math";
 import type { Node, Viewport } from "@fourjs/scene";
 
+import { isParticleDrawable } from "./particles.js";
 import { Renderable } from "./renderable.js";
 import type { Renderer } from "./renderer.js";
 
@@ -204,10 +205,10 @@ export interface PickingService {
  * declare the id-buffer strategy absent rather than emulating it (RFC 0005
  * Q6's adopted disposition).
  *
- * A `true` answer says the backend *can*; the WebGL 2 backend additionally
- * requires its `registerPickingPipeline()` — the capability says what is
- * possible, registration is the application opting in to paying for it (the
- * skinning precedent).
+ * A `true` answer says the backend *can*; the WebGL 2 and WebGPU backends
+ * additionally require their `registerPickingPipeline()` — the capability
+ * says what is possible, registration is the application opting in to
+ * paying for it (the skinning precedent).
  */
 export function supportsPicking(
   renderer: Renderer,
@@ -256,10 +257,11 @@ export function assertEncodableCandidateCount(count: number): void {
  *
  * The walk is the render list's exactly: depth-first in insertion order (§6),
  * pruning `visible === false` / `enabled === false` subtrees. Every
- * `Renderable` met is a candidate — §46 layer masks and §87 culling do *not*
- * filter the table, because they filter per view while the table is per pass;
- * a filtered node simply has no draw referencing its index, which costs
- * nothing and keeps the table a function of the scene alone (§33).
+ * `Renderable` **or** {@link isParticleDrawable} node met is a candidate —
+ * §46 layer masks and §87 culling do *not* filter the table, because they
+ * filter per view while the table is per pass; a filtered node simply has no
+ * draw referencing its index, which costs nothing and keeps the table a
+ * function of the scene alone (§33).
  *
  * ## Why the correlation key is the world-matrix object
  *
@@ -272,10 +274,16 @@ export function assertEncodableCandidateCount(count: number): void {
  * its content draw share the matrix and therefore the index, which is
  * correct: they are one candidate.
  *
- * Particle systems are **not** collected: §36's batched item has no
- * per-particle node and its id draw is the staged half of RFC 0005's tier
- * (see `@fourjs/render-webgl`'s `gl-picking.ts`); a table entry nothing can
- * draw would only suggest otherwise.
+ * Particle systems **are** collected when they satisfy
+ * {@link isParticleDrawable}: §36's batched item has one node and no
+ * per-particle geometry, so the table stores **one id for the whole
+ * system**, joined through the emitter's `transform.worldMatrix` exactly as
+ * for a `Renderable`. The id pass draws that index through the instanced
+ * billboard (`@fourjs/render-webgl`'s `ParticleIdProgram`; WebGPU's private
+ * particle id pipeline — one colour per emitter on both). It is not a
+ * per-particle id. Trails are not drawn. WebGL draws skinned items through
+ * `SkinnedIdProgram`; WebGPU still skips them (no RFC 0003 skinned
+ * pipelines).
  *
  * Both containers are cleared first, so a caller can reuse them per pass —
  * which is also what "rebuilt per pass" means: no index survives into the
@@ -300,7 +308,10 @@ function collectInto(
   if (!node.visible || !node.enabled) {
     return;
   }
-  if (node instanceof Renderable) {
+  // A boolean, not a narrowed union: `isParticleDrawable` would otherwise
+  // drop `Node.transform` (the structural contract has no transform field).
+  const pickable = node instanceof Renderable || isParticleDrawable(node);
+  if (pickable) {
     indexByMatrix.set(node.transform.worldMatrix, ids.length);
     ids.push(node.id);
   }

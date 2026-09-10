@@ -136,13 +136,13 @@ export function applyStencilReference(
  * cache record.
  *
  * Only the material-carrying kinds this backend draws are scanned: an item
- * with no pipeline (skinned — a skipped draw) must not be able to re-key
- * every pipeline of a frame it contributes nothing to, and a `"particles"`
- * item — drawn since WP-R1.8 — carries **no material at all**
- * (`material?: undefined` on the item), so it has nothing to scan and its
- * only stencil is §67's clip record, which clause 1 already answers. Mask
- * items short out at clause 1, so the scan body only ever reads content
- * materials.
+ * with no pipeline (an *unregistered* skinned draw, a node material with
+ * nothing registered) must not be able to re-key every pipeline of a frame
+ * it contributes nothing to, and a `"particles"` item — drawn since
+ * WP-R1.8 — carries **no material at all** (`material?: undefined` on the
+ * item), so it has nothing to scan and its only stencil is §67's clip
+ * record, which clause 1 already answers. Mask items short out at clause 1,
+ * so the scan body only ever reads content materials.
  *
  * `"node"` items are scanned **exactly when `scanNode` is true** (WP-R1.9):
  * the renderer passes whether a node pipeline is registered, because a node
@@ -152,10 +152,17 @@ export function applyStencilReference(
  * node item} byte-identity depends on it). One honest corner remains: a
  * registered graph whose emission later fails still selects the format here —
  * the frame pays an unused stencil aspect, never a wrong picture.
+ *
+ * `"skinned-unlit"` / `"skinned-lit"` items are scanned **exactly when
+ * `scanSkinned` is true** (RFC 0003): colour pair behind
+ * `registerSkinningPipeline()`; an unregistered skinned item stays
+ * format-invisible the way an unregistered node item does. The shadow
+ * caster and id pass still absent — those skips do not re-key the frame.
  */
 export function frameWantsStencil(
   items: readonly RenderItem[],
   scanNode = false,
+  scanSkinned = false,
 ): boolean {
   if (items.length === 0) {
     return false;
@@ -170,7 +177,9 @@ export function frameWantsStencil(
       kind !== "sprite" &&
       kind !== "lit" &&
       kind !== "standard" &&
-      (kind !== "node" || !scanNode)
+      (kind !== "node" || !scanNode) &&
+      (kind !== "skinned-unlit" || !scanSkinned) &&
+      (kind !== "skinned-lit" || !scanSkinned)
     ) {
       continue;
     }

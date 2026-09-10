@@ -27,7 +27,7 @@
  * exactly; masked box x 72…119, y 64…127.
  */
 
-import { unlitShaderSource } from "@fourjs/render-webgpu";
+import { DRAW_UNIFORM_BYTES, unlitShaderSource } from "@fourjs/render-webgpu";
 import { expect, test } from "@playwright/test";
 
 /** Restates `PORT` in `playwright.config.ts` — the site whose origin is borrowed. */
@@ -78,7 +78,7 @@ interface StencilProbe {
  * one recorded pass command.
  */
 const STENCIL_SCRIPT = `async (options) => {
-  const { width, height, shader, masked, view } = options;
+  const { width, height, shader, masked, view, drawBytes } = options;
   if (navigator.gpu === undefined) return { adapter: false };
   const adapter = await navigator.gpu.requestAdapter();
   if (adapter === null) return { adapter: false };
@@ -88,7 +88,7 @@ const STENCIL_SCRIPT = `async (options) => {
     entries: [{
       binding: 0,
       visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-      buffer: { type: "uniform", minBindingSize: 144 },
+      buffer: { type: "uniform", minBindingSize: drawBytes },
     }],
   });
   const layout = device.createPipelineLayout({ bindGroupLayouts: [drawLayout] });
@@ -101,9 +101,10 @@ const STENCIL_SCRIPT = `async (options) => {
     return buffer;
   };
   // An orthographic DrawUniforms block: viewProjection scales the world
-  // extents onto clip space, model stays identity, colour as given.
+  // extents onto clip space, model stays identity, colour as given,
+  // normalMatrix identity (std140 mat3 at offset 144).
   const drawBlock = (color) => {
-    const floats = new Float32Array(36);
+    const floats = new Float32Array(drawBytes / 4);
     floats[0] = 2 / view.width;
     floats[5] = 2 / view.height;
     floats[10] = 1;
@@ -111,6 +112,7 @@ const STENCIL_SCRIPT = `async (options) => {
     floats[16] = 1; floats[21] = 1; floats[26] = 1; floats[31] = 1;
     floats[32] = color[0]; floats[33] = color[1];
     floats[34] = color[2]; floats[35] = color[3];
+    floats[36] = 1; floats[41] = 1; floats[46] = 1;
     return floats;
   };
   const quad = (w, h) => {
@@ -279,6 +281,7 @@ async function probe(
       height: HEIGHT,
       shader: unlitShaderSource(false, false),
       masked,
+      drawBytes: DRAW_UNIFORM_BYTES,
       view: {
         width: VIEW_WIDTH,
         height: VIEW_HEIGHT,

@@ -1,4 +1,5 @@
 import { noteConstruction } from "./alloc-counter.js";
+import type { Matrix4 } from "./matrix4.js";
 
 /**
  * Mutable 3×3 matrix stored **column-major** in a `Float64Array(9)` (§7b).
@@ -212,6 +213,106 @@ export class Matrix3 {
     e[7] = (n21 * n13 - n23 * n11) * inverseDeterminant;
     e[8] = (n22 * n11 - n21 * n12) * inverseDeterminant;
 
+    this.onChanged?.();
+    return this;
+  }
+
+  /**
+   * Transposes this matrix in place. Diagonal elements stay put; the three
+   * off-diagonal pairs swap. Fires the change hook once, after the last write.
+   */
+  transpose(): this {
+    const e = this.elements;
+    const m01 = e[3];
+    const m02 = e[6];
+    const m12 = e[7];
+    e[3] = e[1];
+    e[6] = e[2];
+    e[7] = e[5];
+    e[1] = m01;
+    e[2] = m02;
+    e[5] = m12;
+    this.onChanged?.();
+    return this;
+  }
+
+  /**
+   * Copies the upper-left 3×3 of a column-major {@link Matrix4} into this
+   * matrix. Translation (`e[12..14]`) and the homogeneous row are ignored —
+   * the linear part that transforms directions, which is what a normal matrix
+   * starts from.
+   *
+   * Always writes and always fires the change hook: even a copy of the
+   * identity is a write.
+   */
+  setFromMatrix4Upper3x3(m: Matrix4): this {
+    const s = m.elements;
+    const e = this.elements;
+    e[0] = s[0];
+    e[1] = s[1];
+    e[2] = s[2];
+    e[3] = s[4];
+    e[4] = s[5];
+    e[5] = s[6];
+    e[6] = s[8];
+    e[7] = s[9];
+    e[8] = s[10];
+    this.onChanged?.();
+    return this;
+  }
+
+  /**
+   * Builds the **normal matrix** of `m`: `transpose(inverse(upper 3×3))`, the
+   * linear map that keeps object-space normals perpendicular to surfaces after
+   * a non-uniform scale (§68). Translation does not participate.
+   *
+   * The inverse is {@link Matrix3.invert}'s general inverse, so a singular
+   * upper 3×3 (determinant exactly `0`) is the same no-op: this matrix is
+   * left unchanged, the change hook does not fire, and the method returns
+   * `this`. Callers that must distinguish "built" from "left alone" check
+   * the upper 3×3's determinant first — the same rule invert documents.
+   *
+   * The change hook fires **once**, after the last write, never per
+   * intermediate copy / invert / transpose. That is plan D3: one mutation,
+   * one notification.
+   */
+  setNormalFromMatrix4(m: Matrix4): this {
+    const src = m.elements;
+    const n11 = src[0];
+    const n21 = src[1];
+    const n31 = src[2];
+    const n12 = src[4];
+    const n22 = src[5];
+    const n32 = src[6];
+    const n13 = src[8];
+    const n23 = src[9];
+    const n33 = src[10];
+
+    // Same determinant probe {@link Matrix3.invert} uses, so a singular
+    // upper 3×3 no-ops without touching this matrix or firing the hook.
+    const t11 = n33 * n22 - n32 * n23;
+    const t12 = n32 * n13 - n33 * n12;
+    const t13 = n23 * n12 - n22 * n13;
+    const determinant = n11 * t11 + n21 * t12 + n31 * t13;
+    if (determinant === 0) {
+      return this;
+    }
+
+    const hook = this.onChanged;
+    this.onChanged = undefined;
+    const e = this.elements;
+    e[0] = n11;
+    e[1] = n21;
+    e[2] = n31;
+    e[3] = n12;
+    e[4] = n22;
+    e[5] = n32;
+    e[6] = n13;
+    e[7] = n23;
+    e[8] = n33;
+    this.invert();
+    this.transpose();
+    this.onChanged = hook;
     this.onChanged?.();
     return this;
   }

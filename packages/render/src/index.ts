@@ -313,6 +313,7 @@ export { Sprite, groupSpritesByTexture } from "./sprite.js";
 export type {
   TextureDimension,
   TextureFilter,
+  TextureMapRole,
   TextureMinFilter,
   TextureSource,
   TextureWrap,

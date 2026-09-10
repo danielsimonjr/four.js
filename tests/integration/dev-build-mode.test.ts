@@ -267,7 +267,7 @@ const GATED: ReadonlyMap<string, string> = new Map([
   ],
   [
     join("packages", "render-webgpu", "src", "webgpu-renderer.ts"),
-    "§67's clip-into-a-stencil-less-render-target warning (WP-R1.6, 2026-08-28) — the WebGPU restatement of the GL entry above, reachable only off screen (the on-screen attachment always widens to carry stencil). Diagnostic only, and O(1): the check is one read of the frame's first item beside the target record's `stencil` flag, records no command, and writes no value any later code reads — a production build draws the identical (unclipped) frame silently, the same fail-toward-drawing behaviour the warning describes. WP-R1.9 (2026-08-29) added §60's unregistered-node-pipeline notice under the GL entry's rule: the draws are skipped identically in both builds (absence, never a flat-coloured stand-in), and only the message naming registerWebgpuNodeMaterialPipeline() moves with the flag. Rendering is outside the §33 envelope regardless; nothing a frame draws re-enters simulation state (§42/§43)",
+    "§67's clip-into-a-stencil-less-render-target warning (WP-R1.6, 2026-08-28) — the WebGPU restatement of the GL entry above, reachable only off screen (the on-screen attachment always widens to carry stencil). Diagnostic only, and O(1): the check is one read of the frame's first item beside the target record's `stencil` flag, records no command, and writes no value any later code reads — a production build draws the identical (unclipped) frame silently, the same fail-toward-drawing behaviour the warning describes. WP-R1.9 (2026-08-29) added §60's unregistered-node-pipeline notice under the GL entry's rule: the draws are skipped identically in both builds (absence, never a flat-coloured stand-in), and only the message naming registerWebgpuNodeMaterialPipeline() moves with the flag. RFC 0003 (2026-09-09) added the same two notices for the skinned colour pair: unregistered (`registerSkinningPipeline()`) and factory-compile failure — skipped identically, never a bind pose, only the message moves. Rendering is outside the §33 envelope regardless; nothing a frame draws re-enters simulation state (§42/§43)",
   ],
   [
     join("packages", "render-webgpu", "src", "wgpu-node-program.ts"),
@@ -276,6 +276,10 @@ const GATED: ReadonlyMap<string, string> = new Map([
   [
     join("packages", "render-webgl", "src", "gl-picking.ts"),
     "§71's id-program compile-failure notice (RFC 0005, 2026-08-28). Message only: the failure is latched per context era in both builds — picking passes are skipped identically, and `pick` refuses identically for want of an id buffer — and only the console.warn carrying §89's log moves with the flag. Picking is outside the §33 envelope regardless: a pick is a §34 *input*, its result never enters a checksum, and nothing an id pass draws re-enters simulation state (§42/§43)",
+  ],
+  [
+    join("packages", "render-webgpu", "src", "wgpu-picking.ts"),
+    "§71's id-pipeline compile-failure notices (RFC 0005, 2026-09-09) — the WebGPU twin of gl-picking.ts's entry: mesh and particle id pipelines each latch a per-device failure in both builds, picking passes are skipped identically, and only the console.warn carrying §89's log moves with the flag. Picking is outside the §33 envelope regardless: a pick is a §34 *input*, its result never enters a checksum, and nothing an id pass draws re-enters simulation state (§42/§43)",
   ],
   [
     join("packages", "assets", "src", "asset-manager.ts"),

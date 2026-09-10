@@ -69,6 +69,7 @@ import {
   CLEAR_SHADER_SOURCE,
   FRAGMENT_ENTRY_POINT,
   POSITION_BUFFER_LAYOUT,
+  UV_BUFFER_LAYOUT,
   VERTEX_ENTRY_POINT,
   unlitShaderSource,
   unlitVertexBufferLayouts,
@@ -313,6 +314,18 @@ export interface WgpuPipelineDescriptor {
    * label stay byte-identical.
    */
   readonly gpuInstances?: boolean;
+
+  /**
+   * Whether a `kind: "standard"` variant samples §59's packed
+   * metallic-roughness map (`wgpu-standard.ts`) — GL's per-draw
+   * `useMetalRoughnessMap` as pipeline identity. Appended to the key
+   * **only when `true`** (the `shadow` rule, third application): `false`
+   * and absent name the very pipeline every landed scalar-only transcript
+   * compiled. The renderer passes the flag on shaded draws; the lit family
+   * ignores it (layout and module stay the unmapped/mapped pair they
+   * always were).
+   */
+  readonly metalRoughness?: boolean;
 }
 
 /**
@@ -327,13 +340,14 @@ export interface WgpuPipelineDescriptor {
  * compile error here until it is added below.
  *
  * The **optional** fields (§67's `stencil`, §65's `batch`, §68's `normals`,
- * §70's `effect`, §69's `shadow`) append a prefixed segment only when carried
- * — `shadow` only when carried *true*, since `false` names the same pipeline
- * content as absence. That is still a total, injective function — absence
- * appends nothing, and no required field's value can spell the prefixes —
- * and it is what keeps every earlier packet's key, and therefore every
- * `fourJS:<key>` pipeline label already recorded in landed transcripts,
- * byte-identical for a descriptor that does not carry them.
+ * §70's `effect`, §69's `shadow`, §59's `metalRoughness`) append a prefixed
+ * segment only when carried — `shadow` and `metalRoughness` only when carried
+ * *true*, since `false` names the same pipeline content as absence. That is
+ * still a total, injective function — absence appends nothing, and no
+ * required field's value can spell the prefixes — and it is what keeps every
+ * earlier packet's key, and therefore every `fourJS:<key>` pipeline label
+ * already recorded in landed transcripts, byte-identical for a descriptor
+ * that does not carry them.
  */
 export function pipelineKey(descriptor: WgpuPipelineDescriptor): string {
   let key = [
@@ -369,6 +383,9 @@ export function pipelineKey(descriptor: WgpuPipelineDescriptor): string {
   }
   if (descriptor.shadow === true) {
     key += "|sh:y";
+  }
+  if (descriptor.metalRoughness === true) {
+    key += "|mr:y";
   }
   if (descriptor.gpuInstances === true) {
     key += "|gi:y";
@@ -465,6 +482,16 @@ export class WgpuPipelineCache {
   #standardMapPipelineLayout: GpuPipelineLayout | null = null;
 
   /**
+   * Mr-only and map+mr standard layouts — built with each variant's first
+   * pipeline. Separate from `#standardMapPipelineLayout` so an mr-only
+   * frame labels `…:standard:mr` rather than borrowing `:map`, even though
+   * both compositions are `[uniforms, lights, texture]`.
+   */
+  #standardMrPipelineLayout: GpuPipelineLayout | null = null;
+
+  #standardMapMrPipelineLayout: GpuPipelineLayout | null = null;
+
+  /**
    * The **shadowed** shaded families' group-1 layout (WP-R1.7,
    * `wgpu-shadow.ts`) — the widened light block plus the comparison pair —
    * reached only when a shadowed pipeline is first created: a provider for
@@ -478,9 +505,10 @@ export class WgpuPipelineCache {
 
   /**
    * The shadowed shaded compositions, keyed `lit`/`lit|map`/`standard`/
-   * `standard|map` — a small map rather than four more fields, because the
-   * four landed fields stay exactly where the landed transcripts put them
-   * and these compositions are new objects a shadowless frame never creates.
+   * `standard|map`/`standard|mr`/`standard|map|mr` — a small map rather
+   * than more fields, because the four landed fields stay exactly where
+   * the landed transcripts put them and these compositions are new objects
+   * a shadowless frame never creates.
    */
   readonly #shadowShadedLayouts = new Map<string, GpuPipelineLayout>();
 
@@ -600,6 +628,8 @@ export class WgpuPipelineCache {
     this.#litMapPipelineLayout = null;
     this.#standardPipelineLayout = null;
     this.#standardMapPipelineLayout = null;
+    this.#standardMrPipelineLayout = null;
+    this.#standardMapMrPipelineLayout = null;
     this.#effectPipelineLayout = null;
     this.#effectGradePipelineLayout = null;
     this.#shadowShadedLayouts.clear();
@@ -611,10 +641,13 @@ export class WgpuPipelineCache {
    * plus group 1 for the sprite family (`wgpu-sprite.ts`); or, for the two
    * shaded families, their group 0 plus the light block at group 1 — the
    * widened shadow-lights layout for a shadowed variant (WP-R1.7) — plus the
-   * texture layout at group 2 when the variant samples (`wgpu-lights.ts`).
-   * §69's caster family (`"shadow"`) reads exactly the shared `DrawUniforms`
-   * group, so it resolves through the unsampling arm below. §36's particle
-   * family (WP-R1.8) reads its own three-matrix group 0 and nothing else.
+   * texture layout at group 2 when the variant samples albedo
+   * (`wgpu-lights.ts`), and at group 2 *or* 3 for §59's packed
+   * metallic-roughness map (group 3 when albedo already occupies 2; group 2
+   * when it does not). §69's caster family (`"shadow"`) reads exactly the
+   * shared `DrawUniforms` group, so it resolves through the unsampling arm
+   * below. §36's particle family (WP-R1.8) reads its own three-matrix
+   * group 0 and nothing else.
    *
    * `null` when a pipeline is asked of a cache that was given no provider for
    * a layout it needs — see {@link WgpuPipelineCache}'s fields.
@@ -705,9 +738,13 @@ export class WgpuPipelineCache {
    * which skips the draw ({@link WgpuPipelineCache}'s fields).
    *
    * A **shadowed** variant (WP-R1.7) is the same shape with group 1 swapped
-   * for the widened shadow-lights layout — four more compositions, cached in
+   * for the widened shadow-lights layout — compositions cached in
    * {@link WgpuPipelineCache.#shadowShadedLayouts}, none of which a
    * shadowless frame creates.
+   *
+   * §59's packed metallic-roughness map (standard family only) appends the
+   * same texture layout: at group 3 when albedo already occupies group 2,
+   * at group 2 when it does not. Lit descriptors ignore `metalRoughness`.
    */
   #shadedLayoutFor(
     descriptor: WgpuPipelineDescriptor,
@@ -722,30 +759,50 @@ export class WgpuPipelineCache {
     if (standard && drawProvider === undefined) {
       return null;
     }
+    const metalRoughness = standard && descriptor.metalRoughness === true;
     const texture = this.#textureLayout;
-    if (descriptor.map && texture === undefined) {
+    if ((descriptor.map || metalRoughness) && texture === undefined) {
       return null;
     }
     const drawLayout =
       drawProvider === undefined ? this.#drawLayout : drawProvider();
     const family = standard ? "standard" : "lit";
+    const bindGroupLayouts: GpuBindGroupLayout[] = [drawLayout, lights()];
+    if (descriptor.map && texture !== undefined) {
+      bindGroupLayouts.push(texture());
+    }
+    if (metalRoughness && texture !== undefined) {
+      bindGroupLayouts.push(texture());
+    }
+    const suffix = `${descriptor.map ? ":map" : ""}${metalRoughness ? ":mr" : ""}`;
     if (shadow) {
-      const key = `${family}${descriptor.map ? "|map" : ""}`;
+      const key = `${family}${descriptor.map ? "|map" : ""}${metalRoughness ? "|mr" : ""}`;
       const existing = this.#shadowShadedLayouts.get(key);
       if (existing !== undefined) {
         return existing;
       }
       const created = this.#device.createPipelineLayout({
-        label: `fourJS:pipeline-layout:${family}:shadow${
-          descriptor.map ? ":map" : ""
-        }`,
-        bindGroupLayouts:
-          descriptor.map && texture !== undefined
-            ? [drawLayout, lights(), texture()]
-            : [drawLayout, lights()],
+        label: `fourJS:pipeline-layout:${family}:shadow${suffix}`,
+        bindGroupLayouts,
       });
       this.#shadowShadedLayouts.set(key, created);
       return created;
+    }
+    if (metalRoughness) {
+      if (descriptor.map) {
+        this.#standardMapMrPipelineLayout ??= this.#device.createPipelineLayout(
+          {
+            label: "fourJS:pipeline-layout:standard:map:mr",
+            bindGroupLayouts,
+          },
+        );
+        return this.#standardMapMrPipelineLayout;
+      }
+      this.#standardMrPipelineLayout ??= this.#device.createPipelineLayout({
+        label: "fourJS:pipeline-layout:standard:mr",
+        bindGroupLayouts,
+      });
+      return this.#standardMrPipelineLayout;
     }
     if (descriptor.map && texture !== undefined) {
       const existing = standard
@@ -756,7 +813,7 @@ export class WgpuPipelineCache {
       }
       const created = this.#device.createPipelineLayout({
         label: `fourJS:pipeline-layout:${family}:map`,
-        bindGroupLayouts: [drawLayout, lights(), texture()],
+        bindGroupLayouts,
       });
       if (standard) {
         this.#standardMapPipelineLayout = created;
@@ -773,7 +830,7 @@ export class WgpuPipelineCache {
     }
     const created = this.#device.createPipelineLayout({
       label: `fourJS:pipeline-layout:${family}`,
-      bindGroupLayouts: [drawLayout, lights()],
+      bindGroupLayouts,
     });
     if (standard) {
       this.#standardPipelineLayout = created;
@@ -788,10 +845,11 @@ export class WgpuPipelineCache {
    * **unlit** module keys: a batch draws through the unlit shader family
    * (`wgpu-batch.ts`), so a frame mixing batched and unbatched unlit draws of
    * one variant compiles that variant's module exactly once. The two shaded
-   * families key on their own variant triple (`normals` × `map` × WP-R1.7's
-   * `shadow`) — `"lit"`, `"lit|n"`, `"lit|map"`, `"lit|n|map"`, their `|sh`
-   * counterparts, and the `standard` set — so a frame mixing normal-carrying
-   * and normal-less lit geometry compiles two modules, not one per pipeline,
+   * families key on their own variant tuple (`normals` × `map` × WP-R1.7's
+   * `shadow` × the standard family's `metalRoughness`) — `"lit"`, `"lit|n"`,
+   * `"lit|map"`, `"lit|n|map"`, their `|sh` counterparts, and the `standard`
+   * set with optional `|mr` — so a frame mixing normal-carrying and
+   * normal-less lit geometry compiles two modules, not one per pipeline,
    * and a shadowed frame's non-receivers share the shadowless module. The
    * effect family keys per kind (WP-R1.6) — `"effect|copy"`,
    * `"effect|grade"`, `"effect|output-transform"` — so a chain grading into
@@ -806,6 +864,7 @@ export class WgpuPipelineCache {
     normals: boolean,
     effect: WgpuEffectKind | null,
     shadow: boolean,
+    metalRoughness: boolean,
   ): GpuShaderModule {
     const key =
       kind === "clear"
@@ -819,7 +878,7 @@ export class WgpuPipelineCache {
               : kind === "effect"
                 ? `effect|${effect ?? "copy"}`
                 : kind === "lit" || kind === "standard"
-                  ? `${kind}${normals ? "|n" : ""}${map ? "|map" : ""}${shadow ? "|sh" : ""}`
+                  ? `${kind}${normals ? "|n" : ""}${map ? "|map" : ""}${kind === "standard" && metalRoughness ? "|mr" : ""}${shadow ? "|sh" : ""}`
                   : `unlit${vertexColors ? "|vc" : ""}${map ? "|map" : ""}`;
     const existing = this.#modules.get(key);
     if (existing !== undefined) {
@@ -841,7 +900,12 @@ export class WgpuPipelineCache {
                   : kind === "lit"
                     ? litShaderSource(normals, map, shadow)
                     : kind === "standard"
-                      ? standardShaderSource(normals, map, shadow)
+                      ? standardShaderSource(
+                          normals,
+                          map,
+                          shadow,
+                          metalRoughness,
+                        )
                       : unlitShaderSource(vertexColors, map),
     });
     this.#modules.set(key, module);
@@ -852,7 +916,8 @@ export class WgpuPipelineCache {
    * The vertex-buffer layouts `descriptor`'s pipeline reads: none for the
    * clear and the effect (their triangles are generated from the vertex
    * index), position alone
-   * for a sprite (uv is derived from the quad uniform) and for §69's caster
+   * for a sprite (position plus the authored uv stream at `@location(2)`)
+   * and for §69's caster
    * (a depth-only stage ignores every other stream, `gl-shadow.ts`'s
    * argument — the vertex arrays' streams-not-declared-are-ignored rule,
    * expressed as a one-buffer layout), the shaded stream
@@ -867,8 +932,11 @@ export class WgpuPipelineCache {
     if (descriptor.kind === "clear" || descriptor.kind === "effect") {
       return [];
     }
-    if (descriptor.kind === "sprite" || descriptor.kind === "shadow") {
+    if (descriptor.kind === "shadow") {
       return [POSITION_BUFFER_LAYOUT];
+    }
+    if (descriptor.kind === "sprite") {
+      return [POSITION_BUFFER_LAYOUT, UV_BUFFER_LAYOUT];
     }
     if (descriptor.kind === "particles") {
       // §36 `simulation: "gpu"` re-sources @location(1) from the
@@ -881,7 +949,9 @@ export class WgpuPipelineCache {
     if (descriptor.kind === "lit" || descriptor.kind === "standard") {
       return shadedVertexBufferLayouts(
         descriptor.normals === true,
-        descriptor.map,
+        descriptor.map ||
+          (descriptor.kind === "standard" &&
+            descriptor.metalRoughness === true),
       );
     }
     const batch = descriptor.batch ?? null;
@@ -910,6 +980,7 @@ export class WgpuPipelineCache {
       descriptor.normals === true,
       descriptor.effect ?? null,
       descriptor.shadow === true,
+      descriptor.metalRoughness === true,
     );
     const blend = blendStateFor(descriptor.blend);
     return this.#device.createRenderPipeline({

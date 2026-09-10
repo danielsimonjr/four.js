@@ -27,14 +27,18 @@ assumes the ones above it:
    groups, components (§6a), events (§6b), and the transform system (§7).
 2. **[Cameras and coordinate conversion](cameras-and-coordinate-conversion.md)** —
    §47 cameras, §48 viewports, and the full pixel → NDC → world → pick path
-   (§71/§72), including pointer input and dragging.
+   (§71/§72), including pointer input, dragging, `hitTestMode = "gpu"`,
+   `registerPickingPipeline` / `createPickingService`, and
+   `createPickProvider` / `PointerInput.pickProvider`.
 3. **[Fixed-step simulation](fixed-step-simulation.md)** — §9 time domains, the
-   §10 accumulator, §39 system ordering, and §43 interpolated rendering.
+   §10 accumulator, §39 system ordering, and §43 interpolated rendering
+   (including skin palettes via `Skeleton.update(..., worldOf)`).
 4. **[Transform authority](transform-authority.md)** — §42's one-owner rule,
    authority handovers, and the §19 physics-animation blending pipeline.
 5. **[Materials and the render graph](materials-and-render-graph.md)** — the
    five shipped material classes over §57's complete base (§59's
-   `StandardMaterial` and §60's `NodeMaterial` included), render lists and
+   `StandardMaterial` and §60's `NodeMaterial` included), render lists
+   (`buildInterpolatedRenderList` also refreshes §43 skin palettes),
    opt-in §65 batching, and the shipped §63 render graph with its §69/§70
    tiers. (Until 2026-08-29 this entry read "the shipped unlit/sprite
    material tier … and the honest state of the §63 render graph", describing
@@ -119,9 +123,13 @@ under `/examples/<name>/` on Pages; browser gates live in `tests/browser/`.
 | Tweens / clips / timelines | `examples/first-2d-scene` / `examples/first-animated-scene`; `tests/browser/animation.spec.ts` |
 | glTF | no example site; `tests/browser/gltf.spec.ts` loads the committed fixture through the real loader |
 | UI | `examples/ui-demo`; `tests/browser/ui.spec.ts` |
-| Input / picking / dragging | `examples/first-2d-scene`; `tests/browser/interaction.spec.ts`. First-person: `examples/character-controller` |
+| Input / picking / dragging | `examples/first-2d-scene`; `tests/browser/interaction.spec.ts`. First-person: `examples/character-controller`. GPU/pixel: `registerPickingPipeline` + `createPickProvider` in [cameras-and-coordinate-conversion](cameras-and-coordinate-conversion.md); `tests/browser/picking.spec.ts`. WebGL skinned GPU pick: `tests/integration/skinned-gpu-picking.test.ts` (`SkinnedIdProgram`; WebGPU still skips skinned items) |
 | Particles | `examples/particles-demo`; `tests/browser/particles.spec.ts` |
-| Mixed 2D / 3D / physics | `examples/mixed-scene` / `examples/physics-playground`; the §118 flagship |
+| Mixed 2D / 3D / physics | `examples/mixed-scene` / `examples/physics-playground` (a 2D world and a 3D world side by side); the §118 flagship (2D + 3D in **one** scene) |
+| Text / §56 | `examples/first-2d-scene`; `tests/browser/text.spec.ts`. `buildGlyphAtlas` lives on `fourJS/text`; the `Text` node is imported from `fourJS`, not that subpath |
+| Scene save / §79 + §34 snapshot | `examples/flagship/motor-digital-twin`; [digital-twin](digital-twin.md). `registerSceneNodeTypes()` then `serializeScene` / `instantiateScene` — `createDefaultComponentSerializers()` alone refuses a `Renderable`. `PhysicsWorld.createSnapshot()` is the solver half |
+| §43 interpolated skin palettes | `Skeleton.update(skinRoot, worldOf?)` + `buildInterpolatedRenderList` — local poses interpolate, then the palette product; palettes are never matrix-lerped. [materials-and-render-graph](materials-and-render-graph.md), [fixed-step-simulation](fixed-step-simulation.md). Consumer check: `tests/integration/interpolated-skin-palettes.test.ts` |
+| WebGL skinned GPU picking | `registerPickingPipeline` + `registerSkinningPipeline` then `createPickingService` — WebGL draws the deformed silhouette (`SkinnedIdProgram`, live palette). WebGPU still skips skinned items (no RFC 0003 skinned pipelines). [cameras-and-coordinate-conversion](cameras-and-coordinate-conversion.md). Consumer check: `tests/integration/skinned-gpu-picking.test.ts` |
 
 ## Beside the guides
 

@@ -9,7 +9,7 @@ colocated in each package (`packages/<name>/tests/`); performance measurements l
 | directory                      | runner                                      | what is committed                        |
 | ------------------------------ | ------------------------------------------- | ---------------------------------------- |
 | [`determinism/`](determinism/) | `bun run test:suites`                       | **26** suites + **23** committed goldens |
-| [`integration/`](integration/) | `bun run test:suites`                       | **67** suites                            |
+| [`integration/`](integration/) | `bun run test:suites`                       | **69** suites                            |
 | [`browser/`](browser/)         | `bun run test:browser` (project `chromium`) | **31** Playwright specs                  |
 | [`visual/`](visual/)           | `bun run test:browser` (project `visual`)   | **2** specs, **3** committed PNG goldens |
 
@@ -43,7 +43,7 @@ and is not claimed.
 
 ## `integration/` — §92
 
-**67** suites. Seven of them are the original scenario set plus the repository-hygiene
+**69** suites. Seven of them are the original scenario set plus the repository-hygiene
 suite; the rest landed with later packets. Scenario builders shared between them live
 in `integration/helpers/`.
 
@@ -56,6 +56,8 @@ in `integration/helpers/`.
 | `motion-advanced.test.ts`         | §13–§14 trajectories and path following                                                                                               |
 | `scene-roundtrip.test.ts`         | §79 serialization round-trips of a populated scene                                                                                    |
 | `examples-build-coverage.test.ts` | repository hygiene, not engine behaviour: every example `playwright.config.ts` previews must be one `bun run examples:build` builds |
+| `interpolated-skin-palettes.test.ts` | §43 palettes: two-bone `Skeleton.update(..., worldOf)` matches `buildInterpolatedRenderList`; not a lerp of `jointMatrices` |
+| `skinned-gpu-picking.test.ts` | WebGL §71 skinned id pass: both registration seams, `SkinnedIdProgram` + live `jointMatrices`, unskinned control unchanged |
 
 ## `browser/` — §92's browser tier
 

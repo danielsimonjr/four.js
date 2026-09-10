@@ -1,6 +1,6 @@
 # RFC 0009: GPU readback as a raster source (§77a residue)
 
-- **Status:** Proposed
+- **Status:** draft — proposed to the owner 2026-09-06; corrected 2026-09-10 (review pass, see *Review log*)
 - **Date:** 2026-09-06
 - **Owner decision:** pending
 - **Spec sections affected:** §77a (primary), §33, §34, §61, §62, §63, §77, §83, §85, §89, §90, §96
@@ -56,24 +56,41 @@ not make the loop safe; it only makes it a frame late.
 
 Add `GpuReadbackSource` in `@fourjs/render` (beside `raster.ts`). It
 **implements `RasterSource`**. It does not widen `RasterSource`, does
-not make `readPixels` async, and does not change `CanvasTexture`.
+not make `readPixels` async, and leaves `CanvasTexture`'s contract intact
+(§3 adds one readonly accessor, `readbackTarget`, for the feedback check;
+no behaviour of `update` / `invalidate` / `dispose` changes).
 
 ```ts
-export class GpuReadbackSource implements RasterSource, Disposable {
-  constructor(
-    target: RenderTarget,
-    options?: { region?: Rectangle2; colorSpace?: ColorSpace },
-  );
+export interface GpuReadbackSourceOptions {
+  /** Target texels from the bottom-left (§7a); whole target if omitted. */
+  readonly region?: Rectangle2;
+  /** Defaults to `"srgb"` (RFC 0004 Q3); never inferred from the target. */
+  readonly colorSpace?: ColorSpace;
+  /**
+   * Snapshot byte ceiling; defaults to `CanvasTexture`'s 64 MiB constant.
+   * Checked once, at construction, because the size is fixed for life.
+   */
+  readonly maximumBytes?: number;
+}
 
+export class GpuReadbackSource implements RasterSource, Disposable {
+  constructor(target: RenderTarget, options?: GpuReadbackSourceOptions);
+
+  /** The target sampled by `refresh`; what the feedback check reads (§3). */
+  readonly target: RenderTarget;
   readonly width: number;
   readonly height: number;
   readonly origin: "bottom-left"; // matches Renderer.readPixels
   readonly colorSpace: ColorSpace;
+  // No `paint` hook: `RasterSource.paint` is synchronous and the GPU read
+  // is not, so the read is the explicit `refresh` below.
 
   /**
    * Pull `renderer.readPixels(target, region)` into the CPU snapshot.
-   * Between frames only; never from a fixed step; never inside
-   * `Renderer.beginFrame`…`endFrame`.
+   * Between frames only; never from a fixed step; never from inside a
+   * `Renderer.render(...)` / `RenderGraph.execute(...)` call (the
+   * `Renderer` interface has no begin/end-frame pair; `render` is the
+   * frame).
    */
   refresh(renderer: Renderer): Promise<boolean>;
 
@@ -106,18 +123,22 @@ The sentence is RFC 0004 §3 with the producer renamed:
 > `GpuReadbackSource` or from a `CanvasTexture` fed by one may reach a
 > fixed step, a §33 checksum, a §34 snapshot, or a replay document.
 
-`tests/integration/raster-display-only.test.ts` already forbids
-simulation packages from importing `@fourjs/render`'s raster module.
-`GpuReadbackSource` lives in that module (or a sibling imported only
-from it), so the existing allowlist covers it. No new scan.
+`tests/integration/raster-display-only.test.ts` already forbids every
+package outside `render`, `render-webgl`, and the umbrella from naming the
+raster module. Its scan is a fixed `FORBIDDEN` list of a module path and
+four identifiers, so a new class is **not** covered until it is listed:
+the packet adds `GpuReadbackSource`, `GpuReadbackSourceOptions`, and the
+new module's path (`/gpu-readback.js`) to that list. No new test file;
+the allowlist of packages does not change.
 
 `refresh` / `update` stay on §9 render or real time, never
 `fixedUpdate`.
 
 This is **not** a particle-pool or compute-buffer snapshot. Those
 read device simulation state and need their own §33/§34 argument
-(R-31 residue). This RFC does not authorise using `readPixels` or
-`readComputeBuffer` as a checksum or replay source.
+(R-31 residue). This RFC does not authorise using `Renderer.readPixels`
+or the WebGPU backend's `readComputeBuffer` (a `WebgpuRenderer` method,
+not a `Renderer` interface member) as a checksum or replay source.
 
 ### 3. Feedback is refused, a frame late is still a loop
 
@@ -126,10 +147,18 @@ whose `target` is the colour attachment of the view currently being
 rendered is the same loop, even though the bytes are from the
 *previous* refresh.
 
-The packet extends the existing feedback check: a `MaterialTexture`
-whose data last came from `GpuReadbackSource(target)` is refused as a
-sample of `target` in the same graph, matching
-`isRenderTargetTexture` / "feedback loops are refused". A graph that
+The packet extends the existing feedback check, and the mechanism has
+to be named because `CanvasTexture` keeps its source private:
+`RenderGraph`'s `collectSampledTargets` (`packages/render/src/render-graph.ts`)
+today recognises a sampled target only through `isRenderTargetTexture`.
+`CanvasTexture` gains one readonly accessor, `readbackTarget:
+RenderTarget | null` — the source's `target` when the source is a
+`GpuReadbackSource`, else `null` — and `collectSampledTargets` adds that
+target to its set exactly as it adds a `RenderTargetTexture`'s. The
+existing `"feedback"` issue then fires unchanged: a material sampling a
+`CanvasTexture` fed by `GpuReadbackSource(target)` while a pass draws
+into `target` is refused. The accessor is the narrowest seam that works
+(no `source` getter, no exposure of the pixel buffer). A graph that
 cannot see inside a custom pass still emits the opaque-info issue
 R-5/R-6 already require.
 
@@ -151,9 +180,13 @@ paint tool.
   HDR target must pass `colorSpace` explicitly; the source does not
   guess from the target format.
 - `CanvasTextureOptions.maximumBytes` (64 MiB) still applies when
-  the application wraps the source. `refresh` also refuses a region
-  whose `width * height * 4` exceeds that default unless the caller
-  opted out on the `CanvasTexture`.
+  the application wraps the source. The source cannot see that option,
+  so it carries its own `maximumBytes` (same 64 MiB default, exported as
+  one shared constant): the constructor refuses a region whose
+  `width * height * 4` exceeds it with a `RangeError` (§85 — the size
+  came from the application's own target and region, the same reasoning
+  `CanvasTexture`'s validation records), never `refresh`, because the
+  size is fixed at construction.
 
 ### 5. Staging
 
@@ -231,10 +264,10 @@ None run. The packet must record:
 
 1. **Latency.** `refresh` + `update` + upload at 256² / 1024² /
    2048² on WebGL (`readPixels`) and WebGPU (`mapAsync`), as a
-   between-frames cost, not a frame-time budget. RFC 0005 already
-   owed fence-vs-stall numbers for picking; this packet should not
-   share that measurement (picking is a point; this is a whole
-   region).
+   between-frames cost, not a frame-time budget. RFC 0005's
+   pick-latency numbers exist (`benchmarks/pick-latency.mjs`,
+   2026-09-09); this packet should not reuse them (picking is a
+   point; this is a whole region).
 2. **Correctness.** Clear a target to a known RGBA, `refresh`,
    assert the snapshot bytes match (browser gate, both backends).
 3. **Feedback.** A graph that samples a `CanvasTexture` backed by
@@ -255,3 +288,17 @@ None run. The packet must record:
 3. **Default colour space for a linear HDR target.**
    Recommendation: do not infer; default `"srgb"` and document
    the override.
+
+## Review log
+
+- **2026-09-10 — correction pass against the tree** (no decision changed):
+  the `Renderer` interface has no `beginFrame`/`endFrame`, so the "never
+  inside a frame" rule now names `render` / `RenderGraph.execute`; the
+  source cannot read a `CanvasTexture`'s `maximumBytes`, so it carries its
+  own, checked at construction with `RangeError` per the raster precedent;
+  the display-only scan is a fixed `FORBIDDEN` identifier list, so the new
+  names must be added to it rather than "covered by the allowlist"; the
+  feedback check's mechanism is spelled (`CanvasTexture.readbackTarget`
+  feeding `collectSampledTargets`) because `CanvasTexture` hides its
+  source; `readComputeBuffer` is attributed to the WebGPU backend; the
+  RFC 0005 pick-latency measurement is cited as landed, not owed.

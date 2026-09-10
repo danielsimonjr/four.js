@@ -269,7 +269,7 @@ export function instantiateGltf(asset: GltfAsset): GltfInstance {
         `gltf:${asset.url}:materials[${String(i)}]:ignored-textures`,
         `glTF "${asset.url}": materials[${String(i)}] carries ` +
           `${record.ignoredTextures.join(", ")}; the §59 material tier ` +
-          "samples the base-colour and packed metallic-roughness maps — " +
+          "samples the base-colour, packed metallic-roughness, and emissive maps — " +
           "factors still apply (§85).",
       );
     }
@@ -288,6 +288,10 @@ export function instantiateGltf(asset: GltfAsset): GltfInstance {
           record.metallicRoughnessTexture === null
             ? null
             : resources.textures[record.metallicRoughnessTexture],
+        emissiveMap:
+          record.emissiveTexture === null
+            ? null
+            : resources.textures[record.emissiveTexture],
       }),
     );
   }

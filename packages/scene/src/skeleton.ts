@@ -124,9 +124,10 @@ function invalidSkeleton(
  *
  * ## The palette is derived state, never an authority input (§42; RFC 0003 §4)
  *
- * `update` reads bone world matrices *after* transform resolution and writes
- * only into {@link Skeleton.jointMatrices}; nothing reads the palette back
- * into a transform. This is §43's "render interpolation never feeds back into
+ * `update` reads bone world matrices (resolved, or a caller-supplied
+ * `worldOf` that composes interpolated poses) and writes only into
+ * {@link Skeleton.jointMatrices}; nothing reads the palette back into a
+ * transform. This is §43's "render interpolation never feeds back into
  * physics state" applied one level down, and it is what keeps a ragdoll's §19
  * `"blended"` bones ordinary nodes with ordinary authorities.
  *
@@ -265,10 +266,18 @@ export class Skeleton {
    * ```
    *
    * Deterministic (§33): bones are visited in insertion order, the two
-   * products associate left-to-right, and world matrices come from the same
-   * `resolveWorldTransform` every other node uses — version-cached, so after
-   * the frame's resolve pass each read is a few comparisons. Allocates
-   * nothing (§7b: module scratch).
+   * products associate left-to-right, and world matrices come from `worldOf`
+   * when provided, otherwise from the same `resolveWorldTransform` every other
+   * node uses — version-cached, so after the frame's resolve pass each read is
+   * a few comparisons. Allocates nothing (§7b: module scratch).
+   *
+   * `worldOf` is how §43 interpolation reaches the palette without writing
+   * interpolated poses back into `node.transform` (§42): the render list
+   * supplies a provider that composes interpolated local poses the same way
+   * node world matrices are composed. The provider is used for **both** the
+   * skin root and every bone. The palette itself is never lerped — local
+   * poses interpolate, then this product runs. A returned matrix is copied
+   * immediately, so the provider may reuse one scratch across calls.
    *
    * Degenerate input follows the engine's transform policy rather than
    * throwing on a per-frame path (§85, `Matrix4.invert`): a `skinRoot` whose
@@ -277,16 +286,17 @@ export class Skeleton {
    * frame is well-defined arithmetic over a wrong matrix — finite, visible,
    * and gone the moment the scale is. Nothing is written anywhere else.
    */
-  update(skinRoot: Node): void {
+  update(skinRoot: Node, worldOf?: (node: Node) => Matrix4): void {
     const bones = this.bones;
     const binds = this.inverseBindMatrices;
     const palette = this.jointMatrices;
-    rootInverseScratch.copy(resolveWorldTransform(skinRoot)).invert();
+    const world = worldOf ?? resolveWorldTransform;
+    rootInverseScratch.copy(world(skinRoot)).invert();
     for (let i = 0; i < bones.length; i += 1) {
       const base = i * FLOATS_PER_JOINT;
       jointScratch
         .copy(rootInverseScratch)
-        .multiply(resolveWorldTransform(bones[i]))
+        .multiply(world(bones[i]))
         .multiply(bindScratch.fromArray(binds, base));
       const elements = jointScratch.elements;
       for (let k = 0; k < FLOATS_PER_JOINT; k += 1) {

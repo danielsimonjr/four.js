@@ -211,6 +211,94 @@ describe("Matrix3 determinant and invert", () => {
   });
 });
 
+describe("Matrix3 transpose", () => {
+  it("leaves the identity unchanged and returns this", () => {
+    const m = new Matrix3();
+    expect(m.transpose()).toBe(m);
+    expectElementsExactly(m, IDENTITY_3);
+  });
+
+  it("swaps the three off-diagonal pairs of a general matrix", () => {
+    const m = new Matrix3().fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    m.transpose();
+    expectElementsExactly(m, [1, 4, 7, 2, 5, 8, 3, 6, 9]);
+  });
+
+  it("is its own inverse", () => {
+    const original = [1, 2, 3, 4, 5, 6, 7, 8, 10] as const;
+    const m = new Matrix3().fromArray(original);
+    m.transpose().transpose();
+    expectElementsExactly(m, original);
+  });
+});
+
+describe("Matrix3 setFromMatrix4Upper3x3", () => {
+  it("copies the identity's upper 3×3 and returns this", () => {
+    const m = new Matrix3().fromArray([9, 8, 7, 6, 5, 4, 3, 2, 1]);
+    expect(m.setFromMatrix4Upper3x3(new Matrix4())).toBe(m);
+    expectElementsExactly(m, IDENTITY_3);
+  });
+
+  it("copies a scaled rotation and drops the translation column", () => {
+    const m4 = new Matrix4().fromArray([
+      2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 4, 0, 5, 6, 7, 1,
+    ]);
+    const m3 = new Matrix3().setFromMatrix4Upper3x3(m4);
+    expectElementsExactly(m3, [2, 0, 0, 0, 3, 0, 0, 0, 4]);
+  });
+});
+
+describe("Matrix3 setNormalFromMatrix4", () => {
+  it("leaves the identity as the identity", () => {
+    const m = new Matrix3().fromArray([9, 8, 7, 6, 5, 4, 3, 2, 1]);
+    expect(m.setNormalFromMatrix4(new Matrix4())).toBe(m);
+    expectElementsExactly(m, IDENTITY_3);
+  });
+
+  it("maps a uniform scale to the reciprocal scale", () => {
+    const scaled = new Matrix4().fromArray([
+      2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 9, 8, 7, 1,
+    ]);
+    const m = new Matrix3().setNormalFromMatrix4(scaled);
+    expectElementsCloseTo(m, [0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5]);
+  });
+
+  it("maps a non-uniform scale to the inverse-transpose diagonal", () => {
+    // Scale (2, 4, 8): inverse is (1/2, 1/4, 1/8), and a diagonal is its
+    // own transpose, so the normal matrix is the reciprocal diagonal.
+    const scaled = new Matrix4().fromArray([
+      2, 0, 0, 0, 0, 4, 0, 0, 0, 0, 8, 0, 1, 2, 3, 1,
+    ]);
+    const m = new Matrix3().setNormalFromMatrix4(scaled);
+    expectElementsCloseTo(m, [0.5, 0, 0, 0, 0.25, 0, 0, 0, 0.125]);
+  });
+
+  it("equals copy-then-invert-then-transpose for a general affine transform", () => {
+    const m4 = new Matrix4().compose(
+      new Vector3(5, 6, 7),
+      new Quaternion().setFromAxisAngle(AXIS_Y, 0.7),
+      new Vector3(2, 3, 4),
+      ZERO,
+    );
+    const expected = new Matrix3()
+      .setFromMatrix4Upper3x3(m4)
+      .invert()
+      .transpose();
+    const actual = new Matrix3().setNormalFromMatrix4(m4);
+    expectElementsCloseTo(actual, Array.from(expected.elements));
+  });
+
+  it("leaves this matrix unchanged when the upper 3×3 is singular", () => {
+    const singular = new Matrix4().fromArray([
+      1, 2, 3, 0, 2, 4, 6, 0, 3, 6, 9, 0, 10, 11, 12, 1,
+    ]);
+    const kept = [2, 0, 0, 0, 4, 0, 0, 0, 8] as const;
+    const m = new Matrix3().fromArray(kept);
+    expect(m.setNormalFromMatrix4(singular)).toBe(m);
+    expectElementsExactly(m, kept);
+  });
+});
+
 describe("Matrix4 basics", () => {
   it("constructs the identity in a column-major Float64Array(16)", () => {
     const m = new Matrix4();
@@ -787,6 +875,20 @@ describe("Matrix changed hook (plan D3)", () => {
       ["fromArray", (m) => void m.fromArray([2, 0, 0, 0, 2, 0, 0, 0, 2])],
       ["multiply", (m) => void m.multiply(new Matrix3())],
       ["invert", (m) => void m.invert()],
+      ["transpose", (m) => void m.transpose()],
+      [
+        "setFromMatrix4Upper3x3",
+        (m) => void m.setFromMatrix4Upper3x3(new Matrix4()),
+      ],
+      [
+        "setNormalFromMatrix4",
+        (m) =>
+          void m.setNormalFromMatrix4(
+            new Matrix4().fromArray([
+              2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 4, 0, 1, 2, 3, 1,
+            ]),
+          ),
+      ],
     ];
 
     for (const [name, mutate] of mutators) {
@@ -850,6 +952,18 @@ describe("Matrix changed hook (plan D3)", () => {
     };
     m3.invert();
     expect(calls3).toBe(0);
+
+    const dest = new Matrix3().fromArray([2, 0, 0, 0, 4, 0, 0, 0, 8]);
+    let callsNormal = 0;
+    dest.onChanged = () => {
+      callsNormal += 1;
+    };
+    dest.setNormalFromMatrix4(
+      new Matrix4().fromArray([
+        1, 2, 3, 0, 2, 4, 6, 0, 3, 6, 9, 0, 0, 0, 0, 1,
+      ]),
+    );
+    expect(callsNormal).toBe(0);
 
     const m4 = new Matrix4().fromArray([
       1, 2, 3, 4, 1, 2, 3, 4, 0, 0, 1, 0, 0, 0, 0, 1,
@@ -917,6 +1031,7 @@ describe("Matrix allocation counter (§7b, §83)", () => {
       world.copy(parent).multiply(local);
       world.decompose(outPosition, outRotation, outScale);
       scratch3.copy(normalMatrix).invert();
+      scratch3.setNormalFromMatrix4(world);
       accumulator +=
         world.determinant() +
         outPosition.lengthSq() +

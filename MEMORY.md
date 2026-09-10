@@ -30,10 +30,247 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-09 — Open-TODO audit: 12 still open, 257 closed.** A
+  subagent-team review of every `- [ ]` row against source. None of the 12
+  packets can close: dogfood is standing; first publish is owner-gated
+  (no git tag, nothing on npm); R-33 still needs non-SwiftShader; RFC
+  0001/0003/0004/0005, lighting, R-1 deferred, batching, R-30c, and §96
+  each still have named remaining slices (WebGPU skinned id/shadow skip;
+  GPU morph / CPU skinning / bone-texture absent; cube/array/3D and
+  compressed/video/async absent). Header closed-count was 249 — seven
+  `[x]` rows had never been added. Hygiene only: stale “remaining”
+  sentences on closed rows (rigs, PH-11c, scissor, `recording-gl` adopt,
+  flagship §46 layers, WebGPU `maximumSkinningJoints`) and Priority-index
+  leftovers (A-4/A-5/A-19, R-32, camera-rig residue, particle-trail
+  spatial-hash). Remaining-work wording follow-up: R-17 point/spot
+  (8 punctual) is not “multi-light still open”; §27 GPU fields /
+  depth-buffer are stub-tier; §96 shader trust is the closed union
+  (extensible operators still deferred); WebGPU batch idle-skip absent.
+  Do not re-triage the 12 as quick wins.
+
+- **2026-09-09 — WebGPU skinned colour pair (RFC 0003).** Opt-in
+  `registerSkinningPipeline()` from `@fourjs/render-webgpu`. `WebgpuRenderer`
+  imports only `wgpu-skinning-registry.ts` (pipeline-cost law). Palette is
+  a separate 3072-byte bind group (`48 × 64`), `hasDynamicOffset`, vertex
+  stage only — `DRAW_UNIFORM_BYTES` stays 192. Group index after existing
+  groups: unlit 1, unlit+map/lit 2, lit+map 3. Joints `@location(4)`
+  `uint16x4`, weights `@location(5)` `float32x4`; LBS, weights not
+  renormalized. Classes are not named `SkinnedUnlitProgram` /
+  `SKINNING_GLSL` (`graph:duplicates`). Unregistered or factory failure
+  skips, never bind-pose. Shadow caster and RFC 0005 id pass still skip.
+  `maximumSkinningJoints` is reported. RFC 0003 checkbox stays `[ ]`.
+
+- **2026-09-09 — WebGL `StandardMaterial.emissiveMap` on unit 3.** Packed
+  glTF factor × texture (sRGB). Allocator: 0 albedo, 1 shadow, 2 MR, 3
+  emissive. Uniform switch `useEmissiveMap` (R-19), not a shader variant.
+  Unresolved/disposed map degrades — the draw continues, matching albedo
+  / MR. glTF `emissiveTexture` is decoded sRGB and dropped from
+  `ignoredTextures`. WebGPU does **not** sample it: groups 2 and 3 already
+  hold albedo and MR when both maps exist, and the four-group budget is
+  full. No fifth bind group. Occlusion stays staged (no AO term); normal
+  stays staged (tangents). Lighting leftover checkbox stays `[ ]`.
+
+- **2026-09-09 — Dogfood cycle 7: WebGL skinned GPU picking.** Read from
+  a consumer seat. `registerPickingPipeline` + `registerSkinningPipeline`
+  then `createPickingService`. One-bone plane, bone +1 Y: id pass uses
+  `SKINNING_GLSL` + `pickId`, uploads the live palette (y-translation
+  1, not bind pose). Unskinned control id/colour transcripts are
+  identical with or without the skinning seam. Recording GL cannot
+  rasterise, so deformed-vs-bind hit/miss is staged texels + the
+  silhouette claim is the program. Engine clean. Guide index patched.
+  WebGPU still skips skinned items. Standing checkbox stays `[ ]`.
+
+- **2026-09-09 — R-30c map roles.** Optional `TextureMapRole` `"color"` |
+  `"data"` on `TextureSource` / `Texture.role`. Omitting `role` invents
+  **no** default and leaves `colorSpace` at R-15's `"linear"` — that is
+  the golden-stability rule, not a missing default. `role: "color"` with
+  no `colorSpace` resolves to `"srgb"`; `"data"` stays linear; an
+  authored `colorSpace` always wins. Backends still sample
+  `texture.colorSpace` only; glTF already passes `"linear"` for
+  metallic-roughness. Invalid role is `RangeError` via `validateEnum`
+  (same as filter/wrap). R-30c checkbox stays `[ ]` (cube/array/3D,
+  compressed, video/`ImageBitmap`, async upload).
+
+- **2026-09-09 — `wgpu-picking.ts` on the `GATED` list.** Wave 5's WebGPU
+  picking id pipelines wrap compile-failure notices in `if (DEV)` (mesh
+  + particle). `gl-picking.ts` was already listed; the WebGPU twin was
+  not, so `tests/integration/dev-build-mode.test.ts` failed on #87.
+  Argument matches the WebGL entry: failure latched in both builds,
+  picking is a §34 input, nothing an id pass draws re-enters simulation
+  (§42/§43).
+
+- **2026-09-09 — RFC 0005 WebGL `SkinnedIdProgram`.** The id pass draws
+  skinned-unlit / skinned-lit items through a deformed silhouette
+  (`SKINNING_GLSL` in `gl-skinning-glsl.ts`, spliced into the id
+  fragment). Lives in `gl-picking.ts` so `registerPickingPipeline` does
+  not link the colour pair. Lazy compile, fail-once skip, same palette
+  upload as the colour pass. WebGPU still skips: no RFC 0003 skinned
+  pipelines there. RFC 0005 checkbox stays `[ ]`.
+
+- **2026-09-09 — Size budgets after #86.** Main CI failed at `bun run size`
+  with the browser gate green (107/107). particles-demo 43.04/43 kB (+38 B),
+  ui-demo 49.51/49.5 kB (+11 B). Limits 43.5 / 50 kB. first-3d holds.
+  PickProvider and the WebGL particle id arm ride those two graphs.
+
+- **2026-09-09 — Open-TODO wave 5, simple → complex.** Twelve checkboxes
+  remain; three slices landed without pretending the packets closed.
+  (1) RFC 0005 WebGPU particle id: one id per emitter, private pipeline
+  (not exported as `ParticleIdProgram`); 208-byte `PARTICLE_ID_*` block;
+  CPU 8-float stream; trails / GPU-sim / wide stream skip. Remaining:
+  WebGPU skinned id pass (needs RFC 0003 skinned pipelines). (2) Lighting leftover: WebGPU
+  samples `StandardMaterial.metalRoughnessMap` (G=roughness, B=metalness);
+  group 3 with albedo, group 2 without (`shadedMrBindingWgsl`). `|mr:y`
+  only when true. Remaining: multi-light / cascades / PBR / §60a / light
+  layers / other texture slots. (3) Dogfood cycle 6 sat on §43 palettes;
+  engine clean; guides patched; standing checkbox stays open. First
+  publish and R-33's §112 exit stay blocked.
+
+- **2026-09-09 — WebGPU particle id arm (RFC 0005 residue).** One id per
+  emitter, mirroring WebGL's `ParticleIdProgram` without exporting that
+  class name (`graph:duplicates`). `PickingRendererHost.particles()` is
+  the live `WgpuParticleCache` accessor. Mesh `IdUniforms` stay 144
+  bytes; the particle id block is 208 bytes (projection 0 / view 64 /
+  model 128 / pickId 192) in the 256-byte stride. Billboard vertex math
+  is `PARTICLE_SHADER_SOURCE`'s. Default 8-float CPU stream only; trails,
+  GPU-sim layouts, and the R-32 wide stream skip. WebGL now draws
+  skinned ids (`SkinnedIdProgram`); WebGPU still skips (no RFC 0003
+  skinned pipelines). RFC 0005 is not closed.
+
+- **2026-09-09 — Dogfood cycle 6: §43 interpolated skin palettes.**
+  Read from a consumer seat. `Skeleton.update(skinRoot, worldOf?)` and
+  `buildInterpolatedRenderList` compose interpolated local poses, then
+  run the palette product. Palettes are never matrix-lerped; scene
+  transforms are unchanged. Engine clean. Evidence:
+  `tests/integration/interpolated-skin-palettes.test.ts` (two-bone, 90°
+  hip; mid-alpha ≠ lerp of endpoints). Guides and architecture docs
+  patched. Standing dogfood checkbox stays open.
+
+- **2026-09-09 — WebGPU samples `StandardMaterial.metalRoughnessMap`.** Packed
+  G=roughness / B=metalness, matching WebGL unit 2. Bind-group index is
+  **3 when albedo occupies group 2, 2 when it does not** (`shadedMrBindingWgsl`).
+  `|mr:y` appends to the pipeline key only when true, so scalar-only
+  transcripts stay byte-identical. Unresolved named maps skip the draw.
+  `normalMap` / `occlusionMap` / `emissiveMap` remain unstaged. Lighting
+  follow-ups stay open.
+
+- **2026-09-09 — WebGPU browser gates follow `DRAW_UNIFORM_BYTES`.** The
+  Playwright page programs are not the renderer: they bind their own
+  layouts. After `DrawUniforms` grew to 192 bytes (`normalMatrix` at 144)
+  and sprites dropped `quad` (R-19/R-20), six `[webgpu]` specs still
+  declared `minBindingSize: 144` and the sprite gate still used a 160-byte
+  quad uniform with position-only vertices. Validation: "shader uses more
+  bytes than minBindingSize" and "vertex attribute slot 2 not present".
+  Harnesses now import `DRAW_UNIFORM_BYTES` / `SPRITE_UNIFORM_BYTES` and
+  authored uv at `@location(2)`. Node-material 144-byte prefixes are a
+  different block — leave them.
+
+- **2026-09-09 — Open-TODO wave 4, simple → complex.** Twelve
+  checkboxes remain; four slices landed without pretending the packets
+  closed. (1) RFC 0003 §43: `Skeleton.update(skinRoot, worldOf?)`;
+  interpolated collect composes local poses then the palette product
+  (never matrix-lerps palettes; scene transforms unchanged). (2) RFC
+  0003 WebGL skinned shadow: `SkinnedShadowProgram` via
+  `pair.acquireShadow()` on the first caster (third `createProgram`);
+  colour pair still compiles on first colour draw; `gl-shadow.ts` does
+  not import `gl-skinning.ts`. Unregistered still skips. WebGPU has no
+  skinned pipelines. (3) RFC 0005 WebGPU `PickingService`: the same
+  `registerPickingPipeline()` seam as WebGL; `mapAsync` 1×1 readback;
+  skips particles and skinned items. (4) Dogfood cycle 5 sat on GPU
+  pick / PickProvider; engine clean; cameras guide and package READMEs
+  patched. Remaining: RFC 0005 WebGPU `ParticleIdProgram`; RFC 0003
+  GPU morph / CPU skinning / bone-texture. First publish and R-33's
+  §112 exit stay blocked.
+
+- **2026-09-09 — Open-TODO second wave, simple → complex.** Twelve
+  checkboxes remain; three slices landed without pretending the packets
+  closed. (1) Lighting leftover: WebGPU `DrawUniforms` is 192 bytes
+  (`normalMatrix` at 144, std140-padded mat3); `StandardUniforms` 224
+  (emissive 192, surface 208); sprites stay 144. Lit/standard vertex
+  stages read `draw.normalMatrix`; `NORMAL_MATRIX_WGSL` stays exported
+  and is not spliced. `#writeBlock` uses a module-level `Matrix3`
+  scratch and `setNormalFromMatrix4` (identity on null/singular).
+  (2) RFC 0005 `ParticleIdProgram`: `collectPickCandidates` includes
+  `isParticleDrawable`; WebGL id pass instances the §36 billboard with
+  one `pickId` per emitter; skinned still skipped; trails not drawn.
+  (3) §72: optional `PointerInputOptions.pickProvider`; default
+  handlers stay fully synchronous; provider path copies the event and
+  serializes per `pointerId`. Remaining on those rows: WebGPU
+  `PickingService` `mapAsync`; multi-light / cascades / PBR / §60a.
+  First publish and R-33's §112 exit stay blocked.
+
+- **2026-09-09 — R-19/R-20 closed (§55 authored sprite uvs).** `Sprite`
+  writes a 4-vertex `uvs` stream (`frame / textureSize`, or 0…1 if
+  frameless). WebGL `SpriteProgram` and WebGPU sprite WGSL sample
+  `@location(2) uv`. `uniform vec4 quad` and `SPRITE_QUAD_OFFSET` are
+  gone. `setFrame` is a no-op when unchanged; a real change
+  `markDirty()`s so GeometryCache re-uploads eight floats. Trade-off vs
+  the 2026-08-08 affine-quad design: animation clips no longer get a
+  zero-upload frame flip. Texture/material stay shared. Graph regen
+  dropped the export.
+
+- **2026-09-09 — Stale-item honesty on two follow-ups.** The batching
+  "still scene re-uploads every frame" sentence was false:
+  `contentVersion` + `#canSkipUpload` already skip `bufferSubData` on
+  an idle batched run (tested). §52 already caps concave extrudes;
+  `polygonGeometry2D` already takes holes. Struck both. Remaining on
+  those rows: shaded instancing, atlas grouping, default-on batching,
+  §55 authored sprite uvs.
+
+- **2026-09-09 — Open-TODO first wave, simple → complex.** Thirteen
+  checkboxes remain; four slices landed without pretending the packets
+  closed. (1) Lighting: `Matrix3.setNormalFromMatrix4` + WebGL
+  lit/standard hoist; singular models upload identity; WebGPU stays
+  per-vertex cofactor until `DrawUniforms` widens (144 → ~192).
+  CSS light colors were already shipped (`parseColorRGB`). (2) RFC 0005
+  §86: `benchmarks/pick-latency.mjs` — N=64 id-pass ≈ list (1.03×);
+  10k–100k ≈ 3–4×; fence vs stall is JS+seam only (no host WebGL 2).
+  (3) R-33: `data-simulate` / `data-present` seconds on particles-demo;
+  gate asserts existence, not 16.6 ms. (4) Dogfood cycle 4: the three
+  leftover surfaces work; `digital-twin.md` taught the throwing save.
+  First publish and R-33's §112 exit stay blocked.
+
 - **2026-09-09 — tools/docs must stay on typescript@6.0.3.** Dependabot #82
   bumped it to 7.0.2 with the root. TypeDoc 0.28's peer is 5.0–6.0; CI died
   on `PropertyDeclaration`. Isolation is a version pin, not a directory.
   `check-compiler.mjs` refuses anything else. Root 7.x is free to move.
+
+- **2026-09-09 — RFC 0003 prototype measurements recorded.** Bones-as-nodes
+  at 60 ×1/×10 is within noise of ordinary Groups at ×10; alternative A does
+  not return. 180-channel controller is ~0.03 ms/step on the recording host,
+  within 0.002 ms of the mixer. Proposed §86: 227 independent 60-bone
+  characters inside one 60 Hz step (host-specific, not a gate).
+
+- **2026-09-09 — Vitest 5 particles follow-up.** Landing the bump on the
+  five named failures left `@fourjs/particles` at 92.1% branches
+  (455/494) under honest v8 remap — CI `bun run coverage` caught it.
+  The misses were real: `copySizeRamp` / `copyColorRamp` reject `t`
+  outside `(0, 1)` and unsorted stops; `evaluateLifetimeRamp*` empty
+  `stops` and the after-last-stop `span <= 0` guard (NaN age past a
+  stop at `t >= 1`); `ParticleTrailStore` out-of-range
+  `readSample` / `#assertSlot`; `buildTrailRibbonMesh` `sampleCount < 2`;
+  `ParticleRenderable.computeBounds` non-positive lifetime. Re-measured
+  **97.16% branches (480/494)**. Gate unchanged. Lesson: remasure every
+  package, not only the ones a local Vitest 5 probe named.
+
+- **2026-09-09 — Vitest 5.0.0 landed.** The coverage campaign closed the
+  last honest gap: physics-rapier branches 95.26% (724/760) after
+  `rapier-defensive-branches.test.ts` (countContacts + snapshot-envelope
+  guards). physics 97.27%, render-webgl 95.57%, text 100%, render 97.59%.
+  `vitest` and `@vitest/coverage-v8` bumped together. Gate unchanged at 95%.
+  Oxlint `**/tests/**` now also allows `typescript/no-unsafe-*` — Vitest 5
+  mock types trip them; `tsc -p tests` is still clean. Package test
+  tsconfigs set `"types": ["node"]` because Vitest 5 dropped the Node
+  triple-slash that 3.2.7 shipped (TypeDoc/TS 6 typechecks those tests).
+  Supersedes the same-day "second measurement / bump still waits" note.
+  **Same-day follow-up:** particles was a sixth miss — see the entry above.
+
+- **2026-09-09 — Vitest 5 coverage campaign, second measurement.** After
+  executing the previously-unrun Rapier init reject path, stale-handle
+  context, and R-32 particle appearance/wide-stream/trail branches, four of
+  the five failing packages clear 95% under Vitest 5. Remaining: physics-rapier
+  global branches 92.1% (adapter defensive paths). Bump still waits.
+  **Superseded the same day — see the 5.0.0 landing entry above.**
+
 
 - **2026-09-09 — Browser-gate follow-up on the open-TODO PR.** Pause-during-
   grab was not enough: `waitForVirtualFrameCount` pumped the patched rAF and
@@ -111,6 +348,22 @@ readable; never delete the pointer itself.
   §56 shaping (`0008`: optional HarfBuzz-compatible WASM, identity default);
   GPU readback as a raster source (`0009`: between-frames `refresh()` snapshot,
   display-only, no feedback). Implementation waits on acceptance.
+
+- **2026-09-10 — RFCs 0007–0009 corrected; subagent plans written.** Standing
+  facts the review pinned (each was wrong in a draft): `DeterminismLevel` is
+  declared in `@fourjs/physics`, unreachable from motion — motion-side
+  contracts spell their own literal union; the umbrella's specifier is
+  `fourJS/…` (`packages/fourjs/package.json`), `four` is only the workspace
+  nickname; `layoutText` iterates code points (`for…of`); `FourErrorCode` is
+  an open union — reuse `NOT_IMPLEMENTED` for staged API rather than minting
+  codes; `Renderer` has no begin/end-frame pair (`render` is the frame);
+  `tests/integration/raster-display-only.test.ts` is a fixed `FORBIDDEN`
+  identifier list, so new raster-tier names must be added to it; no
+  workspace tsconfig pins `lib`, so "DOM-free" is a seam rule, not a compiler
+  guarantee; Roboto is Apache-2.0, Noto Sans is OFL. Plans live in
+  `docs/plans/RFC-000{7,8,9}-*_PLAN.md`: ≤ 4 agents, disjoint file ownership,
+  waves, an anti-hallucination table per plan citing file:line, and "stop and
+  report" rules for network-gated steps (harfbuzzjs install, Noto download).
 
 - **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
   (the exception each golden's `_warning` names). Values came from the

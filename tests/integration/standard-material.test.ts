@@ -201,6 +201,9 @@ function everyOlderPipeline(test: Harness): void {
  * Recorded, not written. Do not "fix" a failure here by re-recording: this list
  * is the regression guard for every pixel golden and every browser test, and a
  * change to it is a change to what a frame that uses none of §59 draws.
+ * Updated 2026-09-09: lit `setModel` now also uploads `uniform mat3
+ * normalMatrix` (identity for these identity models) — sequence only; shading
+ * of non-singular models is the same inverse-transpose.
  *
  * One caveat stated rather than hidden: the double records typed-array
  * arguments **by reference**, and every upload in this backend goes through one
@@ -239,22 +242,23 @@ const FRAME_BEFORE_R13: readonly string[] = [
   "uniform3fv(getUniformLocation#8, [2,1.899999976158142,1.7999999523162842])",
   "uniform1i(getUniformLocation#9, 0)",
   "uniformMatrix4fv(getUniformLocation#10, false, [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1])",
-  "uniform4fv(getUniformLocation#11, [1,1,1,1])",
+  "uniformMatrix3fv(getUniformLocation#11, false, [1,0,0,0,1,0,0,0,1])",
+  "uniform4fv(getUniformLocation#12, [1,1,1,1])",
   "bindVertexArray(createVertexArray#2)",
   "drawElements(4, 36, 5123, 0)",
   "bindTexture(3553, createTexture#0)",
   "uniform1i(getUniformLocation#9, 1)",
   "uniformMatrix4fv(getUniformLocation#10, false, [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1])",
-  "uniform4fv(getUniformLocation#11, [1,1,1,1])",
+  "uniformMatrix3fv(getUniformLocation#11, false, [1,0,0,0,1,0,0,0,1])",
+  "uniform4fv(getUniformLocation#12, [1,1,1,1])",
   "bindVertexArray(createVertexArray#3)",
   "drawElements(4, 36, 5123, 0)",
   "useProgram(createProgram#2)",
-  "uniform1i(getUniformLocation#12, 0)",
+  "uniform1i(getUniformLocation#13, 0)",
   "activeTexture(33984)",
   "enable(3042)",
-  "uniformMatrix4fv(getUniformLocation#13, false, [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1])",
   "uniformMatrix4fv(getUniformLocation#14, false, [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1])",
-  "uniform4fv(getUniformLocation#15, [1,1,1,1])",
+  "uniformMatrix4fv(getUniformLocation#15, false, [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1])",
   "uniform4fv(getUniformLocation#16, [1,1,1,1])",
   "bindTexture(3553, createTexture#0)",
   "bindVertexArray(createVertexArray#4)",

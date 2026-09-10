@@ -69,6 +69,7 @@ export { isWebgpuSupported, registerWebgpuRenderer } from "./register.js";
 export {
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  DRAW_NORMAL_OFFSET,
   DRAW_UNIFORM_BYTES,
   DRAW_UNIFORM_FLOATS,
   DRAW_UNIFORM_WGSL,
@@ -102,7 +103,6 @@ export {
 } from "./wgpu-batch.js";
 export {
   SPRITE_MODEL_OFFSET,
-  SPRITE_QUAD_OFFSET,
   SPRITE_SHADER_SOURCE,
   SPRITE_TINT_OFFSET,
   SPRITE_UNIFORM_BYTES,
@@ -135,6 +135,7 @@ export {
   VERTEX_ENTRY_POINT,
   unlitShaderSource,
   unlitVertexBufferLayouts,
+  unlitFragmentStageWgsl,
 } from "./wgpu-unlit.js";
 export {
   LIGHTS_BIND_GROUP_INDEX,
@@ -156,7 +157,10 @@ export {
   PUNCTUAL_LIGHT_WGSL,
   SHADED_MAP_BINDING_WGSL,
   SHADED_MAP_BIND_GROUP_INDEX,
+  SHADED_MR_BINDING_WGSL,
+  SHADED_MR_BIND_GROUP_INDEX,
   createLightsBindGroupLayout,
+  shadedMrBindingWgsl,
   writeLightUniforms,
 } from "./wgpu-lights.js";
 export {
@@ -166,6 +170,7 @@ export {
   litShaderSource,
   shadedVertexBufferLayouts,
   shadedVertexStageWgsl,
+  litFragmentStageWgsl,
 } from "./wgpu-lit.js";
 export type {
   WgpuCacheableRenderTarget,
@@ -266,6 +271,7 @@ export {
   STANDARD_BASE_COLOR_OFFSET,
   STANDARD_EMISSIVE_OFFSET,
   STANDARD_MODEL_OFFSET,
+  STANDARD_NORMAL_OFFSET,
   STANDARD_SURFACE_OFFSET,
   STANDARD_UNIFORM_BYTES,
   STANDARD_UNIFORM_WGSL,
@@ -300,3 +306,67 @@ export {
   emitShaderGraphWgsl,
   registerWebgpuNodeMaterialPipeline,
 } from "./wgpu-node-program.js";
+// §71's picking pipeline (RFC 0005). Deliberately — like the node-material
+// pipeline above — a module `WebgpuRenderer` never reaches statically:
+// importing `registerPickingPipeline` is what links the id pipeline, the
+// service, and its `mapAsync` read-back into a bundle, and a barrel
+// re-export does not (it tree-shakes like every other unused export) —
+// see `wgpu-picking-registry.ts` for the whole seam.
+export type {
+  PickingRendererHost,
+  PickingServiceFactory,
+} from "./wgpu-picking-registry.js";
+export {
+  clearRegisteredPickingPipeline,
+  resolvePickingServiceFactory,
+} from "./wgpu-picking-registry.js";
+export {
+  ID_MODEL_OFFSET,
+  ID_PICK_OFFSET,
+  ID_SHADER_SOURCE,
+  ID_UNIFORM_BYTES,
+  ID_VIEW_PROJECTION_OFFSET,
+  PARTICLE_ID_MODEL_OFFSET,
+  PARTICLE_ID_PICK_OFFSET,
+  PARTICLE_ID_PROJECTION_OFFSET,
+  PARTICLE_ID_SHADER_SOURCE,
+  PARTICLE_ID_UNIFORM_BYTES,
+  PARTICLE_ID_VIEW_OFFSET,
+  WebgpuPickingService,
+  registerPickingPipeline,
+} from "./wgpu-picking.js";
+// §54's skinning pipeline (RFC 0003). Deliberately — like the picking
+// pipeline above — a module `WebgpuRenderer` never reaches statically:
+// importing `registerSkinningPipeline` is what links the two skinned colour
+// pipelines and the palette uploader into a bundle, and a barrel re-export
+// does not (it tree-shakes like every other unused export) —
+// see `wgpu-skinning-registry.ts` for the whole seam.
+export type {
+  SkinningPipelineFactory,
+  SkinningPipelineHost,
+  SkinnedLitPipeline,
+  SkinnedPrograms,
+  SkinnedUnlitPipeline,
+  WgpuSkinnedDrawDescriptor,
+} from "./wgpu-skinning-registry.js";
+export {
+  clearRegisteredSkinningPipeline,
+  resolveSkinningPipelineFactory,
+} from "./wgpu-skinning-registry.js";
+export {
+  JOINTS_BUFFER_LAYOUT,
+  JOINTS_SHADER_LOCATION,
+  JOINT_PALETTE_BINDING,
+  JOINT_PALETTE_BYTES,
+  JOINT_PALETTE_FLOATS,
+  WEIGHTS_BUFFER_LAYOUT,
+  WEIGHTS_SHADER_LOCATION,
+  createJointPaletteBindGroupLayout,
+  registerSkinningPipeline,
+  skinnedLitShaderSource,
+  skinnedLitVertexBufferLayouts,
+  skinnedPaletteBindGroupIndex,
+  skinnedUnlitShaderSource,
+  skinnedUnlitVertexBufferLayouts,
+  skinningWgsl,
+} from "./wgpu-skinning.js";

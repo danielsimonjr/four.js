@@ -96,6 +96,7 @@ import {
 import {
   GL,
   LitProgram,
+  EMISSIVE_TEXTURE_UNIT,
   MAP_TEXTURE_UNIT,
   METAL_ROUGHNESS_TEXTURE_UNIT,
   SHADOW_TEXTURE_UNIT,
@@ -114,6 +115,7 @@ import {
 import {
   resolveSkinningPipelineFactory,
   type SkinnedPrograms,
+  type SkinnedShadowPipeline,
 } from "./gl-skinning-registry.js";
 import {
   NODE_SURFACE_TEXTURE_UNIT_BASE,
@@ -270,6 +272,10 @@ const REQUIRED_CONTEXT_METHODS = [
   // draw, the same courtesy the check extends to every other entry point the
   // backend cannot draw without.
   "uniform3fv",
+  // The lit/standard normal-matrix hoist (2026-09-09): `uniform mat3`. Core
+  // WebGL 1 and 2, listed so an incomplete stub fails at initialize rather
+  // than at the first shaded `setModel`.
+  "uniformMatrix3fv",
   // The render-target path's five (R-4, 2026-08-07). Core WebGL 1 and 2 too,
   // so they discriminate nothing either; they are checked for the same reason
   // as `uniform3fv` — a stub that cannot allocate a framebuffer should say so
@@ -853,6 +859,12 @@ function metalRoughnessMapOf(material: {
   metalRoughnessMap?: CacheableTexture | null;
 }): CacheableTexture | null {
   return material.metalRoughnessMap ?? null;
+}
+
+function emissiveMapOf(material: {
+  emissiveMap?: CacheableTexture | null;
+}): CacheableTexture | null {
+  return material.emissiveMap ?? null;
 }
 
 function unlitColorBlends(material: object): boolean {
@@ -1439,7 +1451,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   #shadowTarget: RenderTarget | null = null;
 
   /**
-   * The registered skinning pipeline's two programs (§54; RFC 0003), or
+   * The registered skinning pipeline's colour programs (§54; RFC 0003), or
    * `null` — before the first skinned draw, while the context is lost, when
    * nothing registered, and forever in a scene that never skins. **Compiled
    * lazily by {@link WebglRenderer.render}**, never at initialize: the other
@@ -1448,6 +1460,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * so the frame compiles inside a `try` and a driver refusal costs skinning,
    * not the frame. A skinless scene therefore issues the byte-identical GL
    * sequence it always did — the RFC's acceptance gate.
+   *
+   * The depth-only skinned caster lives on the same pair and compiles later,
+   * on the first skinned caster — see `#acquireSkinnedShadowProgram`.
    */
   #skinnedPrograms: SkinnedPrograms | null = null;
 
@@ -1458,6 +1473,14 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * compile.
    */
   #skinnedProgramsFailed = false;
+
+  /**
+   * Whether the skinned caster compile failed on the current context — a
+   * separate latch from `#skinnedProgramsFailed`, so a driver that can shade
+   * a skinned mesh but cannot compile the depth-only sibling still draws the
+   * colour pass and only skips the deformed shadow.
+   */
+  #skinnedShadowFailed = false;
 
   /**
    * The registered node-material pipeline's per-context program cache (§60;
@@ -1612,6 +1635,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // other handle; the next skinned draw recompiles.
     this.#skinnedPrograms = null;
     this.#skinnedProgramsFailed = false;
+    this.#skinnedShadowFailed = false;
     // §60's node-program cache (RFC 0001) died with the context too; the
     // next node-material draw re-creates it and recompiles per graph.
     this.#nodePrograms = null;
@@ -1908,6 +1932,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // the same unit, so a frame that mixes them issues one call either way.
     let mapUnitActive = false;
     let metalRoughnessBound = false;
+    let emissiveBound = false;
     // §69 (R-18): whether this frame bound a shadow map to
     // `SHADOW_TEXTURE_UNIT`, so the `finally` knows whether it has one to
     // unbind. A frame in which nothing casts never touches unit 1 at all.
@@ -2642,46 +2667,10 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               spriteProgram.setViewProjection(viewProjection);
               spriteViewUploaded = true;
             }
-            // The local rectangle the whole texture maps onto, from which the
-            // vertex stage derives uv. `computeBounds()` is cached against the
-            // geometry's version, so this is a version comparison per draw, not
-            // a pass over the vertices.
-            const bounds = item.geometry.computeBounds();
-            const quadWidth = bounds.max.x - bounds.min.x;
-            const quadHeight = bounds.max.y - bounds.min.y;
+            // Atlas UVs live on the geometry (`Sprite` authors `frame` onto
+            // `BufferGeometry.uvs`). The vertex stage interpolates that stream;
+            // there is no per-draw `quad` uniform.
             spriteProgram.setModel(item.worldMatrix);
-            // §55's frame (R-29, 2026-08-08). `?? null` for the same reason
-            // `material.transparent === true` is written that way in the render
-            // list: a **structurally typed** sprite item built before the field
-            // existed reports `undefined`, which must read as "no frame".
-            const frame = item.frame ?? null;
-            if (frame === null) {
-              // Unchanged, deliberately and to the byte: a sprite with no frame
-              // takes the branch it took before frames existed and uploads the
-              // same four floats through the same call. See
-              // `SpriteProgram.setQuad`.
-              spriteProgram.setQuad(
-                bounds.min.x,
-                bounds.min.y,
-                quadWidth,
-                quadHeight,
-              );
-            } else {
-              // The reparametrization derived in `@fourjs/render`'s `sprite.ts`:
-              // the rectangle the *whole* texture would occupy, given that the
-              // quad shows `frame` of it. Collapses to the four values above at
-              // `frame = (0, 0, texture.width, texture.height)`. `map` rather
-              // than `texture`, which above is the *GL handle* this draw binds:
-              // the texel size comes from the engine-side texture the material
-              // points at.
-              const map = material.texture;
-              spriteProgram.setQuad(
-                bounds.min.x - (frame.x * quadWidth) / frame.width,
-                bounds.min.y - (frame.y * quadHeight) / frame.height,
-                (quadWidth * map.width) / frame.width,
-                (quadHeight * map.height) / frame.height,
-              );
-            }
             spriteProgram.setTint(material.tint, opacityOf(material));
             gl.bindTexture(GL.TEXTURE_2D, texture);
             textureBound = true;
@@ -2825,9 +2814,26 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               gl.bindTexture(GL.TEXTURE_2D, metalRoughnessTexture);
               metalRoughnessBound = true;
             }
+            const emissiveSource = emissiveMapOf(item.material);
+            const emissiveTexture =
+              emissiveSource === null
+                ? null
+                : resolveTexture(
+                    textures,
+                    renderTargets,
+                    activeTarget,
+                    emissiveSource,
+                  );
+            if (emissiveTexture !== null) {
+              gl.activeTexture(GL.TEXTURE0 + EMISSIVE_TEXTURE_UNIT);
+              mapUnitActive = false;
+              gl.bindTexture(GL.TEXTURE_2D, emissiveTexture);
+              emissiveBound = true;
+            }
             standardProgram.setFeatures(
               standardTexture !== null,
               metalRoughnessTexture !== null,
+              emissiveTexture !== null,
             );
             standardProgram.setReceivesShadow(
               shadowActive && item.receiveShadow,
@@ -2921,9 +2927,22 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       if (metalRoughnessBound && nodeUnitsBound === 0) {
         // Unit 2 is already active when this frame bound only the packed map.
         // If unit 0 was also borrowed, the restore above moved the active
-        // unit back to 0 and we have to re-select 2 before unbinding.
-        if (textureBound || mapUnitActive) {
+        // unit back to 0 and we have to re-select 2 before unbinding. Binding
+        // unit 3 after unit 2 does the same: the active unit is no longer 2.
+        if (textureBound || mapUnitActive || emissiveBound) {
           gl.activeTexture(GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT);
+        }
+        gl.bindTexture(GL.TEXTURE_2D, null);
+        if (!emissiveBound) {
+          gl.activeTexture(GL.TEXTURE0);
+        }
+      }
+      if (emissiveBound) {
+        // Unit 3 is already active when this frame bound only the emissive
+        // map. Restoring unit 0 and/or unit 2 first leaves a different unit
+        // active, so re-select 3 before unbinding.
+        if (textureBound || metalRoughnessBound || mapUnitActive) {
+          gl.activeTexture(GL.TEXTURE0 + EMISSIVE_TEXTURE_UNIT);
         }
         gl.bindTexture(GL.TEXTURE_2D, null);
         gl.activeTexture(GL.TEXTURE0);
@@ -3177,12 +3196,12 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * in (the pipeline-cost law; `gl-picking-registry.ts`).
    *
    * What the service receives is a **live window** onto exactly the renderer
-   * state an id pass needs — context, the two shared caches, the surface
-   * size, and the two lifecycle flags — as accessors, so a §61 restore's new
-   * caches are seen rather than captured stale (`PickingRendererHost`). Each
-   * call builds an independent service; the caller owns and disposes it
-   * (§83). No GL call is issued here — the id program compiles on the
-   * service's first pass.
+   * state an id pass needs — context, the three shared caches (geometry,
+   * render targets, particle batches), the surface size, and the two
+   * lifecycle flags — as accessors, so a §61 restore's new caches are seen
+   * rather than captured stale (`PickingRendererHost`). Each call builds an
+   * independent service; the caller owns and disposes it (§83). No GL call is
+   * issued here — the id program compiles on the service's first pass.
    *
    * @throws FourError `INVALID_APPLICATION_STATE` on a disposed renderer, or
    * when no picking pipeline is registered.
@@ -3198,7 +3217,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         { context: { registered: false } },
       );
     }
-    // Seven `this`-capturing arrows are the whole window: the host outlives
+    // Eight `this`-capturing arrows are the whole window: the host outlives
     // this call and must keep seeing the *live* renderer state (a §61 restore
     // swaps the caches), which is why the seam is accessor methods rather
     // than a snapshot — and arrows rather than getters is what keeps this
@@ -3207,6 +3226,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     const host: PickingRendererHost = {
       context: () => this.#gl,
       geometries: () => this.#geometries,
+      particleBatches: () => this.#particleBatches,
       renderTargets: () => this.#renderTargets,
       surfaceWidth: () => this.#bufferWidth,
       surfaceHeight: () => this.#bufferHeight,
@@ -3633,6 +3653,44 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   }
 
   /**
+   * The registered skinning pipeline's depth-only caster for this context,
+   * compiled on the first skinned caster, or `null` when there is nothing to
+   * draw a deformed silhouette with (§54, §69; RFC 0003 residue).
+   *
+   * Separate from `#acquireSkinnedPrograms`: the colour pair compiles on the
+   * first skinned colour draw, and this program must not ride along — a
+   * skinned mesh that does not cast must not add a third `createProgram`. A
+   * colour-pair failure (unregistered, or a refusing driver) skips skinned
+   * casters the way it skips skinned colour draws: a bind-pose shadow is a
+   * different picture. A caster-only compile failure latches here and leaves
+   * colour skinning alone.
+   */
+  #acquireSkinnedShadowProgram(
+    gl: ParticleGlContext,
+  ): SkinnedShadowPipeline | null {
+    if (this.#skinnedShadowFailed) {
+      return null;
+    }
+    const programs = this.#acquireSkinnedPrograms(gl);
+    if (programs === null) {
+      return null;
+    }
+    try {
+      return programs.acquireShadow();
+    } catch (error: unknown) {
+      this.#skinnedShadowFailed = true;
+      if (DEV) {
+        devWarnOnce(
+          "webgl-skinned-shadow-compile-failed",
+          "§69: the skinned shadow pipeline failed to compile on this " +
+            `context; skinned casters are skipped (§61, §89). ${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
    * The registered node-material program cache for this context, created on
    * first need, or `null` when nothing registered (§60; RFC 0001).
    *
@@ -3793,11 +3851,17 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    * ## What it draws
    *
    * The frame's own render list, filtered twice: to the items whose node set
-   * §49's `castShadow`, and to the three *surface* kinds. Sprites are excluded
-   * because a depth-only pass writes geometry rather than alpha, so a §55 quad
-   * would cast its rectangle instead of its texture — §69's transparent shadow
-   * masks are what fix that, and they are staged. Particle items carry
-   * `castShadow: false` from the list builder and are excluded by that.
+   * §49's `castShadow`, and to the *surface* kinds a depth-only pass can
+   * honestly draw. Sprites are excluded because a depth-only pass writes
+   * geometry rather than alpha, so a §55 quad would cast its rectangle instead
+   * of its texture — §69's transparent shadow masks are what fix that, and they
+   * are staged. Particle items carry `castShadow: false` from the list builder
+   * and are excluded by that; their trails are never drawn here.
+   *
+   * Skinned casters (`skinned-unlit` / `skinned-lit`) draw through the lazy
+   * skinned shadow program when the skinning pipeline is registered, so the
+   * map holds the **deformed** silhouette. Unregistered or failed skinning
+   * skips them — a bind-pose shadow is a different picture (RFC 0003 §5).
    *
    * Drawing from the *list* rather than re-walking the scene is what makes the
    * caster pass and the colour pass agree by construction: same items, same
@@ -3872,6 +3936,14 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
 
     shadowProgram.use();
     shadowProgram.setViewProjection(sceneLights.shadowMatrix);
+    // `"shadow"` / `"skinned-shadow"` rather than `RenderItemKind`: the caster
+    // pass has two programs for what the colour pass splits across families,
+    // and switching when the kind changes is the colour loop's `activeKind`
+    // rule applied to that pair. View-projection is per-program, so the
+    // unskinned upload above stays valid across a switch away and back; the
+    // skinned program gets its own copy the first time it is current.
+    let activeKind: "shadow" | "skinned-shadow" = "shadow";
+    let skinnedShadowViewUploaded = false;
     for (const item of items) {
       // §67's clip is deliberately not consulted here (R-23). A stencil clip
       // is a per-view, screen-space construct and this framebuffer carries no
@@ -3882,11 +3954,6 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       // depth-only pass writes geometry, not visibility. Mask draws never
       // reach this loop at all; the list builder writes `castShadow: false`
       // on every one, because a mask is not content.
-      // §54 (RFC 0003): skinned draws are excluded beside sprites, and for
-      // the analogous reason — this depth-only program does not skin, so a
-      // skinned caster would cast its **bind pose**, which is a different
-      // picture. A skinned caster program is deferred with CPU skinning;
-      // until it lands, a skinned mesh casts no shadow, documented on `Mesh`.
       // §60 (RFC 0001): a node material with **no** displacement casts its
       // geometry exactly — depth ignores colour, so the caster program is
       // right for it — but one whose graph displaces vertices would cast its
@@ -3895,16 +3962,48 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       if (
         !item.castShadow ||
         item.kind === "sprite" ||
-        item.kind === "skinned-unlit" ||
-        item.kind === "skinned-lit" ||
         (item.kind === "node" &&
           item.material.graph.positionOffset !== undefined)
       ) {
         continue;
       }
+      if (isSkinnedUnlitItem(item) || isSkinnedLitItem(item)) {
+        const skinnedShadow = this.#acquireSkinnedShadowProgram(gl);
+        if (skinnedShadow === null) {
+          continue;
+        }
+        const geometry = geometries.acquire(item.geometry);
+        if (geometry === null) {
+          continue;
+        }
+        if (activeKind !== "skinned-shadow") {
+          skinnedShadow.use();
+          activeKind = "skinned-shadow";
+        }
+        if (!skinnedShadowViewUploaded) {
+          skinnedShadow.setViewProjection(sceneLights.shadowMatrix);
+          skinnedShadowViewUploaded = true;
+        }
+        skinnedShadow.setModel(item.worldMatrix);
+        skinnedShadow.setJointMatrices(item.jointMatrices);
+        gl.bindVertexArray(geometry.vertexArray);
+        if (geometry.indexType === null) {
+          gl.drawArrays(geometry.mode, 0, geometry.count);
+        } else {
+          gl.drawElements(geometry.mode, geometry.count, geometry.indexType, 0);
+        }
+        if (statistics !== null) {
+          countDraw(statistics, geometry.mode, geometry.count, 1);
+        }
+        continue;
+      }
       const geometry = geometries.acquire(item.geometry);
       if (geometry === null) {
         continue;
+      }
+      if (activeKind !== "shadow") {
+        shadowProgram.use();
+        activeKind = "shadow";
       }
       shadowProgram.setModel(item.worldMatrix);
       gl.bindVertexArray(geometry.vertexArray);
