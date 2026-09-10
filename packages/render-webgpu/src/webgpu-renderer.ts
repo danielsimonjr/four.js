@@ -182,7 +182,7 @@ import { WgpuGeometryCache, type WgpuGeometryRecord } from "./wgpu-geometry.js";
 import { WgpuGpuTimer } from "./wgpu-gpu-timer.js";
 import {
   LIGHTS_BIND_GROUP_INDEX,
-  LIGHT_UNIFORM_BYTES,
+  LIGHT_BINDING_BYTES,
   LIGHT_UNIFORM_STRIDE_BYTES,
   LIGHT_UNIFORM_STRIDE_FLOATS,
   SHADED_MAP_BIND_GROUP_INDEX,
@@ -3982,7 +3982,7 @@ export class WebgpuRenderer implements Renderer {
       entries: [
         {
           binding: 0,
-          resource: { buffer, offset: 0, size: LIGHT_UNIFORM_BYTES },
+          resource: { buffer, offset: 0, size: LIGHT_BINDING_BYTES },
         },
       ],
     });

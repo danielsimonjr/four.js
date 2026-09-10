@@ -4971,7 +4971,7 @@ function litRenderable(
 }
 
 describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
-  it("compiles both stages, links, and resolves the twenty uniforms", () => {
+  it("compiles both stages, links, and resolves the twenty-four uniforms", () => {
     const gl = createFakeGl();
 
     const program = LitProgram.create(gl);
@@ -5001,6 +5001,12 @@ describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
       "punctualColor[0]",
       "punctualDirection[0]",
       "punctualParams[0]",
+      // §68's hemisphere (2026-09-10). Four more locations resolved once;
+      // a frame with no hemisphere issues no call for them.
+      "hemisphereSky",
+      "hemisphereGround",
+      "hemisphereUp",
+      "useHemisphere",
       // §69's shadow map (R-18, 2026-08-09). Six more locations resolved once,
       // at program creation, and — exactly as R-17's five — not one call
       // issued by a frame in which no light casts (see the byte-identity
@@ -8032,7 +8038,7 @@ function standardRenderable(
 }
 
 describe("StandardProgram — compilation and linking (§59, §61, §89)", () => {
-  it("compiles both stages, links, and resolves the twenty-eight uniforms", () => {
+  it("compiles both stages, links, and resolves the thirty-two uniforms", () => {
     const gl = createFakeGl();
 
     const program = StandardProgram.create(gl);
@@ -8067,6 +8073,13 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
       "punctualColor[0]",
       "punctualDirection[0]",
       "punctualParams[0]",
+      // §68's hemisphere — the same four names, in the same order, as the
+      // lit pipeline's, because both resolve them through the one
+      // `HemisphereLightUniforms.resolve`.
+      "hemisphereSky",
+      "hemisphereGround",
+      "hemisphereUp",
+      "useHemisphere",
       // §69's shadow map (R-18, 2026-08-09) — the same six names, in the same
       // order, as the lit pipeline's, because both resolve them through the
       // one `ShadowUniforms.resolve`.
@@ -9099,6 +9112,44 @@ describe("PunctualLightUniforms — the light set (§68, R-17)", () => {
     expect(fragment).toContain("in vec3 vWorldPosition;");
   });
 
+  it("uploads nothing when the frame has no hemisphere", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    program.use();
+    gl.reset();
+
+    program.setHemisphereLight(createSceneLights());
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("uploads sky, ground, up, and the use flag once a hemisphere exists", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    program.use();
+    gl.reset();
+
+    const lights = createSceneLights();
+    lights.hasHemisphereLight = true;
+    lights.hemisphereSky[0] = 0.6;
+    lights.hemisphereSky[1] = 0.7;
+    lights.hemisphereSky[2] = 1;
+    lights.hemisphereGround[0] = 0.2;
+    lights.hemisphereGround[1] = 0.1;
+    lights.hemisphereGround[2] = 0.05;
+    lights.hemisphereUp.set(0, 1, 0);
+    program.setHemisphereLight(lights);
+
+    const uniforms = punctualUniforms(gl, "ambientLight");
+    expect(uploadsAt(gl, uniforms.get("hemisphereSky"))).toEqual([
+      [Math.fround(0.6), Math.fround(0.7), 1],
+    ]);
+    expect(uploadsAt(gl, uniforms.get("hemisphereGround"))).toEqual([
+      [Math.fround(0.2), Math.fround(0.1), Math.fround(0.05)],
+    ]);
+    expect(uploadsAt(gl, uniforms.get("hemisphereUp"))).toEqual([[0, 1, 0]]);
+    expect(uploadsAt(gl, uniforms.get("useHemisphere"))).toEqual([1]);
+  });
+
   it("uploads nothing when the frame has no point or spot light", () => {
     const gl = createFakeGl();
     const program = LitProgram.create(gl);
@@ -9456,7 +9507,9 @@ describe("ShadowUniforms — the receiver half (§69, R-18)", () => {
     // The shadow multiplies the *existing* directional product, in place —
     // the pixel half of byte-identity (see `ShadowUniforms`).
     expect(litFragment).toContain("vec3 direct = lightColor * diffuse;");
-    expect(litFragment).toContain("vec3 lighting = ambientLight + direct;");
+    expect(litFragment).toContain(
+      "vec3 lighting = ambientLight + hemisphereAmbient(len, n) + direct;",
+    );
     expect(standardFragment).toContain("shaded += direct;");
   });
 });

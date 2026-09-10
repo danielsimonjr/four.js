@@ -3,6 +3,7 @@ import { Matrix4, Vector3 } from "@fourjs/math";
 import {
   DirectionalLight,
   Group,
+  HemisphereLight,
   PointLight,
   Scene,
   SpotLight,
@@ -14,9 +15,11 @@ import {
   collectSceneLights,
   createSceneLights,
   isDirectionalLightSource,
+  isHemisphereLightSource,
   isPunctualLightSource,
   type AmbientLightSource,
   type DirectionalLightSource,
+  type HemisphereLightSource,
   type PointLightSource,
   type SceneLights,
   type SpotLightSource,
@@ -37,12 +40,14 @@ function typePins(): [
   AmbientLightSource,
   PointLightSource,
   SpotLightSource,
+  HemisphereLightSource,
 ] {
   const light: DirectionalLightSource = new DirectionalLight();
   const ambient: AmbientLightSource = new Scene();
   const point: PointLightSource = new PointLight();
   const spot: SpotLightSource = new SpotLight();
-  return [light, ambient, point, spot];
+  const hemi: HemisphereLightSource = new HemisphereLight();
+  return [light, ambient, point, spot, hemi];
 }
 
 /** The three live entries of `punctualPositions` and friends, as a tuple. */
@@ -96,6 +101,14 @@ describe("createSceneLights", () => {
       lights.direction.z,
     ]).toEqual([0, 0, -1]);
     expect(lights.directionalColor).toEqual([0, 0, 0]);
+    expect(lights.hasHemisphereLight).toBe(false);
+    expect(lights.hemisphereSky).toEqual([0, 0, 0]);
+    expect(lights.hemisphereGround).toEqual([0, 0, 0]);
+    expect([
+      lights.hemisphereUp.x,
+      lights.hemisphereUp.y,
+      lights.hemisphereUp.z,
+    ]).toEqual([0, 1, 0]);
     expect(lights.punctualCount).toBe(0);
     expect(lights.punctualPositions).toHaveLength(MAX_PUNCTUAL_LIGHTS * 3);
     expect(lights.punctualColors).toHaveLength(MAX_PUNCTUAL_LIGHTS * 3);
@@ -576,5 +589,89 @@ describe("collectSceneLights — §69 shadows (R-18)", () => {
 
     expect(out.hasDirectionalLight).toBe(true);
     expect(out.hasShadow).toBe(false);
+  });
+});
+
+describe("isHemisphereLightSource", () => {
+  it("accepts the real HemisphereLight", () => {
+    const [, , , , hemi] = typePins();
+    expect(isHemisphereLightSource(hemi)).toBe(true);
+  });
+
+  it("requires the brand and the up method together", () => {
+    expect(isHemisphereLightSource(null)).toBe(false);
+    expect(isHemisphereLightSource({ isHemisphereLight: true })).toBe(false);
+    expect(
+      isHemisphereLightSource({
+        isHemisphereLight: true,
+        color: [1, 1, 1],
+        groundColor: [0, 0, 0],
+        intensity: 1,
+        getWorldUp: (out: Vector3) => out,
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("collectSceneLights — hemisphere (§68)", () => {
+  it("packs sky, ground, and the node's +Y axis", () => {
+    const scene = new Scene();
+    const hemi = new HemisphereLight({
+      color: [0.6, 0.8, 1],
+      groundColor: [0.2, 0.1, 0.05],
+      intensity: 2,
+    });
+    scene.add(hemi);
+
+    const lights = collectSceneLights(scene, createSceneLights());
+    expect(lights.hasHemisphereLight).toBe(true);
+    expect(lights.hemisphereSky).toEqual([1.2, 1.6, 2]);
+    expect(lights.hemisphereGround).toEqual([0.4, 0.2, 0.1]);
+    expect([
+      lights.hemisphereUp.x,
+      lights.hemisphereUp.y,
+      lights.hemisphereUp.z,
+    ]).toEqual([0, 1, 0]);
+  });
+
+  it("takes the first hemisphere in scene-graph order", () => {
+    const scene = new Scene();
+    scene.add(
+      new HemisphereLight({ color: [1, 0, 0], groundColor: [0, 0, 0] }),
+    );
+    scene.add(
+      new HemisphereLight({ color: [0, 1, 0], groundColor: [0, 0, 0] }),
+    );
+    const lights = collectSceneLights(scene, createSceneLights());
+    expect(lights.hemisphereSky).toEqual([1, 0, 0]);
+  });
+
+  it("prunes a hidden hemisphere the way it prunes a hidden sun", () => {
+    const scene = new Scene();
+    const hidden = new Group();
+    hidden.visible = false;
+    hidden.add(new HemisphereLight({ color: [1, 0, 0] }));
+    scene.add(hidden);
+    scene.add(new HemisphereLight({ color: [0, 0, 1] }));
+
+    const lights = collectSceneLights(scene, createSceneLights());
+    expect(lights.hemisphereSky).toEqual([0, 0, 1]);
+  });
+
+  it("clears a previous frame's hemisphere when the light is removed", () => {
+    const scene = new Scene();
+    const hemi = new HemisphereLight({ color: [1, 0, 0], intensity: 3 });
+    scene.add(hemi);
+    const out = createSceneLights();
+    collectSceneLights(scene, out);
+    expect(out.hasHemisphereLight).toBe(true);
+
+    scene.remove(hemi);
+    collectSceneLights(scene, out);
+    expect(out.hasHemisphereLight).toBe(false);
+    expect(out.hemisphereSky).toEqual([0, 0, 0]);
+    expect([out.hemisphereUp.x, out.hemisphereUp.y, out.hemisphereUp.z]).toEqual(
+      [0, 1, 0],
+    );
   });
 });

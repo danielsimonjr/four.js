@@ -956,6 +956,130 @@ vec3 punctualIrradiance(int i, vec3 p, out vec3 l) {
 `;
 
 /**
+ * The hemisphere chunk both shaded fragment stages splice in (§68;
+ * 2026-09-10) — a two-colour directional ambient, not a lamp.
+ *
+ * ```text
+ * w    = 0.5 · n · up + 0.5
+ * hemi = mix(ground, sky, w)
+ * ```
+ *
+ * Sky and ground are already `color × intensity` (R-13). `useHemisphere`
+ * starts at GL's initial `false`, so a scene with no hemisphere issues
+ * **no upload at all** — {@link HemisphereLightUniforms}' skip rule, the
+ * same contract {@link PunctualLightUniforms} states for the light set.
+ * A fragment with no normal uses the 0.5 mix (constant extra ambient)
+ * rather than inventing a world-up; a metal on the standard stage still
+ * multiplies the term by the diffuse colour, so it stays black.
+ */
+export const HEMISPHERE_LIGHT_GLSL = `uniform vec3 hemisphereSky;
+uniform vec3 hemisphereGround;
+uniform vec3 hemisphereUp;
+uniform bool useHemisphere;
+
+vec3 hemisphereIrradiance(vec3 n) {
+  if (!useHemisphere) {
+    return vec3(0.0);
+  }
+  float w = clamp(0.5 * dot(n, hemisphereUp) + 0.5, 0.0, 1.0);
+  return mix(hemisphereGround, hemisphereSky, w);
+}
+
+vec3 hemisphereAmbient(float normalLength, vec3 n) {
+  if (!useHemisphere) {
+    return vec3(0.0);
+  }
+  if (normalLength > 0.0) {
+    return hemisphereIrradiance(n);
+  }
+  return mix(hemisphereGround, hemisphereSky, 0.5);
+}
+`;
+
+const HEMISPHERE_UNIFORM_NAMES = [
+  "hemisphereSky",
+  "hemisphereGround",
+  "hemisphereUp",
+  "useHemisphere",
+] as const;
+
+/**
+ * One shaded pipeline's hemisphere uniforms: the four locations, and the
+ * CPU mirror that keeps a scene without a hemisphere emitting **no GL
+ * call at all**.
+ *
+ * Shared by {@link LitProgram}, `gl-standard.ts`'s `StandardProgram`, and
+ * the skinned lit program for the same reason {@link PunctualLightUniforms}
+ * is shared: the skip rule must not drift.
+ *
+ * `#enabled` starts at `false`, which is what GL initializes a `bool`
+ * uniform to. A frame whose `SceneLights.hasHemisphereLight` is `false`
+ * while the mirror is `false` therefore uploads nothing.
+ */
+export class HemisphereLightUniforms {
+  readonly #gl: WebglContext;
+
+  readonly #locations: readonly GlUniformLocation[];
+
+  /** CPU mirror of `useHemisphere`, seeded at GL's initial value. */
+  #enabled = false;
+
+  private constructor(
+    gl: WebglContext,
+    locations: readonly GlUniformLocation[],
+  ) {
+    this.#gl = gl;
+    this.#locations = locations;
+  }
+
+  /**
+   * Looks the four locations up on a linked program, throwing the §89
+   * `SHADER_COMPILATION_FAILED` `requireUniform` throws if a driver
+   * optimised one away.
+   */
+  static resolve(
+    gl: WebglContext,
+    program: GlProgramHandle,
+    label: string,
+  ): HemisphereLightUniforms {
+    return new HemisphereLightUniforms(
+      gl,
+      HEMISPHERE_UNIFORM_NAMES.map((name) =>
+        requireUniform(gl, program, name, label),
+      ),
+    );
+  }
+
+  /**
+   * Uploads the frame's hemisphere, or nothing at all — see the class
+   * header. Call once per viewport, beside the ambient upload.
+   */
+  upload(lights: SceneLights): void {
+    if (lights.hasHemisphereLight) {
+      vec3Scratch[0] = lights.hemisphereSky[0];
+      vec3Scratch[1] = lights.hemisphereSky[1];
+      vec3Scratch[2] = lights.hemisphereSky[2];
+      this.#gl.uniform3fv(this.#locations[0], vec3Scratch);
+      vec3Scratch[0] = lights.hemisphereGround[0];
+      vec3Scratch[1] = lights.hemisphereGround[1];
+      vec3Scratch[2] = lights.hemisphereGround[2];
+      this.#gl.uniform3fv(this.#locations[1], vec3Scratch);
+      vec3Scratch[0] = lights.hemisphereUp.x;
+      vec3Scratch[1] = lights.hemisphereUp.y;
+      vec3Scratch[2] = lights.hemisphereUp.z;
+      this.#gl.uniform3fv(this.#locations[2], vec3Scratch);
+      if (!this.#enabled) {
+        this.#gl.uniform1i(this.#locations[3], 1);
+        this.#enabled = true;
+      }
+    } else if (this.#enabled) {
+      this.#gl.uniform1i(this.#locations[3], 0);
+      this.#enabled = false;
+    }
+  }
+}
+
+/**
  * The five uniform names {@link PUNCTUAL_LIGHT_GLSL} declares, in the order
  * {@link PunctualLightUniforms.resolve} looks them up.
  *
@@ -1314,10 +1438,16 @@ void main() {
  *
  * ```text
  * fragColor.rgb = color.rgb * (ambientLight
+ *                            + hemisphere
  *                            + lightColor * max(dot(N, -L), 0)
  *                            + Σᵢ irradianceᵢ * max(dot(N, Lᵢ), 0))
  * fragColor.a   = color.a
  * ```
+ *
+ * `hemisphere` is the two-colour sky/ground mix {@link HEMISPHERE_LIGHT_GLSL}
+ * evaluates; with `useHemisphere` at GL's initial `false` it is the zero
+ * vector and the arithmetic is the arithmetic this stage performed before
+ * the hemisphere existed.
  *
  * The sum runs over the frame's point and spot lights (R-17, 2026-08-09) —
  * see {@link PUNCTUAL_LIGHT_GLSL} for the falloff and the cone. It is written
@@ -1382,11 +1512,13 @@ in vec2 vUv;
 out vec4 fragColor;
 
 ${PUNCTUAL_LIGHT_GLSL}
+${HEMISPHERE_LIGHT_GLSL}
 ${SHADOW_GLSL}
 void main() {
   float len = length(vNormal);
+  vec3 n = len > 0.0 ? vNormal / len : vec3(0.0);
   float diffuse = len > 0.0
-    ? max(dot(vNormal / len, -lightDirection), 0.0)
+    ? max(dot(n, -lightDirection), 0.0)
     : 0.0;
   vec4 base = color;
   if (useMap) {
@@ -1394,11 +1526,10 @@ void main() {
   }
   vec3 direct = lightColor * diffuse;
   if (useShadow && len > 0.0) {
-    direct *= shadowFactor(vWorldPosition, vNormal / len);
+    direct *= shadowFactor(vWorldPosition, n);
   }
-  vec3 lighting = ambientLight + direct;
+  vec3 lighting = ambientLight + hemisphereAmbient(len, n) + direct;
   if (len > 0.0) {
-    vec3 n = vNormal / len;
     for (int i = 0; i < punctualCount; i += 1) {
       vec3 l;
       lighting += punctualIrradiance(i, vWorldPosition, l) * max(dot(n, l), 0.0);
@@ -2033,6 +2164,8 @@ export class LitProgram implements Disposable {
 
   readonly #punctual: PunctualLightUniforms;
 
+  readonly #hemisphere: HemisphereLightUniforms;
+
   readonly #shadow: ShadowUniforms;
 
   /** CPU mirror of `useMap`; see `UnlitProgram`'s for the contract. */
@@ -2055,6 +2188,7 @@ export class LitProgram implements Disposable {
     mapLocation: GlUniformLocation,
     useMapLocation: GlUniformLocation,
     punctual: PunctualLightUniforms,
+    hemisphere: HemisphereLightUniforms,
     shadow: ShadowUniforms,
   ) {
     this.#gl = gl;
@@ -2069,6 +2203,7 @@ export class LitProgram implements Disposable {
     this.#mapLocation = mapLocation;
     this.#useMapLocation = useMapLocation;
     this.#punctual = punctual;
+    this.#hemisphere = hemisphere;
     this.#shadow = shadow;
   }
 
@@ -2099,6 +2234,7 @@ export class LitProgram implements Disposable {
         requireUniform(gl, program, "map", "lit"),
         requireUniform(gl, program, "useMap", "lit"),
         PunctualLightUniforms.resolve(gl, program, "lit"),
+        HemisphereLightUniforms.resolve(gl, program, "lit"),
         ShadowUniforms.resolve(gl, program, "lit"),
       );
     } catch (error: unknown) {
@@ -2195,6 +2331,15 @@ export class LitProgram implements Disposable {
    */
   setPunctualLights(lights: SceneLights): void {
     this.#punctual.upload(lights);
+  }
+
+  /**
+   * Uploads the frame's hemisphere (§68) — or nothing, for a scene that
+   * has none. See {@link HemisphereLightUniforms} for the contract and
+   * for why "nothing" is load-bearing.
+   */
+  setHemisphereLight(lights: SceneLights): void {
+    this.#hemisphere.upload(lights);
   }
 
   /**

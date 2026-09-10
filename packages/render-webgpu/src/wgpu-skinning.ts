@@ -57,6 +57,7 @@ import {
 } from "./webgpu-device.js";
 import { DRAW_UNIFORM_WGSL, MAP_BINDING_WGSL } from "./wgpu-bindings.js";
 import {
+  HEMISPHERE_IRRADIANCE_WGSL,
   LIGHT_UNIFORM_WGSL,
   PUNCTUAL_LIGHT_WGSL,
   SHADED_MAP_BINDING_WGSL,
@@ -409,7 +410,9 @@ ${input}
   return output;
 }
 
-${PUNCTUAL_LIGHT_WGSL}${
+${PUNCTUAL_LIGHT_WGSL}
+
+${HEMISPHERE_IRRADIANCE_WGSL}${
     shadow
       ? `
 

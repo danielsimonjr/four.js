@@ -62,6 +62,7 @@ import {
   FRAGMENT_SHADER_SOURCE,
   LIT_FRAGMENT_SHADER_SOURCE,
   MAP_TEXTURE_UNIT,
+  HemisphereLightUniforms,
   PunctualLightUniforms,
   ShadowUniforms,
   createLinkedProgram,
@@ -335,6 +336,8 @@ export class SkinnedLitProgram implements SkinnedLitPipeline, Disposable {
 
   readonly #punctual: PunctualLightUniforms;
 
+  readonly #hemisphere: HemisphereLightUniforms;
+
   readonly #shadow: ShadowUniforms;
 
   #useMap = false;
@@ -381,6 +384,11 @@ export class SkinnedLitProgram implements SkinnedLitPipeline, Disposable {
       "skinned-lit",
     );
     this.#punctual = PunctualLightUniforms.resolve(gl, program, "skinned-lit");
+    this.#hemisphere = HemisphereLightUniforms.resolve(
+      gl,
+      program,
+      "skinned-lit",
+    );
     this.#shadow = ShadowUniforms.resolve(gl, program, "skinned-lit");
   }
 
@@ -457,6 +465,10 @@ export class SkinnedLitProgram implements SkinnedLitPipeline, Disposable {
 
   setPunctualLights(lights: SceneLights): void {
     this.#punctual.upload(lights);
+  }
+
+  setHemisphereLight(lights: SceneLights): void {
+    this.#hemisphere.upload(lights);
   }
 
   setShadow(lights: SceneLights): void {

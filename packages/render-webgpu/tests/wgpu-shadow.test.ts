@@ -60,7 +60,7 @@ describe("the widened shadow-light layout (wgpu-shadow.ts)", () => {
     expect(SHADOW_MATRIX_OFFSET).toBe(LIGHT_UNIFORM_BYTES);
     expect(SHADOW_MATRIX_OFFSET % 16).toBe(0);
     expect(SHADOW_PARAMS_OFFSET - SHADOW_MATRIX_OFFSET).toBe(64);
-    expect(SHADOW_LIGHT_UNIFORM_BYTES).toBe(SHADOW_PARAMS_OFFSET + 16);
+    expect(SHADOW_LIGHT_UNIFORM_BYTES).toBe(SHADOW_PARAMS_OFFSET + 16 + 48);
     expect(SHADOW_UNIFORM_SPARE_BYTES).toBe(
       LIGHT_UNIFORM_STRIDE_BYTES - SHADOW_LIGHT_UNIFORM_BYTES,
     );
@@ -250,11 +250,9 @@ describe("the shadowed shaded variants", () => {
     // the same normal guard, then joined to the lighting sum unchanged.
     expect(shadowed).toContain("var direct = lights.lightColor.xyz * diffuse;");
     expect(shadowed).toContain(
-      "direct = direct * shadowFactor(input.worldPosition, input.normal / len);",
+      "direct = direct * shadowFactor(input.worldPosition, n);",
     );
-    expect(shadowed).toContain(
-      "var lighting = lights.ambientColor.xyz + direct;",
-    );
+    expect(shadowed).toContain("hemisphereAmbient(len, n)");
     // The map variant samples and shadows together.
     expect(litShaderSource(true, true, true)).toContain(
       "textureSample(mapTexture, mapSampler, input.uv)",

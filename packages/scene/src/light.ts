@@ -3,8 +3,9 @@
  *
  * §68's initial light set is ambient, hemisphere, directional, point, spot,
  * and rectangular area. The §120 MVP shipped the two cheapest members
- * (2026-08-04); **R-17 adds the two positional ones on 2026-08-09** and leaves
- * the remaining two staged. What is here, and what is not:
+ * (2026-08-04); **R-17 adds the two positional ones on 2026-08-09**;
+ * hemisphere lands 2026-09-10. Rectangular area remains staged. What is
+ * here, and what is not:
  *
  * - **directional** — {@link DirectionalLight}, this module. Exactly one
  *   illuminates a frame: it is the sun, it has dedicated shader uniforms, and
@@ -20,12 +21,15 @@
  * - **ambient** — still a *scene-wide constant term* on `Scene.ambientLight`
  *   rather than a node: with exactly one value per scene there is nothing
  *   positional about it, and a node would only add a traversal to find it;
- * - **hemisphere** and **rectangular area** — staged (2026-08-09). Neither is a
- *   punctual light: a hemisphere light is a two-colour directional *ambient*
- *   term (sky above, ground below) that belongs beside `Scene.ambientLight`
- *   rather than in the punctual set, and a rectangular area light needs the
- *   linearly-transformed-cosine machinery §68's "where supported" already
- *   hedges on. Both are absent rather than accepted-and-ignored;
+ * - **hemisphere** — {@link HemisphereLight}, this module (2026-09-10). A
+ *   two-colour directional *ambient* term (sky above, ground below) that
+ *   belongs beside `Scene.ambientLight` rather than in the punctual set.
+ *   Exactly one illuminates a frame: the first visible, enabled hemisphere
+ *   in scene-graph order, the same first-match rule the directional light
+ *   uses. It is not a lamp — there is no Lambert `n·L` and it does not
+ *   cast. A rectangular area light still needs the linearly-transformed-
+ *   cosine machinery §68's "where supported" already hedges on, and stays
+ *   absent rather than accepted-and-ignored;
  * - **shadows** (`castShadow` in §68's own example) ship for the *directional*
  *   light only, at §69's directional-shadow-map tier (R-18, 2026-08-09):
  *   {@link DirectionalLight.castShadow} and {@link DirectionalLightShadow}.
@@ -57,7 +61,11 @@
  * *position* is irrelevant, as §68's directional model requires. A
  * {@link SpotLight} aims its cone along the same axis, so one rig points
  * either kind; a {@link PointLight} has no axis at all and reads only its
- * node's world *position*.
+ * node's world *position*. A {@link HemisphereLight} orients its sky along
+ * the node's **+Y axis in world space** — §7a's world up — so an unrotated
+ * hemisphere is sky-above / ground-below in the Y-up world. That is a
+ * different column from the shine axis on purpose: a hemisphere is not a
+ * lamp, and "up" is the quantity the shade asks for.
  *
  * ## Intensity, and what a light's numbers mean
  *
@@ -608,6 +616,110 @@ export class DirectionalLight extends Node {
         shadow.far,
       )
       .multiply(shadowViewScratch);
+  }
+}
+
+/** Construction arguments of {@link HemisphereLight} (§68). */
+export interface HemisphereLightOptions {
+  /**
+   * Initial sky colour, copied as linear-light RGB. A CSS string is parsed
+   * as sRGB and decoded first (§60a). Defaults to white `[1, 1, 1]`.
+   */
+  color?: LightColorInput;
+  /**
+   * Initial ground colour, copied as linear-light RGB. A CSS string is
+   * parsed as sRGB and decoded first (§60a). Defaults to black `[0, 0, 0]`,
+   * so an unconfigured light is "white sky, no ground fill".
+   */
+  groundColor?: LightColorInput;
+  /**
+   * Initial {@link HemisphereLight.intensity}. Defaults to `1` — the
+   * multiplicative identity, exactly as {@link DirectionalLightOptions}
+   * defaults it.
+   */
+  intensity?: number;
+}
+
+/**
+ * A two-colour directional ambient term (§68) — sky above, ground below.
+ *
+ * ```ts
+ * const hemi = new HemisphereLight({
+ *   color: [0.6, 0.7, 1],
+ *   groundColor: [0.3, 0.2, 0.1],
+ *   intensity: 0.4,
+ * });
+ * scene.add(hemi);
+ * ```
+ *
+ * Not a punctual lamp: there is no position in the shade, no falloff, and
+ * no `castShadow`. The node's **+Y world axis** is the sky direction
+ * (documented on the module header); `color × intensity` is the sky
+ * irradiance and `groundColor × intensity` is the ground irradiance, both
+ * already divided by π (R-13), and a fragment mixes them by
+ * `0.5 · n·up + 0.5`. A frame shades with **at most one** hemisphere —
+ * the first visible, enabled node in scene-graph order, matching the
+ * directional light's first-match rule. Visibility follows §6: a
+ * hemisphere under a hidden or disabled ancestor does not illuminate.
+ *
+ * On a `StandardMaterial` the term reaches the **diffuse lobe only**, the
+ * same rule `Scene.ambientLight` follows, so a pure metal under hemisphere
+ * alone stays black until IBL exists.
+ */
+export class HemisphereLight extends Node {
+  /**
+   * The brand `@fourjs/render`'s light collection recognises — a literal
+   * `true`, one property load per node, exactly as
+   * `DirectionalLight.isDirectionalLight`.
+   */
+  readonly isHemisphereLight = true as const;
+
+  /**
+   * Sky colour, straight RGB in 0…1; white by default. The array instance
+   * is `readonly` — write *into* it — because the renderer may read it
+   * every frame and replacing the array would leave a captured reference
+   * stale.
+   */
+  readonly color: ColorRGB;
+
+  /**
+   * Ground colour, straight RGB in 0…1; black by default. Same ownership
+   * rule as {@link HemisphereLight.color}.
+   */
+  readonly groundColor: ColorRGB;
+
+  /**
+   * Scalar multiplier on both colours (§68). Dimensionless in this tier;
+   * must be finite. Validated at construction, and by contract when
+   * written directly.
+   */
+  intensity: number;
+
+  constructor(options: HemisphereLightOptions = {}) {
+    super();
+    this.color = resolveLightColor(options.color);
+    this.groundColor = resolveLightColor(options.groundColor ?? [0, 0, 0]);
+    this.intensity = requireFinite("intensity", options.intensity ?? 1);
+  }
+
+  /**
+   * Writes this light's **sky direction** — the node's +Y axis in world
+   * space — into `out` and returns it (§7b's `out`-parameter convention).
+   *
+   * +Y is §7a's world up, so an unrotated hemisphere is sky-above /
+   * ground-below without a rotation. Ancestor scale is divided out by the
+   * normalize; a degenerate chain yields the zero vector rather than
+   * `NaN`, matching {@link Node.getWorldDirection}.
+   *
+   * Allocates nothing: the basis column is read from the resolved world
+   * matrix.
+   */
+  getWorldUp(out: Vector3): Vector3 {
+    const elements = resolveWorldTransform(this).elements;
+    // Column-major Matrix4 (§7b): column 1 — elements 4, 5, 6 — is this
+    // node's local +Y axis in world space.
+    out.set(elements[4], elements[5], elements[6]);
+    return out.normalize();
   }
 }
 

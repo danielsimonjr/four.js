@@ -30,6 +30,16 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-10 — Hemisphere light (§68).** `HemisphereLight` is a
+  two-colour directional ambient, not a punctual slot. First-match like
+  the sun. Sky axis is the node's **+Y** (world up), deliberately not the
+  −Z shine axis. GL: `HemisphereLightUniforms` skip-when-absent.
+  WebGPU: pack at 672 in the existing 768-byte stride; do not move the
+  shadow tail (592–672) or `LIGHT_UNIFORM_BYTES` (592). Binding size
+  widens to `LIGHT_BINDING_BYTES` (720). Metals stay black under
+  hemisphere alone (ambient-reaches-diffuse-only). Do not close the
+  lighting checkbox.
+
 - **2026-09-10 — WebGPU skinned shadow caster (RFC 0003).**
   `SkinnedPrograms.acquireShadow()` compiles a private depth-only
   pipeline (palette group 1, `skinMatrix(joints, weights)`, clip-depth

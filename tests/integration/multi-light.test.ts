@@ -50,6 +50,7 @@ import {
 import { WebglRenderer } from "@fourjs/render-webgl";
 import {
   DirectionalLight,
+  HemisphereLight,
   OrthographicCamera,
   PointLight,
   Scene,
@@ -516,5 +517,72 @@ describe("R-17 — the new nodes survive §79", () => {
       ...authored.punctualPositions,
     ]);
     expect([...restored.punctualParams]).toEqual([...authored.punctualParams]);
+  });
+});
+
+describe("hemisphere light (§68)", () => {
+  it("does not touch hemisphere uniforms on a directional-only frame", async () => {
+    const test = await harness();
+    directionalOnlyScene(test);
+    resolveWorldTransforms(test.scene);
+    test.renderer.render(test.scene, test.views);
+
+    const handles: string[] = [];
+    let serial = 0;
+    for (const call of test.recorder.calls) {
+      if (
+        !call.name.startsWith("create") &&
+        call.name !== "getUniformLocation"
+      ) {
+        continue;
+      }
+      serial += 1;
+      if (
+        call.name === "getUniformLocation" &&
+        String(call.args[1]).includes("emisphere")
+      ) {
+        handles.push(JSON.stringify({ kind: "getUniformLocation", serial }));
+      }
+    }
+    // Four names each, in the two shaded pipelines — resolved at
+    // initialization, never uploaded on a scene that has no hemisphere.
+    expect(handles).toHaveLength(8);
+
+    test.recorder.reset();
+    test.renderer.render(test.scene, test.views);
+    const frame = test.recorder.transcript();
+    for (const handle of handles) {
+      expect(frame.some((line) => line.includes(handle))).toBe(false);
+    }
+  });
+
+  it("collects and round-trips a hemisphere beside the sun", () => {
+    const io = registerSceneNodeTypes();
+    const scene = new Scene();
+    scene.add(
+      new HemisphereLight({
+        color: [0.5, 0.6, 1],
+        groundColor: [0.25, 0.15, 0.1],
+        intensity: 0.8,
+      }),
+    );
+    scene.add(new DirectionalLight({ intensity: 2 }));
+
+    const lights = collectSceneLights(scene, createSceneLights());
+    expect(lights.hasHemisphereLight).toBe(true);
+    expect(lights.hasDirectionalLight).toBe(true);
+    expect(lights.hemisphereSky[2]).toBeCloseTo(0.8, 12);
+
+    const reloaded = instantiateScene(
+      decodeSceneDocument(
+        encodeSceneDocument(serializeScene(scene, io.components, io.write)),
+      ),
+      io.components,
+      io.read,
+    );
+    const restored = collectSceneLights(reloaded, createSceneLights());
+    expect(restored.hasHemisphereLight).toBe(true);
+    expect(restored.hemisphereSky).toEqual(lights.hemisphereSky);
+    expect(restored.hemisphereGround).toEqual(lights.hemisphereGround);
   });
 });

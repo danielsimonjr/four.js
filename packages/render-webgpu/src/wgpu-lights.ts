@@ -33,6 +33,14 @@
  *    592  = LIGHT_UNIFORM_BYTES
  * ```
  *
+ * Hemisphere rides the remaining spare stride after §69's shadow tail
+ * (672…720 of 768). The first {@link LIGHT_UNIFORM_BYTES} bytes stay this
+ * layout exactly — a no-hemisphere pack writes zeros in the new slots, so
+ * every landed float in 0…592 is byte-identical. The unshadowed bind group
+ * widens to {@link LIGHT_BINDING_BYTES} so the fragment can read the tail;
+ * the shadowed twin does the same by growing
+ * `SHADOW_LIGHT_UNIFORM_BYTES`.
+ *
  * `counts.x` is an **`f32`, not a `u32`** — the block is packed through one
  * `Float32Array`, and a `u32` word inside it would need a second typed-array
  * view over the same bytes for one integer. `f32` is exact for every value the
@@ -159,6 +167,27 @@ export const LIGHT_UNIFORM_BYTES = 592;
 export const LIGHT_UNIFORM_FLOATS = LIGHT_UNIFORM_BYTES / 4;
 
 /**
+ * Byte offset of the hemisphere sky colour (rgb × intensity; w 0) — the
+ * first spare stride byte after §69's shadow tail (592…672).
+ */
+export const HEMISPHERE_SKY_OFFSET = 672;
+
+/** Byte offset of the hemisphere ground colour (rgb × intensity; w 0). */
+export const HEMISPHERE_GROUND_OFFSET = 688;
+
+/** Byte offset of the hemisphere sky axis (xyz unit; w 0). */
+export const HEMISPHERE_UP_OFFSET = 704;
+
+/**
+ * Size of the unshadowed light binding once the hemisphere tail is
+ * included — 720 bytes, still inside the landed 768-byte stride. The
+ * core {@link LIGHT_UNIFORM_BYTES} is untouched; this is what
+ * `createLightsBindGroupLayout` and the renderer bind as `minBindingSize`
+ * / `size` so the fragment may read the tail.
+ */
+export const LIGHT_BINDING_BYTES = HEMISPHERE_UP_OFFSET + 16;
+
+/**
  * Distance between two views' blocks in the lights buffer: the block size
  * rounded up to the 256-byte dynamic-offset alignment (`UNIFORM_STRIDE_BYTES`'
  * reasoning — 256 is every conforming device's valid alignment, and a fixed
@@ -171,7 +200,7 @@ export const LIGHT_UNIFORM_STRIDE_FLOATS = LIGHT_UNIFORM_STRIDE_BYTES / 4;
 
 /**
  * The light block's bind-group layout: binding 0, a dynamically-offset uniform
- * buffer of {@link LIGHT_UNIFORM_BYTES}, **fragment-only** — no vertex stage
+ * buffer of {@link LIGHT_BINDING_BYTES}, **fragment-only** — no vertex stage
  * in this package reads a light, and declaring vertex visibility would reserve
  * a vertex-stage buffer slot nothing uses (`createTextureBindGroupLayout`'s
  * argument, applied to a buffer).
@@ -192,7 +221,7 @@ export function createLightsBindGroupLayout(
         buffer: {
           type: "uniform",
           hasDynamicOffset: true,
-          minBindingSize: LIGHT_UNIFORM_BYTES,
+          minBindingSize: LIGHT_BINDING_BYTES,
         },
       },
     ],
@@ -217,15 +246,48 @@ export const LIGHT_UNIFORM_MEMBERS_WGSL = `  ambientColor : vec4<f32>,
   punctualParams : array<vec4<f32>, ${String(MAX_PUNCTUAL_LIGHTS)}>,`;
 
 /**
+ * The three hemisphere members, at {@link HEMISPHERE_SKY_OFFSET}. Shared
+ * with `wgpu-shadow.ts` so the shadowed and unshadowed structs cannot
+ * disagree about where sky, ground, and up live.
+ */
+export const HEMISPHERE_UNIFORM_MEMBERS_WGSL = `  hemisphereSky : vec4<f32>,
+  hemisphereGround : vec4<f32>,
+  hemisphereUp : vec4<f32>,`;
+
+/**
  * The WGSL declaration of the block above — `DRAW_UNIFORM_WGSL`'s discipline:
  * the layout the pipeline declares and the layout the shader reads live side
  * by side in one module, so they cannot drift.
+ *
+ * Five `vec4` pads sit in the 592…672 gap §69's shadow tail occupies on
+ * the shadowed twin, so `hemisphereSky` lands at byte 672 in both structs.
  */
 export const LIGHT_UNIFORM_WGSL = `struct LightUniforms {
 ${LIGHT_UNIFORM_MEMBERS_WGSL}
+  hemiPad : array<vec4<f32>, 5>,
+${HEMISPHERE_UNIFORM_MEMBERS_WGSL}
 };
 
 @group(${String(LIGHTS_BIND_GROUP_INDEX)}) @binding(0) var<uniform> lights : LightUniforms;`;
+
+/**
+ * The hemisphere mix both shaded fragment stages share — the WGSL port of
+ * `gl-program.ts`'s `HEMISPHERE_LIGHT_GLSL`. Branch-free: a frame with no
+ * hemisphere writes zeros for sky and ground, so the mix is the zero
+ * vector regardless of `n`. A zero-length normal uses the 0.5 mix
+ * (constant extra ambient), matching the GL chunk.
+ */
+export const HEMISPHERE_IRRADIANCE_WGSL = `fn hemisphereIrradiance(n : vec3<f32>) -> vec3<f32> {
+  let w = clamp(0.5 * dot(n, lights.hemisphereUp.xyz) + 0.5, 0.0, 1.0);
+  return mix(lights.hemisphereGround.xyz, lights.hemisphereSky.xyz, w);
+}
+
+fn hemisphereAmbient(normalLength : f32, n : vec3<f32>) -> vec3<f32> {
+  if (normalLength > 0.0) {
+    return hemisphereIrradiance(n);
+  }
+  return mix(lights.hemisphereGround.xyz, lights.hemisphereSky.xyz, 0.5);
+}`;
 
 /**
  * The **light model** both shaded fragment stages share — the WGSL port of
@@ -387,4 +449,20 @@ export function writeLightUniforms(
   for (let index = 0; index < MAX_PUNCTUAL_LIGHTS * 4; index += 1) {
     staging[params + index] = lights.punctualParams[index];
   }
+
+  const sky = floatBase + HEMISPHERE_SKY_OFFSET / 4;
+  staging[sky] = lights.hemisphereSky[0];
+  staging[sky + 1] = lights.hemisphereSky[1];
+  staging[sky + 2] = lights.hemisphereSky[2];
+  staging[sky + 3] = 0;
+  const ground = floatBase + HEMISPHERE_GROUND_OFFSET / 4;
+  staging[ground] = lights.hemisphereGround[0];
+  staging[ground + 1] = lights.hemisphereGround[1];
+  staging[ground + 2] = lights.hemisphereGround[2];
+  staging[ground + 3] = 0;
+  const up = floatBase + HEMISPHERE_UP_OFFSET / 4;
+  staging[up] = lights.hemisphereUp.x;
+  staging[up + 1] = lights.hemisphereUp.y;
+  staging[up + 2] = lights.hemisphereUp.z;
+  staging[up + 3] = 0;
 }

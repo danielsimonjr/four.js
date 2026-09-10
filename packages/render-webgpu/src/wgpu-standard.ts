@@ -87,6 +87,7 @@ import {
 } from "./webgpu-device.js";
 import {
   LIGHT_UNIFORM_WGSL,
+  HEMISPHERE_IRRADIANCE_WGSL,
   PUNCTUAL_LIGHT_WGSL,
   SHADED_MAP_BIND_GROUP_INDEX,
   SHADED_MAP_BINDING_WGSL,
@@ -212,7 +213,9 @@ ${shadedMrBindingWgsl(
 
 ${shadedVertexStageWgsl(normals, map || metalRoughness)}
 
-${PUNCTUAL_LIGHT_WGSL}${
+${PUNCTUAL_LIGHT_WGSL}
+
+${HEMISPHERE_IRRADIANCE_WGSL}${
     shadow
       ? `
 
@@ -271,9 +274,9 @@ fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
   }
   let diffuseColor = albedo * (1.0 - metalness);
   let f0 = mix(vec3<f32>(DIELECTRIC_F0), albedo, metalness);
-  var shaded = lights.ambientColor.xyz * diffuseColor;
-
   let normalLength = length(input.normal);
+  let nHemi = select(vec3<f32>(0.0), input.normal / normalLength, normalLength > 0.0);
+  var shaded = (lights.ambientColor.xyz + hemisphereAmbient(normalLength, nHemi)) * diffuseColor;
   if (normalLength > 0.0) {
     let n = input.normal / normalLength;
     let v = normalize(lights.cameraPosition.xyz - input.worldPosition);

@@ -48,6 +48,7 @@
 import { DRAW_UNIFORM_WGSL } from "./wgpu-bindings.js";
 import type { GpuVertexBufferLayout } from "./webgpu-device.js";
 import {
+  HEMISPHERE_IRRADIANCE_WGSL,
   LIGHT_UNIFORM_WGSL,
   PUNCTUAL_LIGHT_WGSL,
   SHADED_MAP_BINDING_WGSL,
@@ -229,7 +230,9 @@ ${SHADED_MAP_BINDING_WGSL}`
 
 ${shadedVertexStageWgsl(normals, map)}
 
-${PUNCTUAL_LIGHT_WGSL}${
+${PUNCTUAL_LIGHT_WGSL}
+
+${HEMISPHERE_IRRADIANCE_WGSL}${
     shadow
       ? `
 
@@ -257,19 +260,20 @@ fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
       : ""
   }
   let len = length(input.normal);
+  let n = select(vec3<f32>(0.0), input.normal / len, len > 0.0);
   var diffuse = 0.0;
   if (len > 0.0) {
-    diffuse = max(dot(input.normal / len, -lights.lightDirection.xyz), 0.0);
+    diffuse = max(dot(n, -lights.lightDirection.xyz), 0.0);
   }
   ${
     shadow
       ? `var direct = lights.lightColor.xyz * diffuse;
   if (len > 0.0) {
-    direct = direct * shadowFactor(input.worldPosition, input.normal / len);
+    direct = direct * shadowFactor(input.worldPosition, n);
   }`
       : `let direct = lights.lightColor.xyz * diffuse;`
   }
-  var lighting = lights.ambientColor.xyz + direct;
+  var lighting = lights.ambientColor.xyz + hemisphereAmbient(len, n) + direct;
   if (len > 0.0) {
     let n = input.normal / len;
     let punctualCount = i32(lights.counts.x);

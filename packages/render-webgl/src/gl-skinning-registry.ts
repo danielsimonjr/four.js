@@ -81,6 +81,8 @@ export interface SkinnedLitPipeline {
   ): void;
   /** Uploads the frame's point and spot lights, or nothing (§68, R-17). */
   setPunctualLights(lights: SceneLights): void;
+  /** Uploads the frame's hemisphere, or nothing (§68). */
+  setHemisphereLight(lights: SceneLights): void;
   /** Uploads the frame's shadow state, or nothing (§69, R-18). */
   setShadow(lights: SceneLights): void;
   /** Switches the shadow comparison per draw (§49's `receiveShadow`). */

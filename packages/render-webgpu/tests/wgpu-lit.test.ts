@@ -25,6 +25,11 @@ import {
   LIGHT_PUNCTUAL_DIRECTION_OFFSET,
   LIGHT_PUNCTUAL_PARAMS_OFFSET,
   LIGHT_PUNCTUAL_POSITION_OFFSET,
+  HEMISPHERE_GROUND_OFFSET,
+  HEMISPHERE_IRRADIANCE_WGSL,
+  HEMISPHERE_SKY_OFFSET,
+  HEMISPHERE_UP_OFFSET,
+  LIGHT_BINDING_BYTES,
   LIGHT_UNIFORM_BYTES,
   LIGHT_UNIFORM_FLOATS,
   LIGHT_UNIFORM_STRIDE_BYTES,
@@ -141,7 +146,7 @@ describe("the light uniform layout (wgpu-lights.ts)", () => {
           buffer: {
             type: "uniform",
             hasDynamicOffset: true,
-            minBindingSize: LIGHT_UNIFORM_BYTES,
+            minBindingSize: LIGHT_BINDING_BYTES,
           },
         },
       ],
@@ -209,6 +214,51 @@ describe("the light uniform layout (wgpu-lights.ts)", () => {
     expect(staging[0]).toBe(-123);
     expect(staging[base + blockFloats]).toBe(-123);
   });
+
+  it("packs a hemisphere into the spare stride after the shadow tail", () => {
+    const lights = createSceneLights();
+    lights.hasHemisphereLight = true;
+    lights.hemisphereSky[0] = 0.6;
+    lights.hemisphereSky[1] = 0.7;
+    lights.hemisphereSky[2] = 1;
+    lights.hemisphereGround[0] = 0.2;
+    lights.hemisphereGround[1] = 0.1;
+    lights.hemisphereGround[2] = 0.05;
+    lights.hemisphereUp.set(0, 0, 1);
+
+    const staging = new Float32Array(LIGHT_UNIFORM_STRIDE_FLOATS).fill(-123);
+    writeLightUniforms(staging, 0, lights, 0, 0, 0);
+
+    const at = (byteOffset: number): number[] =>
+      Array.from(staging.slice(byteOffset / 4, byteOffset / 4 + 4));
+    expect(at(HEMISPHERE_SKY_OFFSET)).toEqual([
+      Math.fround(0.6),
+      Math.fround(0.7),
+      1,
+      0,
+    ]);
+    expect(at(HEMISPHERE_GROUND_OFFSET)).toEqual([
+      Math.fround(0.2),
+      Math.fround(0.1),
+      Math.fround(0.05),
+      0,
+    ]);
+    expect(at(HEMISPHERE_UP_OFFSET)).toEqual([0, 0, 1, 0]);
+    // The core 592-byte block is still fully rewritten; the 592…672 gap
+    // (shadow's home) is left to writeShadowUniforms.
+    expect(HEMISPHERE_SKY_OFFSET).toBe(672);
+    expect(LIGHT_BINDING_BYTES).toBe(720);
+  });
+
+  it("writes zeros in the hemisphere slots when none is present", () => {
+    const staging = new Float32Array(LIGHT_UNIFORM_STRIDE_FLOATS).fill(-123);
+    writeLightUniforms(staging, 0, createSceneLights(), 0, 0, 0);
+    expect(
+      Array.from(
+        staging.slice(HEMISPHERE_SKY_OFFSET / 4, HEMISPHERE_UP_OFFSET / 4 + 4),
+      ),
+    ).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]);
+  });
 });
 
 describe("the shaded WGSL builders", () => {
@@ -217,6 +267,8 @@ describe("the shaded WGSL builders", () => {
     expect(litShaderSource(true, false)).toBe(flat);
     expect(flat).toContain(LIGHT_UNIFORM_WGSL);
     expect(flat).toContain(PUNCTUAL_LIGHT_WGSL);
+    expect(flat).toContain(HEMISPHERE_IRRADIANCE_WGSL);
+    expect(flat).toContain("hemisphereAmbient(len, n)");
     expect(flat).toContain("draw.normalMatrix * normal");
     expect(flat).not.toContain(NORMAL_MATRIX_WGSL);
     expect(flat).not.toContain("fn normalMatrix");
@@ -245,6 +297,8 @@ describe("the shaded WGSL builders", () => {
     expect(flat).toContain(PUNCTUAL_LIGHT_WGSL);
     expect(flat).toContain("directLobe");
     // R-13's conventions, spelled where the GL module spells them.
+    expect(flat).toContain(HEMISPHERE_IRRADIANCE_WGSL);
+    expect(flat).toContain("hemisphereAmbient(normalLength, nHemi)");
     expect(flat).toContain("DIELECTRIC_F0 : f32 = 0.04");
     expect(flat).toContain("MIN_ROUGHNESS : f32 = 0.045");
     expect(flat).toContain("lights.cameraPosition.xyz");

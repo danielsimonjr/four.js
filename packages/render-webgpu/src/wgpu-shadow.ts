@@ -111,6 +111,7 @@ import {
 import { DRAW_UNIFORM_WGSL } from "./wgpu-bindings.js";
 import {
   LIGHTS_BIND_GROUP_INDEX,
+  HEMISPHERE_UNIFORM_MEMBERS_WGSL,
   LIGHT_UNIFORM_BYTES,
   LIGHT_UNIFORM_MEMBERS_WGSL,
   LIGHT_UNIFORM_STRIDE_BYTES,
@@ -141,7 +142,12 @@ export const SHADOW_PARAMS_OFFSET = SHADOW_MATRIX_OFFSET + 64;
  * size, still inside the landed 768-byte stride, so the shadow rides
  * allocation the light buffer already made.
  */
-export const SHADOW_LIGHT_UNIFORM_BYTES = SHADOW_PARAMS_OFFSET + 16;
+/**
+ * Size of one `ShadowLightUniforms` block — the shadow tail (80 bytes)
+ * plus the hemisphere members that follow it (48 bytes). Still inside
+ * the landed 768-byte stride.
+ */
+export const SHADOW_LIGHT_UNIFORM_BYTES = SHADOW_PARAMS_OFFSET + 16 + 48;
 
 /** `@binding(1)` of the shadow-lights group — the `texture_depth_2d` map. */
 export const SHADOW_MAP_BINDING = 1;
@@ -221,6 +227,7 @@ export const SHADOW_LIGHT_UNIFORM_WGSL = `struct ShadowLightUniforms {
 ${LIGHT_UNIFORM_MEMBERS_WGSL}
   shadowMatrix : mat4x4<f32>,
   shadowParams : vec4<f32>,
+${HEMISPHERE_UNIFORM_MEMBERS_WGSL}
 };
 
 @group(${String(LIGHTS_BIND_GROUP_INDEX)}) @binding(0) var<uniform> lights : ShadowLightUniforms;

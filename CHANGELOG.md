@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — hemisphere light (2026-09-10)
+
+### Added
+
+- **`HemisphereLight` (§68).** Two-colour directional ambient (sky / ground)
+  beside `Scene.ambientLight`. First visible, enabled node in scene-graph
+  order; sky axis is the node's +Y (world up). Mix
+  `0.5 · n·up + 0.5` added to constant ambient; on `StandardMaterial` the
+  term reaches the diffuse lobe only. WebGL uploads nothing when none is
+  present (`useHemisphere` skip). WebGPU packs sky/ground/up at bytes
+  672–720 of the 768-byte light stride (after the shadow tail). §79 type
+  `scene:hemisphere-light`. Lighting checkbox stays open (area, extra
+  directionals, clustered, IBL, …).
+
 ## Unreleased — WebGPU skinned shadow caster (2026-09-10)
 
 ### Added
