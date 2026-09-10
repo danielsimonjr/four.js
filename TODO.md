@@ -1219,10 +1219,12 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       ~~skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
       shadow is a different picture)~~ **DONE 2026-09-09** (WebGL
       `SkinnedShadowProgram` via `acquireShadow()` on the first skinned
-      caster; unregistered still skips; WebGPU colour pair does not add a
-      caster); ~~WebGPU skinned colour pair~~ **DONE 2026-09-09**
+      caster; unregistered still skips); ~~WebGPU skinned colour pair~~ **DONE 2026-09-09**
       (`registerSkinningPipeline()` unlit+lit; 3072-byte palette bind group;
-      skip unregistered/failed, never bind-pose; caster still skips;
+      skip unregistered/failed, never bind-pose;
+      ~~WebGPU skinned shadow caster still skips~~ **DONE 2026-09-10**
+      (`acquireShadow()` on the registered pair; lazy compile, fail-once
+      skip, never bind-pose; palette at group 1);
       RFC 0005 skinned id lives in `wgpu-picking.ts`);
       CPU skinning (Canvas/SVG tiers + the skinned bounds/picking home,
       with its own `same-runtime` golden); bone-texture palette (unbounds

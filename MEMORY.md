@@ -30,6 +30,13 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-10 — WebGPU skinned shadow caster (RFC 0003).**
+  `SkinnedPrograms.acquireShadow()` compiles a private depth-only
+  pipeline (palette group 1, `skinMatrix(joints, weights)`, clip-depth
+  remap). `WebgpuRenderer` still imports only the registry. Fail-once
+  skip, never bind-pose. GPU morph / CPU skinning / bone-texture remain;
+  do not close the RFC 0003 checkbox.
+
 - **2026-09-10 — Open-TODO audit: 11 still open, 260 closed.** A
   subagent-team review of every `- [ ]` row against source. Closed
   **RFC 0005 residue**: WebGPU skinned id pass (`wgpu-picking.ts`,

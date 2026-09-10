@@ -91,10 +91,8 @@
  * of the kinds this backend draws — `unlit`, `lit`, `standard`. Sprites are
  * excluded (a depth-only pass would cast the §55 rectangle, not the texture);
  * particles carry `castShadow: false` from the list builder; masks likewise.
- * The two GL exclusions with a WebGPU twist: skinned items are excluded
- * from the caster pass **by absence of a skinned caster** — the colour
- * pair lives behind `registerSkinningPipeline()`; the shadow caster
- * still absent. An invisible surface must not cast a bind-pose
+ * Skinned casters draw through `acquireShadow()` on the registered
+ * colour pair — unregistered or failed skips, never a bind-pose
  * silhouette. `node` items: an undisplaced graph casts its geometry
  * exactly (depth ignores colour), while a displacing graph would cast
  * its *undisplaced* silhouette, a different picture, so those casters

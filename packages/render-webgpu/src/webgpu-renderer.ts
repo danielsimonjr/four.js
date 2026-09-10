@@ -46,8 +46,9 @@
  * **opt-in** behind `registerSkinningPipeline()` — the pipeline-cost law's
  * registration seam, matching WebGL: the renderer imports only the registry
  * slot, and an unregistered (or failed) skinned draw is skipped, never
- * shown in bind pose. The §69 skinned caster stays *absent*: those items
- * skip, and an invisible surface must not cast as its bind pose. An
+ * shown in bind pose. The §69 skinned caster compiles lazily through
+ * `acquireShadow()` on the same pair — unregistered or failed casters
+ * skip, never bind-pose. An
  * *unregistered* node material is skipped on the same terms. §71 picking is
  * **opt-in**: `createPickingService()` is declared (presence is the
  * capability, matching WebGL) and throws until `registerPickingPipeline()`
@@ -149,6 +150,7 @@ import {
   type GpuCommandEncoder,
   type GpuDevice,
   type GpuRenderPassEncoder,
+  type GpuRenderPipeline,
   type GpuSampler,
   type GpuTexture,
   type GpuTextureView,
@@ -1215,11 +1217,7 @@ export class WebgpuRenderer implements Renderer {
     const skinningRegistered = resolveSkinningPipelineFactory() !== null;
     const frameStencil =
       targetRecord === null
-        ? frameWantsStencil(
-            items,
-            nodePipelines !== null,
-            skinningRegistered,
-          )
+        ? frameWantsStencil(items, nodePipelines !== null, skinningRegistered)
         : targetRecord.stencil;
     const frameClips = wantsClips && frameStencil;
     // §67's exhaustion case, reachable here only off screen (the on-screen
@@ -1314,7 +1312,10 @@ export class WebgpuRenderer implements Renderer {
     const skinnedPrograms =
       skinnedCount > 0 ? this.#acquireSkinnedPrograms() : null;
     if (skinnedPrograms !== null) {
-      skinnedPrograms.prepare(device, skinnedCount * views.length);
+      skinnedPrograms.prepare(
+        device,
+        skinnedCount * views.length + (frameShadow ? skinnedCount : 0),
+      );
     }
 
     // Sized before recording: one clear block per view plus, at worst, one
@@ -1392,6 +1393,7 @@ export class WebgpuRenderer implements Renderer {
         items,
         block,
         statistics,
+        skinnedPrograms,
       );
       shadowRecord = shadow.record;
       block = shadow.block;
@@ -1643,10 +1645,7 @@ export class WebgpuRenderer implements Renderer {
         if (maskPass && !frameClips) {
           continue;
         }
-        if (
-          !maskPass &&
-          (isSkinnedUnlitItem(item) || isSkinnedLitItem(item))
-        ) {
+        if (!maskPass && (isSkinnedUnlitItem(item) || isSkinnedLitItem(item))) {
           // §54's skinned colour draws (RFC 0003) — a self-contained arm
           // ending in `continue`, like the particle arm below, because the
           // pipeline must be resolved *before* the geometry upload: a draw
@@ -1659,11 +1658,7 @@ export class WebgpuRenderer implements Renderer {
             continue;
           }
           const skinnedLit = isSkinnedLitItem(item);
-          const record = geometries.acquire(
-            item.geometry,
-            skinnedLit,
-            true,
-          );
+          const record = geometries.acquire(item.geometry, skinnedLit, true);
           if (
             record === null ||
             record.jointBuffer === null ||
@@ -1707,9 +1702,9 @@ export class WebgpuRenderer implements Renderer {
         ) {
           // Remaining kinds this colour pass does not draw. Skinned items
           // continued above when registered; unregistered ones fell through
-          // the `skinnedPrograms === null` skip. The §69 caster still
-          // absent — skipped, never bind-pose. The RFC 0005 skinned id
-          // pass lives on the picking service.
+          // the `skinnedPrograms === null` skip. The §69 caster is on the
+          // same pair (`acquireShadow`). The RFC 0005 skinned id pass
+          // lives on the picking service.
           continue;
         }
         if (!maskPass && item.kind === "node") {
@@ -2851,6 +2846,33 @@ export class WebgpuRenderer implements Renderer {
   }
 
   /**
+   * Compiles the §69 skinned caster on first use, or `null` when the
+   * compile failed on this device. Fail-once: a refusing driver must not
+   * be asked again. Never a bind-pose silhouette.
+   */
+  #acquireSkinnedShadowPipeline(
+    programs: SkinnedPrograms,
+    descriptor: {
+      topology: "triangle-list" | "line-list";
+      colorFormat: string;
+      depthFormat: string;
+    },
+  ): GpuRenderPipeline | null {
+    try {
+      return programs.acquireShadow(descriptor);
+    } catch (error: unknown) {
+      if (DEV) {
+        devWarnOnce(
+          "webgpu-skinned-shadow-compile-failed",
+          "§69: the skinned shadow pipeline failed to compile on this " +
+            `device; skinned casters are skipped (§61, §89). ${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
    * Draws one skinned colour item through the registered pair. Returns
    * whether a uniform block was consumed so the caller can keep `block`
    * honest — a skip must not increment it, or the next draw's offset would
@@ -3744,6 +3766,7 @@ export class WebgpuRenderer implements Renderer {
     items: readonly RenderItem[],
     blockStart: number,
     statistics: RenderStatistics | null,
+    skinnedPrograms: SkinnedPrograms | null,
   ): { record: WgpuRenderTargetRecord | null; block: number } {
     let block = blockStart;
     const size = sceneLights.shadowMapSize;
@@ -3778,26 +3801,81 @@ export class WebgpuRenderer implements Renderer {
     });
     for (const item of items) {
       // The caster filter — `wgpu-shadow.ts`'s header owns the list: §49's
-      // opt-out, sprites (a quad would cast its rectangle), and every kind
-      // this backend has no caster pipeline for (skinned — colour pair behind
-      // `registerSkinningPipeline()`; shadow caster still absent, and an
-      // invisible surface must not cast). Masks and particle items carry `castShadow: false`
-      // from the list builder — a §36 billboard has no surface to project,
-      // drawn (WP-R1.8) or not. §60 (WP-R1.9): a node material with **no**
-      // displacement casts its geometry exactly — depth ignores colour, so
-      // the shared caster module is right for it — while a displacing graph
-      // would cast its *undisplaced* silhouette, a different picture, so
-      // those casters skip: GL's node-caster rule, verbatim (and like GL's,
-      // registration-independent — the caster module is this backend's own).
+      // opt-out, sprites (a quad would cast its rectangle). Masks and
+      // particle items carry `castShadow: false` from the list builder.
+      // Skinned casters draw through `acquireShadow()` when the colour
+      // pair is registered; unregistered or failed skips, never bind-pose.
+      // §60: undisplaced node graphs cast; displacing graphs skip.
       if (
         !item.castShadow ||
         (item.kind !== "unlit" &&
           item.kind !== "lit" &&
           item.kind !== "standard" &&
-          item.kind !== "node") ||
+          item.kind !== "node" &&
+          item.kind !== "skinned-unlit" &&
+          item.kind !== "skinned-lit") ||
         (item.kind === "node" &&
           item.material.graph.positionOffset !== undefined)
       ) {
+        continue;
+      }
+      if (isSkinnedUnlitItem(item) || isSkinnedLitItem(item)) {
+        if (skinnedPrograms === null) {
+          continue;
+        }
+        const geometry = geometries.acquire(item.geometry, false, true);
+        if (
+          geometry === null ||
+          geometry.jointBuffer === null ||
+          geometry.weightBuffer === null
+        ) {
+          continue;
+        }
+        const depthFormat = record.depthFormat;
+        if (depthFormat === null) {
+          continue;
+        }
+        const skinnedPipeline = this.#acquireSkinnedShadowPipeline(
+          skinnedPrograms,
+          {
+            topology: geometry.topology,
+            colorFormat: RENDER_TARGET_COLOR_FORMAT,
+            depthFormat,
+          },
+        );
+        if (skinnedPipeline === null) {
+          continue;
+        }
+        const paletteGroup = skinnedPrograms.paletteBindGroup();
+        if (paletteGroup === null) {
+          continue;
+        }
+        const paletteOffset = skinnedPrograms.packPalette(item.jointMatrices);
+        this.#writeBlock(
+          block,
+          sceneLights.shadowMatrix,
+          item.worldMatrix,
+          0,
+          0,
+          0,
+          0,
+        );
+        pass.setPipeline(skinnedPipeline);
+        pass.setBindGroup(0, bindGroup, [block * UNIFORM_STRIDE_BYTES]);
+        pass.setBindGroup(1, paletteGroup, [paletteOffset]);
+        pass.setVertexBuffer(0, geometry.positionBuffer);
+        pass.setVertexBuffer(1, geometry.jointBuffer);
+        pass.setVertexBuffer(2, geometry.weightBuffer);
+        if (geometry.indexBuffer !== null && geometry.indexFormat !== null) {
+          pass.setIndexBuffer(geometry.indexBuffer, geometry.indexFormat);
+          pass.drawIndexed(geometry.count);
+        } else {
+          pass.draw(geometry.count);
+        }
+        if (statistics !== null) {
+          countDraw(statistics, geometry.topology, geometry.count, 1);
+        }
+        block += 1;
         continue;
       }
       const geometry = geometries.acquire(item.geometry);

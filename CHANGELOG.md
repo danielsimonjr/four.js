@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — WebGPU skinned shadow caster (2026-09-10)
+
+### Added
+
+- **WebGPU skinned shadow caster (RFC 0003 residue).** `acquireShadow()` on
+  the registered colour pair (`wgpu-skinning.ts`, not a
+  `SkinnedShadowProgram` class). Depth-only WGSL skins then transforms
+  through the shared `DrawUniforms` block; palette at group 1. Lazy on the
+  first skinned caster; compile failure skips, never bind-pose.
+  Unregistered casters still skip. RFC 0003 stays open (GPU morph, CPU
+  skinning, bone-texture).
+
 ## Unreleased — open-TODO audit + RFC 0005 close (2026-09-10)
 
 ### Added

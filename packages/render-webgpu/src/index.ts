@@ -350,6 +350,7 @@ export type {
   SkinnedPrograms,
   SkinnedUnlitPipeline,
   WgpuSkinnedDrawDescriptor,
+  WgpuSkinnedShadowDescriptor,
 } from "./wgpu-skinning-registry.js";
 export {
   clearRegisteredSkinningPipeline,
@@ -365,9 +366,12 @@ export {
   WEIGHTS_SHADER_LOCATION,
   createJointPaletteBindGroupLayout,
   registerSkinningPipeline,
+  SKINNED_SHADOW_SHADER_SOURCE,
+  SKINNED_SHADOW_VERTEX_BUFFER_LAYOUTS,
   skinnedLitShaderSource,
   skinnedLitVertexBufferLayouts,
   skinnedPaletteBindGroupIndex,
+  skinnedShadowShaderSource,
   skinnedUnlitShaderSource,
   skinnedUnlitVertexBufferLayouts,
   skinningWgsl,

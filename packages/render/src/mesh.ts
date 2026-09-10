@@ -55,8 +55,9 @@
  *   bind-pose shape). The §69 WebGL caster pass deforms skinned casters
  *   when `registerSkinningPipeline()` is linked; without it the draw is
  *   skipped rather than casting a bind-pose shadow. WebGPU draws the
- *   skinned colour pair behind the same registration; its caster still
- *   skips (never a bind-pose shadow). The RFC 0005 skinned id pass
+ *   skinned colour pair and the §69 caster behind the same
+ *   registration (`acquireShadow`); unregistered or failed casters
+ *   skip, never bind-pose. The RFC 0005 skinned id pass
  *   lives in `wgpu-picking.ts` behind `registerPickingPipeline()`.
  */
 
