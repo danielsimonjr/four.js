@@ -3802,10 +3802,16 @@ export class WebgpuRenderer implements Renderer {
     for (const item of items) {
       // The caster filter — `wgpu-shadow.ts`'s header owns the list: §49's
       // opt-out, sprites (a quad would cast its rectangle). Masks and
-      // particle items carry `castShadow: false` from the list builder.
+      // particle items carry `castShadow: false` from the list builder —
+      // a §36 billboard has no surface to project, drawn (WP-R1.8) or not.
       // Skinned casters draw through `acquireShadow()` when the colour
       // pair is registered; unregistered or failed skips, never bind-pose.
-      // §60: undisplaced node graphs cast; displacing graphs skip.
+      // §60 (WP-R1.9): a node material with **no** displacement casts its
+      // geometry exactly — depth ignores colour, so the shared caster
+      // module is right for it — while a displacing graph would cast its
+      // *undisplaced* silhouette, a different picture, so those casters
+      // skip: GL's node-caster rule, verbatim (and like GL's,
+      // registration-independent — the caster module is this backend's own).
       if (
         !item.castShadow ||
         (item.kind !== "unlit" &&
