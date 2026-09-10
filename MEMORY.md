@@ -349,6 +349,22 @@ readable; never delete the pointer itself.
   GPU readback as a raster source (`0009`: between-frames `refresh()` snapshot,
   display-only, no feedback). Implementation waits on acceptance.
 
+- **2026-09-10 — RFCs 0007–0009 corrected; subagent plans written.** Standing
+  facts the review pinned (each was wrong in a draft): `DeterminismLevel` is
+  declared in `@fourjs/physics`, unreachable from motion — motion-side
+  contracts spell their own literal union; the umbrella's specifier is
+  `fourJS/…` (`packages/fourjs/package.json`), `four` is only the workspace
+  nickname; `layoutText` iterates code points (`for…of`); `FourErrorCode` is
+  an open union — reuse `NOT_IMPLEMENTED` for staged API rather than minting
+  codes; `Renderer` has no begin/end-frame pair (`render` is the frame);
+  `tests/integration/raster-display-only.test.ts` is a fixed `FORBIDDEN`
+  identifier list, so new raster-tier names must be added to it; no
+  workspace tsconfig pins `lib`, so "DOM-free" is a seam rule, not a compiler
+  guarantee; Roboto is Apache-2.0, Noto Sans is OFL. Plans live in
+  `docs/plans/RFC-000{7,8,9}-*_PLAN.md`: ≤ 4 agents, disjoint file ownership,
+  waves, an anti-hallucination table per plan citing file:line, and "stop and
+  report" rules for network-gated steps (harfbuzzjs install, Noto download).
+
 - **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
   (the exception each golden's `_warning` names). Values came from the
   scenario helpers, not from editing hashes by hand. 0.20 contact persistence

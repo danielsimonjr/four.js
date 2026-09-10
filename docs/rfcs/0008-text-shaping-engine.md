@@ -1,6 +1,6 @@
 # RFC 0008: §56 full text shaping engine (HarfBuzz-wasm vs native)
 
-- **Status:** Proposed
+- **Status:** draft — proposed to the owner 2026-09-06; corrected 2026-09-10 (review pass, see *Review log*)
 - **Date:** 2026-09-06
 - **Owner decision:** pending
 - **Spec sections affected:** §56 (primary), §33, §49, §73, §76, §79, §83, §85, §86, §89, §90, §91, §96, §98
@@ -19,8 +19,10 @@ Verified against the tree (2026-09-06):
 - `@fourjs/text` is the §56 MVP tier: a built-in 6×12 monospace ASCII face,
   `buildGlyphAtlas`, and `layoutText`. It **produces data, never nodes**. Its
   frozen §3.1 row is `core, math, geometry`.
-- `layoutText` is a pen walk: one atlas glyph per code unit, explicit `\n`
-  only, no wrapping, no bidi, no ligatures, no kerning. Alignment is
+- `layoutText` is a pen walk: one atlas glyph per **code point** (a
+  `for…of` walk over the string, so a surrogate pair is one lookup, which
+  falls to the atlas `fallback` glyph), explicit `\n` only, no wrapping,
+  no bidi, no ligatures, no kerning. Alignment is
   post-walk. The module header lists shaping as staged on this RFC.
 - The `Text` node lives in the umbrella `four` (R-28): one geometry over one
   atlas material. It consumes `layoutText`'s quads. It does not shape.
@@ -69,7 +71,7 @@ Reasons, against the native alternative argued in § Alternatives:
 
 "Native" in this RFC means a first-party TypeScript shaper *or* a
 host-OS/ICU binding. Both lose for full §56. A small first-party path
-remains as the **default identity shaper** (today's 1:1 code-unit walk) so
+remains as the **default identity shaper** (today's 1:1 code-point walk) so
 the MVP tier and the §86 payload budget do not move.
 
 ### 2. The seam is a `ShapingEngine` in `@fourjs/text`
@@ -118,14 +120,20 @@ export interface ShapingEngine extends Disposable {
 }
 ```
 
-Placement: `packages/text/src/shaping.ts`. No new package. `layoutText`
-gains an optional `shaper` / pre-shaped `runs` input; omitted, it keeps
-today's identity walk **bit-identical**. That is the R-28 alignment
+Placement: `packages/text/src/shaping.ts`. No new package. `layoutText`'s
+signature is `layoutText(text, atlas, options)`, so the hook is a new
+optional field on `TextLayoutOptions` — `shaper?: ShapingEngine` (with
+`fontId`, `script`, `language`, `direction`, `features` passed through as
+optional siblings) — rather than a fourth positional argument; omitted, the
+function keeps today's identity walk **bit-identical**. That is the R-28 alignment
 precedent (the `"left"` path does not run the shift loop).
 
 The WASM adapter (`HarfBuzzShapingEngine`) lives in the same package as a
-**separate entry** — `four/text/harfbuzz` or a dynamic import — so a
-consumer that never names it does not download the wasm. If the wasm blob
+**separate entry** — `@fourjs/text/harfbuzz`, surfaced by the umbrella as
+`fourJS/text/harfbuzz` (the umbrella's `package.json` name is `fourJS`;
+`four` is only the workspace nickname the plan and the spec use), or a
+dynamic import — so a consumer that never names it does not download the
+wasm. If the wasm blob
 cannot legally sit inside `@fourjs/text` without dragging every importer
 (bundler / `exports` map), the packet splits it into a workspace package
 **only after** an owner amendment to §98. The default recommendation is
@@ -141,9 +149,13 @@ separate bidi library. The identity shaper does not run bidi — ASCII MVP
 text is LTR, as today.
 
 Vertical directions (`ttb` / `btt`) are declared on the interface so a
-later packet can fill them; the first HarfBuzz packet may refuse them
-with `UNSUPPORTED_GPU_FEATURE`-style `FourError` (`UNSUPPORTED_TEXT_FEATURE`
-or `INVALID_APPLICATION_STATE`) rather than invent a vertical layout.
+later packet can fill them; the first HarfBuzz packet refuses them with
+`FourError` **`NOT_IMPLEMENTED`** — the code `packages/core/src/errors.ts`
+already reserves for "a named part of the public API exists but its
+behaviour lands in a later phase" — rather than invent a vertical layout
+or a new code. (`FourErrorCode` is an open union kept in that one file;
+§89's list is examples, per revision 1.13. No `UNSUPPORTED_TEXT_FEATURE`
+is added by this RFC.)
 
 ### 4. Fonts are untrusted bytes
 
@@ -152,7 +164,11 @@ or `INVALID_APPLICATION_STATE`) rather than invent a vertical layout.
 defaulting to `Infinity` is documentation"), no `eval`, no native code.
 A malformed table is `UNTRUSTED_INPUT_REJECTED`, not a throw from inside
 wasm that escapes as an opaque trap — the adapter catches wasm faults and
-re-throws `FourError`.
+re-throws `FourError`. A-23's split applies to the two inputs: the font
+*bytes* are content, so bytes over `maximumFontBytes` are also
+`UNTRUSTED_INPUT_REJECTED`; the *option* is application-built, so a
+non-finite or non-positive `maximumFontBytes` is a `RangeError` (§85), the
+same pair `CanvasTexture`'s `maximumBytes` validation draws.
 
 `@fourjs/assets` may grow a font loader later; this RFC does not add one.
 The shaper accepts bytes the application already has. No URL parameter
@@ -189,10 +205,13 @@ checksummed.
 gzip and does not include `@fourjs/text`. The real risk is **ui-demo** and
 any example that imports `four/text`. The identity path must remain the
 default export; the wasm must be absent from every bundle that does not
-name `HarfBuzzShapingEngine` or `four/text/harfbuzz`.
+name `HarfBuzzShapingEngine` or `fourJS/text/harfbuzz`.
 
-Published HarfBuzz-wasm builds are typically hundreds of kilobytes gzip.
-That is acceptable as an **opt-in** and forbidden as a default. The
+Published HarfBuzz-wasm builds are several hundred kilobytes raw and
+roughly 100–200 kB gzip (an estimate from published `harfbuzzjs` builds —
+the packet measures the pinned build and records the number; nothing
+here depends on the estimate). That is acceptable as an **opt-in** and
+forbidden as a default. The
 packet's A/B measurement (below) is a gate, not a hope.
 
 ### 7. What `layoutText` and `Text` gain
@@ -202,6 +221,17 @@ packet's A/B measurement (below) is a gate, not a hope.
 - RTL runs reverse the pen walk per run, not per string.
 - Ligatures occupy one quad and a cluster range.
 - Bit-identical output when no shaper is passed.
+- **Glyph id → quad.** Today's `GlyphAtlas.glyphs` is keyed by character,
+  which a shaper's glyph ids cannot index. `GlyphAtlas` gains an optional
+  `glyphsById: ReadonlyMap<number, GlyphAtlasEntry>`; `buildGlyphAtlas`
+  fills it for the built-in face with **code point as glyph id** (which is
+  exactly the identity shaper's id space), and a shaped glyph whose id is
+  absent falls to `atlas.fallback`, as an unknown character does today. An
+  application shaping with HarfBuzz supplies an atlas whose `glyphsById`
+  was rasterised outside the engine (display content, RFC 0004's rule);
+  engine-side rasterisation of arbitrary fonts stays the deferred SDF /
+  bitmap packet. The first packet's goldens therefore check ids,
+  clusters, advances and quad geometry — never glyph images.
 
 The `Text` node and `Label` do not import the wasm. They accept layout
 output. An application that wants Arabic constructs a
@@ -233,7 +263,9 @@ explicitly *not* the full engine.
 **B. Host-OS / browser shaping (`measureText`, `Intl`, CoreText,
 Uniscribe, DirectWrite).** Nicest visual match to the platform. Rejected:
 not same-runtime portable, not available in the headless suites without
-a DOM or a native addon, and `@fourjs/text` compiles without `lib.dom`.
+a DOM or a native addon, and `@fourjs/text`'s public surface names no
+DOM type (RFC 0004's DOM-free seam rule; the workspace tsconfigs do not
+pin `lib`, so this is a rule the seam keeps, not a compiler guarantee).
 RFC 0004 already refused a DOM-typed paint seam for this reason.
 
 **C. rustybuzz (Rust → wasm) instead of HarfBuzz C → wasm.** rustybuzz
@@ -308,10 +340,11 @@ None run. What the first packet must measure:
 1. **Bundle A/B.** ui-demo and first-2d-scene with and without a
    `HarfBuzzShapingEngine` import. Target: **zero gzip delta** when
    unused; wasm + adapter size reported (not gated) when used.
-2. **Correctness.** Pinned wasm + Roboto (or another OFL face checked
-   into `tests/fixtures`) + `"fi"` / `"لام"` (Arabic lam-alef) goldens
-   for glyph ids, clusters, and advances. Same answers on Node and
-   Chromium.
+2. **Correctness.** Pinned wasm + an OFL face checked into
+   `tests/fixtures/fonts/` (Noto Sans is OFL 1.1; Roboto is Apache-2.0,
+   also acceptable, but is not an OFL face) + `"fi"` / `"لا"` (Arabic
+   lam-alef) goldens for glyph ids, clusters, and advances. Same answers
+   in the Vitest suites and in Chromium (Playwright).
 3. **Init cost.** `WebAssembly.instantiate` time for the pinned build,
    once, so Application startup guides can say whether to lazy-load.
 4. **Layout parity.** Identity shaper vs today's `layoutText` on the
@@ -321,8 +354,8 @@ None run. What the first packet must measure:
 ## Open questions
 
 1. **Subpath vs §98 package for the wasm.** Recommendation: subpath
-   `four/text/harfbuzz` first; amend §98 only if the blob cannot be
-   kept off the default export.
+   `@fourjs/text/harfbuzz` (umbrella `fourJS/text/harfbuzz`) first; amend
+   §98 only if the blob cannot be kept off the default export.
 2. **Which wasm build?** `harfbuzzjs`, rustybuzz-wasm, or a repo-owned
    build. Recommendation: leave to the packet, with the ABI and the
    pin-hash as the acceptance tests. Prefer a build that includes a
@@ -336,3 +369,20 @@ None run. What the first packet must measure:
    Recommendation: yes, optional, default omitted.
 5. **Vertical text.** Interface-ready, implementation refused until a
    dedicated packet. Confirm.
+
+## Review log
+
+- **2026-09-10 — correction pass against the tree** (no decision changed):
+  the umbrella's published specifier is `fourJS/…` (its `package.json`
+  name), so `four/text/harfbuzz` became `@fourjs/text/harfbuzz` /
+  `fourJS/text/harfbuzz`; `layoutText` walks code points (`for…of`), not
+  code units; the shaper hook is a `TextLayoutOptions` field because the
+  function takes an options record; vertical writing is refused with the
+  existing `NOT_IMPLEMENTED` code instead of an invented one; the §96
+  error split (bytes → `UNTRUSTED_INPUT_REJECTED`, option → `RangeError`)
+  is stated; Roboto is Apache-2.0, not OFL, so the golden fixture names
+  Noto Sans; the "no `lib.dom`" claim is restated as a seam rule since no
+  tsconfig pins `lib`; the wasm size estimate is labelled as such.
+  Added §7's glyph-id → quad rule (`GlyphAtlas.glyphsById`, code point as
+  the identity id) — the draft had no way for a shaped glyph to reach an
+  atlas entry.
