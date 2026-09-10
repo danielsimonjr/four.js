@@ -30,6 +30,14 @@ specification; until then, entries are grouped by date under **Unreleased**.
   “owner-gated” struck on closed rows; idle-cache index names both
   backends.
 
+- **Doc-drift follow-up from the same audit.** §96 decompression limits
+  are **partial** in the security guide (`createTextureLoader` bounds;
+  gzip/Draco/Basis still absent). `fields.ts` records radial GPU fields
+  as shipped on `simulation: "gpu"`. Custom-shaders / `NodeMaterial`
+  stop claiming R-17's light-uniform contract is missing; `angle` and
+  the §58 paint tier leave the deferred list. Spec revision **1.15**
+  matches that §60 honesty.
+
 ## Unreleased — RFC 0007–0009 review pass (2026-09-10)
 
 ### Changed

@@ -1205,7 +1205,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       scope + call-site key), conditional variants (a second cache dimension),
       storage buffers (§82, WebGPU), source maps (per-node provenance; the error
       path ships source + driver log); lighting-aware graphs (R-17's light-uniform
-      contract first); alternative E (data-declared custom operators — a follow-up
+      contract exists on lit/standard; node emitters still unlit); alternative E (data-declared custom operators — a follow-up
       RFC; ~~`SHADER_OPERATORS` token~~ **DONE 2026-09-06**); ~~an angle operator
       (unlocks §58's conic gradient)~~ **DONE 2026-09-06** (`angle` +
       `registerShapePaints` conic lowering); ~~the §58 Paint-object tier on `Shape2D`~~ (done 2026-08-29).
@@ -1958,7 +1958,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
 - [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust **runtime** boundary is the closed operator union (shipped); **extensible** data-declared operators remain a follow-up RFC (0001 alternative E — `SHADER_OPERATORS` is the named hook only). **Plugin trust
       boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a
       document; enforced by `tests/integration/plugin-boundary.test.ts`; explicitly not a
-      sandbox. Guide row moved absent → partial
+      sandbox. Guide row **partial** 2026-09-10 (`docs/guides/security-and-untrusted-content.md`: texture-loader bounds; gzip/Draco/Basis still absent)
 - [x] **Regenerate `docs/Architecture/` graph artifacts** (`pnpm graph`) — dependency
       graph + export surfaces are stale for the wave-2 exports (new input/ui/geometry/
       materials/assets/core/serialization/diagnostics surface)
