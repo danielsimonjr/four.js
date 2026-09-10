@@ -2034,8 +2034,9 @@ describe("WebgpuRenderer batching (§65, WP-R1.3)", () => {
     harness.gpu.reset();
     harness.renderer.render(root, [createView()]);
     expect(harness.gpu.countOf("device.createBuffer")).toBe(0);
-    // One uniform upload plus the slot's vertex and index streams.
-    expect(harness.gpu.countOf("queue.writeBuffer")).toBe(3);
+    // Uniforms still rewrite every frame; the slot's vertex and index
+    // streams skip (`contentVersion` unchanged — the still-scene row).
+    expect(harness.gpu.countOf("queue.writeBuffer")).toBe(1);
   });
 
   it("merges a sprite run, tinted and textured at group 1", () => {

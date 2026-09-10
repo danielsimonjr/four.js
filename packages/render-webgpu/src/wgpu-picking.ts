@@ -27,10 +27,14 @@
  *   clip node does not pick as a solid quad. Clipped *content* still
  *   writes an id (scrolled-away list rows can pick — an honest reduction
  *   versus WebGL, which tests the mask bit plane);
- * - **skinned items are skipped** — colour pair behind
- *   `registerSkinningPipeline()`; shadow caster and id pass still absent.
- *   A bind-pose id would be a different silhouette (RFC 0005 residue);
- *   the bounds tier serves them;
+ * - **skinned items draw through a private skinned id pipeline** — the
+ *   §54 deformed silhouette (`skinMatrix()` over a 3072-byte palette
+ *   group, never bind pose). Compiled lazily on the first skinned item;
+ *   compile failure skips, bounds still serve. Lives here, not in
+ *   `wgpu-skinning.ts`: {@link registerPickingPipeline} is what links
+ *   this module, and importing the colour-pair module would pull two
+ *   unused pipelines into every picking bundle. Not a `SkinnedIdProgram`
+ *   class: WebGL already exports that name (`graph:duplicates`);
  * - **particle items write one id for the whole system** — §36's batched
  *   item has one node and no per-particle geometry, so the pass instances
  *   the shared unit quad through a private particle id pipeline (the §36
@@ -73,6 +77,7 @@
 import { DEV, FourError, devWarnOnce } from "@fourjs/core";
 import { Frustum, Matrix4, Rectangle2 } from "@fourjs/math";
 import {
+  MAX_SKINNING_JOINTS,
   PARTICLE_INSTANCE_FLOATS,
   RenderTarget,
   assertEncodableCandidateCount,
@@ -98,6 +103,7 @@ import {
   type GpuDevice,
   type GpuRenderPipeline,
   type GpuTextureView,
+  type GpuVertexBufferLayout,
 } from "./webgpu-device.js";
 import type { WgpuGeometryCache, WgpuGeometryRecord } from "./wgpu-geometry.js";
 import {
@@ -166,6 +172,17 @@ export const PARTICLE_ID_PICK_OFFSET = 192;
  * {@link UNIFORM_STRIDE_BYTES}.
  */
 export const PARTICLE_ID_UNIFORM_BYTES = 208;
+
+/**
+ * Size of the skinned-id palette block in bytes — `MAX_SKINNING_JOINTS` ×
+ * a std140 `mat4` (64 bytes). Already a multiple of the 256-byte dynamic
+ * offset alignment, so the slot *is* the stride. Named apart from the
+ * colour pair's `JOINT_PALETTE_BYTES` (`graph:duplicates`).
+ */
+export const SKINNED_ID_PALETTE_BYTES = MAX_SKINNING_JOINTS * 64;
+
+/** {@link SKINNED_ID_PALETTE_BYTES} in `Float32Array` elements. */
+const SKINNED_ID_PALETTE_FLOATS = SKINNED_ID_PALETTE_BYTES / 4;
 
 /** `UNIFORM_STRIDE_BYTES` in `Float32Array` elements. */
 const UNIFORM_STRIDE_FLOATS = UNIFORM_STRIDE_BYTES / 4;
@@ -236,6 +253,78 @@ fn ${FRAGMENT_ENTRY_POINT}() -> @location(0) vec4<f32> {
 }
 `;
 
+/**
+ * The skinned id pass's WGSL — {@link ID_SHADER_SOURCE}'s product with
+ * `skinMatrix()` spliced into the vertex stage and a 3072-byte palette at
+ * group 1. Joints `@location(4)` `uint16x4`, weights `@location(5)`
+ * `float32x4`; LBS, weights not renormalised — the colour pair's contract,
+ * restated so this module never imports `wgpu-skinning.ts`. Compiled lazily
+ * on the first skinned item. Kept private on the service (WebGL already
+ * exports `SkinnedIdProgram`).
+ */
+export const SKINNED_ID_SHADER_SOURCE = `struct IdUniforms {
+  viewProjection : mat4x4<f32>,
+  model : mat4x4<f32>,
+  pickId : vec4<f32>,
+};
+
+struct JointPalette {
+  jointMatrices : array<mat4x4<f32>, ${String(MAX_SKINNING_JOINTS)}>,
+};
+
+@group(0) @binding(0) var<uniform> id : IdUniforms;
+@group(1) @binding(0) var<uniform> palette : JointPalette;
+
+fn skinMatrix(joints : vec4<u32>, weights : vec4<f32>) -> mat4x4<f32> {
+  return weights.x * palette.jointMatrices[joints.x]
+       + weights.y * palette.jointMatrices[joints.y]
+       + weights.z * palette.jointMatrices[joints.z]
+       + weights.w * palette.jointMatrices[joints.w];
+}
+
+@vertex
+fn ${VERTEX_ENTRY_POINT}(
+  @location(0) position : vec3<f32>,
+  @location(4) joints : vec4<u32>,
+  @location(5) weights : vec4<f32>,
+) -> @builtin(position) vec4<f32> {
+  let clip = id.viewProjection * id.model * (skinMatrix(joints, weights) * vec4<f32>(position, 1.0));
+  // WebGL clip depth [-w, w] onto WebGPU's [0, w]; see wgpu-unlit.ts.
+  return vec4<f32>(clip.x, clip.y, (clip.z + clip.w) * 0.5, clip.w);
+}
+
+@fragment
+fn ${FRAGMENT_ENTRY_POINT}() -> @location(0) vec4<f32> {
+  return id.pickId;
+}
+`;
+
+/** Vertex layout for the joint stream: one tightly packed `uint16x4`. */
+const SKINNED_ID_JOINTS_LAYOUT: GpuVertexBufferLayout = Object.freeze({
+  arrayStride: 8,
+  stepMode: "vertex",
+  attributes: Object.freeze([
+    Object.freeze({
+      format: "uint16x4",
+      offset: 0,
+      shaderLocation: 4,
+    }),
+  ]),
+});
+
+/** Vertex layout for the weight stream: one tightly packed `vec4<f32>`. */
+const SKINNED_ID_WEIGHTS_LAYOUT: GpuVertexBufferLayout = Object.freeze({
+  arrayStride: 16,
+  stepMode: "vertex",
+  attributes: Object.freeze([
+    Object.freeze({
+      format: "float32x4",
+      offset: 0,
+      shaderLocation: 5,
+    }),
+  ]),
+});
+
 /** One pass's resolved viewport rectangle, in target pixels (§7a, bottom-left). */
 interface PassRect {
   x: number;
@@ -249,6 +338,12 @@ interface PackedDraw {
   readonly geometry: WgpuGeometryRecord;
   readonly model: Matrix4;
   readonly tableIndex: number;
+  /**
+   * The skeleton's palette when this is a skinned silhouette; `null` for
+   * an ordinary mesh. The id uniforms stay the 144-byte block either way
+   * — the palette is a second bind group, the colour pair's shape.
+   */
+  readonly palette: Float32Array | null;
 }
 
 /** One §36 emitter the particle id arm will instance. */
@@ -351,11 +446,30 @@ export class WebgpuPickingService implements PickingService {
 
   #particleUniformCapacity = 0;
 
+  /**
+   * The skinned id pipeline — compiled on the first skinned item of an
+   * era, never at construction. `null` until then.
+   */
+  #skinnedPipeline: GpuRenderPipeline | null = null;
+
+  #skinnedPaletteLayout: GpuBindGroupLayout | null = null;
+
+  #skinnedPaletteBuffer: GpuBuffer | null = null;
+
+  #skinnedPaletteBindGroup: GpuBindGroup | null = null;
+
+  #skinnedPaletteStaging = new Float32Array(0);
+
+  #skinnedPaletteCapacity = 0;
+
   /** Latched per era — a driver that refused last era is asked once more. */
   #pipelineFailed = false;
 
   /** Latched per era, same discipline as `#pipelineFailed`. */
   #particlePipelineFailed = false;
+
+  /** Latched per era, same discipline as `#pipelineFailed`. */
+  #skinnedPipelineFailed = false;
 
   /** The cache era `#pipeline` was compiled in. */
   #pipelineEra: WgpuGeometryCache | null = null;
@@ -483,9 +597,6 @@ export class WebgpuPickingService implements PickingService {
     const particleCache = host.particles();
     for (let index = 0; index < viewItems.length; index += 1) {
       const item = viewItems[index];
-      if (item.kind === "skinned-unlit" || item.kind === "skinned-lit") {
-        continue;
-      }
       const maskPass = item.clip?.maskPass === true;
       if (maskPass) {
         continue;
@@ -534,6 +645,32 @@ export class WebgpuPickingService implements PickingService {
         });
         continue;
       }
+      const isSkinned =
+        item.kind === "skinned-unlit" || item.kind === "skinned-lit";
+      if (isSkinned) {
+        const skinnedCompiled = this.#acquireSkinnedPipeline(
+          device,
+          geometries,
+        );
+        if (skinnedCompiled === null) {
+          continue;
+        }
+        const geometry = geometries.acquire(item.geometry, false, true);
+        if (
+          geometry === null ||
+          geometry.jointBuffer === null ||
+          geometry.weightBuffer === null
+        ) {
+          continue;
+        }
+        packedDraws.push({
+          geometry,
+          model: item.worldMatrix,
+          tableIndex: joined,
+          palette: item.jointMatrices,
+        });
+        continue;
+      }
       const geometry = geometries.acquire(item.geometry);
       if (geometry === null) {
         continue;
@@ -542,6 +679,7 @@ export class WebgpuPickingService implements PickingService {
         geometry,
         model: item.worldMatrix,
         tableIndex: joined,
+        palette: null,
       });
     }
 
@@ -695,6 +833,7 @@ export class WebgpuPickingService implements PickingService {
     if (live && host.geometries() === this.#pipelineEra) {
       this.#uniformBuffer?.destroy();
       this.#particleUniformBuffer?.destroy();
+      this.#skinnedPaletteBuffer?.destroy();
     }
     this.#uniformBuffer = null;
     this.#bindGroup = null;
@@ -708,6 +847,12 @@ export class WebgpuPickingService implements PickingService {
     this.#particleBindGroupLayout = null;
     this.#particleUniformStaging = new Float32Array(0);
     this.#particleUniformCapacity = 0;
+    this.#skinnedPaletteBuffer = null;
+    this.#skinnedPaletteBindGroup = null;
+    this.#skinnedPipeline = null;
+    this.#skinnedPaletteLayout = null;
+    this.#skinnedPaletteStaging = new Float32Array(0);
+    this.#skinnedPaletteCapacity = 0;
     const target = this.#target;
     if (target !== null) {
       target.dispose();
@@ -740,6 +885,12 @@ export class WebgpuPickingService implements PickingService {
       this.#particleUniformBuffer = null;
       this.#particleUniformCapacity = 0;
       this.#particlePipelineFailed = false;
+      this.#skinnedPipeline = null;
+      this.#skinnedPaletteLayout = null;
+      this.#skinnedPaletteBindGroup = null;
+      this.#skinnedPaletteBuffer = null;
+      this.#skinnedPaletteCapacity = 0;
+      this.#skinnedPipelineFailed = false;
       this.#pipelineEra = era;
     }
     if (this.#pipeline !== null && this.#bindGroupLayout !== null) {
@@ -912,6 +1063,109 @@ export class WebgpuPickingService implements PickingService {
   }
 
   /**
+   * The compiled skinned id pipeline for this era, or `null`. Compiled on
+   * the first skinned item, never at construction — a scene that registers
+   * picking and never submits a skinned mesh issues the mesh id pipeline
+   * only, and never links `wgpu-skinning.ts`. Not a `SkinnedIdProgram`
+   * class: WebGL already exports that name.
+   */
+  #acquireSkinnedPipeline(
+    device: GpuDevice,
+    era: WgpuGeometryCache,
+  ): { pipeline: GpuRenderPipeline; layout: GpuBindGroupLayout } | null {
+    if (this.#pipelineEra !== era) {
+      this.#skinnedPipeline = null;
+      this.#skinnedPaletteLayout = null;
+      this.#skinnedPaletteBindGroup = null;
+      this.#skinnedPaletteBuffer = null;
+      this.#skinnedPaletteCapacity = 0;
+      this.#skinnedPipelineFailed = false;
+    }
+    if (
+      this.#skinnedPipeline !== null &&
+      this.#skinnedPaletteLayout !== null &&
+      this.#bindGroupLayout !== null
+    ) {
+      return {
+        pipeline: this.#skinnedPipeline,
+        layout: this.#skinnedPaletteLayout,
+      };
+    }
+    if (this.#skinnedPipelineFailed || this.#bindGroupLayout === null) {
+      return null;
+    }
+    try {
+      const paletteLayout = device.createBindGroupLayout({
+        label: "fourJS:pick-skinned-id-palette",
+        entries: [
+          {
+            binding: 0,
+            visibility: GPU_SHADER_STAGE.VERTEX,
+            buffer: {
+              type: "uniform",
+              hasDynamicOffset: true,
+              minBindingSize: SKINNED_ID_PALETTE_BYTES,
+            },
+          },
+        ],
+      });
+      const pipelineLayout = device.createPipelineLayout({
+        label: "fourJS:pick-skinned-id-layout",
+        bindGroupLayouts: [this.#bindGroupLayout, paletteLayout],
+      });
+      const module = device.createShaderModule({
+        label: "fourJS:pick-skinned-id",
+        code: SKINNED_ID_SHADER_SOURCE,
+      });
+      const pipeline = device.createRenderPipeline({
+        label: "fourJS:pick-skinned-id",
+        layout: pipelineLayout,
+        vertex: {
+          module,
+          entryPoint: VERTEX_ENTRY_POINT,
+          buffers: [
+            POSITION_BUFFER_LAYOUT,
+            SKINNED_ID_JOINTS_LAYOUT,
+            SKINNED_ID_WEIGHTS_LAYOUT,
+          ],
+        },
+        fragment: {
+          module,
+          entryPoint: FRAGMENT_ENTRY_POINT,
+          targets: [
+            {
+              format: RENDER_TARGET_COLOR_FORMAT,
+              writeMask: COLOR_WRITE_ALL,
+            },
+          ],
+        },
+        primitive: {
+          topology: "triangle-list",
+        },
+        depthStencil: {
+          format: RENDER_TARGET_DEPTH_FORMAT,
+          depthWriteEnabled: true,
+          depthCompare: "less",
+        },
+      });
+      this.#skinnedPaletteLayout = paletteLayout;
+      this.#skinnedPipeline = pipeline;
+      return { pipeline, layout: paletteLayout };
+    } catch (error: unknown) {
+      this.#skinnedPipelineFailed = true;
+      if (DEV) {
+        devWarnOnce(
+          "webgpu-picking-skinned-compile-failed",
+          "§71: the skinned picking id pipeline failed to compile on this " +
+            "device; skinned id draws are skipped (§61, §89). " +
+            `${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
    * Packs one id block per draw, records the pass, and submits. Starts from
    * a cleared id target (loadOp clear — this buffer is never composited, so
    * a whole-attachment clear *is* "nothing there"). Particle emitters are
@@ -950,6 +1204,42 @@ export class WebgpuPickingService implements PickingService {
         staging[idBase + 3] = idScratch[3];
       }
       const buffer = this.#uniformBuffer;
+      if (buffer !== null) {
+        device.queue.writeBuffer(buffer, 0, staging);
+      }
+    }
+
+    let skinnedCount = 0;
+    for (let index = 0; index < draws.length; index += 1) {
+      if (draws[index].palette !== null) {
+        skinnedCount += 1;
+      }
+    }
+    if (skinnedCount > 0 && this.#skinnedPaletteLayout !== null) {
+      this.#growSkinnedPalette(
+        device,
+        this.#skinnedPaletteLayout,
+        skinnedCount,
+      );
+      const staging = this.#skinnedPaletteStaging;
+      let packed = 0;
+      for (let index = 0; index < draws.length; index += 1) {
+        const palette = draws[index].palette;
+        if (palette === null) {
+          continue;
+        }
+        const base = packed * SKINNED_ID_PALETTE_FLOATS;
+        const limit = Math.min(palette.length, SKINNED_ID_PALETTE_FLOATS);
+        for (
+          let element = 0;
+          element < SKINNED_ID_PALETTE_FLOATS;
+          element += 1
+        ) {
+          staging[base + element] = element < limit ? palette[element] : 0;
+        }
+        packed += 1;
+      }
+      const buffer = this.#skinnedPaletteBuffer;
       if (buffer !== null) {
         device.queue.writeBuffer(buffer, 0, staging);
       }
@@ -1012,12 +1302,43 @@ export class WebgpuPickingService implements PickingService {
     pass.setScissorRect(rect.x, top, rect.width, rect.height);
 
     const bindGroup = this.#bindGroup;
+    const skinnedPipeline = this.#skinnedPipeline;
+    const skinnedPaletteGroup = this.#skinnedPaletteBindGroup;
     if (draws.length > 0 && bindGroup !== null) {
+      let activeKind: "id" | "skinned" = "id";
       pass.setPipeline(pipeline);
+      let paletteSlot = 0;
       for (let index = 0; index < draws.length; index += 1) {
-        const geometry = draws[index].geometry;
+        const draw = draws[index];
+        const geometry = draw.geometry;
+        const skinned = draw.palette !== null;
+        if (skinned && activeKind !== "skinned") {
+          if (skinnedPipeline === null || skinnedPaletteGroup === null) {
+            continue;
+          }
+          pass.setPipeline(skinnedPipeline);
+          activeKind = "skinned";
+        } else if (!skinned && activeKind !== "id") {
+          pass.setPipeline(pipeline);
+          activeKind = "id";
+        }
         pass.setBindGroup(0, bindGroup, [index * UNIFORM_STRIDE_BYTES]);
-        pass.setVertexBuffer(0, geometry.positionBuffer);
+        if (skinned && skinnedPaletteGroup !== null) {
+          pass.setBindGroup(1, skinnedPaletteGroup, [
+            paletteSlot * SKINNED_ID_PALETTE_BYTES,
+          ]);
+          paletteSlot += 1;
+          const joints = geometry.jointBuffer;
+          const weights = geometry.weightBuffer;
+          if (joints === null || weights === null) {
+            continue;
+          }
+          pass.setVertexBuffer(0, geometry.positionBuffer);
+          pass.setVertexBuffer(1, joints);
+          pass.setVertexBuffer(2, weights);
+        } else {
+          pass.setVertexBuffer(0, geometry.positionBuffer);
+        }
         if (geometry.indexBuffer !== null && geometry.indexFormat !== null) {
           pass.setIndexBuffer(geometry.indexBuffer, geometry.indexFormat);
           pass.drawIndexed(geometry.count);
@@ -1109,6 +1430,38 @@ export class WebgpuPickingService implements PickingService {
         {
           binding: 0,
           resource: { buffer, offset: 0, size: PARTICLE_ID_UNIFORM_BYTES },
+        },
+      ],
+    });
+  }
+
+  #growSkinnedPalette(
+    device: GpuDevice,
+    layout: GpuBindGroupLayout,
+    blocks: number,
+  ): void {
+    if (blocks <= this.#skinnedPaletteCapacity) {
+      return;
+    }
+    const capacity = Math.max(blocks, this.#skinnedPaletteCapacity * 2);
+    this.#skinnedPaletteBuffer?.destroy();
+    const buffer = device.createBuffer({
+      label: "fourJS:pick-skinned-id-palette",
+      size: capacity * SKINNED_ID_PALETTE_BYTES,
+      usage: GPU_BUFFER_USAGE.UNIFORM | GPU_BUFFER_USAGE.COPY_DST,
+    });
+    this.#skinnedPaletteBuffer = buffer;
+    this.#skinnedPaletteStaging = new Float32Array(
+      capacity * SKINNED_ID_PALETTE_FLOATS,
+    );
+    this.#skinnedPaletteCapacity = capacity;
+    this.#skinnedPaletteBindGroup = device.createBindGroup({
+      label: "fourJS:pick-skinned-id-palette",
+      layout,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer, offset: 0, size: SKINNED_ID_PALETTE_BYTES },
         },
       ],
     });

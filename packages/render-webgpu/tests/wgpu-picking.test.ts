@@ -33,6 +33,8 @@ import {
   ID_SHADER_SOURCE,
   PARTICLE_ID_PICK_OFFSET,
   PARTICLE_ID_SHADER_SOURCE,
+  SKINNED_ID_PALETTE_BYTES,
+  SKINNED_ID_SHADER_SOURCE,
   UNIFORM_STRIDE_BYTES,
   WebgpuPickingService,
   WebgpuRenderer,
@@ -129,6 +131,23 @@ function drawable(
   material: PickMaterial | PickSpriteMaterial = new PickMaterial(),
 ): Renderable {
   return new Renderable(geometry.asGeometry, material.asMaterial);
+}
+
+function skinnedDrawable(palette = new Float32Array(16)): Renderable {
+  const geometry = triangleGeometry();
+  geometry.joints = new Uint16Array(12);
+  geometry.weights = new Float32Array(12);
+  const mesh = drawable(geometry);
+  Object.assign(mesh, {
+    skeleton: {
+      bones: [{}],
+      jointMatrices: palette,
+      update(): void {
+        // palette refreshed elsewhere
+      },
+    },
+  });
+  return mesh;
 }
 
 /**
@@ -403,6 +422,14 @@ function particleIdUploads(gpu: RecordingGpu): number[][] {
   return idsFromStaging(data, PARTICLE_ID_PICK_OFFSET, particleDraws);
 }
 
+function paletteUploads(gpu: RecordingGpu): number[][] {
+  const writes = uniformWritesBeforePass(gpu);
+  const paletteFloats = SKINNED_ID_PALETTE_BYTES / 4;
+  return writes.filter(
+    (data) => data.length % paletteFloats === 0 && data.length >= paletteFloats,
+  );
+}
+
 function expectedIdUpload(index: number): number[] {
   const encoded = new Float32Array(4);
   encodePickId(index, encoded);
@@ -553,22 +580,12 @@ describe("WebgpuPickingService.update — the id pass", () => {
     expect(gpu.countOf("pass.draw")).toBe(1);
   });
 
-  it("skips skinned items and draws particles with one id per emitter", () => {
+  it("draws a skinned mesh through the skinned id pipeline, not bind pose", () => {
     const { gpu, service, view } = createRig();
     const emitter = particleEmitter(3);
-    const skinnedGeometry = triangleGeometry();
-    skinnedGeometry.joints = new Uint16Array(12);
-    skinnedGeometry.weights = new Float32Array(12);
-    const skinned = drawable(skinnedGeometry);
-    Object.assign(skinned, {
-      skeleton: {
-        bones: [{}],
-        jointMatrices: new Float32Array(16),
-        update(): void {
-          // palette refreshed elsewhere
-        },
-      },
-    });
+    const palette = new Float32Array(16);
+    palette[5] = 3;
+    const skinned = skinnedDrawable(palette);
     const plain = drawable();
     const root = {
       visible: true,
@@ -578,14 +595,64 @@ describe("WebgpuPickingService.update — the id pass", () => {
     type PickRoot = Parameters<PickingService["update"]>[0];
 
     service.update(root as unknown as PickRoot, view);
-    // Traversal table: emitter 0, skinned 1, plain 2. Skinned stays in the
-    // table but is never drawn. Particles instance the live quads; the
-    // plain drawable is the one non-instanced `pass.draw`.
+    // Traversal table: emitter 0, skinned 1, plain 2. Skinned draws through
+    // the deformed silhouette; particles instance the live quads; the
+    // plain drawable is the other non-instanced `pass.draw`.
     expect(particleDrawCount(gpu)).toBe(1);
-    expect(meshDrawCount(gpu)).toBe(1);
+    expect(meshDrawCount(gpu)).toBe(2);
     expect(gpu.countOf("pass.drawIndexed")).toBe(0);
     expect(particleIdUploads(gpu)).toEqual([expectedIdUpload(0)]);
-    expect(idUploads(gpu)).toEqual([expectedIdUpload(2)]);
+    expect(idUploads(gpu)).toEqual([expectedIdUpload(1), expectedIdUpload(2)]);
+
+    const sources = gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => (call.args[0] as { code: string }).code);
+    expect(sources).toContain(SKINNED_ID_SHADER_SOURCE);
+    expect(SKINNED_ID_SHADER_SOURCE).toContain("skinMatrix(");
+    expect(SKINNED_ID_SHADER_SOURCE).toContain("jointMatrices");
+    expect(SKINNED_ID_SHADER_SOURCE).toContain("return id.pickId;");
+
+    const palettes = paletteUploads(gpu);
+    expect(palettes).toHaveLength(1);
+    expect(palettes[0].slice(0, 16)).toEqual(Array.from(palette));
+
+    service.update(root as unknown as PickRoot, view);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(3);
+    expect(meshDrawCount(gpu)).toBe(4);
+  });
+
+  it("latches a skinned-pipeline compile failure and still draws meshes", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {
+      // silenced
+    });
+    try {
+      const { gpu, service, state, view } = createRig();
+      const raw = state.device as GpuDevice;
+      state.device = {
+        ...raw,
+        createRenderPipeline(descriptor) {
+          const label = (descriptor as { label?: string }).label;
+          if (label === "fourJS:pick-skinned-id") {
+            throw new Error("skinned id refused");
+          }
+          return raw.createRenderPipeline(descriptor);
+        },
+      };
+      type PickRoot = Parameters<PickingService["update"]>[0];
+      const skinned = skinnedDrawable();
+      const plain = drawable();
+      const root = {
+        visible: true,
+        enabled: true,
+        children: [skinned, plain] as unknown[],
+      };
+      service.update(root as unknown as PickRoot, view);
+      service.update(root as unknown as PickRoot, view);
+      expect(meshDrawCount(gpu)).toBe(2);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("instances a particle system with one id for the whole emitter", () => {

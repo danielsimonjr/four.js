@@ -30,6 +30,22 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-10 — Open-TODO audit: 11 still open, 260 closed.** A
+  subagent-team review of every `- [ ]` row against source. Closed
+  **RFC 0005 residue**: WebGPU skinned id pass (`wgpu-picking.ts`,
+  private pipeline, `skinMatrix()` + 3072-byte palette group at bind
+  group 1, fail-once skip, never bind-pose). Same-day slice on the
+  still-open batching row: WebGPU idle-skip (`WgpuBatching.#canSkipUpload`,
+  per-slot `contentVersion`; `0` always uploads). The other 11 cannot
+  close: dogfood is standing; first publish is owner-gated (no git tag,
+  nothing on npm); R-33 still needs non-SwiftShader; RFC 0001/0003/0004,
+  lighting, R-1 deferred, batching, R-30c, and §96 each still have named
+  remaining slices (GPU morph / CPU skinning / bone-texture / WebGPU
+  skinned shadow; cube/array/3D and compressed/video/async; extra
+  directionals / cascades / PBR rest). TypeDoc/`typescript@6.0.3`
+  isolation stays in Priority-index tier 4, not a new checkbox. RFC
+  0007/0008/0009 stay Proposed. Do not re-triage the 11 as quick wins.
+
 - **2026-09-09 — Open-TODO audit: 12 still open, 257 closed.** A
   subagent-team review of every `- [ ]` row against source. None of the 12
   packets can close: dogfood is standing; first publish is owner-gated

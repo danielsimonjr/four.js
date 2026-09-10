@@ -47,6 +47,7 @@ function batch(
     indexCount: number;
     stagingFloats: number;
     stagingIndices: number;
+    contentVersion: number;
   }> = {},
 ): RenderBatch {
   const vertexCount = overrides.vertexCount ?? 4;
@@ -70,6 +71,7 @@ function batch(
       overrides.stagingFloats ?? vertexCount * floatsPerVertex,
     ),
     indices: new Uint32Array(overrides.stagingIndices ?? indexCount),
+    contentVersion: overrides.contentVersion,
   };
 }
 
@@ -137,8 +139,30 @@ describe("WgpuBatching.draw — slots, growth, devices", () => {
     batching.beginFrame();
     batching.draw(device, pass, batch());
     batching.draw(device, pass, batch());
-    // Frame 2: the same pairs, no allocation at all.
+    // Frame 2: the same pairs, no allocation at all. Hand-built batches
+    // omit contentVersion, so they still re-upload (the still-scene skip
+    // needs a non-zero planner stamp).
     expect(gpu.countOf("device.createBuffer")).toBe(4);
+    expect(gpu.countOf("queue.writeBuffer")).toBe(8);
+  });
+
+  it("skips writeBuffer on a still scene whose contentVersion did not move", () => {
+    const { gpu, device, pass } = rig();
+    const batching = new WgpuBatching();
+    const still = batch({ contentVersion: 7 });
+
+    batching.beginFrame();
+    batching.draw(device, pass, still);
+    expect(gpu.countOf("queue.writeBuffer")).toBe(2);
+
+    batching.beginFrame();
+    batching.draw(device, pass, still);
+    expect(gpu.countOf("queue.writeBuffer")).toBe(2);
+    expect(gpu.countOf("pass.drawIndexed")).toBe(2);
+
+    batching.beginFrame();
+    batching.draw(device, pass, batch({ contentVersion: 8 }));
+    expect(gpu.countOf("queue.writeBuffer")).toBe(4);
   });
 
   it("uploads exactly the used floats and indices, not the staging arrays", () => {
