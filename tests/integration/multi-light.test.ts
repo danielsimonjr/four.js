@@ -539,7 +539,7 @@ describe("hemisphere light (§68)", () => {
       serial += 1;
       if (
         call.name === "getUniformLocation" &&
-        String(call.args[1]).includes("emisphere")
+        String(call.args[1]).toLowerCase().includes("hemisphere")
       ) {
         handles.push(JSON.stringify({ kind: "getUniformLocation", serial }));
       }
