@@ -27,7 +27,7 @@
  * `baseURL`), `physics-playground` on 4174, `mechanism` on 4175 and `blending`
  * on 4176. {@link BLENDING_URL} restates that port for the reason the scene
  * constants below are restated rather than imported — see "Method notes". Run
- * `pnpm blending:build` before `pnpm test:browser`, or the preview server has no
+ * `bun run blending:build` before `bun run test:browser`, or the preview server has no
  * `dist` to serve.
  *
  * ## What is measured, and against what

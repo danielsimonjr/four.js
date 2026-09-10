@@ -165,7 +165,7 @@ examples:
 | particles-demo | 23.56 kB    | 23.04 kB   | 0.52 kB |
 | ui-demo        | 30.96 kB    | 30.46 kB   | 0.50 kB |
 
-(gzip, `pnpm run size`. The flagship is unchanged at 1.54 MB — its payload is
+(gzip, `bun run size`. The flagship is unchanged at 1.54 MB — its payload is
 Rapier's two wasm images, which dwarf half a kilobyte.)
 
 Three things go, and they are all things only an author reads:
@@ -276,7 +276,7 @@ reveal.
   reaching for a profiler, and keep `benchmarks/` as the model for a fair
   headless measurement.
 - **Ship a production build** (§85): `define: { __FOUR_DEV__: "false" }`, which
-  is what the examples do and what `pnpm run size` measures.
+  is what the examples do and what `bun run size` measures.
 
 ## Cross-references
 

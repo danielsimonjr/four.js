@@ -23,7 +23,7 @@
  * `playwright.config.ts` serves the built example on {@link CHARACTER_URL}'s
  * port; the port is restated here for the reason every sibling spec gives — a
  * browser gate checks the built page from the outside. Run
- * `pnpm character:build` before `pnpm test:browser`, or the preview server has
+ * `bun run character:build` before `bun run test:browser`, or the preview server has
  * no `dist` to serve.
  *
  * ## What is measured, and against what

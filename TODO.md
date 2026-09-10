@@ -2220,8 +2220,16 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       added 2026-09-06 (no-ops without pandoc). Does not replace the archived
       pre-1.0 PDF.
 
-- [ ] **Record hygiene from the 2026-09-10 RFC audit** (tree text the accepted
-      RFCs' corrections exposed; none is code): RFC 0005 has no spec amendments
+- [ ] **`benchmarks/pick-latency.mjs` is broken against the current `dist`**
+      (found 2026-09-10 while re-recording its caveat): `TypeError:
+      host.particleBatches is not a function` at HEAD after `bun run build`.
+      The 2026-09-09 record predates whatever renamed that host member; the
+      caveat string was aligned by hand and the script needs re-pointing at
+      the renderer's current particle-batch accessor, then a re-run.
+- [x] **Record hygiene from the 2026-09-10 RFC audit — DONE 2026-09-10** (same
+      day; all items below applied except the owner-gated RFC 0005 spec row,
+      which was added as revision 1.15 recording the shipped form). Original
+      list (tree text the accepted RFCs' corrections exposed; none is code): RFC 0005 has no spec amendments
       row (owner: add §71/§79/§86 row or record "not amended"); spec revision
       1.14 and §91 still say ESLint (Oxlint since the TS 7 move); `pnpm`
       leftovers in `benchmarks/README.md`, `benchmarks/harness.mjs`,

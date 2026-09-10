@@ -164,5 +164,5 @@
   "hostCpuModel": "Intel(R) Xeon(R) Processor",
   "hostCpuCount": 4,
   "hostTotalMemoryGb": 15.6,
-  "hostCaveat": "CI container, no WebGL 2, no GPU. Id-pass and pick numbers are the service plus a counting GL seam, not driver or GPU time. WebGPU has no PickingService (mapAsync pick path does not exist)."
+  "hostCaveat": "CI container, no WebGL 2, no GPU. Id-pass and pick numbers are the service plus a counting GL seam, not driver or GPU time. WebGPU's PickingService (mapAsync, 2026-09-09) is not exercised here: no WebGPU device in this container. (Caveat text aligned by hand 2026-09-10; the script could not be re-run — see TODO.)"
 }

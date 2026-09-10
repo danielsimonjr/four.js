@@ -39,8 +39,8 @@
  * `baseURL`), `physics-playground` on 4174, `mechanism` on 4175, `blending` on
  * 4176 and `particles-demo` on 4177. {@link PARTICLES_URL} restates that port
  * for the reason the scene constants below are restated rather than imported —
- * see "Method notes". Run `pnpm particles-demo:build` before
- * `pnpm test:browser`, or the preview server has no `dist` to serve.
+ * see "Method notes". Run `bun run particles-demo:build` before
+ * `bun run test:browser`, or the preview server has no `dist` to serve.
  *
  * The site is deliberately the cheap tier: no physics package, therefore no
  * WebAssembly image, ~19 kB gzip of JavaScript. Plan §6h weighed a fifth

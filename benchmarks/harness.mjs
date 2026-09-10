@@ -3,7 +3,7 @@
  * P11-4, WP-11.4).
  *
  * ```sh
- * pnpm run build               # every script here imports the built dist
+ * bun run build               # every script here imports the built dist
  * node benchmarks/harness.mjs  # prints the suite index and how to run it
  * ```
  *
@@ -411,11 +411,11 @@ function usage() {
     "",
     "  Build first — every script imports the built dist, not src:",
     "",
-    "    pnpm run build",
+    "    bun run build",
     "",
     "  Then run the whole suite,",
     "",
-    "    pnpm bench                 # node benchmarks/run-all.mjs",
+    "    bun run bench                 # node benchmarks/run-all.mjs",
     "",
     "  or one script at a time:",
     "",

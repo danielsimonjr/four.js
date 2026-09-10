@@ -35,8 +35,8 @@
  * `playwright.config.ts` runs one `vite preview` per built example;
  * `first-3d-scene` is the seventh, on port 4179. {@link SCENE_3D_URL} restates
  * that port for the reason the scene constants below are restated rather than
- * imported — see "Method notes". Run `pnpm examples:build` (or
- * `pnpm first-3d-scene:build`) before `pnpm test:browser`, or the preview server
+ * imported — see "Method notes". Run `bun run examples:build` (or
+ * `bun run first-3d-scene:build`) before `bun run test:browser`, or the preview server
  * has no `dist` to serve.
  *
  * ## Method notes

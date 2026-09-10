@@ -100,6 +100,17 @@ specification; until then, entries are grouped by date under **Unreleased**.
   (all eleven exist since 2026-09-06) or that the umbrella declares them.
 - **RFC 0009** — no longer calls RFC 0005 "closed" (implemented; one residue open).
 
+- **Record hygiene applied.** Spec revision 1.15 (§71 gains RFC 0005's shipped
+  form, which never had a row; §91 ESLint → Oxlint); `pnpm` command leftovers
+  replaced by `bun run` across READMEs, benchmark scripts, test and example
+  comments (dated audit/gap-analysis documents left as written); COMPATIBILITY §1
+  now says `bun@1.4.2`; stale comments fixed in `renderer.ts` (WebGPU skinned
+  status; the picking service does not read through `readPixels`), `raster.ts`
+  ("no lib.dom" → seam rule), `core/src/index.ts` (token homes); MEMORY's Bun
+  floor and WebGPU-skinning lines; `pick-latency` caveat text.
+- **Found:** `benchmarks/pick-latency.mjs` fails at HEAD against the current
+  `dist` (`host.particleBatches is not a function`); tracked in TODO.
+
 ### Added
 
 - `docs/plans/RFC-0001-RESIDUE_PLAN.md`, `RFC-0003-RESIDUE_PLAN.md`,

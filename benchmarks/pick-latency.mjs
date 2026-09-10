@@ -565,7 +565,7 @@ const r8Largest = passRows.find((row) => row.nodes === 100000);
 const host = hostRecord();
 const hostCaveat =
   hostGpu.webgl2 === false
-    ? "CI container, no WebGL 2, no GPU. Id-pass and pick numbers are the service plus a counting GL seam, not driver or GPU time. WebGPU has no PickingService (mapAsync pick path does not exist)."
+    ? "CI container, no WebGL 2, no GPU. Id-pass and pick numbers are the service plus a counting GL seam, not driver or GPU time. WebGPU's PickingService (mapAsync, 2026-09-09) is not exercised here: no WebGPU device in this container."
     : hostGpu.fenceEntryPoints
       ? "WebGL 2 is present; fence entry points are present. Numbers still include this process's wall clock around the public API, not a GPU timer query."
       : "WebGL 2 is present without the fence group; only the stalling readPixels path exists on this host.";

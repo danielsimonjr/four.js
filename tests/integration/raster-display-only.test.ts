@@ -35,7 +35,7 @@
  * not named by a scene document, and `CanvasTexture` accepts no URL and no
  * module specifier — RFC 0002's plugin rule in a second place, asserted here
  * the same two ways: `@ts-expect-error` that the constructor admits no string
- * (`pnpm typecheck:tests` runs it), and the scan's guarantee that neither
+ * (`bun run typecheck:tests` runs it), and the scan's guarantee that neither
  * `@fourjs/serialization` nor `@fourjs/assets` — the two packages that touch
  * §96's untrusted content — can reach the raster module at all. §77a's "no
  * §79 representation" is what makes the second half true by construction: a
@@ -155,7 +155,7 @@ describe("§96: untrusted content can never become a paint source", () => {
   it("admits no string and no URL where a RasterSource is expected", () => {
     // @ts-expect-error §96: a module specifier is not a raster source, and the
     // type system is where that is enforced — never a runtime check somebody
-    // forgets. (`pnpm typecheck:tests` is what runs this assertion.)
+    // forgets. (`bun run typecheck:tests` is what runs this assertion.)
     expect(() => new CanvasTexture("@vendor/minimap")).toThrow(RangeError);
     // A URL is a string with a parser in front of it, and so is anything a
     // §79 document could carry.

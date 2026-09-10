@@ -26,7 +26,7 @@
  * `baseURL`), `physics-playground` on 4174 and `mechanism` on 4175.
  * {@link MECHANISM_URL} restates that port for the reason the scene constants
  * below are restated rather than imported — see "Method notes". Run
- * `pnpm mechanism:build` before `pnpm test:browser`, or the preview server has
+ * `bun run mechanism:build` before `bun run test:browser`, or the preview server has
  * no `dist` to serve.
  *
  * ## What is measured, and against what

@@ -83,7 +83,7 @@ engineering judgement with no gate behind it.
 | Target                                    | Status             | What backs the claim                                                                                                                                                                                                                                                                           |
 | ----------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Node >= 20                                | verified           | Root `engines.node`. The unit suites, `tests/integration`, `tests/determinism` and every `tools/` script run here, headless and with no GPU.                                                                                                                                                   |
-| Headless Chromium, ANGLE over SwiftShader | verified           | `playwright.config.ts` launches with `--use-gl=angle --use-angle=swiftshader` and drives six built example sites (`pnpm test:browser`); the `visual` project additionally compares committed SwiftShader goldens.                                                                              |
+| Headless Chromium, ANGLE over SwiftShader | verified           | `playwright.config.ts` launches with `--use-gl=angle --use-angle=swiftshader` and drives six built example sites (`bun run test:browser`); the `visual` project additionally compares committed SwiftShader goldens.                                                                              |
 | Chromium on a real GPU                    | expected           | The same code path with a different rasteriser. No gate runs it, which is why the browser suite asserts thresholds rather than pixels in the `chromium` project.                                                                                                                               |
 | Firefox, Safari, other evergreen browsers | expected, untested | Nothing in the engine is Chromium-specific and the requirements below are all standard, but there is no Playwright project and no CI job for them. Do not read this row as support.                                                                                                            |
 | Browsers with WebGL 1 only                | not supported      | §120 fixes the MVP renderer tier at WebGL 2, and neither shipped GPU backend (section 2) has a WebGL 1 path. There is no WebGL 1 fallback and none is planned. (This row called `@fourjs/render-webgl` "the only backend" until 2026-08-29 — stale since WP-R1.1 shipped `@fourjs/render-webgpu`.) |
@@ -106,7 +106,7 @@ What an application needs at runtime:
   mode, so `SharedArrayBuffer` is not required and COOP/COEP headers are not
   needed. See `docs/guides/workers-and-cross-origin-isolation.md` for what
   changes if split-simulation mode lands.
-- **pnpm 10** (`packageManager` pins `pnpm@10.33.0`) to build from source,
+- **Bun 1.4.2** (`packageManager` pins `bun@1.4.2`) to build from source,
   which is the only way to consume the packages until first publish.
 
 ## 2. Render backends and capability tiers (§62)
@@ -487,7 +487,7 @@ node tools/generate-compatibility.mjs           # refresh the generated block
 node tools/generate-compatibility.mjs --check   # fail if the block is stale
 ```
 
-The generator imports the built adapters from `dist/`, so run `pnpm build`
+The generator imports the built adapters from `dist/`, so run `bun run build`
 first. Everything outside the `BEGIN GENERATED` / `END GENERATED` markers is
 hand-written and has to be reviewed against the code the same way any other
 document does; `tools/check-spec.mjs` and `tools/check-docs.mjs` are the

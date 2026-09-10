@@ -142,7 +142,8 @@ readable; never delete the pointer itself.
   (`SKINNING_GLSL` in `gl-skinning-glsl.ts`, spliced into the id
   fragment). Lives in `gl-picking.ts` so `registerPickingPipeline` does
   not link the colour pair. Lazy compile, fail-once skip, same palette
-  upload as the colour pass. WebGPU still skips: no RFC 0003 skinned
+  upload as the colour pass. WebGPU still skips (superseded 2026-09-09: the
+  colour pair landed; the id pass is still absent): no RFC 0003 skinned
   pipelines there. RFC 0005 checkbox stays `[ ]`.
 
 - **2026-09-09 — Size budgets after #86.** Main CI failed at `bun run size`
@@ -416,6 +417,10 @@ readable; never delete the pointer itself.
   does not exist) until this date. Bun in the container was 1.3.11 and could
   not parse the v2 lockfile — `npm install -g bun@1.4.2` restores parity.
   Residue plans: `docs/plans/RFC-000{1,3,4,5}-RESIDUE_PLAN.md`.
+  Same day, hygiene applied: spec revision 1.15 (§71 RFC 0005 shipped form,
+  §91 Oxlint); `pnpm` → `bun run` in live docs and comments only — the dated
+  audit and gap-analysis documents keep their original commands on purpose.
+  `benchmarks/pick-latency.mjs` no longer runs against `dist` (pre-existing).
 
 - **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
   (the exception each golden's `_warning` names). Values came from the
@@ -603,7 +608,7 @@ readable; never delete the pointer itself.
   (deepthinking-mcp `524ada7f`, fzf-mcp `387ee494`, MathTS `c0dd0d12`) before it was written down.
 
 - **2026-09-05 — TypeScript-on-Bun toolchain (RFC 0006).** The workspace package
-  manager and script runner is Bun (≥ 1.2). `package.json` declares
+  manager and script runner is Bun (≥ 1.4.2 since the lockfile v2 bump; was ≥ 1.2). `package.json` declares
   `"workspaces": ["packages/*"]`; committed lockfile is text `bun.lock`;
   `bunfig.toml` sets `saveTextLockfile` / `exact`. CI uses `oven-sh/setup-bun`
   and `bun install --frozen-lockfile`. Library emit stays `tsc -b` (composite
