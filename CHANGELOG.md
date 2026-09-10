@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — RFC 0007–0009 review pass (2026-09-10)
+
+### Changed
+
+- **RFC 0007 (path-planning adapters) corrected in place.** `PathPlannerDeterminism`
+  replaces the unreachable physics-owned `DeterminismLevel`; `followWaypoints` takes
+  `FollowWaypointsOptions { agentRadius, slowRadius? }` and composes the existing
+  `arrive(context, target, slowRadius, out)`; `PATH_PLANNERS` is non-revocable by
+  `defineCapability`'s default; the compatibility list names every export.
+- **RFC 0008 (§56 shaping engine) corrected in place.** Subpath is
+  `@fourjs/text/harfbuzz` / `fourJS/text/harfbuzz`; `layoutText` walks code points; the
+  shaper hook is a `TextLayoutOptions` field; vertical text refuses with
+  `NOT_IMPLEMENTED`; §96 error split stated; Noto Sans (OFL) replaces the mislabelled
+  Roboto; new §7 glyph-id → quad rule (`GlyphAtlas.glyphsById`).
+- **RFC 0009 (GPU readback raster source) corrected in place.** "Never inside
+  `render`/`RenderGraph.execute`" replaces the non-existent `beginFrame`/`endFrame`;
+  the source owns a `maximumBytes` checked at construction (`RangeError`, raster
+  precedent); the display-only scan's `FORBIDDEN` list must gain the new names; the
+  feedback check mechanism (`CanvasTexture.readbackTarget` → `collectSampledTargets`)
+  is spelled; RFC 0005's pick-latency numbers cited as landed.
+
+### Added
+
+- `docs/plans/RFC-0007-PATH-PLANNING_PLAN.md`, `RFC-0008-TEXT-SHAPING_PLAN.md`,
+  `RFC-0009-GPU-READBACK_PLAN.md` — subagent-driven plans (≤ 4 haiku-class agents,
+  disjoint file ownership, waves, per-plan anti-hallucination sheets with file:line
+  citations, gates). Plan only; implementation waits on owner acceptance.
+
 ## Unreleased — open-TODO burndown (2026-09-09)
 
 Closed the remaining *contained* open items. Feature packets, RFC residues, the

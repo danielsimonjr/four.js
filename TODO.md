@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-09**, recounted not estimated (`grep -c '^- \[ \]'` / `'^- \[x\]'`): **12 open**, **257 closed** (header had 249; seven `[x]` rows were never added to the tally, plus this audit's Done row). Closed this pass: none of the 12 packets. Audit confirmed every open checkbox still has remaining work or is standing/owner-gated. Tracker hygiene the same day: stale “remaining” prose on closed rows (rigs, PH-11c, scissor, `recording-gl` adopt, flagship §46 layers, `maximumSkinningJoints` on WebGPU) and Priority-index leftovers (A-4/A-5/A-19, R-32, camera-rig residue, particle-trail spatial-hash). Closed this *burndown*: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm** + **WebGL `SkinnedIdProgram`**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster** + **WebGPU skinned colour pair**; lighting leftover **WebGPU `metalRoughnessMap`** + **WebGL `emissiveMap`**; R-30c **map roles**; R-33 simulate/present split; dogfood cycles 4–7. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the **WebGPU** skinned id pass.
+Counts as of **2026-09-10**, recounted not estimated (`grep -c '^- \[ \]'` / `'^- \[x\]'`): **12 open**, **258 closed** (2026-09-09 audit: header had 249; seven `[x]` rows were never added to the tally, plus that audit's Done row; +1 for the 2026-09-10 RFC review row). Closed this pass: none of the 12 packets. Audit confirmed every open checkbox still has remaining work or is standing/owner-gated. Tracker hygiene the same day: stale “remaining” prose on closed rows (rigs, PH-11c, scissor, `recording-gl` adopt, flagship §46 layers, `maximumSkinningJoints` on WebGPU) and Priority-index leftovers (A-4/A-5/A-19, R-32, camera-rig residue, particle-trail spatial-hash). Closed this *burndown*: the smoothness screenshot-stride flake, §79 minified `constructor.name` diagnostics, the Oxlint correctness-warning triage, the 12.8s-vs-5s timeout question, A-5 (opt-in leak audit is the design), A-19 (merged into R-30c), RFC 0003's owed prototype measurements, the Vitest 5 coverage campaign, and **R-19/R-20** (§52 already shipped; §55 authored sprite uvs). Same-day slices on still-open rows: WebGL + WebGPU normal-matrix hoist; RFC 0005 pick-latency + ParticleIdProgram + §72 PickProvider + **WebGPU `PickingService` (`mapAsync`)** + **WebGPU particle id arm** + **WebGL `SkinnedIdProgram`**; RFC 0003 **§43 interpolated palettes** + **WebGL skinned shadow caster** + **WebGPU skinned colour pair**; lighting leftover **WebGPU `metalRoughnessMap`** + **WebGL `emissiveMap`**; R-30c **map roles**; R-33 simulate/present split; dogfood cycles 4–7. Of the 12, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. RFC 0005's remaining render-side residue is the **WebGPU** skinned id pass.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -112,7 +112,7 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's §6 table; these are the post-1.0 roadmap rather than release work.
 
-- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; ~~spherical wander~~ DONE 2026-09-06; ~~CCD/FABRIK~~ DONE 2026-09-06; ~~path-planning adapters (RFC)~~ **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`); robotic joint commands utility (MAY declined — see prediction.ts staging note)
+- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; ~~spherical wander~~ DONE 2026-09-06; ~~CCD/FABRIK~~ DONE 2026-09-06; ~~path-planning adapters (RFC)~~ **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`; corrected 2026-09-10, four-agent plan `docs/plans/RFC-0007-PATH-PLANNING_PLAN.md`); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
 - RFC 0005 residue (staged in source, 2026-08-29): §86 pick measurements DONE 2026-09-09 (`benchmarks/pick-latency.mjs`); ParticleIdProgram + §72 PickProvider dispatch DONE 2026-09-09; WebGPU `PickingService` (`mapAsync`) + particle id arm DONE 2026-09-09; WebGL `SkinnedIdProgram` DONE 2026-09-09; remaining: WebGPU skinned id pass (colour pair landed).
 - RFC 0001 residue (staged in source, 2026-08-28):
@@ -1123,7 +1123,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       partial/dirty-rect upload + mipmaps/filter modes for raster surfaces (all
       R-30); ~~GPU readback as a raster source (wants its own RFC)~~ **Proposed
       2026-09-06** (`docs/rfcs/0009-gpu-readback-raster-source.md` — display-only
-      snapshot, not riding 0004/0005); the §62
+      snapshot, not riding 0004/0005; corrected 2026-09-10, plan
+      `docs/plans/RFC-0009-GPU-READBACK_PLAN.md`); the §62
       Canvas 2D backend (stays a stub **by decision** — and if ever built,
       refusing a feedback `CanvasTexture` sampling the surface being rendered is
       that packet's named obligation); ~~a docs/guides page carrying the browser adapter~~ (done 2026-08-29:
@@ -2200,7 +2201,8 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       shipped; `groupSpritesByTexture` consecutive-run helper DONE 2026-09-06.
       Atlas *packing* of distinct textures remains.
 - [x] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
-      — **Proposed 2026-09-06** (`docs/rfcs/0008-text-shaping-engine.md`). Owner
+      — **Proposed 2026-09-06** (`docs/rfcs/0008-text-shaping-engine.md`; corrected
+      2026-09-10, plan `docs/plans/RFC-0008-TEXT-SHAPING_PLAN.md`). Owner
       decision pending; default stays the identity pen walk.
 
 ### Documentation
@@ -2210,6 +2212,25 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       pre-1.0 PDF.
 
 ## Done
+
+- [x] 2026-09-10 — **RFC 0007–0009 review pass + subagent plans.** Each
+      proposed RFC re-verified against the tree and corrected in place
+      (review logs at the foot of each file): 0007 — `DeterminismLevel` is
+      physics-owned, so a motion-local `PathPlannerDeterminism` is spelled;
+      `followWaypoints` gained the radius options its prose required;
+      `PATH_PLANNERS` non-revocability stated against `defineCapability`'s
+      default. 0008 — umbrella specifier is `fourJS/…`; `layoutText` walks
+      code points; shaper hook is a `TextLayoutOptions` field; vertical text
+      refuses with the existing `NOT_IMPLEMENTED`; Roboto is Apache-2.0 (Noto
+      Sans named); new §7 rule for glyph-id → atlas quad (`glyphsById`).
+      0009 — no `beginFrame`/`endFrame` exists; the source carries its own
+      `maximumBytes`; the display-only scan's `FORBIDDEN` list must grow; the
+      feedback mechanism (`CanvasTexture.readbackTarget` →
+      `collectSampledTargets`) is spelled. Plans (≤ 4 haiku agents, disjoint
+      files, waves, anti-hallucination sheets):
+      `docs/plans/RFC-0007-PATH-PLANNING_PLAN.md`,
+      `RFC-0008-TEXT-SHAPING_PLAN.md`, `RFC-0009-GPU-READBACK_PLAN.md`.
+      Implementation still waits on owner acceptance.
 
 - [x] 2026-09-09 — **Open-TODO audit (subagent team).** Recounted
       `grep -c '^- \[ \]'` / `'^- \[x\]'`: **12 open, 257 closed** (header

@@ -1,6 +1,6 @@
 # RFC 0007: Path-planning adapters (§111, steering fold)
 
-- **Status:** Proposed
+- **Status:** draft — proposed to the owner 2026-09-06; corrected 2026-09-10 (review pass, see *Review log*)
 - **Date:** 2026-09-06
 - **Owner decision:** pending
 - **Spec sections affected:** §111 (primary), §12, §13, §33, §42, §81, §85, §89, §90, §98
@@ -107,13 +107,28 @@ can consume the same plan. Conversion is opt-in. Steering never needs it.
 ### 3. The adapter
 
 ```ts
+/**
+ * §33's four tiers, spelled in `@fourjs/motion`. `DeterminismLevel` itself
+ * lives in `@fourjs/physics` (`packages/physics/src/types.ts`), a wave-4
+ * package that depends on motion; motion cannot import it without reversing
+ * a §3.1 edge. The literals are §33's verbatim, so a physics adapter's tier
+ * and a planner's tier compare as plain strings. Hoisting `DeterminismLevel`
+ * to `@fourjs/core` is a separate additive move this RFC does not wait on.
+ */
+export type PathPlannerDeterminism =
+  | "none"
+  | "same-runtime"
+  | "same-platform"
+  | "cross-platform";
+
 export interface PathPlannerCapabilities {
   readonly families: readonly ("grid" | "navmesh" | "waypoint")[];
   readonly dimensions: readonly ("2d" | "3d")[];
   /** Same-runtime is the floor this RFC requires of every adapter. */
-  readonly determinism: DeterminismLevel;
+  readonly determinism: PathPlannerDeterminism;
 }
 
+/** `Disposable` is `@fourjs/core`'s (`packages/core/src/disposable.ts`). */
 export interface PathPlannerAdapter extends Disposable {
   readonly name: string;
   readonly version: string;
@@ -144,21 +159,47 @@ Rules the interface commits to:
 Add one behaviour to `steering.ts`:
 
 ```ts
+export interface WaypointCursor {
+  /** Index of the waypoint currently being sought; caller-owned. */
+  index: number;
+}
+
+export interface FollowWaypointsOptions {
+  /**
+   * The agent's body radius in world units; required, finite, ≥ 0 — no
+   * silent default. The arrival radius at waypoint `i` is
+   * `max(agentRadius, path.radii?.[i] ?? 0)`.
+   */
+  readonly agentRadius: number;
+  /**
+   * `arrive`'s slow radius for the **last** waypoint (world units, > 0).
+   * Defaults to the last arrival radius, which is `arrive`'s natural
+   * "start braking here" distance.
+   */
+  readonly slowRadius?: number;
+}
+
 followWaypoints(
   agent: SteeringContext,
   path: PlannedPath,
   cursor: WaypointCursor,
+  options: FollowWaypointsOptions,
   out: Vector3,
 ): Vector3;
 ```
 
-`followWaypoints` is Reynolds seek toward `path.waypoints[cursor.index]`,
-advancing the cursor when the agent is inside a finite arrival radius
-(default: the path's per-segment `radii[i]`, else a caller-supplied
-`arrivalRadius`). The last waypoint uses `arrive` so the agent stops.
-`out` is an acceleration, like every other behaviour. The cursor is
-caller-owned mutable state (`{ index: number }`); the behaviour does not
-store it.
+`followWaypoints` is Reynolds `seek` toward `path.waypoints[cursor.index]`,
+advancing the cursor (possibly several times in one call, if consecutive
+waypoints are within radius) when the agent is inside that waypoint's
+arrival radius. The last waypoint uses the existing
+`arrive(context, target, slowRadius, out)` so the agent stops; once the
+cursor is past the last index the behaviour keeps calling `arrive` on the
+last waypoint, so an agent that overshoots comes back. `out` is an
+acceleration, like every other behaviour, and — like them — the function
+writes `out` exactly once and allocates nothing. The cursor is caller-owned
+mutable state; the behaviour does not store it. A `path` with fewer than
+two waypoints, or a non-finite / negative `agentRadius`, is a `RangeError`
+(§85) at the call, not a NaN in the acceleration.
 
 This is the fold P8-1 asked for: planners produce geometry, steering
 produces acceleration, the caller integrates. Obstacle avoidance and wall
@@ -193,18 +234,24 @@ packet.
 §81 has no "path planners" row. This RFC does **not** add one to the
 specification (that is an amendments-table change after acceptance). The
 in-repo registration path is a new capability token in `@fourjs/motion`,
-declared the way `SIMULATION_SYSTEMS` already is:
+declared at the same site and in the same shape as
+`SIMULATION_SYSTEMS` (`packages/motion/src/capabilities.ts`: module scope,
+`/* @__PURE__ */`, type-only import of the registry), and re-exported by
+the umbrella's `plugins.ts` as the very same object:
 
 ```ts
 export const PATH_PLANNERS =
-  defineCapability<PathPlannerRegistry>("fourJS:path-planners");
+  /* @__PURE__ */ defineCapability<PathPlannerRegistry>("fourJS:path-planners");
 ```
 
 `PathPlannerRegistry` is `register(adapter)` / `resolve(name)` /
 `list()`, explicit calls, never side-effect imports (RFC 0002's binding
-rule). The token is **not revocable** (the conservative default). An
-application that does not configure plugins constructs a planner with
-`new` and never touches the registry.
+rule). `list()` returns adapters in registration order (§33). The token is
+**not revocable** — `defineCapability`'s default, and RFC 0002 Q3's
+conservative disposition; unlike `SIMULATION_SYSTEMS`, which is the one
+revocable token, a planner registry has no unregister. An application that
+does not configure plugins constructs a planner with `new` and never
+touches the registry.
 
 ### 7. Determinism, units, authority
 
@@ -293,10 +340,13 @@ determinism is the floor.
 Rows in `docs/COMPATIBILITY.md` this RFC moves:
 
 - **Public API (§90).** Additive. New exports from `@fourjs/motion`
-  (`PathPlannerAdapter`, `PathQuery`, `PlannedPath`,
-  `WaypointGraphPlanner`, `followWaypoints`, `plannedPathToTrajectory`,
-  `PATH_PLANNERS`). Re-exported through the umbrella barrels per §97a.
-  **Minor.** No closed union widens.
+  (`PathPlannerAdapter`, `PathPlannerCapabilities`,
+  `PathPlannerDeterminism`, `PathQuery`, `PlannedPath`,
+  `WaypointCursor`, `FollowWaypointsOptions`, `WaypointGraphPlanner`,
+  `PathPlannerRegistry`, `followWaypoints`, `plannedPathToTrajectory`,
+  `PATH_PLANNERS`). Re-exported through the umbrella barrels per §97a
+  (`packages/fourjs/src/motion.ts` is `export *`; the token additionally
+  through `plugins.ts`). **Minor.** No closed union widens.
 - **Scene format versions (§79).** Unmoved. A planned path is a runtime
   value, not a node. A future document that *names* a registered planner
   (by `name` string, never a module specifier) is a later packet and
@@ -334,8 +384,9 @@ interface packet must measure:
    plus the interface?** Recommendation: waypoint only, unless the grid
    implementation stays under ~200 lines and has no new dependency.
 2. **Arrival radius default.** Per-segment `radii` vs a single
-   `PathQuery.radius`. Recommendation: query radius is the agent's body;
-   path radii are the corridor; `followWaypoints` uses
+   `PathQuery.radius`. Recommendation (now written into §4's
+   `FollowWaypointsOptions`, pending owner confirmation): query radius is
+   the agent's body; path radii are the corridor; `followWaypoints` uses
    `max(agentRadius, radii[i] ?? 0)` and requires the caller to pass
    `agentRadius` (no silent 0.5).
 3. **Should `PATH_PLANNERS` wait for a §81 amendment?** The token can
@@ -345,3 +396,17 @@ interface packet must measure:
 4. **3D navmesh vs 2D-on-a-plane.** Recommendation: the interface is
    3D (`Vector3`); a 2D planner zeros `z` and declares
    `dimensions: ["2d"]`. No separate 2D path type.
+
+## Review log
+
+- **2026-09-10 — correction pass against the tree** (no decision changed):
+  `DeterminismLevel` is declared in `@fourjs/physics`, which sits above
+  motion in the frozen §3.1 matrix, so §3 now spells a motion-local
+  `PathPlannerDeterminism` with §33's literals; §4's `followWaypoints`
+  signature carried no radius argument while its prose and Q2 required one
+  — the signature now takes `FollowWaypointsOptions` and names the
+  existing `arrive(context, target, slowRadius, out)` it composes; §6
+  states that `PATH_PLANNERS` is non-revocable by `defineCapability`'s
+  default and that `SIMULATION_SYSTEMS` is the revocable exception, rather
+  than implying the two share a disposition; the compatibility list names
+  every new export.
