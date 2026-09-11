@@ -90,6 +90,8 @@ import { inflateSync } from "node:zlib";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { framesFor, waitForFrames } from "./helpers/wait.js";
+
 /** A decoded, unfiltered 8-bit image: `pixels` is `width * height` samples. */
 interface DecodedImage {
   readonly width: number;
@@ -487,7 +489,7 @@ test.describe("examples/particles-demo (§112, §36)", () => {
 
     // A render loop fails on its first frames, not on first paint: keep the page
     // alive long enough for a throw in `step`/`render` to be recorded.
-    await page.waitForTimeout(FRAME_GAP_SECONDS * 1000);
+    await waitForFrames(page, framesFor(FRAME_GAP_SECONDS));
     expect(errors).toEqual([]);
   });
 
@@ -497,7 +499,7 @@ test.describe("examples/particles-demo (§112, §36)", () => {
     await openDemo(page);
     // Two mean lifetimes in, the population is at its steady state rather than
     // still filling.
-    await page.waitForTimeout(4_000);
+    await waitForFrames(page, framesFor(4));
 
     const status = await readStatus(page);
     const live = statusNumber(status.fountain);
@@ -520,7 +522,7 @@ test.describe("examples/particles-demo (§112, §36)", () => {
 
   test("draws the fountain and keeps it moving", async ({ page }) => {
     await openDemo(page);
-    await page.waitForTimeout(3_000);
+    await waitForFrames(page, framesFor(3));
 
     const first = await grab(page.locator("#scene"));
     const firstStats = measure(first);
@@ -529,7 +531,7 @@ test.describe("examples/particles-demo (§112, §36)", () => {
       "the fountain drew nothing — the batched particle draw never reached the framebuffer",
     ).toBeGreaterThanOrEqual(MINIMUM_FOUNTAIN_PIXELS);
 
-    await page.waitForTimeout(FRAME_GAP_SECONDS * 1000);
+    await waitForFrames(page, framesFor(FRAME_GAP_SECONDS));
     const second = await grab(page.locator("#scene"));
 
     expect(
@@ -542,7 +544,7 @@ test.describe("examples/particles-demo (§112, §36)", () => {
     page,
   }) => {
     await openDemo(page);
-    await page.waitForTimeout(3_000);
+    await waitForFrames(page, framesFor(3));
 
     const stats = measure(await grab(page.locator("#scene")));
     expect(stats.fountain).toBeGreaterThanOrEqual(MINIMUM_FOUNTAIN_PIXELS);
@@ -563,7 +565,7 @@ test.describe("examples/particles-demo (§112, §36)", () => {
   }) => {
     await openDemo(page);
     const canvas = page.locator("#scene");
-    await page.waitForTimeout(3_000);
+    await waitForFrames(page, framesFor(3));
 
     // The burst emitter has `emissionRate: 0`, so before a click there is not
     // one burst-coloured pixel anywhere — which is also what makes the

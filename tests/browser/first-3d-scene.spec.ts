@@ -61,6 +61,12 @@ import { inflateSync } from "node:zlib";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import {
+  framesFor,
+  waitForFrames,
+  waitForSimulationTime,
+} from "./helpers/wait.js";
+
 /** A decoded, unfiltered 8-bit image: `pixels` is `width * height` samples. */
 interface DecodedImage {
   readonly width: number;
@@ -576,7 +582,7 @@ async function settledFrame(
   await openDemo(page);
   // A second and a half in, the capsule has left its starting pose and the
   // torus has turned far enough to present its ring rather than its rim.
-  await page.waitForTimeout(1_500);
+  await waitForSimulationTime(page, 1.5);
   const image = await grab(page.locator("#scene"));
   return { image, stats: measure(image) };
 }
@@ -620,7 +626,7 @@ test.describe("examples/first-3d-scene (§93, §47, §57, §68)", () => {
 
     // A render loop fails on its first frames, not on first paint: keep the
     // page alive long enough for a throw in `step`/`render` to be recorded.
-    await page.waitForTimeout(FRAME_GAP_SECONDS * 1000);
+    await waitForFrames(page, framesFor(FRAME_GAP_SECONDS));
     expect(errors).toEqual([]);
   });
 
@@ -723,12 +729,12 @@ test.describe("examples/first-3d-scene (§93, §47, §57, §68)", () => {
     page,
   }) => {
     await openDemo(page);
-    await page.waitForTimeout(1_000);
+    await waitForSimulationTime(page, 1);
 
     const before = await readStatus(page);
     const first = await grab(page.locator("#scene"));
 
-    await page.waitForTimeout(FRAME_GAP_SECONDS * 1000);
+    await waitForFrames(page, framesFor(FRAME_GAP_SECONDS));
     const second = await grab(page.locator("#scene"));
     const after = await readStatus(page);
 
