@@ -422,6 +422,20 @@ readable; never delete the pointer itself.
   audit and gap-analysis documents keep their original commands on purpose.
   `benchmarks/pick-latency.mjs` no longer runs against `dist` (pre-existing).
 
+- **2026-09-11 — Sync after #91/#92; gate repair.** The size gate was red on
+  main after #92: a feature spliced into the lit/standard programs costs every
+  bundle ~0.5 kB gzip, light-free ones included, because those programs
+  compile at init — the node class itself tree-shakes (verified in the built
+  bundle: only the collector branch, three `SceneLights` fields, the GLSL
+  chunk and `HemisphereLightUniforms` ride). Trimming the GLSL recovered
+  ~25 B; budgets rose with the A/B in `tools/size-budgets.mjs`. Rule worth
+  keeping: **an A/B against the parent commit before every lighting / program
+  change**, because `bun run size` runs in CI and the failure lands on the
+  next PR, not the one that caused it. `pick-latency.mjs`'s host double must
+  mirror every member `WebglPickingService` reads (`particleBatches()` since
+  #86). Spec revision numbers: check the table's tail before minting — #91
+  and this branch both took 1.15; the audit row is 1.16.
+
 - **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
   (the exception each golden's `_warning` names). Values came from the
   scenario helpers, not from editing hashes by hand. 0.20 contact persistence

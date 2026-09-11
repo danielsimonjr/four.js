@@ -2,7 +2,7 @@
 
 - **Status:** accepted (owner, 2026-08-21 — "Continue with the remaining WPs and the RFCs"; the recommended dispositions of the flagged questions are adopted)
 - **Date:** 2026-08-21
-- **Owner decision:** accepted (2026-08-21); implemented 2026-08-29 (WebGL, analytic tier A-11), 2026-09-09 (WebGPU `PickingService`, particle ids, WebGL skinned ids, §72 `PickProvider` dispatch, §86 measurements); residue: WebGPU skinned id pass. **No spec amendments-table row was added** — dispositions live in source and MEMORY only (see corrections below).
+- **Owner decision:** accepted (2026-08-21); implemented 2026-08-29 (WebGL, analytic tier A-11), 2026-09-09 (WebGPU `PickingService`, particle ids, WebGL skinned ids, §72 `PickProvider` dispatch, §86 measurements); residue (WebGPU skinned id pass) closed 2026-09-10 (#91). **No spec amendments-table row was added until revision 1.16 (2026-09-11)** — dispositions live in source and MEMORY only (see corrections below).
 - **Spec sections affected:** §71 (primary), §6b, §33, §34, §45, §47, §48, §55, §61, §62, §63, §72, §73, §85, §89, §90, §92, §96, §98
 
 ## Context
@@ -396,10 +396,8 @@ snapshot; everything it calls absent has since landed. Verified 2026-09-10:
 - **Wrong when written:** "if RFC 0002 is accepted" — it was accepted in the
   same decision, the same day.
 
-**Residue (open):** the WebGPU skinned id pass. `wgpu-picking.ts` skips
-`"skinned-unlit"` / `"skinned-lit"` items; the WebGPU colour pair
-(`registerSkinningPipeline()`, `skinningWgsl`, joint-palette bind group with
-dynamic offset, `packPalette`) and the particle id arm's lazy / fail-once
-pipeline pattern are the two halves a port composes; WebGL's
-`SkinnedIdProgram` + `#acquireSkinnedProgram` is the template. Plan:
-`docs/plans/RFC-0005-RESIDUE_PLAN.md`.
+**Residue: closed 2026-09-10 (#91).** The WebGPU skinned id pass landed as a
+private pipeline on `WebgpuPickingService` (`wgpu-picking.ts`: `skinMatrix()`
+plus the 3072-byte palette group at bind group 1, fail-once skip, never
+bind-pose). Spec revision 1.16 records §71's shipped form. The plan written for
+it (`docs/plans/RFC-0005-RESIDUE_PLAN.md`) is retained as a record only.

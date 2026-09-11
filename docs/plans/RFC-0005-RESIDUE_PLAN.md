@@ -1,6 +1,6 @@
 # RFC 0005 residue — WebGPU skinned id pass: subagent plan
 
-**Status:** plan only. Written 2026-09-10 against `claude/rfc-review-planning-s2clzd`.
+**Status:** **superseded 2026-09-10** — the residue closed in #91 the same day this plan was written (WebGPU skinned id pass in `wgpu-picking.ts`). Retained as a record of the intended shape; only the A3 record-hygiene items remained, and those landed in spec revision 1.16 / the 2026-09-11 sync. Originally: plan only, written 2026-09-10 against `claude/rfc-review-planning-s2clzd`.
 Scope: the one open residue in `TODO.md`'s "RFC 0005 residue" row, plus the record
 hygiene the RFC's *Post-acceptance corrections* found. **Crew:** 3 haiku-class agents
 (the fourth slot is unused on purpose: the seam is one file). Format per

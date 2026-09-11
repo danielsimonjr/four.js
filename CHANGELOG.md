@@ -69,6 +69,31 @@ specification; until then, entries are grouped by date under **Unreleased**.
   the §58 paint tier leave the deferred list. Spec revision **1.15**
   matches that §60 honesty.
 
+## Unreleased — sync after #91/#92 and gate repair (2026-09-11)
+
+### Fixed
+
+- **Size gate red after #92.** `HemisphereLight` grew every example bundle by
+  ~0.5 kB gzip (lit/standard/skinned-lit programs compile at init, so the GLSL
+  chunk and its uniform class ride light-free bundles too). The two GLSL
+  helpers collapse into one `hemisphereAmbient` and the uploader is compacted
+  (−20–30 B); the three over-budget limits rise with the A/B recorded in
+  `tools/size-budgets.mjs` (first-3d 44 kB, particles-demo 44.5 kB, ui-demo
+  51 kB). first-2d-scene stays at 58 kB against §86's 150 kB.
+- **Lint red after #92.** Two unnecessary `as number` assertions in
+  `webgpu-renderer.test.ts` removed (`typeof` already narrows).
+- **`benchmarks/pick-latency.mjs` runs again.** Its host double lacked the
+  `particleBatches()` member the WebGL picking service has asked for since #86;
+  the record is re-recorded and its caveat no longer says WebGPU has no
+  `PickingService`.
+- **Spec revision collision.** #91 and the RFC-audit branch both minted 1.15;
+  the audit's row is now **1.16 (2026-09-11)** (§71 RFC 0005 shipped form,
+  §91 Oxlint), placed after #91's 1.15 in the table.
+- **RFC 0003 / 0005 corrections and plans reconciled with #91/#92:** the
+  WebGPU skinned id pass and skinned shadow caster are recorded as landed;
+  `RFC-0005-RESIDUE_PLAN.md` is marked superseded; `RFC-0003-RESIDUE_PLAN.md`
+  drops its WP-SK.1 slot.
+
 ## Unreleased — RFC 0007–0009 review pass (2026-09-10)
 
 ### Changed
@@ -98,10 +123,10 @@ specification; until then, entries are grouped by date under **Unreleased**.
   the umbrella never names the raster types).
 - **`docs/COMPATIBILITY.md` §5** — no longer claims five §81 points lack tokens
   (all eleven exist since 2026-09-06) or that the umbrella declares them.
-- **RFC 0009** — no longer calls RFC 0005 "closed" (implemented; one residue open).
+- **RFC 0009** — no longer calls RFC 0005 "closed" without qualification (its last residue closed in #91 the same day).
 
-- **Record hygiene applied.** Spec revision 1.15 (§71 gains RFC 0005's shipped
-  form, which never had a row; §91 ESLint → Oxlint); `pnpm` command leftovers
+- **Record hygiene applied.** Spec revision 1.16 (§71 gains RFC 0005's shipped
+  form, which never had a row; §91 ESLint → Oxlint; 1.15 was taken by #91's §60 pass); `pnpm` command leftovers
   replaced by `bun run` across READMEs, benchmark scripts, test and example
   comments (dated audit/gap-analysis documents left as written); COMPATIBILITY §1
   now says `bun@1.4.2`; stale comments fixed in `renderer.ts` (WebGPU skinned

@@ -324,6 +324,9 @@ function createHost(counter) {
     context: () => counter.gl,
     geometries: () => geometries,
     renderTargets: () => renderTargets,
+    // No particle systems in these scenes (the header says so); the service
+    // still asks the host for the batch cache before the id pass (#86).
+    particleBatches: () => null,
     surfaceWidth: () => SURFACE_WIDTH,
     surfaceHeight: () => SURFACE_HEIGHT,
     contextLost: () => false,

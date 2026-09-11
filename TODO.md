@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-10**, recounted not estimated (`grep -c '^- \[ \]'` / `'^- \[x\]'`): **11 open**, **260 closed**. Closed this pass: **RFC 0005 residue** (WebGPU skinned id pass was the last named slice). Audit confirmed the other 11 still have remaining work or are standing/owner-gated. Same-day slices on still-open rows: WebGPU idle-skip (`WgpuBatching.#canSkipUpload`). Of the 11, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. TypeDoc/`typescript@6.0.3` isolation remains in tier 4 (Vitest 5 already landed; not a second `[ ]`). RFC 0007/0008/0009 stay Proposed (implementation waits on owner acceptance).
+Counts as of **2026-09-11**, recounted not estimated (`grep -c '^- \[ \]'` / `'^- \[x\]'`): **11 open**, **263 closed** (2026-09-10 main: 11 / 260; the rebased RFC-audit branch adds two Done rows; the `pick-latency` benchmark row opened and closed 2026-09-11). Closed this pass: **RFC 0005 residue** (WebGPU skinned id pass was the last named slice). Audit confirmed the other 11 still have remaining work or are standing/owner-gated. Same-day slices on still-open rows: WebGPU idle-skip (`WgpuBatching.#canSkipUpload`). Of the 11, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. TypeDoc/`typescript@6.0.3` isolation remains in tier 4 (Vitest 5 already landed; not a second `[ ]`). RFC 0007/0008/0009 stay Proposed (implementation waits on owner acceptance).
 
 ### 0 · Blocked on an event, not on effort
 
@@ -2220,7 +2220,7 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       added 2026-09-06 (no-ops without pandoc). Does not replace the archived
       pre-1.0 PDF.
 
-- [ ] **`benchmarks/pick-latency.mjs` is broken against the current `dist`**
+- [x] **`benchmarks/pick-latency.mjs` is broken against the current `dist` — DONE 2026-09-11** (host double gained `particleBatches: () => null`; record re-recorded)
       (found 2026-09-10 while re-recording its caveat): `TypeError:
       host.particleBatches is not a function` at HEAD after `bun run build`.
       The 2026-09-09 record predates whatever renamed that host member; the

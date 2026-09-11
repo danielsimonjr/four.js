@@ -21,6 +21,25 @@
  * minimal-2D-app gate. `__FOUR_DEV__: false` on every production example
  * except the twin; the wasm deltas are the solver bump, not DEV leftovers.
  *
+ * **2026-09-11 (after #92, measured locally on the rebased RFC-audit branch):**
+ * #92's `HemisphereLight` (§68) grew **every** example bundle by ~480–520 B
+ * gzip, light-free ones included — the A/B at 07d4eab (pre-#92) vs 318e6bd:
+ * first-2d 57.60 → 58.08, first-3d 42.93 → 43.42, particles-demo 43.20 → 43.72,
+ * ui-demo 49.75 → 50.25. Traced in the built bundles: the node class does
+ * **not** ride (it tree-shakes); what does is the structural collector branch
+ * + three `SceneLights` fields in `@fourjs/render`, and the GLSL chunk +
+ * `HemisphereLightUniforms` spliced into the lit / standard / skinned-lit
+ * programs the WebGL renderer compiles at init (the 0.75 kB law). Collapsing
+ * the two GLSL helpers into one and compacting the uploader recovered
+ * ~20–30 B (58.06 / 43.41 / 43.70 / 50.22); the rest is the feature. Three
+ * budgets rose to keep ~1.4–2 % headroom; first-2d stays far under §86's gate.
+ *
+ * | Example        | Measured (gzip) | Prior limit | New limit | Rationale |
+ * |----------------|-----------------|-------------|-----------|-----------|
+ * | first-3d-scene | 43.41 kB        | 43 kB       | 44 kB     | +0.48 kB hemisphere in lit/standard programs compiled at init |
+ * | particles-demo | 43.70 kB        | 43.5 kB     | 44.5 kB   | same mechanism |
+ * | ui-demo        | 50.22 kB        | 50 kB       | 51 kB     | same mechanism (no lights in the demo; the programs still ship) |
+ *
  * **2026-09-09 (#86 squash on main, run 34339266079):** PickProvider,
  * WebGL `ParticleIdProgram`, 192-byte `DrawUniforms`, and the particles-demo
  * simulate/present split pushed two gzip bundles over the 2026-09-07

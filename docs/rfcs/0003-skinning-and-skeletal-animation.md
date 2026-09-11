@@ -254,7 +254,8 @@ revision 1.10). Verified against the tree 2026-09-10:
   and lit colour pair, `SkinnedShadowProgram` (2026-09-09, lazily via
   `acquireShadow()`) and `SkinnedIdProgram` for the §71 id pass (2026-09-09,
   `gl-picking.ts`). WebGPU has the colour pair only (`registerSkinningPipeline()`,
-  2026-09-09); its shadow and id passes still skip skinned items.
+  2026-09-09); its skinned id pass (#91) and skinned shadow caster (#92)
+  landed 2026-09-10 — WebGPU now matches WebGL's four.
 - **§5 `RenderItemKind` "or `pipelineId` if RFC 0001's follow-up lands
   first".** The kinds `"skinned-unlit"` / `"skinned-lit"` landed; `pipelineId`
   did not.
@@ -289,6 +290,5 @@ revision 1.10). Verified against the tree 2026-09-10:
 **Residue (open, `TODO.md` "RFC 0003 residue"):** GPU morph path (plumbing
 only — `MorphWeights`, `Mesh.morphTargetWeights`, `morphWeights` on render
 items, `createArrayElementBinding`; zero morph code in either backend), CPU
-skinning (nothing), bone-texture palette (nothing), WebGPU skinned shadow and
-id passes (skipped in `wgpu-skinning.ts`, `wgpu-shadow.ts`, `wgpu-picking.ts`).
-Plan: `docs/plans/RFC-0003-RESIDUE_PLAN.md`.
+skinning (nothing), bone-texture palette (nothing). The WebGPU skinned shadow
+and id passes closed 2026-09-10 (#91, #92). Plan: `docs/plans/RFC-0003-RESIDUE_PLAN.md`.

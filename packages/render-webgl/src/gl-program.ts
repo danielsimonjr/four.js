@@ -977,22 +977,14 @@ uniform vec3 hemisphereGround;
 uniform vec3 hemisphereUp;
 uniform bool useHemisphere;
 
-vec3 hemisphereIrradiance(vec3 n) {
-  if (!useHemisphere) {
-    return vec3(0.0);
-  }
-  float w = clamp(0.5 * dot(n, hemisphereUp) + 0.5, 0.0, 1.0);
-  return mix(hemisphereGround, hemisphereSky, w);
-}
-
 vec3 hemisphereAmbient(float normalLength, vec3 n) {
   if (!useHemisphere) {
     return vec3(0.0);
   }
-  if (normalLength > 0.0) {
-    return hemisphereIrradiance(n);
-  }
-  return mix(hemisphereGround, hemisphereSky, 0.5);
+  float w = normalLength > 0.0
+    ? clamp(0.5 * dot(n, hemisphereUp) + 0.5, 0.0, 1.0)
+    : 0.5;
+  return mix(hemisphereGround, hemisphereSky, w);
 }
 `;
 
@@ -1055,25 +1047,24 @@ export class HemisphereLightUniforms {
    * header. Call once per viewport, beside the ambient upload.
    */
   upload(lights: SceneLights): void {
+    const gl = this.#gl;
+    const at = this.#locations;
     if (lights.hasHemisphereLight) {
-      vec3Scratch[0] = lights.hemisphereSky[0];
-      vec3Scratch[1] = lights.hemisphereSky[1];
-      vec3Scratch[2] = lights.hemisphereSky[2];
-      this.#gl.uniform3fv(this.#locations[0], vec3Scratch);
-      vec3Scratch[0] = lights.hemisphereGround[0];
-      vec3Scratch[1] = lights.hemisphereGround[1];
-      vec3Scratch[2] = lights.hemisphereGround[2];
-      this.#gl.uniform3fv(this.#locations[1], vec3Scratch);
-      vec3Scratch[0] = lights.hemisphereUp.x;
-      vec3Scratch[1] = lights.hemisphereUp.y;
-      vec3Scratch[2] = lights.hemisphereUp.z;
-      this.#gl.uniform3fv(this.#locations[2], vec3Scratch);
+      const up = lights.hemisphereUp;
+      vec3Scratch.set(lights.hemisphereSky);
+      gl.uniform3fv(at[0], vec3Scratch);
+      vec3Scratch.set(lights.hemisphereGround);
+      gl.uniform3fv(at[1], vec3Scratch);
+      vec3Scratch[0] = up.x;
+      vec3Scratch[1] = up.y;
+      vec3Scratch[2] = up.z;
+      gl.uniform3fv(at[2], vec3Scratch);
       if (!this.#enabled) {
-        this.#gl.uniform1i(this.#locations[3], 1);
+        gl.uniform1i(at[3], 1);
         this.#enabled = true;
       }
     } else if (this.#enabled) {
-      this.#gl.uniform1i(this.#locations[3], 0);
+      gl.uniform1i(at[3], 0);
       this.#enabled = false;
     }
   }

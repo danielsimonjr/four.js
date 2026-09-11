@@ -9,8 +9,8 @@ corrections*. **Crew:** ≤ 4 haiku-class agents, disjoint files. Format per
 
 | Residue item | This plan | Why |
 | --- | --- | --- |
-| WebGPU skinned **shadow caster** | **WP-SK.1** | WebGL twin exists (`SkinnedShadowProgram`); WebGPU colour pair supplies `skinningWgsl` + palette bind group |
-| WebGPU skinned **id pass** | handled by `docs/plans/RFC-0005-RESIDUE_PLAN.md` (same seam, owned there to avoid two agents in `wgpu-picking.ts`) | — |
+| WebGPU skinned **shadow caster** | **closed 2026-09-10 (#92)** — `SkinnedPrograms.acquireShadow()` on WebGPU; WP-SK.1 below is retained as the record of what landed | — |
+| WebGPU skinned **id pass** | **closed 2026-09-10 (#91)** | — |
 | CPU skinning (`same-runtime` golden; home for skinned bounds) | **WP-SK.2** | Deterministic path, no backend; unblocks skinned bounds |
 | Skinned bounds for culling/picking (uses WP-SK.2) | **WP-SK.3** | RFC §6's named inaccuracy; opt-in, never default |
 | GPU morph path | **WP-SK.4 — layout decision only + one-target WebGL path** | The extra-vertex-stream layout is a public ABI (§53/§79); this packet pins it at locations 6/7 for `POSITION_1`/`NORMAL_1` and ships one target; more targets are a follow-up |
@@ -36,14 +36,14 @@ corrections*. **Crew:** ≤ 4 haiku-class agents, disjoint files. Format per
 
 | Agent | Owns | Wave |
 | --- | --- | --- |
-| **A1 — WebGPU skinned shadow** | `packages/render-webgpu/src/wgpu-shadow.ts` (edit: skinned variant), `wgpu-skinning.ts` (append: `skinnedShadowShaderSource`), tests (`packages/render-webgpu/tests/`), `tests/browser/webgpu/webgpu-skinned-shadow.spec.ts` | 1 |
+| ~~**A1 — WebGPU skinned shadow**~~ | landed in #92 before dispatch; the slot is free (crew is three) | — |
 | **A2 — CPU skinning** | `packages/render/src/cpu-skinning.ts` (new), `packages/render/tests/cpu-skinning.test.ts`, `tests/determinism/cpu-skinning.test.ts` + helper | 1 |
 | **A3 — skinned bounds** | `packages/render/src/skinned-bounds.ts` (new; consumes A2), `packages/render/src/mesh.ts` (edit: opt-in `boundsMode: "bind-pose" \| "skinned"`), `packages/input/src/pick.ts` (edit: read the same bounds), tests | 2 |
 | **A4 — morph layout + one-target WebGL path** | spec amendment draft text (handed to the lead), `packages/geometry/src/buffer-geometry.ts` (edit: `positions1`/`normals1` streams at locations 6/7), `packages/render-webgl/src/gl-geometry.ts` + unlit/lit programs (edit: `morphWeight0` uniform + blend), tests, `tests/browser/morph.spec.ts` | 2 (spec row first — see §4) |
 
 ## 4. Packets
 
-**WP-SK.1 [S] — A1.** Mirror `SkinnedShadowProgram`: a `skinnedShadowShaderSource()` in
+**WP-SK.1 [S] — landed 2026-09-10 (#92), kept as the record.** Mirror `SkinnedShadowProgram`: a `skinnedShadowShaderSource()` in
 `wgpu-skinning.ts` that prefixes `skinningWgsl(1)` to the existing shadow vertex stage
 (read `wgpu-shadow.ts`'s depth-only pipeline and its bind group 0), a lazily created
 pipeline (fail-once flag, §61 diagnostic `"webgpu-shadow-skinned-compile-failed"`)
