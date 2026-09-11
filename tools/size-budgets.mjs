@@ -49,6 +49,30 @@
  * |----------------|-----------------|-------------|-----------|-----------|
  * | particles-demo | 43.04 kB        | 43 kB       | 43.5 kB   | +38 B over — id-pass / appearance already in the demo graph. A: hold at 43 → red; B: 43.5 kB. |
  * | ui-demo        | 49.51 kB        | 49.5 kB     | 50 kB     | +11 B over — PickProvider on `@fourjs/input` rides the retained-mode graph. B: 50 kB. |
+ *
+ * **2026-09-11 (registration seams for the shadow, effect and particle
+ * pipelines):** `WebglRenderer` compiled eight programs at initialize, so
+ * `ShadowProgram`, `EffectProgram`, `ParticleProgram` + `ParticleTrailProgram`
+ * and both particle batch caches rode every bundle that carried the class.
+ * They now sit behind `registerShadowPipeline()`, `registerEffectPipeline()`
+ * and `registerParticlePipeline()` (the `registerSkinningPipeline()` shape:
+ * a module `let`, resolved lazily on first use, fail-once, one dev warning)
+ * and compile only in bundles that call them. Measured on this worktree
+ * (`bun run examples:build && bun run size`, gzip), before → after:
+ *
+ * | Example              | Before   | After    | Delta    | Prior limit | New limit | Rationale |
+ * |----------------------|----------|----------|----------|-------------|-----------|-----------|
+ * | first-2d-scene       | 58.08 kB | 56.00 kB | −2.08 kB | 150 kB      | 150 kB    | §86's minimal-2D-app gate, not a measured ceiling — left alone. |
+ * | first-3d-scene       | 43.42 kB | 41.28 kB | −2.14 kB | 43 kB       | 42 kB     | was 421 B over before this packet; 42 kB ≈ 1.7 % headroom. |
+ * | particles-demo       | 43.72 kB | 43.24 kB | −0.48 kB | 43.5 kB     | 43.5 kB   | registers particles, so only shadows + effects left; was 220 B over, now 260 B under (0.6 %). Not lowered — 43.24 × 1.015 > 43.5. |
+ * | ui-demo              | 50.25 kB | 48.16 kB | −2.09 kB | 50 kB       | 49 kB     | was 246 B over; 49 kB ≈ 1.7 % headroom. |
+ * | flagship             | 1.98 MB  | 1.98 MB  | —        | 2.05 MB     | 2.05 MB   | registers particles; the wasm images dominate at this precision. |
+ * | motor-digital-twin   | 1.22 MB  | 1.22 MB  | —        | 1.25 MB     | 1.25 MB   | unchanged at MB precision. |
+ * | character-controller | 1.15 MB  | 1.15 MB  | —        | 1.20 MB     | 1.20 MB   | unchanged at MB precision. |
+ *
+ * No limit was raised. `StandardProgram` stays compiled at initialize —
+ * `StandardMaterial` is a core §57 family and making it opt-in is an owner
+ * decision.
  */
 
 export const SIZE_BUDGETS_DOC = "tools/size-budgets.mjs";

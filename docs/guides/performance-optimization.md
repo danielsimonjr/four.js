@@ -43,11 +43,17 @@ import {
   ParticleSystem,
   uniformGravityField,
 } from "fourJS/particles";
-import { WebglRenderer } from "fourJS/render-webgl";
+import { WebglRenderer, registerParticlePipeline } from "fourJS/render-webgl";
 import { OrthographicCamera, createFullscreenViewport } from "fourJS/scene";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#scene");
 if (canvas === null) throw new Error("no canvas");
+
+// WebGL 2 draws particles through a registered pipeline (2026-09-11) — the
+// same seam as skinning and picking. One explicit call links the instanced
+// billboard program; without it every `ParticleRenderable` is skipped with a
+// single development warning naming this line.
+registerParticlePipeline();
 
 const camera = new OrthographicCamera({
   left: -4,

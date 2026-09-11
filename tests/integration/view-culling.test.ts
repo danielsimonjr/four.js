@@ -50,7 +50,7 @@ import {
   sortRenderListByDepth,
   type RenderItem,
 } from "@fourjs/render";
-import { WebglRenderer } from "@fourjs/render-webgl";
+import { WebglRenderer, registerShadowPipeline } from "@fourjs/render-webgl";
 import {
   DirectionalLight,
   OrthographicCamera,
@@ -401,6 +401,8 @@ describe("R-8 — one frame list, two views that disagree (§64, §48)", () => {
 
 describe("R-8 — the §69 shadow map stays view-independent (R-18's §46 argument)", () => {
   it("draws a caster no camera can see into the map", async () => {
+    // The caster pass is a registration seam since 2026-09-11.
+    registerShadowPipeline();
     const test = await harness();
     const sun = new DirectionalLight({ intensity: 1 });
     sun.castShadow = true;
