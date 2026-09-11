@@ -73,6 +73,18 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### Changed
 
+- **WebGPU per-draw allocations removed.** Thirteen `[offset]` dynamic-offset
+  arrays per draw path go through one reused array (the fake-device harness
+  already copies retained arguments at record time, so transcripts are
+  byte-identical). Pipeline resolution memoises against the previous draw's
+  derived key scalars (`wgpu-pipeline-memo.ts`; the six §57 render-state
+  fields deliberately do not bump `material.version`, so a version-keyed
+  memo would have been wrong): 406 → 36 ns/draw without stencil, 839 → 42
+  with, on 100k same-material draws; keys, labels, draw order and the
+  string-keyed cache unchanged (§33). The batch content-hash change (B4)
+  was measured (~20 % upper bound on the batching pass) and **declined**: a
+  version-only stamp cannot see the in-place matrix write the idle-skip
+  contract pins, and interpolated matrices change every frame anyway.
 - **Dispose discipline (§83).** Eleven classes gain a `disposed` getter, an
   idempotent `dispose()`, and `INVALID_APPLICATION_STATE` on their primary
   mutating entry points after dispose: `AnimationSystem`, `KinematicSystem`,

@@ -424,12 +424,10 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       benchmark's largest suspect (~9 of 10.4 ms/step at 5k piled bodies);
       gate on `RigidBody` listener presence, numeric pair keys, lazy
       `contacts`; re-run `physics-step` golden.~~ **DONE 2026-09-11**
-      (`setEventInterest`, listener-gated, checksum-neutral). (B4) `contentVersionOf` hashes
-      all 16 world-matrix floats per batched item (`batch.ts:347`); a pool
-      matrix version would replace it — re-run the idle-skip tests. (A2/A3)
-      WebGPU allocates a dynamic-offset array and a pipeline-key string per
-      draw — a reusable offset array is only safe once the fake-device
-      transcripts copy their args; memoise the key per material. (A5/A6) WebGL
+      (`setEventInterest`, listener-gated, checksum-neutral). ~~(B4) batch content hash~~ **measured and declined 2026-09-11** (a
+      version stamp misses the in-place matrix write the idle-skip contract
+      pins; interpolated matrices change per frame). ~~(A2/A3) WebGPU per-draw allocations~~ **DONE 2026-09-11** (reused
+      offset array; previous-draw pipeline memo). (A5/A6) WebGL
       `setColor`/`setTint` and `bindTexture` have no CPU mirrors — adding them
       changes the F13 GL-sequence goldens, so re-record deliberately. ~~(A7) `EventEmitter.emit` slices the listener array per emit~~ **DONE
       2026-09-11** (index loop + deferred compaction). (B2, B3, B5, B6, B7) measure
