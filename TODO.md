@@ -444,9 +444,10 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       (worst: one-scene-everything-moves 20, motor-digital-twin 13 with 2.5 s
       sleeps, particles 3–4 s) → `waitForFunction` on a frame counter.
       ~~`Scheduler.step` counter skew on a throwing step~~ **DONE 2026-09-11**
-      (counters roll back with the accumulator). Seventeen
-      `dispose()` implementations have no disposed flag (idempotent, but
-      use-after-dispose is silent; `drag.ts` documents reuse on purpose).
+      (counters roll back with the accumulator). ~~Seventeen `dispose()` implementations have no disposed flag~~ **DONE
+      2026-09-11** (eleven guarded; drag / snapshot-system / event-system /
+      physics-system / adapter documented as exceptions; `gl-batch.ts` with
+      the WebGL seams packet).
       WebGPU picking uses `CONTEXT_LOST` where the renderer uses
       `DEVICE_LOST` for the same condition (tests pin both; pick one).
       **Security.** ~~`bun audit` non-blocking~~ **DONE 2026-09-11** (critical

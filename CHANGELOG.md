@@ -73,6 +73,18 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### Changed
 
+- **Dispose discipline (§83).** Eleven classes gain a `disposed` getter, an
+  idempotent `dispose()`, and `INVALID_APPLICATION_STATE` on their primary
+  mutating entry points after dispose: `AnimationSystem`, `KinematicSystem`,
+  `ConstraintSystem`, `MotionSystem`, `ParticleSystem`,
+  `SweptCharacterSystem` (`track` / `fixedUpdate`); `RigidBody` (`validateFor`
+  and the §26/§32 commands), `Collider` (`validateFor` / `toDescriptor`),
+  every shipped `Joint` (`describeBase`, so `world.addJoint` refuses);
+  `WgpuBatching` (`beginFrame` / `draw`), `WgpuGpuTimer` (`arm` /
+  `beginPass`). Live behaviour unchanged; one test per class. Documented
+  exceptions: `DragManager` reuses after dispose on purpose (now stated on
+  `dispose()`); `createSnapshotSystem` is a stateless factory whose resource
+  is the `PoseBuffer`.
 - **Scheduler:** a fixed step that throws now rolls `simulationStep` and
   `simulationTime` back beside the accumulator it leaves holding, so the
   re-run next frame is the same step (they ran one ahead for the rest of the

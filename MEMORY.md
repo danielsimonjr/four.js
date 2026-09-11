@@ -461,6 +461,15 @@ readable; never delete the pointer itself.
   silently once. Pending in worktree agents at this commit: WebGL register
   seams (shadow/effect/particles) and the Playwright sleep removal.
 
+- **2026-09-11 — Dispose discipline.** The house pattern is `#disposed` +
+  `get disposed()` + idempotent `dispose()` + a `#requireLive()` that throws
+  `INVALID_APPLICATION_STATE` with `CanvasTexture.update`'s message shape
+  (§83). Two deliberate exceptions, now written down: `DragManager` may be
+  reused after dispose (no owned resource; `makeDraggable` re-establishes
+  subscriptions) and `createSnapshotSystem` is a stateless factory — the
+  `PoseBuffer` is the resource. `RigidBody.dispose()` while registered never
+  makes a step throw: the world drains through package-internal helpers.
+
 - **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
   (the exception each golden's `_warning` names). Values came from the
   scenario helpers, not from editing hashes by hand. 0.20 contact persistence
