@@ -1,3 +1,4 @@
+import { CanvasTexture } from "./raster.js";
 /**
  * `RenderGraph` (§63) — an ordered list of passes, executed by one call, with
  * the dependency between "a pass writes a target" and "a later pass samples it"
@@ -386,19 +387,37 @@ function collectSampledTargets(root: Node, out: Set<RenderTarget>): void {
         const bound = item.material.getTexture(sampler.name);
         if (isRenderTargetTexture(bound)) {
           out.add(bound.renderTarget);
+        } else if (
+          bound instanceof CanvasTexture &&
+          bound.readbackTarget !== null
+        ) {
+          out.add(bound.readbackTarget);
         }
       }
       continue;
     }
-    // Everything else: the material-shaped half of what the WebGL backend's
-    // `resolveTexture` reads, minus the caches — §55's `texture`, or §57's
-    // `map` (an untextured surface has a `null` map and samples nothing).
-    const texture: unknown =
-      item.kind === "sprite"
-        ? item.material.texture
-        : (item.material.map ?? null);
-    if (isRenderTargetTexture(texture)) {
-      out.add(texture.renderTarget);
+    // Every material texture slot can carry a delayed readback dependency.
+    // Validation is authoring-time; enumerate all sampled standard-map slots,
+    // not only albedo (RFC 0009 feedback applies to every sampler).
+    const material = item.material;
+    for (const key of [
+      "texture",
+      "map",
+      "metalRoughnessMap",
+      "emissiveMap",
+      "normalMap",
+      "occlusionMap",
+    ] as const) {
+      const texture: unknown =
+        key in material
+          ? (material as unknown as Record<string, unknown>)[key]
+          : null;
+      if (isRenderTargetTexture(texture)) out.add(texture.renderTarget);
+      else if (
+        texture instanceof CanvasTexture &&
+        texture.readbackTarget !== null
+      )
+        out.add(texture.readbackTarget);
     }
   }
 }

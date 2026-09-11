@@ -1,8 +1,8 @@
 # RFC 0009: GPU readback as a raster source (§77a residue)
 
-- **Status:** draft — proposed to the owner 2026-09-06; corrected 2026-09-10 (review pass, see *Review log*)
+- **Status:** accepted 2026-09-11 — implementation requested by the owner; recommendations adopted.
 - **Date:** 2026-09-06
-- **Owner decision:** pending
+- **Owner decision:** 2026-09-11: implement all RFCs and remaining TODO items.
 - **Spec sections affected:** §77a (primary), §33, §34, §61, §62, §63, §77, §83, §85, §89, §90, §96
 
 ## Context
@@ -19,7 +19,7 @@ rows bottom-to-top, `region` in target texels from the bottom-left.
 `RasterSource.readPixels` is the opposite shape: **synchronous**,
 application-owned `out`, called from `CanvasTexture.update()`.
 
-No RFC in `docs/rfcs/` covers joining the two. Particle GPU *snapshots*
+No RFC in `docs/rfcs/` covers joining the two. Particle GPU _snapshots_
 (`packages/particles/src/types.ts`) name "the GPU-readback RFC the R-1
 plan names" as a **simulation-state** question; that is not this RFC.
 This document is only: may a render target's colour attachment be a
@@ -31,7 +31,9 @@ The temptation is a live source:
 const source: RasterSource = {
   width: target.width,
   height: target.height,
-  readPixels: (out) => { /* renderer.readPixels(target) — but that is a Promise */ },
+  readPixels: (out) => {
+    /* renderer.readPixels(target) — but that is a Promise */
+  },
 };
 ```
 
@@ -145,7 +147,7 @@ not a `Renderer` interface member) as a checksum or replay source.
 R-4: feedback loops are refused, not drawn. A `GpuReadbackSource`
 whose `target` is the colour attachment of the view currently being
 rendered is the same loop, even though the bytes are from the
-*previous* refresh.
+_previous_ refresh.
 
 The packet extends the existing feedback check, and the mechanism has
 to be named because `CanvasTexture` keeps its source private:
@@ -192,8 +194,9 @@ paint tool.
 
 **Packet (S).** `GpuReadbackSource` + feedback-graph check + the
 display-only test still green + a unit double of `Renderer.readPixels`
-+ one browser assertion (WebGL and WebGPU) that `refresh` then
-`CanvasTexture.update` uploads the known clear colour.
+
+- one browser assertion (WebGL and WebGPU) that `refresh` then
+  `CanvasTexture.update` uploads the known clear colour.
 
 **Out of scope:** particle/compute snapshots; making `RasterSource`
 async; in-place resize; video; `ImageBitmap`; the §62 Canvas 2D
@@ -223,7 +226,7 @@ bump into a stall. RFC 0005 already refused a sync `readPixels` on
 is GPU-to-GPU sampling and already works. It does not produce CPU
 bytes and cannot feed a host 2D composite. Different feature.
 
-**E. Ride along with particle GPU snapshots.** Those bytes *are*
+**E. Ride along with particle GPU snapshots.** Those bytes _are_
 simulation state. Mixing the arguments would either ban checksums
 of a display blit (fine) or silently bless checksums of a GPU
 particle pool (false). Rejected; R-31 keeps its own RFC/packet.

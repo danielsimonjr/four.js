@@ -82,7 +82,9 @@ import type {
   MaterialTextureWrap,
   SpriteTexture,
 } from "@fourjs/materials";
-import type { ColorSpace } from "@fourjs/math";
+import type { ColorSpace, Rectangle2 } from "@fourjs/math";
+
+import { TextureUpdates } from "./texture-updates.js";
 
 import { validateColorSpace } from "./render-target.js";
 import {
@@ -502,7 +504,7 @@ function validateEnum<T extends string>(
 }
 
 /** Runs the §85 checks for one source. Throws on the first violation. */
-function validate(source: TextureSource): void {
+export function validateTextureSource(source: TextureSource): void {
   if (source.dimension !== undefined) {
     validateEnum(source.dimension, DIMENSIONS, "dimension");
     if (source.dimension !== "2d") {
@@ -591,7 +593,8 @@ function validate(source: TextureSource): void {
  * ## Version, not events
  *
  * Backends cache GPU uploads per texture, keyed on {@link Texture.id} and
- * validated by {@link Texture.version} — the identical contract
+ * validated by {@link Texture.version}; regional dirty updates additionally
+ * retain a bounded history for independent backend readers — the identical contract
  * `BufferGeometry` offers, and for the identical reason: a renderer that draws
  * a texture every frame compares a number, whereas a change event would cost a
  * subscription per texture per backend for no extra information. Assigning a new
@@ -603,8 +606,10 @@ function validate(source: TextureSource): void {
  *
  * Cube/array/3D *uploads* (the field is named — {@link TextureSource.dimension}
  * — and non-`"2d"` is refused with `NOT_IMPLEMENTED` rather than sampled as
- * 2D), compressed containers, render-target textures (§63), video textures
- * / `ImageBitmap`, and asynchronous upload with residency diagnostics (§84).
+ * 2D) and compressed containers. Render-target textures are implemented in
+ * `render-target.ts`; host bitmap/video sources are in `host-texture.ts`, and
+ * `Renderer.prepareTexture` waits for GPU completion with cache residency
+ * diagnostics. Regional `markDirty` calls preserve allocations where supported.
  * Every one of them adds public state that a backend, the §79 scene format,
  * and §76's asset manager all have to agree on.
  *
@@ -627,9 +632,9 @@ function validate(source: TextureSource): void {
  * `"srgb"` without moving goldens that never set `role`. What is left on the
  * list are the members that are *not* upload-time state: a cube or array
  * target changes the sampler type in every shader that reads it, a compressed
- * container changes the upload call and needs a §62 format report, a video
- * or `ImageBitmap` source needs per-frame update semantics (§9) rather than a
- * version bump, and async upload is residency diagnostics (§84).
+ * container changes the upload call and needs a §62 format report. Video
+ * frame notification and asynchronous upload completion now have separate
+ * implemented entry points, without changing the CPU resource ownership model.
  */
 export class Texture implements Disposable, SpriteTexture {
   /**
@@ -643,10 +648,12 @@ export class Texture implements Disposable, SpriteTexture {
 
   #version = 0;
 
+  readonly #updates = new TextureUpdates();
+
   #disposed = false;
 
   constructor(source: TextureSource) {
-    validate(source);
+    validateTextureSource(source);
     this.#source = source;
     noteTexture(1, this.byteLength);
     trackRenderDisposable(this, this.id);
@@ -666,7 +673,7 @@ export class Texture implements Disposable, SpriteTexture {
   }
 
   set source(value: TextureSource) {
-    validate(value);
+    validateTextureSource(value);
     const before = this.byteLength;
     this.#source = value;
     noteTexture(0, this.byteLength - before);
@@ -879,8 +886,19 @@ export class Texture implements Disposable, SpriteTexture {
    * Calling it after assigning {@link Texture.source} is harmless, only
    * wasteful: the version advances again and the texture re-uploads once more.
    */
-  markDirty(): void {
+  markDirty(region?: Rectangle2): void {
+    this.#updates.add(
+      this.#version + 1,
+      region ?? null,
+      this.width,
+      this.height,
+    );
     this.#version += 1;
+  }
+
+  /** Changed texels since a backend version, or null when a full upload is needed. */
+  getDirtyRegion(sinceVersion: number): Rectangle2 | null {
+    return this.#updates.since(sinceVersion, this.#version);
   }
 
   /**

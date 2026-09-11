@@ -1,16 +1,16 @@
 # Unused Files and Exports Analysis
 
-**Generated**: 2026-09-09
+**Generated**: 2026-09-11
 
 ## Summary
 
 - **Potentially unused files**: 0
-- **Dormant files** (runtime code on disk, unreachable from any entry/build root): 1
+- **Dormant files** (runtime code on disk, unreachable from any entry/build root): 4
   - **Orphaned (reachable from nothing — delete/wire candidates)**: 0
-  - **Test-only (exercised by a test, ships nothing)**: 1
-- **Potentially unused exports**: 4
+  - **Test-only (exercised by a test, ships nothing)**: 4
+- **Potentially unused exports**: 5
   - **Unreferenced anywhere (deletion candidates)**: 0
-  - **Referenced in-module (type contracts / helpers backing live exports)**: 4
+  - **Referenced in-module (type contracts / helpers backing live exports)**: 5
 
 ## Dormant Files — Orphaned (delete/wire candidates)
 
@@ -31,6 +31,15 @@ directly. Not dead; not shipped. No action needed.
 
 - `packages/diagnostics/src/dev-warnings.ts`
 
+### `packages/fourjs` (1)
+
+- `packages/fourjs/src/text-harfbuzz.ts`
+
+### `packages/text` (2)
+
+- `packages/text/src/harfbuzz/harfbuzz-shaping-engine.ts`
+- `packages/text/src/harfbuzz/index.ts`
+
 ## Potentially Unused Files
 
 These files are not imported by any other file in the codebase:
@@ -48,19 +57,23 @@ Not imported cross-file, but referenced within their own module — they type or
 support exports that ARE used, so they cannot be deleted in isolation. Mostly
 interfaces typing live guards and per-package API completeness, not rot.
 
+### `packages/text/src/shaping.ts`
+
+- `validateShapingDirection` (function) — 1 in-file ref
+
 ### `packages/fourjs/src/scene-serializers.ts`
 
 - `CANVAS_VIEW_NODE_TYPE` (constant) — 3 in-file refs
 
-### `packages/geometry/src/svg-document.ts`
+### `packages/geometry/src/path-boolean.ts`
 
-- `parseTransform` (function) — 1 in-file ref
+- `ringsContain` (function) — 2 in-file refs
 
 ### `packages/geometry/src/geometry.ts`
 
 - `nextGeometryIdentifier` (function) — 1 in-file ref
 
-### `packages/geometry/src/path-boolean.ts`
+### `packages/geometry/src/svg-document.ts`
 
-- `ringsContain` (function) — 2 in-file refs
+- `parseTransform` (function) — 1 in-file ref
 

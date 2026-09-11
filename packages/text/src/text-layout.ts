@@ -62,8 +62,8 @@
  *
  * Line **breaking** and wrapping (only an explicit `\n` breaks a line here),
  * **vertical** alignment, word spacing, rich-text spans, text on
- * paths, bidirectional reordering, shaping, ligatures, and kerning. §56 stages
- * shaping/bidi/ligatures behind a shaping-engine decision recorded by amendment;
+ * paths and bidirectional reordering. Optional shaping, ligatures and kerning
+ * use the RFC0008 shaping seam; the default code-point walk stays unchanged.
  * wrapping is not blocked by that, it is simply the next packet — and it is a
  * *different* kind of change from alignment, because a wrap decides where lines
  * end (a word-breaking rule, i.e. UAX #14 and a language) rather than where a
@@ -72,6 +72,11 @@
  * would be inventing an origin convention that §56 does not state.
  */
 
+import {
+  IdentityShapingEngine,
+  type ShapingEngine,
+  type ShapingDirection,
+} from "./shaping.js";
 import type { GlyphAtlas, GlyphAtlasEntry } from "./glyph-atlas.js";
 
 /**
@@ -84,6 +89,8 @@ import type { GlyphAtlas, GlyphAtlasEntry } from "./glyph-atlas.js";
  * and expanding it to vertices is one line at the point of use.
  */
 export interface TextQuad {
+  /** UTF-16 source index, present only when shaping was requested. */
+  readonly cluster?: number;
   /** Left edge in world units. */
   readonly x0: number;
 
@@ -120,6 +127,12 @@ export type TextAlign = "left" | "center" | "right";
 
 /** Arguments of {@link layoutText}. */
 export interface TextLayoutOptions {
+  shaper?: ShapingEngine;
+  fontId?: string;
+  script?: string;
+  language?: string;
+  direction?: ShapingDirection;
+  features?: Readonly<Record<string, number>>;
   /**
    * World units per line — the baseline-to-baseline distance of single-spaced
    * lines, and the height of one glyph cell. Must be finite and positive. See
@@ -278,6 +291,12 @@ export function layoutText(
     options.letterSpacing ?? 0,
   );
 
+  if (options.shaper) {
+    if (!options.fontId)
+      throw new RangeError("fontId is required with a shaper");
+    return layoutShaped(text, atlas, options, letterSpacing);
+  }
+
   const align = options.align ?? "left";
 
   const quads: MutableTextQuad[] = [];
@@ -383,5 +402,105 @@ export function layoutText(
     width,
     height: lineCount * size,
     lineCount,
+  });
+}
+
+/** Shapes each explicit line; bidi resolution and wrapping remain caller responsibilities. */
+function layoutShaped(
+  text: string,
+  atlas: GlyphAtlas,
+  options: TextLayoutOptions,
+  spacing: number,
+): TextLayout {
+  if (!text)
+    return Object.freeze({
+      quads: Object.freeze([]),
+      width: 0,
+      height: 0,
+      lineCount: 0,
+    });
+  const size = options.size,
+    scale = size / atlas.lineHeight;
+  const quads: (MutableTextQuad & { cluster: number })[] = [];
+  const lines = text.split("\n"),
+    widths: number[] = [],
+    starts: number[] = [];
+  let source = 0,
+    baseline = 0,
+    width = 0;
+  for (const line of lines) {
+    starts.push(quads.length);
+    let pen = 0,
+      count = 0;
+    const runs = options.shaper!.shape({
+      ...options,
+      text: line,
+      fontId: options.fontId!,
+    });
+    for (const run of runs) {
+      const glyphs = run.glyphs.filter((g) => line[g.cluster] !== "\r");
+      const advances = glyphs.map((g) =>
+        options.shaper instanceof IdentityShapingEngine
+          ? (atlas.glyphsById?.get(g.glyphId) ?? atlas.fallback).advance * scale
+          : (g.advanceX * size) / 1000,
+      );
+      let runWidth = 0;
+      for (let i = 0; i < glyphs.length; i++) {
+        if (i) runWidth += spacing;
+        runWidth += advances[i];
+      }
+      if (glyphs.length && count) pen += spacing;
+      let cursor = run.direction === "rtl" ? pen + runWidth : pen;
+      for (let i = 0; i < glyphs.length; i++) {
+        const g = glyphs[i],
+          entry = atlas.glyphsById?.get(g.glyphId) ?? atlas.fallback;
+        if (run.direction === "rtl") {
+          if (i) cursor -= spacing;
+          cursor -= advances[i];
+        } else if (i) cursor += spacing;
+        const x = g.offsetX === 0 ? cursor : cursor + (g.offsetX * size) / 1000;
+        const y =
+          g.offsetY === 0 ? baseline : baseline + (g.offsetY * size) / 1000;
+        if (!entry.blank)
+          quads.push({
+            x0: x,
+            x1: x + entry.width * scale,
+            y0: y - atlas.descent * scale,
+            y1: y + atlas.ascent * scale,
+            u0: entry.u0,
+            v0: entry.v0,
+            u1: entry.u1,
+            v1: entry.v1,
+            cluster: source + g.cluster,
+          });
+        if (run.direction !== "rtl") cursor += advances[i];
+      }
+      pen = run.direction === "rtl" ? pen + runWidth : cursor;
+      count += glyphs.length;
+    }
+    widths.push(pen);
+    width = Math.max(width, pen);
+    source += line.length + 1;
+    baseline -= size;
+  }
+  if (options.align && options.align !== "left")
+    for (let line = 0; line < lines.length; line++) {
+      const offset =
+        (width - widths[line]) * (options.align === "center" ? 0.5 : 1);
+      if (offset)
+        for (
+          let i = starts[line];
+          i < (starts[line + 1] ?? quads.length);
+          i++
+        ) {
+          quads[i].x0 += offset;
+          quads[i].x1 += offset;
+        }
+    }
+  return Object.freeze({
+    quads: Object.freeze(quads.map((q) => Object.freeze(q))),
+    width,
+    height: lines.length * size,
+    lineCount: lines.length,
   });
 }

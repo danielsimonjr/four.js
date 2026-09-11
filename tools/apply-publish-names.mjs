@@ -201,7 +201,7 @@ const CODE_EXTENSIONS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"];
 // name left every subpath token behind and failed the run it was meant to protect.
 const SCOPED_STRING = /(["'])@fourjs\/([a-z0-9-]+(?:\/[a-z0-9-]+)*)\1/g;
 const BARE_SPECIFIER =
-  /(\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)(["'])fourJS\2/g;
+  /(\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)(["'])fourJS((?:\/[a-z0-9-]+)*)\2/g;
 
 /**
  * Rewrites workspace names inside emitted code. Returns the new text and the
@@ -210,9 +210,9 @@ const BARE_SPECIFIER =
  */
 export function rewriteCode(text) {
   let count = 0;
-  let out = text.replace(BARE_SPECIFIER, (_m, lead, quote) => {
+  let out = text.replace(BARE_SPECIFIER, (_m, lead, quote, subpath) => {
     count += 1;
-    return `${lead}${quote}${PUBLISH_UMBRELLA}${quote}`;
+    return `${lead}${quote}${PUBLISH_UMBRELLA}${subpath}${quote}`;
   });
   out = out.replace(SCOPED_STRING, (_m, quote, name) => {
     count += 1;
@@ -240,9 +240,7 @@ function walkFiles(dir) {
  * from a release.
  */
 export function workspacePatterns(root) {
-  const manifest = JSON.parse(
-    readFileSync(join(root, "package.json"), "utf8"),
-  );
+  const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const raw = manifest.workspaces;
   if (Array.isArray(raw)) return raw.map(String);
   if (raw && typeof raw === "object" && Array.isArray(raw.packages)) {
@@ -279,11 +277,13 @@ export function readWorkspacePackages(root = DEFAULT_ROOT) {
       dirs.push(join(root, pattern));
     }
   }
-  return dirs.sort((a, b) => a.localeCompare(b)).map((dir) => ({
-    dir,
-    relDir: relative(root, dir).split("\\").join("/"),
-    manifest: JSON.parse(readFileSync(join(dir, "package.json"), "utf8")),
-  }));
+  return dirs
+    .sort((a, b) => a.localeCompare(b))
+    .map((dir) => ({
+      dir,
+      relDir: relative(root, dir).split("\\").join("/"),
+      manifest: JSON.parse(readFileSync(join(dir, "package.json"), "utf8")),
+    }));
 }
 
 /**
@@ -351,6 +351,9 @@ export function applyPublishNames({ root = DEFAULT_ROOT, outDir = null } = {}) {
   const staged = [];
 
   for (const pkg of packages) {
+    // Private workspaces are build tools, never release candidates. Keep them
+    // in version discovery so a public dependency on one is still validated.
+    if (pkg.manifest.private === true) continue;
     const rewritten = rewriteManifest(pkg.manifest, versions);
     for (const problem of checkRewrite(pkg.manifest, rewritten)) {
       problems.push(`${pkg.relDir}: ${problem}`);
@@ -358,7 +361,7 @@ export function applyPublishNames({ root = DEFAULT_ROOT, outDir = null } = {}) {
     staged.push({ ...pkg, rewritten });
   }
 
-  const unversioned = packages.filter((p) => p.manifest.version === "0.0.0");
+  const unversioned = staged.filter((p) => p.manifest.version === "0.0.0");
   if (unversioned.length) {
     notes.push(
       `${unversioned.length} package(s) are still at 0.0.0 — \`changeset version\` must run ` +

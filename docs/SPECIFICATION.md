@@ -10,7 +10,7 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.15 — 2026-09-10**
+**Specification revision 1.16 — 2026-09-11**
 
 | Revision | Date | Summary |
 |---|---|---|
@@ -30,6 +30,7 @@
 | 1.13 | 2026-08-30 | Honesty pass over §89's example-code list: the shipped `FourErrorCode` union had grown `INVALID_APPLICATION_STATE`, `UNTRUSTED_INPUT_REJECTED`, `NOT_IMPLEMENTED`, and (this revision) `INVALID_RENDER_GRAPH` without the spec's example list following. The list is examples, not a closed set, but a host matching on the documented names should see every code the engine currently throws. Header revision number was lagging at 1.11 while the table already carried 1.12. Frozen §1–120 numbering untouched. |
 | 1.14 | 2026-09-05 | RFC 0006 (TypeScript-on-Bun toolchain) accepted: §91 recommended baseline replaces "pnpm workspace" and "Turborepo or Nx" with a **Bun workspace** (package manager + script runner); Vitest, Playwright, ESLint, Prettier, TypeDoc, Vite, Changesets, and GitHub Actions stay. Library emit remains `tsc -b` with composite project references — Bun does not replace the TypeScript compiler for published `dist`. §103 Phase 0 deliverables list `bun.lock` / `bunfig.toml` instead of `pnpm-workspace.yaml`. Frozen §1–120 numbering untouched. |
 | 1.15 | 2026-09-10 | Honesty pass on §60's shipped-tier paragraph: R-17's light-uniform contract landed 2026-08-09, so lighting-aware graphs are no longer sequenced as waiting on that contract. Node materials stay **unlit**; lighting-aware graphs remain RFC 0001 residue. Frozen §1–120 numbering untouched. |
+| 1.16 | 2026-09-11 | Owner requested implementation of all RFCs: accept RFC 0007 path-planning adapters, RFC 0008 optional HarfBuzz WebAssembly shaping, and RFC 0009 display-only GPU readback snapshots. §56 records the shaping-engine decision before implementation; default bitmap layout remains unchanged. Frozen section numbering preserved. |
 
 ---
 
@@ -1854,8 +1855,10 @@ Requirements:
 - accessible semantic mirror.
 MVP tier: initial releases may ship bitmap/SDF text with basic Latin-script layout
 only. Full shaping, bidirectional layout, and ligatures are staged behind a
-shaping-engine decision (for example HarfBuzz via WebAssembly versus a native
-implementation), to be recorded by amendment before that work begins.
+shaping-engine decision. Revision 1.16 accepts RFC 0008: optional HarfBuzz via
+WebAssembly behind a separate entry point and application-supplied wasm/font bytes;
+the default bitmap path stays unchanged. Bidi auto-resolution, vertical layout and
+font rasterization remain separately staged by that RFC.
 
 ```ts
 const label = new Four.Text({

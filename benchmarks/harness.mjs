@@ -90,6 +90,21 @@ export const MEASUREMENT_NOTE =
 export const SUITE = Object.freeze(
   [
     {
+      file: "shader-uniform-block.mjs",
+      record: "shader-uniform-block",
+      what: "RFC 0001 std140 upload-call and byte comparison",
+    },
+    {
+      file: "text-shaping-init.mjs",
+      record: "text-shaping-init",
+      what: "RFC 0008 wasm initialization and warm shaping",
+    },
+    {
+      file: "path-planning.mjs",
+      record: "path-planning",
+      what: "RFC 0007 waypoint A* on open and serpentine 256x256 graphs",
+    },
+    {
       file: "math-ops.mjs",
       record: "math-ops",
       what: "§7b math throughput and per-op allocation (§83, §92)",

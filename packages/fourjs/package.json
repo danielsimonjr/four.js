@@ -104,6 +104,10 @@
     "./application": {
       "types": "./dist/application.d.ts",
       "import": "./dist/application.js"
+    },
+    "./text/harfbuzz": {
+      "types": "./dist/text-harfbuzz.d.ts",
+      "import": "./dist/text-harfbuzz.js"
     }
   },
   "files": [

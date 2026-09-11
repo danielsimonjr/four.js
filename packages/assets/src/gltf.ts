@@ -30,8 +30,8 @@
  *   texture, metallic/roughness factors, packed `metallicRoughnessTexture`
  *   (linear), emissive factor, `OPAQUE`/`BLEND`. Packed MR and emissive
  *   textures are decoded and assigned; remaining unstaged slots
- *   (`normalTexture`, `occlusionTexture`) are validated, **not decoded**,
- *   and recorded per material as {@link GltfMaterialRecord.ignoredTextures}.
+ *   (`normalTexture`, `occlusionTexture`) decode as linear data and carry
+ *   their normal scale / occlusion strength through instantiation.
  *   WebGL samples the packed map (unit 2) and the emissive map (unit 3);
  *   WebGPU samples the packed map and still shades emissive from the factor
  *   alone (four-group budget when albedo and MR occupy groups 2 and 3).
@@ -234,6 +234,12 @@ export interface GltfMaterialRecord {
   readonly metallicRoughnessTexture: number | null;
   /** Emissive map index, or `null`. Decoded sRGB. */
   readonly emissiveTexture: number | null;
+  /** Linear normal map index. */
+  readonly normalTexture: number | null;
+  readonly normalScale: number;
+  /** Linear ambient occlusion map index. */
+  readonly occlusionTexture: number | null;
+  readonly occlusionStrength: number;
   /** Whether `alphaMode` was `"BLEND"`. */
   readonly transparent: boolean;
   /**
@@ -244,8 +250,8 @@ export interface GltfMaterialRecord {
   readonly doubleSided: boolean;
   /**
    * Texture slots the file carries but this tier cannot sample
-   * (`normalTexture`, `occlusionTexture`): validated, not decoded, warned
-   * at instantiation. `emissiveTexture` is decoded (sRGB) and assigned.
+   * for future extensions. All five core metallic-roughness texture slots
+   * are decoded; rendering support remains backend-dependent.
    */
   readonly ignoredTextures: readonly string[];
   /** §78 user metadata (`extras`). */
@@ -1705,10 +1711,7 @@ async function parseGltf(
   const materials: GltfMaterialRecord[] = [];
   const referencedTextures = new Set<number>();
   const textureColorSpace = new Map<number, "srgb" | "linear">();
-  const referenceTexture = (
-    index: number,
-    space: "srgb" | "linear",
-  ): void => {
+  const referenceTexture = (index: number, space: "srgb" | "linear"): void => {
     referencedTextures.add(index);
     if (space === "srgb" || !textureColorSpace.has(index)) {
       textureColorSpace.set(index, space);
@@ -1724,6 +1727,10 @@ async function parseGltf(
     let baseColorTexture: number | null = null;
     let metallicRoughnessTexture: number | null = null;
     let emissiveTexture: number | null = null;
+    let normalTexture: number | null = null;
+    let occlusionTexture: number | null = null;
+    let normalScale = 1;
+    let occlusionStrength = 1;
     const pbrValue = record["pbrMetallicRoughness"];
     if (pbrValue !== undefined) {
       const pbr = asObject(pbrValue, url, `${where}.pbrMetallicRoughness`);
@@ -1755,8 +1762,24 @@ async function parseGltf(
     }
     for (const slot of ["normalTexture", "occlusionTexture"]) {
       if (record[slot] !== undefined) {
-        textureInfo(record[slot], `${where}.${slot}`);
-        ignoredTextures.push(slot);
+        const index = textureInfo(record[slot], `${where}.${slot}`);
+        const info = asObject(record[slot], url, `${where}.${slot}`);
+        const parameter = slot === "normalTexture" ? "scale" : "strength";
+        const factor = optionalNumber(
+          info,
+          parameter,
+          1,
+          url,
+          `${where}.${slot}`,
+        );
+        if (slot === "normalTexture") {
+          normalTexture = index;
+          normalScale = factor;
+        } else {
+          occlusionTexture = index;
+          occlusionStrength = factor;
+        }
+        referenceTexture(index, "linear");
       }
     }
     if (record["emissiveTexture"] !== undefined) {
@@ -1765,12 +1788,6 @@ async function parseGltf(
         `${where}.emissiveTexture`,
       );
       referenceTexture(emissiveTexture, "srgb");
-    }
-    if (ignoredTextures.length > 0) {
-      ignore(
-        context,
-        `${where}: texture slot(s) ${ignoredTextures.join(", ")} (unstaged §59 maps)`,
-      );
     }
     const emissive = optionalTuple(
       record,
@@ -1799,6 +1816,10 @@ async function parseGltf(
       baseColorTexture,
       metallicRoughnessTexture,
       emissiveTexture,
+      normalTexture,
+      occlusionTexture,
+      normalScale,
+      occlusionStrength,
       transparent: alphaMode === "BLEND",
       doubleSided: record["doubleSided"] === true,
       ignoredTextures,

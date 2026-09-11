@@ -27,6 +27,9 @@ the module loads. The whole suite takes about **77 s** on the recorded host, dom
 
 | script                                                                                        | what it measures                                                             | §86 row                                                                                   |
 | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [`shader-uniform-block.mjs`](shader-uniform-block.mjs) | RFC 0001: individual versus std140 upload calls and payload bytes | instrumented calls, no GPU timing claim |
+| [`path-planning.mjs`](path-planning.mjs) | RFC 0007: A* on open and serpentine 65,536-node waypoint graphs | CPU planning; construction excluded |
+| [`text-shaping-init.mjs`](text-shaping-init.mjs) | RFC 0008: explicit WASM initialization and warm real-font shaping | CPU initialization and shaping; no rasterization claim |
 | [`geometry-updates.mjs`](#geometry-updatesmjs--dynamic-webgl-geometry) | Geometry-cache GL call/object counts and CPU preparation, dirty/static controls | no GPU or FPS claim |
 | [`math-ops.mjs`](#math-opsmjs--7b-math-throughput-and-allocation)                             | `Vector3`/`Quaternion`/`Matrix4` throughput **and per-operation allocation** | none — the foundation the rows sit on                                                     |
 | [`scene-propagation.mjs`](#scene-propagationmjs--7-world-transform-resolution)                | `resolveWorldTransforms` over deep and wide trees, dirty and clean           | _idle scene_, for the scene graph                                                         |

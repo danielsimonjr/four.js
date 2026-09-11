@@ -518,6 +518,8 @@ export interface GpuCommandEncoder {
 
 /** The device's submission queue. */
 export interface GpuQueue {
+  /** Resolves after work submitted before this call completes on the GPU. */
+  onSubmittedWorkDone?(): Promise<void>;
   /** Uploads CPU bytes into a buffer allocation. */
   writeBuffer(
     buffer: GpuBuffer,
@@ -536,7 +538,11 @@ export interface GpuQueue {
    * it has nothing to undo.
    */
   writeTexture(
-    destination: { readonly texture: GpuTexture; readonly mipLevel?: number },
+    destination: {
+      readonly texture: GpuTexture;
+      readonly mipLevel?: number;
+      readonly origin?: readonly [number, number, number];
+    },
     data: ArrayBufferView,
     dataLayout: {
       readonly offset?: number;

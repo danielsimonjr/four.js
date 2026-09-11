@@ -723,9 +723,9 @@ function scissorJson(node: {
   };
 }
 
-function readScissor(data: {
-  readonly [key: string]: JsonValue;
-}): { scissor?: ScissorRect } {
+function readScissor(data: { readonly [key: string]: JsonValue }): {
+  scissor?: ScissorRect;
+} {
   const value = data.scissor;
   if (value === undefined || value === null || typeof value !== "object") {
     return {};
@@ -1577,7 +1577,7 @@ export function registerRenderSerializers(
             geometry: resourceKeyJson<BufferGeometry>(
               node,
               "geometry",
-              mesh.geometry,
+              mesh.bindGeometry,
               geometries,
               policy,
             ),
@@ -1588,6 +1588,7 @@ export function registerRenderSerializers(
               materials,
               policy,
             ),
+            ...(mesh.skinningMode === "cpu" ? { skinningMode: "cpu" } : {}),
             renderLayer: mesh.renderLayer,
             renderOrder: mesh.renderOrder,
             ...renderableFlagsJson(mesh),
@@ -1757,6 +1758,7 @@ export function registerRenderSerializers(
             ...readRenderableFlags(data),
             ...readScissor(data),
           });
+          if (data.skinningMode === "cpu") mesh.skinningMode = "cpu";
           // The skeleton record: shape-corrupt restores no skeleton (the
           // motion serializers' corrupt-field policy — a mesh without its rig
           // is a usable mesh), while a well-formed record the classes refuse

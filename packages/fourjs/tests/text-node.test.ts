@@ -1,3 +1,4 @@
+import { IdentityShapingEngine, type ShapeQuery } from "@fourjs/text";
 /**
  * §49/§56's `Text` node, and its §79 pair (R-28, 2026-08-13).
  *
@@ -17,7 +18,11 @@
  *    while a missing font is refused loudly.
  */
 
-import { SpriteMaterial, UnlitMaterial, type Material } from "@fourjs/materials";
+import {
+  SpriteMaterial,
+  UnlitMaterial,
+  type Material,
+} from "@fourjs/materials";
 import { Texture } from "@fourjs/render";
 import { Group } from "@fourjs/scene";
 import {
@@ -557,5 +562,32 @@ describe("Text — §79 round trip (R-28)", () => {
     ) as Record<string, unknown>;
 
     expect(data.material).toBeNull();
+  });
+});
+
+it("forwards shaping options", () => {
+  let received: ShapeQuery | undefined;
+  class Spy extends IdentityShapingEngine {
+    override shape(query: ShapeQuery) {
+      received = query;
+      return super.shape(query);
+    }
+  }
+  const shaper = new Spy(),
+    fontId = shaper.addFont(new Uint8Array());
+  void new Text(atlas, inkFor(), {
+    text: "fi",
+    shaper,
+    fontId,
+    script: "latn",
+    language: "en",
+    features: { liga: 1 },
+  }).layout;
+  expect(received).toMatchObject({
+    text: "fi",
+    fontId,
+    script: "latn",
+    language: "en",
+    features: { liga: 1 },
   });
 });

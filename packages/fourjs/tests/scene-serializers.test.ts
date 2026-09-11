@@ -1997,6 +1997,20 @@ describe("registerSceneNodeTypes — Mesh, Bone, and MorphWeights (RFC 0003)", (
     expect(mesh.morphTargetWeights).toBe(weights?.weights);
   });
 
+  it("round-trips CPU mode using authored geometry instead of generated vertices", () => {
+    const io = registerSceneNodeTypes({ geometries, materials });
+    const scene = buildSkinnedScene();
+    const mesh = scene.children[0] as Mesh;
+    mesh.skinningMode = "cpu";
+    expect(mesh.geometry).not.toBe(skinnedPlane);
+    const document = serializeScene(scene, io.components, io.write);
+    const reloaded = instantiateScene(document, io.components, io.read);
+    const restored = reloaded.children[0] as Mesh;
+    expect(restored.skinningMode).toBe("cpu");
+    expect(restored.bindGeometry).toBe(skinnedPlane);
+    expect(serializeScene(reloaded, io.components, io.write)).toEqual(document);
+  });
+
   it("is textually idempotent, skeleton included — the P11-1 gate", () => {
     const io = registerSceneNodeTypes({ geometries, materials });
     const scene = buildSkinnedScene();

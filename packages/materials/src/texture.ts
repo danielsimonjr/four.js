@@ -38,7 +38,7 @@
  * geometry and material.
  */
 
-import type { ColorSpace } from "@fourjs/math";
+import type { ColorSpace, Rectangle2 } from "@fourjs/math";
 
 /**
  * How a texture is sampled between texel centres (§77's "filter modes"; R-30,
@@ -107,6 +107,8 @@ export type MaterialTextureWrap =
  * advances {@link MaterialTexture.version}.
  */
 export interface MaterialTexture {
+  /** Union of changed texels since a backend version; null requires a full upload. */
+  getDirtyRegion?(sinceVersion: number): Rectangle2 | null;
   /**
    * Stable identity (§83's resource model). Backends key their upload caches on
    * it and validate the entry with {@link MaterialTexture.version}, exactly as

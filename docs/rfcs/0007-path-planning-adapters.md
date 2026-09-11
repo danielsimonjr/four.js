@@ -1,8 +1,8 @@
 # RFC 0007: Path-planning adapters (§111, steering fold)
 
-- **Status:** draft — proposed to the owner 2026-09-06; corrected 2026-09-10 (review pass, see *Review log*)
+- **Status:** accepted 2026-09-11 — implementation requested by the owner; recommendations adopted.
 - **Date:** 2026-09-06
-- **Owner decision:** pending
+- **Owner decision:** 2026-09-11: implement all RFCs and remaining TODO items.
 - **Spec sections affected:** §111 (primary), §12, §13, §33, §42, §81, §85, §89, §90, §98
 
 ## Context
@@ -17,10 +17,10 @@ Verified against the tree (2026-09-06):
   `arrive`, `wander` / `wanderSpherical`, flocking) as **pure functions that
   write an acceleration** (plan P8-2). The caller applies it. Nothing in
   `steering.ts` owns a node, reads a clock, or writes a transform.
-- Path *following* already exists, and is a different thing: §12's
+- Path _following_ already exists, and is a different thing: §12's
   `KinematicController.followPath` samples a §13 `Trajectory` and writes
   `transform.position` under `"kinematic"` authority. Steering's own header
-  names path following as *not here*, because it needs a path type.
+  names path following as _not here_, because it needs a path type.
 - Trajectory prediction (`prediction.ts`) and two-bone / CCD / FABRIK IK
   (`ik.ts`) both carry the same dated staging note: path-planning adapters wait
   on this RFC.
@@ -36,11 +36,11 @@ second kinematic controller, and not a robotics command language.
 Three planner families are in scope because they are the ones applications
 actually ship, and they share one output shape:
 
-| Family    | Input                                                                 | Typical algorithm                         |
-| --------- | --------------------------------------------------------------------- | ----------------------------------------- |
-| Grid      | occupancy / cost field on a regular lattice (2D XY or 3D)             | A\*, JPS, Dijkstra                        |
-| Navmesh   | walkable triangles (2D or 3.5D) plus off-mesh links                   | funnel / string-pull, A\* on the dual     |
-| Waypoint  | directed graph of named points, optional radii / portals              | A\* / Dijkstra on the graph               |
+| Family   | Input                                                     | Typical algorithm                     |
+| -------- | --------------------------------------------------------- | ------------------------------------- |
+| Grid     | occupancy / cost field on a regular lattice (2D XY or 3D) | A\*, JPS, Dijkstra                    |
+| Navmesh  | walkable triangles (2D or 3.5D) plus off-mesh links       | funnel / string-pull, A\* on the dual |
+| Waypoint | directed graph of named points, optional radii / portals  | A\* / Dijkstra on the graph           |
 
 `@fourjs/motion`'s frozen §3.1 row is `core, math, scene`. A planner that imported
 `@fourjs/physics` (collider occupancy) or `@fourjs/geometry` (navmesh tessellation)
@@ -62,7 +62,7 @@ The adapter interface, the path record, and the steering consumer live in
 No new §98 package. No new §3.1 edge.
 
 A planner implementation that needs physics queries or geometry processing is
-a **plugin** (or application code) that *reads* those packages and *implements*
+a **plugin** (or application code) that _reads_ those packages and _implements_
 the motion-side interface. Motion never imports them.
 
 ### 2. The path a planner returns
@@ -116,10 +116,7 @@ can consume the same plan. Conversion is opt-in. Steering never needs it.
  * to `@fourjs/core` is a separate additive move this RFC does not wait on.
  */
 export type PathPlannerDeterminism =
-  | "none"
-  | "same-runtime"
-  | "same-platform"
-  | "cross-platform";
+  "none" | "same-runtime" | "same-platform" | "cross-platform";
 
 export interface PathPlannerCapabilities {
   readonly families: readonly ("grid" | "navmesh" | "waypoint")[];
@@ -285,10 +282,10 @@ planners; any occupancy built by reading `@fourjs/physics` colliders
 
 **A. Treat `KinematicController.followPath` as the whole answer.** It
 already follows a `Trajectory`. A planner would only need to emit one.
-This loses the steering fold §111 asked for: kinematic follow *owns*
+This loses the steering fold §111 asked for: kinematic follow _owns_
 translation and samples time, which is the wrong contract for an agent
 that must still flee, separate, and arrive. Steering outputs a
-*contribution*; kinematics replaces the channel. Both consumers are
+_contribution_; kinematics replaces the channel. Both consumers are
 real; only a waypoint record serves both.
 
 **B. Put planners in `@fourjs/physics`.** Attractive for "occupancy is
@@ -301,7 +298,7 @@ implements `PathPlannerAdapter`, not a reason to move the interface.
 generation is large enough to want one. It loses on §98 and plan §3.1:
 new top-level packages need an owner amendment. This RFC can be accepted
 without that. If a navmesh packet later needs its own home, that is a
-follow-up RFC that *adds* a package; it should not gate the adapter.
+follow-up RFC that _adds_ a package; it should not gate the adapter.
 
 **D. Callback-per-query heuristics and cost.** The nicest research API
 (`plan(query, { heuristic, cost })`). It re-enters user code from inside
@@ -348,7 +345,7 @@ Rows in `docs/COMPATIBILITY.md` this RFC moves:
   (`packages/fourjs/src/motion.ts` is `export *`; the token additionally
   through `plugins.ts`). **Minor.** No closed union widens.
 - **Scene format versions (§79).** Unmoved. A planned path is a runtime
-  value, not a node. A future document that *names* a registered planner
+  value, not a node. A future document that _names_ a registered planner
   (by `name` string, never a module specifier) is a later packet and
   would be additive.
 - **Plugin API versions (§81).** Additive token `fourJS:path-planners`.

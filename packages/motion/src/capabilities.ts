@@ -49,6 +49,14 @@ import type { SystemRegistry } from "./systems.js";
  * registry is `app.systems`, which the application owns outright.
  */
 export const SIMULATION_SYSTEMS =
-  /* @__PURE__ */ defineCapability<SystemRegistry>("fourJS:simulation-systems", {
-    revocable: true,
-  });
+  /* @__PURE__ */ defineCapability<SystemRegistry>(
+    "fourJS:simulation-systems",
+    {
+      revocable: true,
+    },
+  );
+
+import type { PathPlannerRegistry } from "./path-planning.js";
+/** RFC 0007 explicit planner registry; non-revocable by default. */
+export const PATH_PLANNERS =
+  /* @__PURE__ */ defineCapability<PathPlannerRegistry>("fourJS:path-planners");

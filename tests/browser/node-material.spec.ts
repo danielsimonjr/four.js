@@ -165,3 +165,32 @@ test.describe("§60 node materials paint per fragment on a real driver (RFC 0001
     expect(probe.pixels[outside + 2]).toBeLessThan(5);
   });
 });
+
+test("std140 matches individual uniforms byte-for-byte on a real WebGL 2 driver", async ({
+  page,
+}) => {
+  const code = await bundleFixture();
+  await page.goto(`http://localhost:${String(PORT)}/`);
+  await page.setContent("<!doctype html><body></body>");
+  await page.addScriptTag({ content: code, type: "module" });
+  await page.waitForSelector("body[data-node-material-ready='1']", {
+    timeout: 30_000,
+  });
+  const result = await page.evaluate(() =>
+    window.fourNodeUniformBlockProbe?.(),
+  );
+  expect(result).toBeDefined();
+  expect(result!.drawCalls).toEqual([1, 1, 1, 1]);
+  expect(result!.glErrors).toEqual([0, 0, 0, 0]);
+  expect(result!.initialMismatches).toBe(0);
+  expect(result!.updatedMismatches).toBe(0);
+  expect(result!.changedPixels).toBeGreaterThan(10_000);
+  for (const channel of result!.center.slice(0, 3)) {
+    expect(channel).toBeGreaterThan(10);
+    expect(channel).toBeLessThan(240);
+  }
+  expect(result!.center[3]).toBe(255);
+  console.log(
+    `std140: all 307200 framebuffer bytes match before and after updates; ${String(result!.changedPixels)} changed pixels; center=${result!.center.join(",")}`,
+  );
+});

@@ -1,0 +1,46 @@
+{
+  "benchmark": "path-planning",
+  "recordedAt": "2026-09-11T17:24:14.138Z",
+  "host": {
+    "hostNode": "v24.19.0",
+    "hostPlatform": "linux x64",
+    "hostCpuModel": "INTEL(R) XEON(R) PLATINUM 8573C",
+    "hostCpuCount": 9,
+    "hostTotalMemoryGb": 21.5
+  },
+  "note": "Planning only; construction excluded. CPU measurements, no GPU claim.",
+  "records": [
+    {
+      "scenario": "open",
+      "nodes": 65536,
+      "directedEdges": 261120,
+      "cost": 510,
+      "waypoints": 511,
+      "milliseconds": {
+        "samples": 10,
+        "meanMs": 36.90682189999999,
+        "medianMs": 35.17866900000001,
+        "p95Ms": 58.69275399999998,
+        "p99Ms": 58.69275399999998,
+        "minMs": 28.912402999999927,
+        "maxMs": 58.69275399999998
+      }
+    },
+    {
+      "scenario": "serpentine",
+      "nodes": 65536,
+      "directedEdges": 131070,
+      "cost": 65535,
+      "waypoints": 65536,
+      "milliseconds": {
+        "samples": 10,
+        "meanMs": 17.22852270000002,
+        "medianMs": 16.908483000000047,
+        "p95Ms": 23.583274000000074,
+        "p99Ms": 23.583274000000074,
+        "minMs": 12.327606999999944,
+        "maxMs": 23.583274000000074
+      }
+    }
+  ]
+}

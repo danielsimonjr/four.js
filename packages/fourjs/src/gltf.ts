@@ -82,7 +82,7 @@ import {
   vector3Adapter,
   type AnimationTrackLike,
 } from "@fourjs/animation";
-import { FourError, devWarnOnce } from "@fourjs/core";
+import { FourError } from "@fourjs/core";
 import { BufferGeometry } from "@fourjs/geometry";
 import { StandardMaterial } from "@fourjs/materials";
 import { Matrix4, Quaternion, Vector3 } from "@fourjs/math";
@@ -264,15 +264,6 @@ export function instantiateGltf(asset: GltfAsset): GltfInstance {
   const materials: StandardMaterial[] = [];
   for (let i = 0; i < asset.materials.length; i += 1) {
     const record = asset.materials[i];
-    if (record.ignoredTextures.length > 0) {
-      devWarnOnce(
-        `gltf:${asset.url}:materials[${String(i)}]:ignored-textures`,
-        `glTF "${asset.url}": materials[${String(i)}] carries ` +
-          `${record.ignoredTextures.join(", ")}; the §59 material tier ` +
-          "samples the base-colour, packed metallic-roughness, and emissive maps — " +
-          "factors still apply (§85).",
-      );
-    }
     materials.push(
       new StandardMaterial({
         baseColor: record.baseColor,
@@ -288,6 +279,16 @@ export function instantiateGltf(asset: GltfAsset): GltfInstance {
           record.metallicRoughnessTexture === null
             ? null
             : resources.textures[record.metallicRoughnessTexture],
+        normalScale: record.normalScale,
+        occlusionStrength: record.occlusionStrength,
+        normalMap:
+          record.normalTexture === null
+            ? null
+            : resources.textures[record.normalTexture],
+        occlusionMap:
+          record.occlusionTexture === null
+            ? null
+            : resources.textures[record.occlusionTexture],
         emissiveMap:
           record.emissiveTexture === null
             ? null

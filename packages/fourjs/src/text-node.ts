@@ -1,3 +1,4 @@
+import type { TextLayoutOptions } from "@fourjs/text";
 /**
  * `Text` (§49, §56) — a string, a font atlas and a material become **one** draw
  * call of positioned glyph quads (R-28, 2026-08-13).
@@ -158,7 +159,13 @@ const EMPTY_INDICES = new Uint16Array(0);
 const ALIGNMENTS: readonly TextAlign[] = ["left", "center", "right"];
 
 /** Optional construction arguments of {@link Text}. */
-export interface TextOptions extends RenderableOptions {
+export interface TextOptions
+  extends
+    RenderableOptions,
+    Pick<
+      TextLayoutOptions,
+      "shaper" | "fontId" | "script" | "language" | "direction" | "features"
+    > {
   /** Initial {@link Text.text}; defaults to `""`, which draws nothing. */
   text?: string;
   /**
@@ -279,6 +286,10 @@ function requireAtlasMaterial(
  * vertex count (R-23's pivot, recorded in `@fourjs/render`'s `shape.ts`).
  */
 export class Text extends Renderable<UnlitMaterial> implements Disposable {
+  #shaping: Pick<
+    TextLayoutOptions,
+    "shaper" | "fontId" | "script" | "language" | "direction" | "features"
+  >;
   #atlas: GlyphAtlas;
 
   #text: string;
@@ -330,6 +341,16 @@ export class Text extends Renderable<UnlitMaterial> implements Disposable {
       castShadow: options.castShadow ?? DEFAULT_CAST_SHADOW,
     });
     this.#quads = quads;
+    this.#shaping = {
+      shaper: options.shaper,
+      fontId: options.fontId,
+      script: options.script,
+      language: options.language,
+      direction: options.direction,
+      features: options.features && Object.freeze({ ...options.features }),
+    };
+    if (options.shaper && !options.fontId)
+      throw new RangeError("fontId is required with a shaper");
     this.#atlas = atlas;
     this.#text = options.text ?? "";
     this.#size = requirePositive(options.size ?? 1);
@@ -441,6 +462,7 @@ export class Text extends Renderable<UnlitMaterial> implements Disposable {
     this.#layout ??= layoutText(this.#text, this.#atlas, {
       size: this.#size,
       letterSpacing: this.#letterSpacing,
+      ...this.#shaping,
       align: this.#align,
     });
     return this.#layout;

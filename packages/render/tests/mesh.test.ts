@@ -13,11 +13,16 @@
 
 import { isFourError, resetDevWarnings } from "@fourjs/core";
 import { planeGeometry } from "@fourjs/geometry";
-import { LitMaterial, StandardMaterial, UnlitMaterial } from "@fourjs/materials";
+import {
+  LitMaterial,
+  StandardMaterial,
+  UnlitMaterial,
+} from "@fourjs/materials";
 import {
   Bone,
   Group,
   MorphWeights,
+  PoseBuffer,
   Scene,
   Skeleton,
   resolveWorldTransforms,
@@ -29,6 +34,7 @@ import {
   Mesh,
   Renderable,
   buildRenderList,
+  buildInterpolatedRenderList,
   isSkinnedLitItem,
   isSkinnedUnlitItem,
   restoreMeshSkeleton,
@@ -320,5 +326,81 @@ describe("the skinned render-item kinds (§54, §64; RFC 0003)", () => {
     expect(items[0].kind).toBe("unlit");
     expect(items[0].morphWeights).toBeNull();
     expect(items[1].kind).toBe("skinned-unlit");
+  });
+});
+
+describe("CPU mesh skinning", () => {
+  it("feeds deformed geometry and bounds to the ordinary render pipeline", () => {
+    const scene = new Scene();
+    const bone = new Bone();
+    const bind = skinnedTriangle();
+    const mesh = new Mesh(bind, new StandardMaterial());
+    mesh.skinningMode = "cpu";
+    mesh.skeleton = new Skeleton([bone]);
+    scene.add(mesh, bone);
+    bone.transform.position.x = 10;
+    const items = buildRenderList(scene, []);
+    expect(items).toHaveLength(1);
+    expect(items[0].kind).toBe("standard");
+    expect(items[0].geometry.positions[0]).toBe(bind.positions[0] + 10);
+    items[0].geometry.computeBounds();
+    expect(items[0].geometry.bounds.min.x).toBe(bind.bounds.min.x + 10);
+    expect(mesh.bindGeometry).toBe(bind);
+    expect(mesh.geometry).toBe(items[0].geometry);
+    mesh.dispose();
+    expect(bind.disposed).toBe(false);
+  });
+
+  it("uses interpolated bones for rendering without overwriting the simulation pose", () => {
+    const scene = new Scene();
+    const bone = new Bone();
+    const bind = skinnedTriangle();
+    const mesh = new Mesh(bind, new UnlitMaterial());
+    mesh.skinningMode = "cpu";
+    mesh.skeleton = new Skeleton([bone]);
+    scene.add(mesh, bone);
+    const poses = new PoseBuffer();
+    poses.track(bone);
+    poses.capture();
+    bone.transform.position.x = 10;
+    poses.capture();
+    const items = buildInterpolatedRenderList(scene, poses, 0.25, []);
+    expect(items[0].geometry.positions[0]).toBe(bind.positions[0] + 2.5);
+    expect(bone.transform.position.x).toBe(10);
+    expect(mesh.geometry.positions[0]).toBe(bind.positions[0] + 10);
+  });
+
+  it("permits large CPU rigs while refusing a switch to the fixed GPU tier", () => {
+    const mesh = new Mesh(skinnedTriangle(), new UnlitMaterial());
+    mesh.skinningMode = "cpu";
+    mesh.skeleton = new Skeleton(Array.from({ length: 49 }, () => new Bone()));
+    expect(mesh.geometry.positions.length).toBeGreaterThan(0);
+    expect(() => {
+      mesh.skinningMode = "gpu";
+    }).toThrow();
+    expect(mesh.skinningMode).toBe("cpu");
+    mesh.skeleton = null;
+    mesh.skinningMode = "gpu";
+    expect(mesh.geometry).toBe(mesh.bindGeometry);
+    expect(() => {
+      mesh.skinningMode = "invalid" as "cpu";
+    }).toThrow(TypeError);
+  });
+
+  it("releases generated geometry on source replacement and GPU switching", () => {
+    const mesh = new Mesh(skinnedTriangle(), new UnlitMaterial());
+    mesh.skinningMode = "cpu";
+    mesh.skeleton = new Skeleton([new Bone()]);
+    const generated = mesh.geometry;
+    const replacement = skinnedTriangle();
+    mesh.geometry = replacement;
+    expect(generated.disposed).toBe(true);
+    const next = mesh.geometry;
+    expect(next).not.toBe(generated);
+    mesh.skinningMode = "gpu";
+    expect(next.disposed).toBe(true);
+    expect(mesh.geometry).toBe(replacement);
+    mesh.dispose();
+    mesh.dispose();
   });
 });

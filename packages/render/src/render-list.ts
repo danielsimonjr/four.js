@@ -169,6 +169,8 @@ interface FramedDrawable {
  */
 interface SkinnedDrawable {
   readonly skeleton?: Skeleton | null;
+  readonly skinningMode?: "gpu" | "cpu";
+  updateCpuGeometry?(worldOf?: (node: Node) => Matrix4): BufferGeometry;
   readonly morphTargetWeights?: Float32Array;
 }
 
@@ -1363,164 +1365,181 @@ function collect(
         sortTracker,
       );
     } else {
-    const geometry = node.geometry;
-    let kind = pipelineOf(material);
-    // §54's skin (RFC 0003): a `Mesh` with a skeleton over a geometry
-    // carrying joints and weights draws through the skinned variant of its
-    // material's family — see `RenderItemKind`. Read structurally, like
-    // `frame`, so this costs every plain renderable one property load.
-    const skeleton = (node as SkinnedDrawable).skeleton ?? null;
-    let activeSkin: Skeleton | null = null;
-    let skinSkipped = false;
-    if (skeleton !== null) {
-      if (geometry.joints === undefined || geometry.weights === undefined) {
-        // §85, development only: the skin cannot apply, and with no weights
-        // there is no other picture — the mesh draws its geometry unskinned.
-        if (DEV) {
-          devWarnOnce(
-            `skin-no-attributes:${node.id}`,
-            `§54: node "${node.id}" has a skeleton but its geometry carries ` +
-              "no joints/weights attributes, so there is nothing to deform " +
-              "and the mesh draws unskinned (RFC 0003).",
-          );
-        }
-      } else if (kind === "unlit") {
-        kind = "skinned-unlit";
-        activeSkin = skeleton;
-      } else if (kind === "lit") {
-        kind = "skinned-lit";
-        activeSkin = skeleton;
+      let geometry: BufferGeometry;
+      const drawable = node as SkinnedDrawable;
+      if (
+        drawable.skinningMode === "cpu" &&
+        drawable.updateCpuGeometry !== undefined
+      ) {
+        palettePoses = poses;
+        paletteAlpha = alpha;
+        geometry = drawable.updateCpuGeometry(
+          poses === null ? undefined : interpolatedWorldOf,
+        );
       } else {
-        // No skinned variant exists for this material family at this tier
-        // (RFC 0003 §7 ships unlit and lit). The draw is skipped rather than
-        // issued in bind pose: a character standing in T-pose is a different
-        // picture, and the recorded rule is that a value must not become one
-        // — the same direction the unregistered-pipeline case fails in
-        // (`@fourjs/render-webgl`).
-        skinSkipped = true;
-        if (DEV) {
-          devWarnOnce(
-            `skin-material:${node.id}`,
-            `§54: node "${node.id}" is skinned but carries a "${kind}" ` +
-              "material, which has no skinned pipeline at this tier " +
-              "(unlit and lit ship; RFC 0003); the draw is skipped rather " +
-              "than shown in bind pose.",
-          );
-        }
+        geometry = node.geometry;
       }
-    }
-    if (skinSkipped) {
-      // Skipped with the one-time warning above; children are still visited.
-    } else {
-      const item = itemAt(pool, next, geometry, node.transform.worldMatrix);
-      item.kind = kind;
-      item.geometry = geometry;
-      // The cast is the union's, not the material's: `MutableRenderItem` types
-      // this slot as the four known surface materials, and `pipelineOf` has just
-      // decided which of them the backend will read it as.
-      item.material = material as
-        | UnlitMaterial
-        | LitMaterial
-        | StandardMaterial
-        | SpriteMaterial
-        | NodeMaterial;
-      // §55's frame (R-29), read structurally and only where it can mean
-      // something. Written on **every** renderable, not only framed sprites: the
-      // item is pooled, so a slot that carried a framed sprite last frame would
-      // otherwise hand a stale sub-rectangle to whatever lands in it next — the
-      // same hazard the `material = undefined` line in the particle arm below
-      // exists for. `?? null` because a `Renderable` with a sprite material has
-      // no such property at all.
-      item.frame =
-        item.kind === "sprite"
-          ? ((node as FramedDrawable).frame ?? null)
-          : null;
-      item.renderLayer = node.renderLayer;
-      item.renderOrder = node.renderOrder;
-      // §46's mask, snapshotted so a per-view filter needs no node reference.
-      item.layers = nodeLayers;
-      // §66 key 2, snapshotted from §57's flag. `=== true` rather than a truthy
-      // read: a material double built before the flag existed reports
-      // `undefined`, which classifies opaque — the behaviour every scene had
-      // before the key landed.
-      item.transparent = material.transparent === true;
-      // §66 key 3's material half (R-10), snapshotted like every other field.
-      // `?? ""` for `transparent`'s reason, with a sharper consequence: a
-      // **structurally typed** material double predating §57's `id` reports
-      // `undefined`, and `undefined < undefined` is `false` in both directions —
-      // a comparator reading it would answer "after" for both orders, which is
-      // not a total order and makes the sort's result implementation-defined.
-      // `""` collapses every such double into one group that keeps scene order,
-      // which is what those items had before key 3 existed.
-      item.materialId = material.id ?? "";
-      // §49's two shadow flags (§69, R-18), snapshotted like every other field.
-      // `!== false` rather than a truthy read, for `transparent`'s reason turned
-      // around: both default to `true` on a `Renderable`, so a **structurally
-      // typed** drawable predating the fields — a host's own minimal node —
-      // reports `undefined`, which must read as "casts and receives", the
-      // behaviour a `Renderable` authored today has.
-      item.castShadow = node.castShadow !== false;
-      item.receiveShadow = node.receiveShadow !== false;
-      // §49's culling flag (§87, R-8), snapshotted like every other field, with
-      // `!== false` for `castShadow`'s reason: it defaults to `true` on a
-      // `Renderable`, so a **structurally typed** drawable predating the field —
-      // a host's own minimal node — reports `undefined`, which must read as "may
-      // be culled", the behaviour a `Renderable` authored today has.
-      item.frustumCulled = node.frustumCulled !== false;
-      // §66 key 4 has no value until a view measures it (`view-list.ts`). Written
-      // rather than left, so a pooled slot cannot hand a stale depth to a caller
-      // that reads the field without sorting.
-      item.viewDepth = 0;
-      // §67 (R-23): the accumulated test of every enclosing clip, or `null` where
-      // there is none. Written rather than left, for the reason the `material`,
-      // `frame` and shadow resets in the particle arm below are — a pooled slot
-      // must not hand a stale clip to whatever lands in it next.
-      item.clip = clip;
-      // §67 scissor, snapshotted like every other field and written on every
-      // drawable so a pooled slot cannot hand a stale rectangle forward.
-      item.scissor = scissorOf(node);
-      item.worldBounds = null;
-      item.transformVersion = node.transform.worldVersion;
-      writeWorldMatrix(item, node, pool, next, poses, alpha);
-      // §54's morph weights (RFC 0003), snapshotted like every other field and
-      // written on **every** drawable for `clip`'s reason: the item is pooled,
-      // and a slot that carried a morphing mesh last frame must not hand its
-      // weights to whatever lands in it next. `?? undefined ?? null`-free: a
-      // plain `Renderable` has no such property and reports `undefined`.
-      item.morphWeights = (node as SkinnedDrawable).morphTargetWeights ?? null;
-      // §54's palette (RFC 0003), refreshed in the same pass that builds the
-      // item — the particle-repack precedent: the uploaded matrices can never
-      // be a step older than the item that points at them. `update` reads
-      // world matrices for the skin root and every bone. On the ordinary path
-      // those are `resolveWorldTransform` (byte-identical to the pre-§43
-      // call). On the interpolated path they are `composeRenderPoseMatrix` at
-      // §43's alpha, so a skin deforms at the same pose the mesh's own matrix
-      // interpolates to. Local poses interpolate, then the palette product
-      // runs — the palette itself is never lerped — and nothing is written
-      // back into `node.transform` (§42, §43).
-      if (activeSkin !== null) {
-        if (poses === null) {
-          activeSkin.update(node);
+      let kind = pipelineOf(material);
+      // §54's skin (RFC 0003): a `Mesh` with a skeleton over a geometry
+      // carrying joints and weights draws through the skinned variant of its
+      // material's family — see `RenderItemKind`. Read structurally, like
+      // `frame`, so this costs every plain renderable one property load.
+      const skeleton =
+        (node as SkinnedDrawable).skinningMode === "cpu"
+          ? null
+          : ((node as SkinnedDrawable).skeleton ?? null);
+      let activeSkin: Skeleton | null = null;
+      let skinSkipped = false;
+      if (skeleton !== null) {
+        if (geometry.joints === undefined || geometry.weights === undefined) {
+          // §85, development only: the skin cannot apply, and with no weights
+          // there is no other picture — the mesh draws its geometry unskinned.
+          if (DEV) {
+            devWarnOnce(
+              `skin-no-attributes:${node.id}`,
+              `§54: node "${node.id}" has a skeleton but its geometry carries ` +
+                "no joints/weights attributes, so there is nothing to deform " +
+                "and the mesh draws unskinned (RFC 0003).",
+            );
+          }
+        } else if (kind === "unlit") {
+          kind = "skinned-unlit";
+          activeSkin = skeleton;
+        } else if (kind === "lit") {
+          kind = "skinned-lit";
+          activeSkin = skeleton;
         } else {
-          palettePoses = poses;
-          paletteAlpha = alpha;
-          activeSkin.update(node, interpolatedWorldOf);
+          // No skinned variant exists for this material family at this tier
+          // (RFC 0003 §7 ships unlit and lit). The draw is skipped rather than
+          // issued in bind pose: a character standing in T-pose is a different
+          // picture, and the recorded rule is that a value must not become one
+          // — the same direction the unregistered-pipeline case fails in
+          // (`@fourjs/render-webgl`).
+          skinSkipped = true;
+          if (DEV) {
+            devWarnOnce(
+              `skin-material:${node.id}`,
+              `§54: node "${node.id}" is skinned but carries a "${kind}" ` +
+                "material, which has no skinned pipeline at this tier " +
+                "(unlit and lit ship; RFC 0003); the draw is skipped rather " +
+                "than shown in bind pose.",
+            );
+          }
         }
-        item.jointMatrices = activeSkin.jointMatrices;
-        item.jointCount = activeSkin.bones.length;
       }
-      // The one cast in the module, and the only place the `kind`/`material`
-      // correlation is established: both were just written from the same node, so
-      // a "sprite" item carries a `SpriteMaterial`, a "lit" item a `LitMaterial`,
-      // a "standard" item a `StandardMaterial`, an "unlit" item an
-      // `UnlitMaterial`, and a skinned item its family's material, by
-      // construction. TypeScript cannot
-      // see that across two assignments to a pooled object — see
-      // `MutableRenderItem`.
-      out[next] = item as RenderItem;
-      noteSortKeys(sortTracker, item);
-      next += 1;
-    }
+      if (skinSkipped) {
+        // Skipped with the one-time warning above; children are still visited.
+      } else {
+        const item = itemAt(pool, next, geometry, node.transform.worldMatrix);
+        item.kind = kind;
+        item.geometry = geometry;
+        // The cast is the union's, not the material's: `MutableRenderItem` types
+        // this slot as the four known surface materials, and `pipelineOf` has just
+        // decided which of them the backend will read it as.
+        item.material = material as
+          | UnlitMaterial
+          | LitMaterial
+          | StandardMaterial
+          | SpriteMaterial
+          | NodeMaterial;
+        // §55's frame (R-29), read structurally and only where it can mean
+        // something. Written on **every** renderable, not only framed sprites: the
+        // item is pooled, so a slot that carried a framed sprite last frame would
+        // otherwise hand a stale sub-rectangle to whatever lands in it next — the
+        // same hazard the `material = undefined` line in the particle arm below
+        // exists for. `?? null` because a `Renderable` with a sprite material has
+        // no such property at all.
+        item.frame =
+          item.kind === "sprite"
+            ? ((node as FramedDrawable).frame ?? null)
+            : null;
+        item.renderLayer = node.renderLayer;
+        item.renderOrder = node.renderOrder;
+        // §46's mask, snapshotted so a per-view filter needs no node reference.
+        item.layers = nodeLayers;
+        // §66 key 2, snapshotted from §57's flag. `=== true` rather than a truthy
+        // read: a material double built before the flag existed reports
+        // `undefined`, which classifies opaque — the behaviour every scene had
+        // before the key landed.
+        item.transparent = material.transparent === true;
+        // §66 key 3's material half (R-10), snapshotted like every other field.
+        // `?? ""` for `transparent`'s reason, with a sharper consequence: a
+        // **structurally typed** material double predating §57's `id` reports
+        // `undefined`, and `undefined < undefined` is `false` in both directions —
+        // a comparator reading it would answer "after" for both orders, which is
+        // not a total order and makes the sort's result implementation-defined.
+        // `""` collapses every such double into one group that keeps scene order,
+        // which is what those items had before key 3 existed.
+        item.materialId = material.id ?? "";
+        // §49's two shadow flags (§69, R-18), snapshotted like every other field.
+        // `!== false` rather than a truthy read, for `transparent`'s reason turned
+        // around: both default to `true` on a `Renderable`, so a **structurally
+        // typed** drawable predating the fields — a host's own minimal node —
+        // reports `undefined`, which must read as "casts and receives", the
+        // behaviour a `Renderable` authored today has.
+        item.castShadow = node.castShadow !== false;
+        item.receiveShadow = node.receiveShadow !== false;
+        // §49's culling flag (§87, R-8), snapshotted like every other field, with
+        // `!== false` for `castShadow`'s reason: it defaults to `true` on a
+        // `Renderable`, so a **structurally typed** drawable predating the field —
+        // a host's own minimal node — reports `undefined`, which must read as "may
+        // be culled", the behaviour a `Renderable` authored today has.
+        item.frustumCulled = node.frustumCulled !== false;
+        // §66 key 4 has no value until a view measures it (`view-list.ts`). Written
+        // rather than left, so a pooled slot cannot hand a stale depth to a caller
+        // that reads the field without sorting.
+        item.viewDepth = 0;
+        // §67 (R-23): the accumulated test of every enclosing clip, or `null` where
+        // there is none. Written rather than left, for the reason the `material`,
+        // `frame` and shadow resets in the particle arm below are — a pooled slot
+        // must not hand a stale clip to whatever lands in it next.
+        item.clip = clip;
+        // §67 scissor, snapshotted like every other field and written on every
+        // drawable so a pooled slot cannot hand a stale rectangle forward.
+        item.scissor = scissorOf(node);
+        item.worldBounds = null;
+        item.transformVersion = node.transform.worldVersion;
+        writeWorldMatrix(item, node, pool, next, poses, alpha);
+        // §54's morph weights (RFC 0003), snapshotted like every other field and
+        // written on **every** drawable for `clip`'s reason: the item is pooled,
+        // and a slot that carried a morphing mesh last frame must not hand its
+        // weights to whatever lands in it next. `?? undefined ?? null`-free: a
+        // plain `Renderable` has no such property and reports `undefined`.
+        item.morphWeights =
+          (node as SkinnedDrawable).morphTargetWeights ?? null;
+        // §54's palette (RFC 0003), refreshed in the same pass that builds the
+        // item — the particle-repack precedent: the uploaded matrices can never
+        // be a step older than the item that points at them. `update` reads
+        // world matrices for the skin root and every bone. On the ordinary path
+        // those are `resolveWorldTransform` (byte-identical to the pre-§43
+        // call). On the interpolated path they are `composeRenderPoseMatrix` at
+        // §43's alpha, so a skin deforms at the same pose the mesh's own matrix
+        // interpolates to. Local poses interpolate, then the palette product
+        // runs — the palette itself is never lerped — and nothing is written
+        // back into `node.transform` (§42, §43).
+        if (activeSkin !== null) {
+          if (poses === null) {
+            activeSkin.update(node);
+          } else {
+            palettePoses = poses;
+            paletteAlpha = alpha;
+            activeSkin.update(node, interpolatedWorldOf);
+          }
+          item.jointMatrices = activeSkin.jointMatrices;
+          item.jointCount = activeSkin.bones.length;
+        }
+        // The one cast in the module, and the only place the `kind`/`material`
+        // correlation is established: both were just written from the same node, so
+        // a "sprite" item carries a `SpriteMaterial`, a "lit" item a `LitMaterial`,
+        // a "standard" item a `StandardMaterial`, an "unlit" item an
+        // `UnlitMaterial`, and a skinned item its family's material, by
+        // construction. TypeScript cannot
+        // see that across two assignments to a pooled object — see
+        // `MutableRenderItem`.
+        out[next] = item as RenderItem;
+        noteSortKeys(sortTracker, item);
+        next += 1;
+      }
     }
   } else if (onLayer && isParticleDrawable(node)) {
     // §36's whole system becomes **one** item (plan P9-3). The repack is the
@@ -1548,7 +1567,8 @@ function collect(
     item.instanceFloats =
       node.particleInstanceFloats ?? PARTICLE_INSTANCE_FLOATS;
     item.particleTexture = node.particleTexture;
-    item.trailVertices = node.hasTrail === true ? node.trailVertices : undefined;
+    item.trailVertices =
+      node.hasTrail === true ? node.trailVertices : undefined;
     item.trailVertexCount =
       node.hasTrail === true ? (node.trailVertexCount ?? 0) : 0;
     item.renderLayer = node.renderLayer;
@@ -1757,7 +1777,9 @@ export function compareRenderItems(a: RenderItem, b: RenderItem): number {
     return a.materialId < b.materialId ? -1 : 1;
   }
   if (a.viewDepth !== b.viewDepth) {
-    return a.transparent ? b.viewDepth - a.viewDepth : a.viewDepth - b.viewDepth;
+    return a.transparent
+      ? b.viewDepth - a.viewDepth
+      : a.viewDepth - b.viewDepth;
   }
   return 0;
 }

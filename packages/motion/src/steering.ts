@@ -86,12 +86,14 @@
  *
  * ## What is *not* here
  *
- * Obstacle avoidance, wall following, path following (§12's `followPath` is
- * already in `kinematic-controller.ts`), offset pursuit, and leader following.
+ * Obstacle avoidance, wall following, offset pursuit, and leader following.
+ * RFC 0007 adds waypoint following here; §12 trajectory following remains in
+ * `kinematic-controller.ts`.
  * They need a collision query, a wall set, or a path type respectively; P8-1's
  * pinned set is the one implemented above (2026-08-02).
  */
 
+import type { PlannedPath } from "./path-planning.js";
 import { Vector3 } from "@fourjs/math";
 
 import { interceptTime as predictedInterceptTime } from "./prediction.js";
@@ -1031,4 +1033,56 @@ export class SteeringAgent implements SteeringContext {
     );
     return this;
   }
+}
+
+/** Caller-owned waypoint traversal state (RFC 0007). */
+export interface WaypointCursor {
+  index: number;
+}
+/** Distances in world units, never implicit grid cells. */
+export interface FollowWaypointsOptions {
+  readonly agentRadius: number;
+  readonly slowRadius?: number;
+}
+/** Seek intermediate waypoints and brake at the final point. Writes out once. */
+export function followWaypoints(
+  context: SteeringContext,
+  path: PlannedPath,
+  cursor: WaypointCursor,
+  options: FollowWaypointsOptions,
+  out: Vector3,
+): Vector3 {
+  assertFinite(options.agentRadius, "agentRadius");
+  if (options.agentRadius < 0 || path.waypoints.length < 2)
+    throw new RangeError(
+      "A path needs two waypoints and a non-negative agentRadius (§85).",
+    );
+  if (!Number.isSafeInteger(cursor.index) || cursor.index < 0)
+    throw new RangeError(
+      "Waypoint cursor must be a non-negative safe integer (§85).",
+    );
+  const last = path.waypoints.length - 1;
+  const slowRadius =
+    options.slowRadius ??
+    Math.max(options.agentRadius, path.radii?.[last - 1] ?? 0);
+  if (!Number.isFinite(slowRadius) || slowRadius <= 0)
+    throw new RangeError(
+      "Pass a finite positive slowRadius when the arrival radius is zero (§85).",
+    );
+  while (cursor.index < last) {
+    const target = path.waypoints[cursor.index];
+    const radius = Math.max(
+      options.agentRadius,
+      path.radii?.[cursor.index] ?? 0,
+    );
+    const dx = target.x - context.position.x,
+      dy = target.y - context.position.y,
+      dz = target.z - context.position.z;
+    if (dx * dx + dy * dy + dz * dz > radius * radius) break;
+    cursor.index++;
+  }
+  if (cursor.index < last)
+    return seek(context, path.waypoints[cursor.index], out);
+  cursor.index = last;
+  return arrive(context, path.waypoints[last], slowRadius, out);
 }

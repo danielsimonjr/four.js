@@ -124,7 +124,11 @@ import {
   type NodeMaterialPrograms,
 } from "./node-pipeline-registry.js";
 import { ShadowProgram } from "./gl-shadow.js";
-import { StandardProgram } from "./gl-standard.js";
+import {
+  StandardProgram,
+  NORMAL_TEXTURE_UNIT,
+  OCCLUSION_TEXTURE_UNIT,
+} from "./gl-standard.js";
 import { TextureCache, type CacheableTexture } from "./gl-texture.js";
 
 /**
@@ -859,6 +863,18 @@ function metalRoughnessMapOf(material: {
   metalRoughnessMap?: CacheableTexture | null;
 }): CacheableTexture | null {
   return material.metalRoughnessMap ?? null;
+}
+
+function normalMapOf(material: {
+  normalMap?: CacheableTexture | null;
+}): CacheableTexture | null {
+  return material.normalMap ?? null;
+}
+
+function occlusionMapOf(material: {
+  occlusionMap?: CacheableTexture | null;
+}): CacheableTexture | null {
+  return material.occlusionMap ?? null;
 }
 
 function emissiveMapOf(material: {
@@ -1917,9 +1933,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // per item to its draw loop and not a single GL call — the same
     // byte-identity contract A-1's counters make.
     const batching = this.batching;
-    const gpuTimer = this.#gpuTimer !== null && this.#gpuTimer.armed
-      ? this.#gpuTimer
-      : null;
+    const gpuTimer =
+      this.#gpuTimer !== null && this.#gpuTimer.armed ? this.#gpuTimer : null;
     gpuTimer?.begin(gl);
     // Whether a texture is bound to unit 0 — the sprite path binds one, and
     // since R-19 so does an unlit or lit draw whose material carries a `map`,
@@ -1933,6 +1948,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     let mapUnitActive = false;
     let metalRoughnessBound = false;
     let emissiveBound = false;
+    let normalBound = false;
+    let occlusionBound = false;
     // §69 (R-18): whether this frame bound a shadow map to
     // `SHADOW_TEXTURE_UNIT`, so the `finally` knows whether it has one to
     // unbind. A frame in which nothing casts never touches unit 1 at all.
@@ -2080,8 +2097,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       // The unlit pipeline is the frame's starting state, so a scene with no
       // sprites issues exactly the GL sequence it issued before sprites existed.
       program.use();
-      let activeKind: RenderItemKind | "particle-trail" | "particle-appearance" =
-        "unlit";
+      let activeKind:
+        RenderItemKind | "particle-trail" | "particle-appearance" = "unlit";
       let particleTrailActive = false;
       // The GL state mirror starts where `#applyFixedState` and GL's own defaults
       // left it; every draw below moves it only where its material asks.
@@ -2623,7 +2640,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                   particleTrailProgram.use();
                   particleTrailActive = true;
                 }
-                applyMaterialState(gl, state, undefined, true, item.clip ?? null);
+                applyMaterialState(
+                  gl,
+                  state,
+                  undefined,
+                  true,
+                  item.clip ?? null,
+                );
                 if (!particleViewUploaded) {
                   particleTrailProgram.setProjection(camera.projectionMatrix);
                   particleTrailProgram.setView(camera.viewMatrix);
@@ -2833,10 +2856,48 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               gl.bindTexture(GL.TEXTURE_2D, emissiveTexture);
               emissiveBound = true;
             }
+            const normalSource = normalMapOf(item.material);
+            const normalTexture =
+              normalSource === null
+                ? null
+                : resolveTexture(
+                    textures,
+                    renderTargets,
+                    activeTarget,
+                    normalSource,
+                  );
+            if (normalTexture !== null) {
+              gl.activeTexture(GL.TEXTURE0 + NORMAL_TEXTURE_UNIT);
+              mapUnitActive = false;
+              gl.bindTexture(GL.TEXTURE_2D, normalTexture);
+              normalBound = true;
+            }
+            const occlusionSource = occlusionMapOf(item.material);
+            const occlusionTexture =
+              occlusionSource === null
+                ? null
+                : resolveTexture(
+                    textures,
+                    renderTargets,
+                    activeTarget,
+                    occlusionSource,
+                  );
+            if (occlusionTexture !== null) {
+              gl.activeTexture(GL.TEXTURE0 + OCCLUSION_TEXTURE_UNIT);
+              mapUnitActive = false;
+              gl.bindTexture(GL.TEXTURE_2D, occlusionTexture);
+              occlusionBound = true;
+            }
             standardProgram.setFeatures(
               standardTexture !== null,
               metalRoughnessTexture !== null,
               emissiveTexture !== null,
+              normalTexture !== null,
+              occlusionTexture !== null,
+            );
+            standardProgram.setMapFactors(
+              item.material.normalScale,
+              item.material.occlusionStrength,
             );
             standardProgram.setReceivesShadow(
               shadowActive && item.receiveShadow,
@@ -2932,7 +2993,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         // If unit 0 was also borrowed, the restore above moved the active
         // unit back to 0 and we have to re-select 2 before unbinding. Binding
         // unit 3 after unit 2 does the same: the active unit is no longer 2.
-        if (textureBound || mapUnitActive || emissiveBound) {
+        if (
+          textureBound ||
+          mapUnitActive ||
+          emissiveBound ||
+          normalBound ||
+          occlusionBound
+        ) {
           gl.activeTexture(GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT);
         }
         gl.bindTexture(GL.TEXTURE_2D, null);
@@ -2944,12 +3011,27 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         // Unit 3 is already active when this frame bound only the emissive
         // map. Restoring unit 0 and/or unit 2 first leaves a different unit
         // active, so re-select 3 before unbinding.
-        if (textureBound || metalRoughnessBound || mapUnitActive) {
+        if (
+          textureBound ||
+          metalRoughnessBound ||
+          mapUnitActive ||
+          normalBound ||
+          occlusionBound
+        ) {
           gl.activeTexture(GL.TEXTURE0 + EMISSIVE_TEXTURE_UNIT);
         }
         gl.bindTexture(GL.TEXTURE_2D, null);
         gl.activeTexture(GL.TEXTURE0);
       }
+      if (normalBound) {
+        gl.activeTexture(GL.TEXTURE0 + NORMAL_TEXTURE_UNIT);
+        gl.bindTexture(GL.TEXTURE_2D, null);
+      }
+      if (occlusionBound) {
+        gl.activeTexture(GL.TEXTURE0 + OCCLUSION_TEXTURE_UNIT);
+        gl.bindTexture(GL.TEXTURE_2D, null);
+      }
+      if (normalBound || occlusionBound) gl.activeTexture(GL.TEXTURE0);
       // §60's node texture units (RFC 0001), released on the same terms as
       // unit 0's albedo: bound during the frame, left bound by nothing. Zero
       // iterations — and zero calls — in every frame that drew no textured
@@ -3237,6 +3319,23 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       disposed: () => this.#disposed,
     };
     return factory.create(host);
+  }
+
+  /** Upload a CPU texture and wait until its queued GPU upload has completed. */
+  async prepareTexture(texture: CacheableTexture): Promise<boolean> {
+    this.#assertUsable("prepareTexture");
+    const textures = this.#textures;
+    if (textures === null)
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "WebglRenderer.prepareTexture() needs an initialized renderer.",
+      );
+    if (this.#contextLost)
+      throw new FourError(
+        "CONTEXT_LOST",
+        "Cannot prepare a texture while the rendering context is lost.",
+      );
+    return (await textures.acquireAsync(texture)) !== null;
   }
 
   /**

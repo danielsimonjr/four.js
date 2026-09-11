@@ -4358,8 +4358,8 @@ describe("registerSkinningPipeline — WebgpuRenderer colour pair (RFC 0003)", (
         .some(
           (call) =>
             typeof call.args[4] === "number" &&
-            (call.args[4] as number) >= JOINT_PALETTE_FLOATS &&
-            (call.args[4] as number) % JOINT_PALETTE_FLOATS === 0,
+            call.args[4] >= JOINT_PALETTE_FLOATS &&
+            call.args[4] % JOINT_PALETTE_FLOATS === 0,
         ),
     ).toBe(true);
   });

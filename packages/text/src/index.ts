@@ -69,3 +69,16 @@ export type {
   TextLayoutOptions,
   TextQuad,
 } from "./text-layout.js";
+
+export {
+  IdentityShapingEngine,
+  DEFAULT_MAXIMUM_FONT_BYTES,
+  validateFontBytes,
+} from "./shaping.js";
+export type {
+  ShapingDirection,
+  ShapedGlyph,
+  ShapedRun,
+  ShapeQuery,
+  ShapingEngine,
+} from "./shaping.js";

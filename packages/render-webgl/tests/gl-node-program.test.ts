@@ -647,3 +647,152 @@ describe("registerNodeMaterialPipeline", () => {
     expect(resolveNodeMaterialPipelineFactory()).toBeNull();
   });
 });
+
+describe("node std140 transport and provenance", () => {
+  function blockContext() {
+    const gl = createFakeGl();
+    const uploads: number[][] = [];
+    gl.getUniformBlockIndex = vi.fn(() => 0);
+    gl.uniformBlockBinding = vi.fn();
+    gl.bindBufferBase = vi.fn();
+    gl.createBuffer = vi.fn(() => ({}));
+    gl.bindBuffer = vi.fn();
+    gl.bufferData = vi.fn((_target, data) => {
+      uploads.push(Array.from(data as Float32Array));
+    });
+    const deleteBuffer = vi.fn();
+    gl.deleteBuffer = deleteBuffer;
+    return { gl, uploads, deleteBuffer };
+  }
+
+  it("emits one identical std140 declaration per stage and pads all six types", () => {
+    const graph = {
+      ...surfaceKitchenSink(),
+      uniformTransport: "std140" as const,
+    };
+    const emitted = emitShaderGraphGlsl(graph);
+    expect(emitted.uniformBlock).toBe(true);
+    expect(emitted.fragment).toContain(
+      "layout(std140) uniform FourNodeUniforms",
+    );
+    expect(emitted.fragment).toContain("vec4 u_gain;");
+    expect(emitted.fragment).toContain("mat4 u_spin;");
+    expect(emitted.fragment).toContain("= u_gain.x;");
+    expect(emitted.fragment).toContain("= u_axis.xyz;");
+    expect(emitted.vertex.match(/layout\(std140\)[\s\S]*?};/)?.[0]).toBe(
+      emitted.fragment.match(/layout\(std140\)[\s\S]*?};/)?.[0],
+    );
+    const { gl, uploads, deleteBuffer } = blockContext();
+    const program = GlNodeProgram.create(gl, emitted);
+    program.use();
+    gl.reset();
+    const data = {
+      gain: [2],
+      offset: [3, 4],
+      axis: [5, 6, 7],
+      tint: [8, 9, 10, 11],
+      spin: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      warp: Array.from({ length: 16 }, (_, i) => i + 1),
+    };
+    program.setMaterial(nodeMaterialDouble(data));
+    expect(uploads).toHaveLength(2); // allocation, then one draw upload
+    expect(uploads[1]).toEqual([
+      2,
+      0,
+      0,
+      0,
+      3,
+      4,
+      0,
+      0,
+      5,
+      6,
+      7,
+      0,
+      8,
+      9,
+      10,
+      11,
+      1,
+      2,
+      3,
+      0,
+      4,
+      5,
+      6,
+      0,
+      7,
+      8,
+      9,
+      0,
+      0,
+      0,
+      0,
+      1,
+      ...data.warp,
+    ]);
+    expect(gl.countOf("uniform4fv")).toBe(0);
+    program.setUniform("absent", [3]);
+    expect(uploads).toHaveLength(2);
+    program.setUniform("gain", [12]);
+    expect(uploads).toHaveLength(3);
+    expect(uploads[2][0]).toBe(12);
+    program.dispose();
+    program.dispose();
+    expect(deleteBuffer).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses unsupported/missing blocks and releases failed allocations", () => {
+    const emitted = emitShaderGraphGlsl({
+      ...surfaceKitchenSink(),
+      uniformTransport: "std140",
+    });
+    expect(() => GlNodeProgram.create(createFakeGl(), emitted)).toThrow(
+      "entry points",
+    );
+    const { gl, deleteBuffer } = blockContext();
+    gl.getUniformBlockIndex = () => 0xffffffff;
+    expect(() => GlNodeProgram.create(gl, emitted)).toThrow("missing");
+    gl.getUniformBlockIndex = () => 0;
+    gl.createBuffer = () => null;
+    expect(() => GlNodeProgram.create(gl, emitted)).toThrow("allocate");
+    gl.createBuffer = () => ({});
+    gl.bufferData = () => {
+      throw new Error("driver failed");
+    };
+    expect(() => GlNodeProgram.create(gl, emitted)).toThrow("driver failed");
+    expect(deleteBuffer).toHaveBeenCalledTimes(1);
+  });
+
+  it("supports screen blocks and omits an empty block", () => {
+    const screen = {
+      ...surfaceKitchenSink(),
+      domain: "screen" as const,
+      uniformTransport: "std140" as const,
+    };
+    expect(emitShaderGraphGlsl(screen).uniformBlock).toBe(true);
+    expect(
+      emitShaderGraphGlsl({ ...screenCopyGraph(), uniformTransport: "std140" })
+        .uniformBlock,
+    ).toBeUndefined();
+  });
+
+  it("maps emitted node statements and attaches maps to compiler errors", () => {
+    const emitted = emitShaderGraphGlsl(displacedGraph());
+    for (const stage of ["vertex", "fragment"] as const) {
+      for (const location of emitted.sourceMap[stage]) {
+        expect(emitted[stage].split("\n")[location.line - 1]).toContain(
+          `n${String(location.nodeId)} =`,
+        );
+        expect(location.stage).toBe(stage);
+      }
+    }
+    let caught: unknown;
+    try {
+      GlNodeProgram.create(createFakeGl({ compileStatus: false }), emitted);
+    } catch (error: unknown) {
+      caught = error;
+    }
+    expect(caught).toHaveProperty("context.sourceMap", emitted.sourceMap);
+  });
+});

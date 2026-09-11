@@ -1,3 +1,6 @@
+import { DEFAULT_RASTER_MAXIMUM_BYTES } from "./raster-limits.js";
+import { isGpuReadbackSource } from "./gpu-readback.js";
+import type { RenderTarget } from "./render-target.js";
 /**
  * Raster painting (§77a; RFC 0004, accepted 2026-08-21) — a surface an
  * application paints and the engine reads: {@link RasterSource} is the read
@@ -106,7 +109,10 @@
 
 import { FourError, type Disposable } from "@fourjs/core";
 import type { MaterialTexture } from "@fourjs/materials";
-import type { ColorSpace } from "@fourjs/math";
+import type { ColorSpace, Rectangle2 } from "@fourjs/math";
+
+import { TextureUpdates } from "./texture-updates.js";
+import { validateTextureSource, type TextureSource } from "./texture.js";
 
 import { validateColorSpace } from "./render-target.js";
 import {
@@ -187,7 +193,10 @@ export interface RasterSource {
 }
 
 /** Construction options for a {@link CanvasTexture}. */
-export interface CanvasTextureOptions {
+export interface CanvasTextureOptions extends Pick<
+  TextureSource,
+  "filter" | "wrap" | "mipmaps" | "minFilter" | "anisotropy"
+> {
   /**
    * §96 ceiling on `width * height * 4` — refused at construction and, because
    * the size is re-checked there, effectively on every
@@ -203,7 +212,7 @@ export interface CanvasTextureOptions {
  * exactly `4096 * 4096 * 4` — A-23's asset default, and the `maxTextureSize`
  * most WebGL 2 devices report.
  */
-const DEFAULT_MAXIMUM_BYTES = 64 * 1024 * 1024;
+export { DEFAULT_RASTER_MAXIMUM_BYTES } from "./raster-limits.js";
 
 /**
  * Source of canvas-texture ids. Monotonic and process-wide, exactly like
@@ -353,13 +362,25 @@ export class CanvasTexture implements MaterialTexture, Disposable {
 
   #version = 0;
 
+  readonly #updates = new TextureUpdates();
+  readonly #invalidations = new TextureUpdates();
+  #invalidationVersion = 0;
+  #lastInvalidation = 0;
+  readonly #sampler: CanvasTextureOptions;
+
   /** Born stale, so the first {@link CanvasTexture.update} always reads. */
   #stale = true;
 
   #disposed = false;
 
   constructor(source: RasterSource, options: CanvasTextureOptions = {}) {
-    validate(source, options.maximumBytes ?? DEFAULT_MAXIMUM_BYTES);
+    validate(source, options.maximumBytes ?? DEFAULT_RASTER_MAXIMUM_BYTES);
+    validateTextureSource({
+      width: source.width,
+      height: source.height,
+      ...options,
+    });
+    this.#sampler = { ...options };
     this.#source = source;
     this.#width = source.width;
     this.#height = source.height;
@@ -414,6 +435,11 @@ export class CanvasTexture implements MaterialTexture, Disposable {
   }
 
   /** Whether {@link CanvasTexture.dispose} has run. */
+  /** RFC 0009 provenance for render-graph feedback refusal. */
+  get readbackTarget(): RenderTarget | null {
+    return isGpuReadbackSource(this.#source) ? this.#source.target : null;
+  }
+
   get disposed(): boolean {
     return this.#disposed;
   }
@@ -423,7 +449,17 @@ export class CanvasTexture implements MaterialTexture, Disposable {
    * texel, and `0` once disposed, exactly as `Texture.byteLength` answers.
    */
   get byteLength(): number {
-    return this.#disposed ? 0 : this.#width * this.#height * 4;
+    if (this.#disposed) return 0;
+    let width = this.#width,
+      height = this.#height,
+      bytes = width * height * 4;
+    if (this.mipmaps)
+      while (width > 1 || height > 1) {
+        width = Math.max(1, Math.floor(width / 2));
+        height = Math.max(1, Math.floor(height / 2));
+        bytes += width * height * 4;
+      }
+    return bytes;
   }
 
   /**
@@ -431,8 +467,43 @@ export class CanvasTexture implements MaterialTexture, Disposable {
    * and re-reads. Cheap, idempotent, allocation-free — call it whenever the
    * painted content should change, from any code that knows it did.
    */
-  invalidate(): void {
+  invalidate(region?: Rectangle2): void {
+    this.#invalidations.add(
+      this.#invalidationVersion + 1,
+      region ?? null,
+      this.#width,
+      this.#height,
+    );
+    this.#invalidationVersion += 1;
     this.#stale = true;
+  }
+
+  /** Regions use bottom-left texture coordinates, regardless of source origin. */
+  getDirtyRegion(sinceVersion: number): Rectangle2 | null {
+    return this.#updates.since(sinceVersion, this.#version);
+  }
+
+  get filter(): NonNullable<TextureSource["filter"]> {
+    return this.#sampler.filter ?? "linear";
+  }
+  get wrap(): NonNullable<TextureSource["wrap"]> {
+    return this.#sampler.wrap ?? "clamp-to-edge";
+  }
+  get mipmaps(): boolean {
+    return this.#sampler.mipmaps === true;
+  }
+  get minFilter(): NonNullable<TextureSource["minFilter"]> {
+    return (
+      this.#sampler.minFilter ??
+      (this.mipmaps
+        ? this.filter === "nearest"
+          ? "nearest-mipmap-nearest"
+          : "linear-mipmap-linear"
+        : this.filter)
+    );
+  }
+  get anisotropy(): number {
+    return this.#sampler.anisotropy ?? 1;
   }
 
   /**
@@ -491,6 +562,15 @@ export class CanvasTexture implements MaterialTexture, Disposable {
     if (this.#row !== null) {
       flipRows(this.#buffer, this.#width * 4, this.#height, this.#row);
     }
+    const region =
+      this.#version === 0
+        ? null
+        : this.#invalidations.since(
+            this.#lastInvalidation,
+            this.#invalidationVersion,
+          );
+    this.#updates.add(this.#version + 1, region, this.#width, this.#height);
+    this.#lastInvalidation = this.#invalidationVersion;
     this.#version += 1;
     this.#stale = false;
     return true;

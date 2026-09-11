@@ -94,10 +94,12 @@
  *   rasterise (garbage, but rasterised) is refused as absence.
  */
 
-import { DEV, devWarnOnce, type Disposable } from "@fourjs/core";
+import { DEV, FourError, devWarnOnce, type Disposable } from "@fourjs/core";
 import {
   SHADER_VALUE_COMPONENTS,
   analyzeShaderGraph,
+  createShaderSourceMap,
+  type ShaderSourceMap,
   isRenderTargetTexture,
   type GraphEffect,
   type NodeRenderItem,
@@ -193,6 +195,7 @@ export interface EmittedWgslNodeShader {
   readonly domain: ShaderDomain;
   /** The module: both entry points (`vertexMain`/`fragmentMain`), one string. */
   readonly code: string;
+  readonly sourceMap: ShaderSourceMap;
   /** Whether any reachable node reads §9 render time. */
   readonly usesTime: boolean;
   /** Reachable uniforms, reflection order (§33). */
@@ -588,6 +591,7 @@ export function emitShaderGraphWgsl(graph: ShaderGraph): EmittedWgslNodeShader {
   return {
     domain: "surface",
     code,
+    sourceMap: createShaderSourceMap(code),
     usesTime,
     uniforms: analysis.reflection.uniforms,
     textures,
@@ -660,6 +664,7 @@ function emitScreen(
   return {
     domain: "screen",
     code,
+    sourceMap: createShaderSourceMap(code),
     usesTime,
     uniforms: analysis.reflection.uniforms,
     textures,
@@ -783,6 +788,13 @@ export class WgpuNodePipelineStore
 
   /** Distinguishes the one-time warnings of distinct failed graphs. */
   #failureSerial = 0;
+
+  readonly #compilationErrors: FourError[] = [];
+
+  /** Asynchronous GPU compiler errors with graph provenance; authoring diagnostics. */
+  get compilationErrors(): readonly FourError[] {
+    return [...this.#compilationErrors];
+  }
 
   #disposed = false;
 
@@ -1154,6 +1166,7 @@ export class WgpuNodePipelineStore
       label: `fourJS:node:${emitted.domain}`,
       code: emitted.code,
     });
+    this.#captureCompilationInfo(module, emitted);
     const groups: GpuBindGroupLayout[] = [];
     if (emitted.domain === "surface") {
       groups.push(this.#blockLayout(emitted.blockBytes, true));
@@ -1249,6 +1262,72 @@ export class WgpuNodePipelineStore
     });
     this.#textureLayouts.set(count, layout);
     return layout;
+  }
+
+  /** Standard GPUShaderModule diagnostics are optional on minimal test contexts. */
+  #captureCompilationInfo(
+    module: GpuShaderModule,
+    emitted: EmittedWgslNodeShader,
+  ): void {
+    const shader = module as {
+      getCompilationInfo?: () => Promise<{
+        messages: readonly {
+          type: string;
+          message: string;
+          lineNum: number;
+          linePos: number;
+        }[];
+      }>;
+    };
+    if (shader.getCompilationInfo === undefined) return;
+    const getInfo = shader.getCompilationInfo.bind(module);
+    void Promise.resolve()
+      .then(getInfo)
+      .then((info) => {
+        if (this.#disposed) return;
+        const errors = info.messages.filter(
+          (message) => message.type === "error",
+        );
+        if (errors.length === 0) return;
+        const messages = errors.map((message) => ({
+          ...message,
+          node: emitted.sourceMap.find(
+            (location) => location.line === message.lineNum,
+          ),
+        }));
+        const error = new FourError(
+          "SHADER_COMPILATION_FAILED",
+          "WebGPU node shader compilation failed.",
+          {
+            context: {
+              source: emitted.code,
+              sourceMap: emitted.sourceMap,
+              messages,
+            },
+          },
+        );
+        this.#compilationErrors.push(error);
+        if (DEV) {
+          this.#failureSerial += 1;
+          devWarnOnce(
+            `webgpu-node-compile:${String(this.#failureSerial)}`,
+            `${error.message} ${JSON.stringify(messages)}`,
+          );
+        }
+      })
+      .catch((cause: unknown) => {
+        if (!this.#disposed)
+          this.#compilationErrors.push(
+            new FourError(
+              "SHADER_COMPILATION_FAILED",
+              "Unable to retrieve WebGPU node shader diagnostics.",
+              {
+                cause,
+                context: { source: emitted.code, sourceMap: emitted.sourceMap },
+              },
+            ),
+          );
+      });
   }
 
   /** The pipeline for one (program × state), created on first use. */

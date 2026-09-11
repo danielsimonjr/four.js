@@ -64,7 +64,7 @@ Facts worth knowing before you fight them:
   `NodeMaterial` owns its own uniform values and texture bindings
   (`setUniform` / `setTexture`), uploaded per draw; writing them does **not**
   bump `Material.version`, exactly like the rest of §57's render state
-  (RFC 0001 Q3 — per-_node_ values are deferred with uniform blocks).
+  (RFC 0001 Q3 — per-_node_ values remain a separate deferred API).
 - **Validation happens at setup, loudly** (§85). A broken graph is refused
   with a `RangeError` naming the node while the code that built it is on the
   stack — a backend never validates inside a frame (§61).
@@ -200,24 +200,49 @@ contract exists (`PunctualLightUniforms`, WebGPU `LIGHT_UNIFORM_*`); node
 emitters still do not consume it. Lighting-aware graphs remain RFC 0001
 residue, not a missing-contract blocker.
 
-## What stays deferred (RFC 0001 residue, staged in source 2026-08-28)
+## Reusable functions, variants, and diagnostics
 
-- **Uniform blocks** (std140, with a measurement first) — also the gate on
-  per-node uniform values.
-- **Reusable functions** (named subgraphs need an emission scope and a
-  call-site key) and **conditional variants** (a second program-cache
-  dimension).
-- **Storage buffers** (§82, WebGPU) and **source maps** (per-node provenance;
-  today the error path ships the emitted source plus the driver log).
-- **Lighting-aware graphs** (above — R-17's contract landed; graphs stay unlit).
-- **Data-declared custom operators** (RFC 0001's alternative E — a follow-up
-  RFC, and the gate on §81's `materials/shader nodes` plugin token). The
-  `SHADER_OPERATORS` token is the named factory hook only (2026-09-06); it
-  does not widen the closed union.
+`new ShaderFunction({ name, graph, parameters, result? })` defines a safe named
+subgraph. Parameters name every uniform in the declaration; `result` defaults
+to the graph's colour output and can instead select a typed intermediate node.
+`fn.call(builder, ...arguments)` substitutes typed operands and remaps the
+subgraph into the caller's scope. Repeating the same call with identical argument
+expression handles reuses its result. Named samplers stay explicit resources.
 
-Shipped after this guide's first draft, so they are **not** residue: the
-`angle` operator (2026-09-06) and the §58 Paint-object tier on `Shape2D`
-(2026-08-29, including conic lowering behind `registerShapePaints()`).
+The plugin registry accepts the same JSON-safe declarations through
+`SHADER_OPERATORS` → `registerDefinition()`, with `getDefinition()` for lookup.
+The closed operator set remains enforced at runtime as well as in TypeScript.
+
+`new ShaderVariantSet({ warm: warmGraph, cool: coolGraph }).select("warm")`
+selects a frozen graph alternative. Equivalent emitted sources share a backend
+program; different alternatives retain independent reflection and resources.
+This is a finite variant family, not an IR-level conditional/define facility.
+
+Both emitters expose `sourceMap`: one-based line/column locations, graph node IDs,
+and stages. GLSL maps are separated into `vertex` and `fragment`; WGSL has one
+module map. WebGL compilation errors include these maps in their context.
+`WgpuNodePipelineStore.compilationErrors` retains mapped asynchronous WebGPU
+compiler errors; development warnings include the affected graph nodes.
+
+## Uniform blocks
+
+Call `builder.useUniformBlock()` before `graph()` or `build()` to select padded
+std140 on WebGL. Uniform names, logical types, and `setUniform()` do not change.
+Scalars/vectors occupy 16 bytes and matrices 64 bytes; surface materials upload
+one block per draw. WebGPU already uses a block. Individual WebGL uniforms remain
+the default. The deterministic 16-scalar measurement reduces upload calls from
+16,000 to 1,000 over 1,000 draws while increasing payload from 64,000 to 256,000
+bytes; this is not a GPU timing result. See the
+[RFC 0001 addendum](../rfcs/0001-shader-extension-addendum.md) for the design,
+measurement command, limits, and screen-effect upload behavior.
+
+## What stays deferred
+
+- Storage-buffer resources for graph shaders (§82, WebGPU).
+- Lighting-aware graphs: scene lights are not automatically bound.
+- IR-level Boolean conditionals and define specialization; finite named
+  alternatives are available through `ShaderVariantSet`.
+- Per-renderable uniform overrides: a shared material still shares values.
 
 ## Cross-references
 

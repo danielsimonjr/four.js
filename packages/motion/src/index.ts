@@ -197,3 +197,23 @@ export {
   ParabolicTrajectory,
   ParametricTrajectory,
 } from "./trajectories.js";
+
+export {
+  freezePlannedPath,
+  validatePathQuery,
+  plannedPathToTrajectory,
+  PathPlannerRegistry,
+} from "./path-planning.js";
+export type {
+  PlannedPath,
+  PathQuery,
+  PathPlannerDeterminism,
+  PathPlannerCapabilities,
+  PathPlannerAdapter,
+  PlannedPathToTrajectoryOptions,
+} from "./path-planning.js";
+export { WaypointGraphPlanner } from "./waypoint-graph-planner.js";
+export type { WaypointGraphOptions } from "./waypoint-graph-planner.js";
+export { followWaypoints } from "./steering.js";
+export type { WaypointCursor, FollowWaypointsOptions } from "./steering.js";
+export { PATH_PLANNERS } from "./capabilities.js";

@@ -4384,3 +4384,29 @@ kinematic-controller, motion, pose-target, rigid-body`) and requires each regist
   numbers (1., 2., 3., …) in the spec body are lists, not sections.
 - The spec body text is hard-wrapped plain text under Markdown headings; code snippets have
   been fenced since 2026-07-28.
+
+### 2026-09-11 — Owner-directed RFC/TODO implementation
+
+Owner requested all RFCs, PHs and TODO remainder implemented. Accepted RFCs 0007–0009
+and amended §56 (spec 1.16) before text-shaping implementation. New first packets are
+implemented; broad roadmap residue is explicitly retained in TODO rather than closed.
+
+Key decisions: waypoint A* scales Euclidean heuristic by minimum authored cost/distance
+so cheap/zero-cost edges remain admissible; reject distance overflow. GPU raster feedback
+scans every standard-map slot, not only albedo. Shared raster limits avoid a runtime cycle.
+HarfBuzz 0.4.13 is optional and injected through Emscripten instantiateWasm; default entry
+contains no wasm. Identity shaping retains original atlas advances for exact default
+parity. Normal/AO factors are preserved glTF→material→WebGL; GPU parity remains staged.
+CPU skinning owns independent output, preserves bind geometry in serialization, and uses
+interpolated palettes for rendering. std140 trades fewer uploads for padded bytes, not an
+unmeasured GPU-speed claim. Safe declarative shaders still lower to closed operators.
+
+Pinned Chromium 153 download failed (timeouts/502). An isolated Chromium 152 runtime was
+obtained separately for software-renderer validation; physical-GPU R-33 remains unproven.
+
+Final checks: 7,556 coverage tests / 24 package gates; 685 integration/determinism
+checks. Browser full run 108/110, then stale hemisphere fixture corrected to use
+LIGHT_BINDING_BYTES and 2/2 rerun passed; visual 3/3 unchanged. Chromium 152/SwiftShader
+only, not R-33 hardware evidence. Release staging had included the private docs
+workspace; now excluded, nested shaping imports preserved; 13 regression tests in PR CI,
+and 24 packages stage locally. Example-size A/B recorded in tools/size-budgets.mjs.

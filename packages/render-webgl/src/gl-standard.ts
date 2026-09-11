@@ -202,6 +202,12 @@ uniform sampler2D metalRoughnessMap;
 uniform bool useMetalRoughnessMap;
 uniform sampler2D emissiveMap;
 uniform bool useEmissiveMap;
+uniform sampler2D normalMap;
+uniform bool useNormalMap;
+uniform sampler2D occlusionMap;
+uniform bool useOcclusionMap;
+uniform float normalScaleOffset;
+uniform float occlusionStrengthOffset;
 uniform float metalness;
 uniform float roughness;
 uniform vec3 emissive;
@@ -249,7 +255,26 @@ vec3 directLobe(
   return diffuseColor + specular;
 }
 
+// Reconstruct the tangent frame from world-position and UV derivatives.
+// Evaluate derivatives outside normal/light branches to preserve quad coherence.
+vec3 mappedNormal(vec3 n, vec3 dpdx, vec3 dpdy, vec2 duvdx, vec2 duvdy) {
+  vec3 tangent = cross(dpdy, n) * duvdx.x + cross(n, dpdx) * duvdy.x;
+  vec3 bitangent = cross(dpdy, n) * duvdx.y + cross(n, dpdx) * duvdy.y;
+  float frameLength = max(dot(tangent, tangent), dot(bitangent, bitangent));
+  if (frameLength <= 1e-20) return n;
+  vec3 sampleNormal = textureGrad(normalMap, vUv, duvdx, duvdy).xyz * 2.0 - 1.0;
+  sampleNormal.xy *= 1.0 + normalScaleOffset;
+  vec3 perturbed = mat3(tangent * inversesqrt(frameLength),
+    bitangent * inversesqrt(frameLength), n) * sampleNormal;
+  float magnitude = length(perturbed);
+  return magnitude > 1e-10 ? perturbed / magnitude : n;
+}
+
 void main() {
+  vec3 dpdx = dFdx(vWorldPosition);
+  vec3 dpdy = dFdy(vWorldPosition);
+  vec2 duvdx = dFdx(vUv);
+  vec2 duvdy = dFdy(vUv);
   vec4 base = baseColor;
   if (useMap) {
     base *= texture(map, vUv);
@@ -273,8 +298,13 @@ void main() {
   vec3 f0 = mix(vec3(DIELECTRIC_F0), albedo, metal);
   float normalLength = length(vNormal);
   vec3 n = normalLength > 0.0 ? vNormal / normalLength : vec3(0.0);
+  if (useNormalMap && normalLength > 0.0) {
+    n = mappedNormal(n, dpdx, dpdy, duvdx, duvdy);
+  }
+  float occlusion = useOcclusionMap
+    ? mix(1.0, texture(occlusionMap, vUv).r, 1.0 + occlusionStrengthOffset) : 1.0;
   vec3 shaded =
-    (ambientLight + hemisphereAmbient(normalLength, n)) * diffuseColor;
+    (ambientLight + hemisphereAmbient(normalLength, n)) * diffuseColor * occlusion;
 
   if (normalLength > 0.0) {
     vec3 v = normalize(cameraPosition - vWorldPosition);
@@ -308,6 +338,10 @@ void main() {
   fragColor = vec4(shaded + emit, base.a);
 }
 `;
+
+/** Standard material data maps occupy units above albedo, shadow, MR and emission. */
+export const NORMAL_TEXTURE_UNIT = 4;
+export const OCCLUSION_TEXTURE_UNIT = 5;
 
 /** Scratch for this pipeline's `vec4` uploads; see `matrixScratch`. */
 const colorScratch = new Float32Array(4);
@@ -379,6 +413,19 @@ export class StandardProgram implements Disposable {
 
   readonly #useEmissiveMapLocation: GlUniformLocation;
 
+  readonly #normalMapLocation: GlUniformLocation;
+  readonly #useNormalMapLocation: GlUniformLocation;
+  readonly #occlusionMapLocation: GlUniformLocation;
+  readonly #useOcclusionMapLocation: GlUniformLocation;
+  readonly #normalScaleLocation: GlUniformLocation;
+  readonly #occlusionStrengthLocation: GlUniformLocation;
+  #normalScale = 1;
+  #occlusionStrength = 1;
+  #useNormalMap = false;
+  #normalSamplerUploaded = false;
+  #useOcclusionMap = false;
+  #occlusionSamplerUploaded = false;
+
   readonly #punctual: PunctualLightUniforms;
 
   readonly #hemisphere: HemisphereLightUniforms;
@@ -434,6 +481,12 @@ export class StandardProgram implements Disposable {
     this.#useMetalRoughnessMapLocation = locations[14];
     this.#emissiveMapLocation = locations[15];
     this.#useEmissiveMapLocation = locations[16];
+    this.#normalMapLocation = locations[17];
+    this.#useNormalMapLocation = locations[18];
+    this.#occlusionMapLocation = locations[19];
+    this.#useOcclusionMapLocation = locations[20];
+    this.#normalScaleLocation = locations[21];
+    this.#occlusionStrengthLocation = locations[22];
   }
 
   /**
@@ -469,6 +522,12 @@ export class StandardProgram implements Disposable {
         "useMetalRoughnessMap",
         "emissiveMap",
         "useEmissiveMap",
+        "normalMap",
+        "useNormalMap",
+        "occlusionMap",
+        "useOcclusionMap",
+        "normalScaleOffset",
+        "occlusionStrengthOffset",
       ];
       return new StandardProgram(
         gl,
@@ -653,6 +712,8 @@ export class StandardProgram implements Disposable {
     useMap: boolean,
     useMetalRoughnessMap = false,
     useEmissiveMap = false,
+    useNormalMap = false,
+    useOcclusionMap = false,
   ): void {
     if (useMap !== this.#useMap) {
       if (useMap && !this.#samplerUploaded) {
@@ -681,11 +742,42 @@ export class StandardProgram implements Disposable {
         this.#gl.uniform1i(this.#emissiveMapLocation, EMISSIVE_TEXTURE_UNIT);
         this.#emissiveSamplerUploaded = true;
       }
-      this.#gl.uniform1i(
-        this.#useEmissiveMapLocation,
-        useEmissiveMap ? 1 : 0,
-      );
+      this.#gl.uniform1i(this.#useEmissiveMapLocation, useEmissiveMap ? 1 : 0);
       this.#useEmissiveMap = useEmissiveMap;
+    }
+    if (useNormalMap !== this.#useNormalMap) {
+      if (useNormalMap && !this.#normalSamplerUploaded) {
+        this.#gl.uniform1i(this.#normalMapLocation, NORMAL_TEXTURE_UNIT);
+        this.#normalSamplerUploaded = true;
+      }
+      this.#gl.uniform1i(this.#useNormalMapLocation, useNormalMap ? 1 : 0);
+      this.#useNormalMap = useNormalMap;
+    }
+    if (useOcclusionMap !== this.#useOcclusionMap) {
+      if (useOcclusionMap && !this.#occlusionSamplerUploaded) {
+        this.#gl.uniform1i(this.#occlusionMapLocation, OCCLUSION_TEXTURE_UNIT);
+        this.#occlusionSamplerUploaded = true;
+      }
+      this.#gl.uniform1i(
+        this.#useOcclusionMapLocation,
+        useOcclusionMap ? 1 : 0,
+      );
+      this.#useOcclusionMap = useOcclusionMap;
+    }
+  }
+
+  /** Offset encoding makes GL's zero-initialized uniforms the glTF defaults. */
+  setMapFactors(normalScale = 1, occlusionStrength = 1): void {
+    if (normalScale !== this.#normalScale) {
+      this.#gl.uniform1f(this.#normalScaleLocation, normalScale - 1);
+      this.#normalScale = normalScale;
+    }
+    if (occlusionStrength !== this.#occlusionStrength) {
+      this.#gl.uniform1f(
+        this.#occlusionStrengthLocation,
+        occlusionStrength - 1,
+      );
+      this.#occlusionStrength = occlusionStrength;
     }
   }
 

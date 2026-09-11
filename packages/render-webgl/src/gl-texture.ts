@@ -83,7 +83,9 @@
  *
  * - a **version bump** (an in-place texel edit plus `markDirty()`, or a new
  *   `source`) is detected on the next `acquire`, which deletes the stale texture
- *   and uploads a fresh one;
+ *   and uploads a fresh one for a full update. A retained regional history
+ *   with unchanged storage/sampler metadata instead uses texSubImage2D and
+ *   refreshes the mip chain without replacing the allocation;
  * - **`texture.dispose()`** bumps the version and marks the texture disposed, so
  *   the next `acquire` deletes the GL object and returns `null` — the sprite is
  *   then skipped rather than drawn with undefined content (§83's "disposed
@@ -95,6 +97,7 @@
  *   invalid and the context must not be touched (§61).
  */
 
+import { FourError } from "@fourjs/core";
 import type { SpriteRenderItem } from "@fourjs/render";
 import { warnDisposedInUse } from "@fourjs/render";
 
@@ -214,6 +217,8 @@ export class TextureCache {
 
   #disposed = false;
 
+  readonly #states = new WeakMap<TextureRecord, string>();
+
   /**
    * The device's anisotropy ceiling (§62, §77; R-30b), or `0` while it has
    * never been asked for.
@@ -225,6 +230,9 @@ export class TextureCache {
    * default and therefore writes nothing at all.
    */
   #maxAnisotropy = 0;
+
+  #generation = 0;
+  readonly #pending = new Map<string, number>();
 
   constructor(gl: WebglContext) {
     this.#gl = gl;
@@ -251,10 +259,47 @@ export class TextureCache {
    * so it skips the object rather than unwinding the frame.
    */
   acquire(texture: CacheableTexture): TextureRecord | null {
+    if (this.#disposed) return null;
     const existing = this.#records.get(texture.id);
     if (existing !== undefined) {
       if (existing.version === texture.version) {
         return existing;
+      }
+      const region = texture.getDirtyRegion?.(existing.version);
+      if (
+        !texture.disposed &&
+        texture.data !== null &&
+        region != null &&
+        this.#gl.texSubImage2D !== undefined &&
+        this.#states.get(existing) === textureState(texture)
+      ) {
+        const gl = this.#gl;
+        const pixels = new Uint8Array(region.width * region.height * 4);
+        for (let row = 0; row < region.height; row += 1) {
+          const start = ((region.y + row) * texture.width + region.x) * 4;
+          pixels.set(
+            texture.data.subarray(start, start + region.width * 4),
+            row * region.width * 4,
+          );
+        }
+        gl.bindTexture(GL.TEXTURE_2D, existing.texture);
+        gl.texSubImage2D?.(
+          GL.TEXTURE_2D,
+          0,
+          region.x,
+          region.y,
+          region.width,
+          region.height,
+          GL.RGBA,
+          GL.UNSIGNED_BYTE,
+          pixels,
+        );
+        if (texture.mipmaps === true) gl.generateMipmap?.(GL.TEXTURE_2D);
+        gl.bindTexture(GL.TEXTURE_2D, null);
+        const updated = { ...existing, version: texture.version };
+        this.#states.set(updated, textureState(texture));
+        this.#records.set(texture.id, updated);
+        return updated;
       }
       this.#gl.deleteTexture(existing.texture);
       this.#records.delete(texture.id);
@@ -269,8 +314,84 @@ export class TextureCache {
     if (record === null) {
       return null;
     }
+    this.#states.set(record, textureState(texture));
     this.#records.set(texture.id, record);
     return record;
+  }
+
+  /** Residency of the submitted version; async preparation exposes in-flight work. */
+  residency(
+    texture: CacheableTexture,
+  ): "absent" | "stale" | "uploading" | "resident" {
+    const record = this.#records.get(texture.id);
+    if (record === undefined || texture.disposed) return "absent";
+    if (record.version !== texture.version) return "stale";
+    return this.#pending.has(texture.id) ? "uploading" : "resident";
+  }
+
+  /** Upload and wait for GPU completion without a blocking client wait. */
+  async acquireAsync(
+    texture: CacheableTexture,
+    poll: () => Promise<void> = textureUploadTick,
+    maximumPolls = 4096,
+  ): Promise<TextureRecord | null> {
+    const gl = this.#gl;
+    if (this.#disposed || texture.disposed) return null;
+    if (!Number.isSafeInteger(maximumPolls) || maximumPolls < 1)
+      throw new RangeError("maximumPolls must be a positive safe integer.");
+    if (
+      gl.fenceSync === undefined ||
+      gl.clientWaitSync === undefined ||
+      gl.deleteSync === undefined
+    )
+      throw new FourError(
+        "NOT_IMPLEMENTED",
+        "Asynchronous texture preparation requires WebGL sync objects.",
+      );
+    const record = this.acquire(texture);
+    if (record === null) return null;
+    const sync = gl.fenceSync(0x9117, 0);
+    if (sync === null)
+      throw new FourError(
+        "CONTEXT_LOST",
+        "Could not allocate a texture upload fence.",
+      );
+    const generation = this.#generation;
+    this.#pending.set(texture.id, (this.#pending.get(texture.id) ?? 0) + 1);
+    try {
+      for (let attempt = 0; attempt < maximumPolls; attempt++) {
+        if (
+          this.#disposed ||
+          texture.disposed ||
+          texture.version !== record.version ||
+          this.#records.get(texture.id) !== record
+        )
+          return null;
+        const status = gl.clientWaitSync(sync, attempt === 0 ? 1 : 0, 0);
+        if (status === 0x911a || status === 0x911c) return record;
+        if (status !== 0x911b)
+          throw new FourError("CONTEXT_LOST", "Texture upload fence failed.");
+        await poll();
+      }
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        "Texture upload fence polling limit exceeded.",
+      );
+    } catch (error) {
+      if (
+        generation === this.#generation &&
+        this.#records.get(texture.id) === record
+      ) {
+        this.#records.delete(texture.id);
+        gl.deleteTexture(record.texture);
+      }
+      throw error;
+    } finally {
+      if (generation === this.#generation) gl.deleteSync(sync);
+      const count = this.#pending.get(texture.id) ?? 1;
+      if (count <= 1) this.#pending.delete(texture.id);
+      else this.#pending.set(texture.id, count - 1);
+    }
   }
 
   /**
@@ -279,6 +400,7 @@ export class TextureCache {
    * would be a GL call against a lost context for no benefit.
    */
   forget(): void {
+    this.#generation += 1;
     this.#records.clear();
   }
 
@@ -419,4 +541,29 @@ export class TextureCache {
 
     return { texture: handle, version: texture.version };
   }
+}
+
+/** Storage and sampler identity; a metadata edit requires a full upload. */
+function textureState(texture: CacheableTexture): string {
+  return [
+    texture.width,
+    texture.height,
+    texture.colorSpace,
+    texture.filter,
+    texture.minFilter,
+    texture.wrap,
+    texture.mipmaps,
+    texture.anisotropy,
+  ].join("|");
+}
+
+/** Let the browser process GPU work between zero-timeout fence polls. */
+function textureUploadTick(): Promise<void> {
+  const host = globalThis as {
+    setTimeout?: (callback: () => void, delay: number) => unknown;
+  };
+  if (host.setTimeout === undefined) return Promise.resolve();
+  return new Promise((resolve) => {
+    host.setTimeout?.(resolve, 0);
+  });
 }

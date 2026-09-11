@@ -971,6 +971,10 @@ class TestStandardMaterial {
   metalRoughnessMap?: ItemTexture | null;
 
   emissiveMap?: ItemTexture | null;
+  normalMap?: ItemTexture | null;
+  occlusionMap?: ItemTexture | null;
+  normalScale = 1;
+  occlusionStrength = 1;
 
   constructor(
     baseColor: [number, number, number, number] = [1, 1, 1, 1],
@@ -1545,7 +1549,9 @@ describe("WebglRenderer — initialization (§61, §62)", () => {
   });
 
   it("does not issue timer queries until lastGpuFrameTimeSeconds is read (A-1)", async () => {
-    const { renderer, gl, camera } = await initialized({ timerExtension: true });
+    const { renderer, gl, camera } = await initialized({
+      timerExtension: true,
+    });
     gl.reset();
     renderer.render(createRoot(), [createView(camera)]);
     expect(gl.countOf("beginQuery")).toBe(0);
@@ -4320,9 +4326,9 @@ describe("ParticleAppearanceProgram — R-32 textured/rotated/soft (opt-in)", ()
 
     const program = ParticleAppearanceProgram.create(gl);
     expect(program.disposed).toBe(false);
-    expect(
-      gl.callsOf("uniform1i").map((call) => call.args[1]),
-    ).not.toContain(MAP_TEXTURE_UNIT);
+    expect(gl.callsOf("uniform1i").map((call) => call.args[1])).not.toContain(
+      MAP_TEXTURE_UNIT,
+    );
     program.dispose();
   });
 });
@@ -4484,10 +4490,7 @@ describe("ParticleBatchCache — one vertex array per system (§61, §64)", () =
     const gl = createFakeGl();
     const cache = new ParticleBatchCache(gl);
     const item: ParticleRenderItem = {
-      ...particleItem(
-        new Float32Array(2 * PARTICLE_WIDE_INSTANCE_FLOATS),
-        2,
-      ),
+      ...particleItem(new Float32Array(2 * PARTICLE_WIDE_INSTANCE_FLOATS), 2),
       instanceFloats: PARTICLE_WIDE_INSTANCE_FLOATS,
     };
 
@@ -4603,9 +4606,7 @@ describe("ParticleTrailBatchCache — ribbon vertex cache (§36 trail tier)", ()
   it("returns null without trail vertices and rebuilds when capacity changes", () => {
     const gl = createFakeGl();
     const cache = new ParticleTrailBatchCache(gl);
-    expect(
-      cache.acquire(trailParticleItem(new Float32Array(0), 0)),
-    ).toBeNull();
+    expect(cache.acquire(trailParticleItem(new Float32Array(0), 0))).toBeNull();
 
     const small = trailParticleItem(new Float32Array(TRAIL_VERTEX_FLOATS), 1);
     const first = cache.acquire(small);
@@ -8065,6 +8066,12 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
       "useMetalRoughnessMap",
       "emissiveMap",
       "useEmissiveMap",
+      "normalMap",
+      "useNormalMap",
+      "occlusionMap",
+      "useOcclusionMap",
+      "normalScaleOffset",
+      "occlusionStrengthOffset",
       // §68's light set (R-17, 2026-08-09) — the same five names, in the same
       // order, as the lit pipeline's, because both resolve them through the
       // one `PunctualLightUniforms.resolve`.
@@ -8545,10 +8552,12 @@ describe("WebglRenderer.render — standard surfaces (§59, §68)", () => {
       gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
     ).toContain(UV_ATTRIBUTE_LOCATION);
     expect(
-      gl.callsOf("vertexAttribPointer").some(
-        (call) =>
-          call.args[0] === UV_ATTRIBUTE_LOCATION && call.args[1] === 2,
-      ),
+      gl
+        .callsOf("vertexAttribPointer")
+        .some(
+          (call) =>
+            call.args[0] === UV_ATTRIBUTE_LOCATION && call.args[1] === 2,
+        ),
     ).toBe(true);
     expect(uploadsAt(gl, standardUniforms(gl).get("useEmissiveMap"))).toEqual([
       1,
@@ -11567,10 +11576,7 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
     const casterUniforms = skinnedShadowUniforms(gl);
     expect(uploadsAt(gl, casterUniforms.get("model"))).toHaveLength(2);
-    const shadowPalette = uploadsAt(
-      gl,
-      casterUniforms.get("jointMatrices[0]"),
-    );
+    const shadowPalette = uploadsAt(gl, casterUniforms.get("jointMatrices[0]"));
     expect(shadowPalette).toHaveLength(2);
     expect((shadowPalette[0] as number[])[13]).toBe(5);
     // The skinned colour draws still happened, on their own program.
@@ -11655,9 +11661,9 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     renderer.render(root, [createView(camera)]);
 
     expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(2);
-    expect(
-      uploadsAt(gl, skinnedShadowUniforms(gl).get("model")),
-    ).toHaveLength(1);
+    expect(uploadsAt(gl, skinnedShadowUniforms(gl).get("model"))).toHaveLength(
+      1,
+    );
   });
 
   it("skips skinned casters when the caster program fails to compile, and still shades", async () => {
@@ -11801,9 +11807,9 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     // matching the colour path's pipeline-then-geometry order.
     expect(gl.countOf("createProgram")).toBe(3);
     expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
-    expect(
-      uploadsAt(gl, skinnedShadowUniforms(gl).get("model")),
-    ).toHaveLength(0);
+    expect(uploadsAt(gl, skinnedShadowUniforms(gl).get("model"))).toHaveLength(
+      0,
+    );
   });
 
   it("skips skinned casters when the colour pair fails to compile", async () => {
@@ -12832,5 +12838,65 @@ describe("WebglRenderer.readPixels (§61, §92; 2026-08-29)", () => {
     expect(error.code).toBe("UNSUPPORTED_GPU_FEATURE");
     renderer.dispose();
     target.dispose();
+  });
+});
+
+describe("Standard material normal and occlusion maps", () => {
+  it("binds both linear data maps, transitions to scalar shading, and releases units", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const material = new TestStandardMaterial();
+    material.normalMap = new TestTexture().asTexture;
+    material.occlusionMap = new TestTexture().asTexture;
+    material.normalScale = 0.5;
+    material.occlusionStrength = 0.25;
+    root.add(standardRenderable(litUvTriangleGeometry(), material));
+    renderer.render(root, [createView(camera)]);
+    const uniforms = standardUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("normalScaleOffset"))).toEqual([-0.5]);
+    expect(uploadsAt(gl, uniforms.get("occlusionStrengthOffset"))).toEqual([
+      -0.75,
+    ]);
+    expect(uploadsAt(gl, uniforms.get("normalMap"))).toEqual([4]);
+    expect(uploadsAt(gl, uniforms.get("occlusionMap"))).toEqual([5]);
+    expect(uploadsAt(gl, uniforms.get("useNormalMap"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("useOcclusionMap"))).toEqual([1]);
+    expect(gl.callsOf("activeTexture").at(-1)?.args[0]).toBe(GL.TEXTURE0);
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(uploadsAt(gl, uniforms.get("useNormalMap"))).toEqual([]);
+    expect(gl.callsOf("activeTexture").map((call) => call.args[0])).toEqual([
+      GL.TEXTURE0 + 4,
+      GL.TEXTURE0 + 5,
+      GL.TEXTURE0 + 4,
+      GL.TEXTURE0 + 5,
+      GL.TEXTURE0,
+    ]);
+    material.normalMap = null;
+    material.occlusionMap = null;
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(uploadsAt(gl, uniforms.get("useNormalMap"))).toEqual([0]);
+    expect(uploadsAt(gl, uniforms.get("useOcclusionMap"))).toEqual([0]);
+    material.normalMap = new TestTexture().asTexture;
+    material.occlusionMap = new TestTexture().asTexture;
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(uploadsAt(gl, uniforms.get("useNormalMap"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("useOcclusionMap"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("normalMap"))).toEqual([]);
+    expect(uploadsAt(gl, uniforms.get("occlusionMap"))).toEqual([]);
+    renderer.dispose();
+  });
+
+  it("keeps derivative evaluation outside normal branches and occlusion outside direct lighting", () => {
+    const gl = createFakeGl();
+    const program = StandardProgram.create(gl);
+    const source = gl.callsOf("shaderSource")[1].args[1] as string;
+    expect(source).toContain("dFdx(vWorldPosition)");
+    expect(source).toContain("frameLength <= 1e-20");
+    expect(source).toContain("diffuseColor * occlusion");
+    expect(source).toContain("vec4(shaded + emit, base.a)");
+    program.dispose();
   });
 });
