@@ -166,15 +166,15 @@ describe("the node pipeline, end to end (§60, §62)", () => {
     expect(rig.recording.countOf("drawElements")).toBe(3);
   });
 
-  it("initialize compiles four programs, registered or not (lazy proof)", async () => {
-    // Four since 2026-09-11 (eight before): the particle, effect and shadow
-    // pipelines became registration seams of their own and compile on first
-    // use, like this one.
+  it("initialize compiles three programs, registered or not (lazy proof)", async () => {
+    // Three since 2026-09-11 (eight before): the particle, effect, shadow
+    // and standard pipelines became registration seams of their own and
+    // compile on first use, like this one.
     registerNodeMaterialPipeline();
     const recording = createRecordingGl();
     const renderer = new WebglRenderer();
     await renderer.initialize({ canvas: new RecordingCanvas(recording.gl) });
-    expect(recording.countOf("createProgram")).toBe(4);
+    expect(recording.countOf("createProgram")).toBe(3);
     renderer.dispose();
   });
 

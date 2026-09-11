@@ -188,7 +188,18 @@ export {
 // §69's depth-only caster (R-18; behind a seam since 2026-09-11): importing
 // `registerShadowPipeline` is what links it — see `gl-shadow-registry.ts`.
 export { ShadowProgram, registerShadowPipeline } from "./gl-shadow.js";
-export { StandardProgram } from "./gl-standard.js";
+export type {
+  StandardPipeline,
+  StandardPipelineFactory,
+} from "./gl-standard-registry.js";
+export {
+  clearRegisteredStandardPipeline,
+  resolveStandardPipelineFactory,
+} from "./gl-standard-registry.js";
+// §59's metallic-roughness pipeline (R-13; behind a seam since 2026-09-11 by
+// owner decision): importing `registerStandardPipeline` is what links it —
+// see `gl-standard-registry.ts`.
+export { StandardProgram, registerStandardPipeline } from "./gl-standard.js";
 export type { CacheableTexture, TextureRecord } from "./gl-texture.js";
 export { TextureCache } from "./gl-texture.js";
 export { isWebgl2Supported, registerWebglRenderer } from "./register.js";

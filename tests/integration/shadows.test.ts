@@ -48,7 +48,11 @@ import {
   collectSceneLights,
   createSceneLights,
 } from "@fourjs/render";
-import { WebglRenderer, registerShadowPipeline } from "@fourjs/render-webgl";
+import {
+  WebglRenderer,
+  registerShadowPipeline,
+  registerStandardPipeline,
+} from "@fourjs/render-webgl";
 import {
   DirectionalLight,
   DirectionalLightShadow,
@@ -79,6 +83,8 @@ import {
 // renderer compiles it on the first shadowed frame. Registered for the file,
 // as an application registers once at setup.
 registerShadowPipeline();
+// …and §59's standard surface, which the receiver scenes below draw.
+registerStandardPipeline();
 
 interface Harness {
   readonly recorder: RecordingGl;
