@@ -832,12 +832,29 @@ test.describe("§108: gravity, collisions, impulses and sensors in the browser",
 
     // The zones start empty: the lowest body has to fall ~0.6 world units before
     // it reaches one, which is ~0.36 s of simulation, and the readiness gate
-    // above fires at the top of the very first frame.
+    // above fires at the top of the very first frame. That window is real
+    // but short, and under CI load the grab can land after a body has already
+    // entered (2026-09-11: two failures in three runs on unchanged content).
+    // So the emptiness proof is gated on the page's own §29 occupancy mirror,
+    // read on both sides of the grab: a zone the example reports empty before
+    // and after the screenshot must paint the empty colour; a zone already
+    // entered is proven by the occupied half below instead of by a race.
+    const occupancyOf = async (): Promise<readonly [string, string]> =>
+      status.evaluate((element) => [
+        element.getAttribute("data-zone2d") ?? "",
+        element.getAttribute("data-zone3d") ?? "",
+      ] as [string, string]);
+    const beforeGrab = await occupancyOf();
     const empty = await grab(canvas);
-    for (const [label, centerX] of [
-      ["2d", -HALF_CENTER_X],
-      ["3d", HALF_CENTER_X],
+    const afterGrab = await occupancyOf();
+    for (const [index, label, centerX] of [
+      [0, "2d", -HALF_CENTER_X],
+      [1, "3d", HALF_CENTER_X],
     ] as const) {
+      const entered = /[1-9]/.test(beforeGrab[index]) || /[1-9]/.test(afterGrab[index]);
+      if (entered) {
+        continue; // a body was already inside during the grab — nothing to prove empty
+      }
       const color = zoneMeanColor(empty, centerX);
       expect(
         colorDistance(color, ZONE_EMPTY_RGB),

@@ -438,9 +438,11 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       the particle programs compile at init and ride every bundle (~2.7 /
       8.2 / 5.0 / 8.8 kB gz standalone) — each is a `register*()` seam
       candidate like skinning/picking/node materials; A/B per module.
-      **Stability.** 77 `page.waitForTimeout` calls across 14 Playwright specs
-      (worst: one-scene-everything-moves 20, motor-digital-twin 13 with 2.5 s
-      sleeps, particles 3–4 s) → `waitForFunction` on a frame counter.
+      **Stability.** ~~77 `page.waitForTimeout` calls across 14 Playwright specs~~
+      **DONE 2026-09-11** (0 left; `tests/browser/helpers/wait.ts`). The
+      playground `each sensor zone repaints` race (a ~0.36 s screenshot window)
+      is closed the same day: the emptiness proof is gated on the page's
+      `data-zone*` occupancy mirror read before and after the grab.
       ~~`Scheduler.step` counter skew on a throwing step~~ **DONE 2026-09-11**
       (counters roll back with the accumulator). ~~Seventeen `dispose()` implementations have no disposed flag~~ **DONE
       2026-09-11** (eleven guarded; drag / snapshot-system / event-system /

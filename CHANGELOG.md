@@ -73,6 +73,16 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### Changed
 
+- **Browser gates no longer sleep.** All 77 `page.waitForTimeout` calls across
+  14 specs are replaced by condition waits from a shared
+  `tests/browser/helpers/wait.ts`: a rAF frame counter, the page's published
+  simulation clock (`data-sim`) where the sleep meant "let the simulation
+  advance", and probe predicates. Assertions unchanged; `context-loss` needs
+  no wall-clock gap (its events were already polled). Three runs of the 14
+  specs: 13 green every time; `playground › each sensor zone repaints` failed
+  twice under load on HEAD's own content (a ~0.36 s screenshot race that
+  predates this change); its emptiness proof is now gated on the page's own
+  `data-zone*` occupancy read before and after the grab (4/4 green).
 - **WebGPU per-draw allocations removed.** Thirteen `[offset]` dynamic-offset
   arrays per draw path go through one reused array (the fake-device harness
   already copies retained arguments at record time, so transcripts are
