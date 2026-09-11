@@ -317,6 +317,13 @@ function countingGl(options = {}) {
   };
 }
 
+/**
+ * The host double the service reads. Typed against the renderer's own host
+ * contract so a member the service starts asking for (as `particleBatches()`
+ * did in #86) fails `bun run typecheck:benchmarks` instead of the run.
+ *
+ * @returns {import("@fourjs/render-webgl").PickingRendererHost}
+ */
 function createHost(counter) {
   const geometries = new GeometryCache(counter.gl);
   const renderTargets = new RenderTargetCache(counter.gl);
@@ -378,6 +385,7 @@ function listWork(scene, view, items, viewItems, frustum, viewProjection) {
   return visible.length;
 }
 
+/** @returns {Record<string, any>} the summary keys are built by `summaryFields` */
 function runTimed(iteration, warmupIterations, measuredIterations) {
   const { warmup, measured } = measure(iteration, {
     warmupIterations,

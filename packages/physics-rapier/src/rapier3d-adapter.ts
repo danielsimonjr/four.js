@@ -232,6 +232,7 @@ import type {
   PhysicsColliderHandle,
   PhysicsDimension,
   PhysicsEvent,
+  PhysicsEventInterest,
   PhysicsJointHandle,
   PhysicsSolverAdapter,
   PhysicsWorldOptions,
@@ -885,6 +886,13 @@ export class Rapier3dAdapter
   /** Keys of the pairs that stopped this step, so `stay` can skip them. */
   readonly #stoppedKeys = new Set<string>();
 
+  /**
+   * Whether `collisionstay` events are synthesised for touching pairs (see
+   * `PhysicsSolverAdapter.setEventInterest`). `true` until a world says
+   * otherwise, so an adapter driven directly keeps reporting everything.
+   */
+  #stayEvents = true;
+
   readonly #scratchVector3 = new Vector3();
 
   readonly #scratchQuaternion = new Quaternion();
@@ -1449,6 +1457,10 @@ export class Rapier3dAdapter
    * allocated per event and are never pooled, so they stay valid for as long as
    * the caller holds them.
    */
+  setEventInterest(interest: PhysicsEventInterest): void {
+    this.#stayEvents = interest.collisionstay;
+  }
+
   drainEvents(): PhysicsEvent[] {
     const drained = this.#pendingEvents;
     this.#pendingEvents = [];
@@ -2913,14 +2925,16 @@ export class Rapier3dAdapter
       this.#emitPair(started[i], started[i + 1], "start");
     }
 
-    for (const pair of this.#activePairs.values()) {
-      if (
-        pair.trigger ||
-        this.#stoppedKeys.has(this.#pairKey(pair.a, pair.b))
-      ) {
-        continue;
+    if (this.#stayEvents) {
+      for (const pair of this.#activePairs.values()) {
+        if (
+          pair.trigger ||
+          this.#stoppedKeys.has(this.#pairKey(pair.a, pair.b))
+        ) {
+          continue;
+        }
+        this.#emitPair(pair.a, pair.b, "stay");
       }
-      this.#emitPair(pair.a, pair.b, "stay");
     }
 
     for (let i = 0; i < started.length; i += 2) {

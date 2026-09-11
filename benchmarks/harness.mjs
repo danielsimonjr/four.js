@@ -217,6 +217,7 @@ export function summarize(durations) {
  * @param unit singular name of one iteration — `"Step"`, `"Batch"`, `"Pass"`
  * @param digits decimals to keep (default 4, the particle script's precedent)
  */
+/** @returns {Record<string, number>} keys are `<stat><unit>`, built dynamically */
 export function summaryFields(summary, unit, digits = 4) {
   return {
     [`meanMsPer${unit}`]: round(summary.meanMs, digits),

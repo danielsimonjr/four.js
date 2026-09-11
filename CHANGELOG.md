@@ -69,6 +69,39 @@ specification; until then, entries are grouped by date under **Unreleased**.
   the §58 paint tier leave the deferred list. Spec revision **1.15**
   matches that §60 honesty.
 
+## Unreleased — "fix all" follow-through (2026-09-11)
+
+### Changed
+
+- **`TODO.md` holds open work only.** Every closed row (263) moved to
+  `docs/archive/TODO-DONE.md` under its original heading; the tracker went from
+  ~2,400 to ~500 lines. `CLAUDE.md` states the rule (close → move in the same
+  commit). `MEMORY.md` is unchanged: it is an append-only record by its own
+  convention and `check-docs` enforces that, so it is not split.
+- **DOM-free is now a compiler guarantee.** `tsconfig.base.json` pins
+  `lib: ["ES2022"]` + `types: ["node"]`; every package builds. The one host
+  global a package needed, `WebAssembly` in `physics-rapier`'s support probe,
+  is read through `globalThis` without a type. Browser specs (`tests/`) and
+  examples keep an explicit DOM lib because they run in a page.
+- **Physics: `PhysicsSolverAdapter.setEventInterest?()`** (additive, optional).
+  `PhysicsWorld` tells the adapter, only when it changes, whether any body
+  listens for `collisionstay`; the Rapier adapters then skip synthesising a
+  stay event per touching pair per step. Proven checksum-neutral: the four
+  piled-scenario §33 fingerprints are identical with and without the gate.
+  `benchmarks/results/physics-step.json` re-recorded (the previous record
+  predated Rapier 0.20; its piled checksums were stale). Timing on this host
+  was noisy (two builds ran concurrently), so the record notes that the
+  events/step column, not the milliseconds, is the evidence.
+- **WebGPU picking uses `DEVICE_LOST`**, the backend's one loss code, instead
+  of `CONTEXT_LOST`; tests updated.
+- **RFC template and README** gain the `proposed` status and the rule that
+  accepted decision text is never rewritten (corrections are appended).
+- **CI:** `bun audit --audit-level=critical` now gates; the high-and-above run
+  stays visibility-only. New `typecheck:benchmarks` step: `pick-latency.mjs`'s
+  host double is typed against `PickingRendererHost`, so a member the service
+  starts reading fails typecheck instead of the run (the exact failure of
+  2026-09-10). `harness.mjs`/`runTimed` carry the JSDoc the checker needs.
+
 ## Unreleased — security, stability and performance pass (2026-09-11)
 
 Three read-only audits (security against §96, stability of lifecycle/error

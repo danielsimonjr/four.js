@@ -2066,3 +2066,24 @@ describe("snapshot envelope hardening (§96, 2026-09-11)", () => {
     adapter.dispose();
   });
 });
+
+describe("setEventInterest (2026-09-11)", () => {
+  it("stops synthesising collisionstay while start and end still report", async () => {
+    const adapter = await createAdapter();
+    createFloor(adapter);
+    const body = adapter.createBody({
+      type: "dynamic",
+      position: new Vector3(0, 2, 0),
+    });
+    adapter.createCollider({ body, shape: { type: "sphere", radius: 0.5 } });
+    adapter.setEventInterest({ collisionstay: false });
+    const quiet = stepAndDrain(adapter, 120);
+    expect(quiet.some((event) => event.type === "collisionstart")).toBe(true);
+    expect(quiet.some((event) => event.type === "collisionstay")).toBe(false);
+    // Re-enabling resumes stays for the pair that is still touching.
+    adapter.setEventInterest({ collisionstay: true });
+    const loud = stepAndDrain(adapter, 5);
+    expect(loud.some((event) => event.type === "collisionstay")).toBe(true);
+    adapter.dispose();
+  });
+});

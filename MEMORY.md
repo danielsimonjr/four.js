@@ -448,6 +448,19 @@ readable; never delete the pointer itself.
   Audit reports were subagent output; every applied item was re-read in
   source before editing. Unapplied items are in TODO with file:line.
 
+- **2026-09-11 — "Fix all" follow-through.** Closed TODO rows live in
+  `docs/archive/TODO-DONE.md` (moved, not rewritten; MEMORY stays append-only
+  and unsplit because `check-docs` and its own convention say so). The
+  workspace now pins `lib: ["ES2022"]` — a package naming a DOM type fails to
+  build; browser specs and examples pin DOM themselves. `setEventInterest`
+  gates event *translation* only: fingerprints identical with/without it. The
+  2026-08-08 `physics-step` record was stale after the Rapier 0.20 bump — a
+  benchmark record's checksums must be re-recorded with every solver bump,
+  not only the goldens. WebGPU has one loss code, `DEVICE_LOST`.
+  `typecheck:benchmarks` exists because the pick-latency host double rotted
+  silently once. Pending in worktree agents at this commit: WebGL register
+  seams (shadow/effect/particles) and the Playwright sleep removal.
+
 - **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
   (the exception each golden's `_warning` names). Values came from the
   scenario helpers, not from editing hashes by hand. 0.20 contact persistence
