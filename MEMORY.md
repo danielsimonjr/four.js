@@ -481,6 +481,14 @@ readable; never delete the pointer itself.
   gates. `bun run graph` regenerates `docs/Architecture/*` — commit it with
   the packet that changed the graph.
 
+- **2026-09-11 — Standard seam + GL mirrors.** Three programs compile at
+  init on WebGL (unlit, sprite, lit); seven register seams (standard,
+  shadow, effect, particles, skinning, picking, node materials). A CPU
+  uniform mirror must hold **doubles**: a `Float32Array` mirror never equals
+  the material's `0.2`, so the skip silently never fires — measure the
+  skip, do not assume it. Two Playwright runs on this machine collide on
+  ports 4173–4183; run browser gates one at a time.
+
 - **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
   (the exception each golden's `_warning` names). Values came from the
   scenario helpers, not from editing hashes by hand. 0.20 contact persistence

@@ -427,15 +427,14 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       (`setEventInterest`, listener-gated, checksum-neutral). ~~(B4) batch content hash~~ **measured and declined 2026-09-11** (a
       version stamp misses the in-place matrix write the idle-skip contract
       pins; interpolated matrices change per frame). ~~(A2/A3) WebGPU per-draw allocations~~ **DONE 2026-09-11** (reused
-      offset array; previous-draw pipeline memo). (A5/A6) WebGL
-      `setColor`/`setTint` and `bindTexture` have no CPU mirrors — adding them
-      changes the F13 GL-sequence goldens, so re-record deliberately. ~~(A7) `EventEmitter.emit` slices the listener array per emit~~ **DONE
+      offset array; previous-draw pipeline memo). ~~(A5/A6) WebGL colour / texture-bind mirrors~~ **DONE 2026-09-11**
+      (goldens re-recorded with reasons). ~~(A7) `EventEmitter.emit` slices the listener array per emit~~ **DONE
       2026-09-11** (index loop + deferred compaction). (B2, B3, B5, B6, B7) measure
       first: Rapier wrapper allocations per body read, the resolver's
       `WeakMap` per node, the O(n·depth) interpolated list, string-keyed
       geometry/texture cache lookups per draw, the two O(n) pre-scans per
       WebGL frame. ~~(D) shadow / effect / particle programs compiled at init~~ **DONE
-      2026-09-11** (three register seams; `StandardProgram` seam in flight).
+      2026-09-11** (four register seams incl. `StandardProgram`).
       **Stability.** ~~77 `page.waitForTimeout` calls across 14 Playwright specs~~
       **DONE 2026-09-11** (0 left; `tests/browser/helpers/wait.ts`). The
       playground `each sensor zone repaints` race (a ~0.36 s screenshot window)

@@ -2,9 +2,9 @@ metadata:
   name: fourjs-monorepo
   version: 0.0.0
   lastUpdated: "2026-09-11"
-  totalFiles: 323
+  totalFiles: 324
   totalModules: 24
-  totalExports: 3339
+  totalExports: 3348
 entryPoints:
   - file: packages/particles/src/index.ts
     type: main
@@ -4742,9 +4742,15 @@ modules:
             - ShadowProgram
             - registerShadowPipeline
           reExport: true
+        - file: ./gl-standard-registry.js
+          imports:
+            - clearRegisteredStandardPipeline
+            - resolveStandardPipelineFactory
+          reExport: true
         - file: ./gl-standard.js
           imports:
             - StandardProgram
+            - registerStandardPipeline
           reExport: true
         - file: ./gl-texture.js
           imports:
@@ -4851,6 +4857,12 @@ modules:
             - ShadowPipelineFactory
           reExport: true
           typeOnly: true
+        - file: ./gl-standard-registry.js
+          imports:
+            - StandardPipeline
+            - StandardPipelineFactory
+          reExport: true
+          typeOnly: true
         - file: ./gl-texture.js
           imports:
             - CacheableTexture
@@ -4935,7 +4947,10 @@ modules:
         - resolveShadowPipelineFactory
         - ShadowProgram
         - registerShadowPipeline
+        - clearRegisteredStandardPipeline
+        - resolveStandardPipelineFactory
         - StandardProgram
+        - registerStandardPipeline
         - TextureCache
         - isWebgl2Supported
         - registerWebglRenderer
@@ -4981,6 +4996,8 @@ modules:
         - EmittedNodeShader
         - ShadowCasterPipeline
         - ShadowPipelineFactory
+        - StandardPipeline
+        - StandardPipelineFactory
         - CacheableTexture
         - TextureRecord
         - WebglCanvas
@@ -5056,7 +5073,10 @@ modules:
         - resolveShadowPipelineFactory
         - ShadowProgram
         - registerShadowPipeline
+        - clearRegisteredStandardPipeline
+        - resolveStandardPipelineFactory
         - StandardProgram
+        - registerStandardPipeline
         - TextureCache
         - isWebgl2Supported
         - registerWebglRenderer
@@ -5101,6 +5121,8 @@ modules:
         - EmittedNodeShader
         - ShadowCasterPipeline
         - ShadowPipelineFactory
+        - StandardPipeline
+        - StandardPipelineFactory
         - CacheableTexture
         - TextureRecord
         - WebglCanvas
@@ -5108,6 +5130,35 @@ modules:
         - WebglContextEventLike
       constants:
         - PACKAGE_NAME
+    packages/render-webgl/src/gl-standard-registry.ts:
+      description: The standard pipeline's registration slot (§59, §62; 2026-09-11) — the
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./gl-program.js
+          imports:
+            - WebglContext
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@fourjs/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+        - package: "@fourjs/render"
+          directory: packages/render
+          imports:
+            - SceneLights
+      exports:
+        - setStandardPipelineFactory
+        - resolveStandardPipelineFactory
+        - clearRegisteredStandardPipeline
+      interfaces:
+        - StandardPipeline
+        - StandardPipelineFactory
+      functions:
+        - setStandardPipelineFactory
+        - resolveStandardPipelineFactory
+        - clearRegisteredStandardPipeline
     packages/render-webgl/src/gl-skinning-glsl.ts:
       description: The vertex-stage skinning chunk both the colour/caster programs
       externalDependencies: []
@@ -5325,6 +5376,9 @@ modules:
             - GlProgramHandle
             - GlUniformLocation
             - WebglContext
+        - file: ./gl-standard-registry.js
+          imports:
+            - setStandardPipelineFactory
       workspaceDependencies:
         - package: "@fourjs/core"
           directory: packages/core
@@ -5340,9 +5394,12 @@ modules:
           imports:
             - SceneLights
       exports:
+        - registerStandardPipeline
         - StandardProgram
       classes:
         - StandardProgram
+      functions:
+        - registerStandardPipeline
     packages/render-webgl/src/register.ts:
       description: This backend's opt-in to §62's renderer registry (R-2, A-8).
       externalDependencies: []
@@ -5602,9 +5659,10 @@ modules:
           imports:
             - resolveShadowPipelineFactory
             - ShadowCasterPipeline
-        - file: ./gl-standard.js
+        - file: ./gl-standard-registry.js
           imports:
-            - StandardProgram
+            - resolveStandardPipelineFactory
+            - StandardPipeline
         - file: ./gl-texture.js
           imports:
             - TextureCache
@@ -19393,6 +19451,7 @@ dependencyGraph:
         - packages/render-webgl/src/gl-effect.ts
         - packages/render-webgl/src/gl-shadow-registry.ts
         - packages/render-webgl/src/index.ts
+        - packages/render-webgl/src/gl-standard-registry.ts
         - packages/render-webgl/src/gl-skinning-glsl.ts
         - packages/render-webgl/src/gl-particles.ts
         - packages/render-webgl/src/gl-picking-registry.ts
@@ -19645,18 +19704,18 @@ dependencyGraph:
         - packages/serialization/src/format.ts
         - packages/serialization/src/serializer.ts
 statistics:
-  totalTypeScriptFiles: 323
+  totalTypeScriptFiles: 324
   totalModules: 24
-  totalLinesOfCode: 158509
-  totalExports: 3339
+  totalLinesOfCode: 159003
+  totalExports: 3348
   totalClasses: 202
-  totalInterfaces: 615
-  totalFunctions: 549
+  totalInterfaces: 617
+  totalFunctions: 553
   totalTypeGuards: 27
   totalEnums: 0
   totalConstants: 494
-  totalReExports: 2113
-  totalTypeOnlyImports: 419
+  totalReExports: 2118
+  totalTypeOnlyImports: 421
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 7
   unusedFilesCount: 0

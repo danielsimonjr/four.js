@@ -73,6 +73,19 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### Changed
 
+- **WebGL: `registerStandardPipeline()`** joins the seams — init compiles
+  three programs (unlit, sprite, lit); an unregistered `StandardMaterial` draw
+  is skipped with one dev warning. Bundles: first-3d-scene 40.2 kB (limit
+  41), particles-demo 42.2 kB (limit 43), ui-demo 47.1 kB (limit 48),
+  first-2d-scene 55.0 kB. **Behavioural change:** `StandardMaterial` on
+  WebGL 2 needs the registrar, like skinning and picking.
+- **WebGL CPU mirrors.** Colour / tint uploads keep a last-value mirror (as
+  doubles — a `Float32Array` mirror rounded `0.2` and never matched) and
+  unit-0 map binds keep a per-frame last-bound mirror. Counting-GL seam,
+  10 000 sprites on one atlas: `uniform4fv` 10 000 → 1, `bindTexture`
+  10 001 → 2, all GL calls 50 015 → 30 017 per frame; 5 000 rectangles:
+  20 007 → 15 008. GL-sequence goldens re-recorded with the reason in each
+  comment; no assertion loosened; 38/38 WebGL browser gates green.
 - **WebGL: shadow, effect and particle pipelines are register seams.**
   `registerShadowPipeline()`, `registerEffectPipeline()`,
   `registerParticlePipeline()` from `@fourjs/render-webgl` (the

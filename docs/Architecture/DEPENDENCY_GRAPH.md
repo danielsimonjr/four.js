@@ -57,7 +57,7 @@ The codebase is organized into the following modules:
 - **packages/assets**: 9 files
 - **packages/physics-soft**: 1 file
 - **packages/physics-rapier**: 8 files
-- **packages/render-webgl**: 23 files
+- **packages/render-webgl**: 24 files
 - **packages/physics**: 25 files
 - **packages/geometry**: 12 files
 - **packages/render**: 30 files
@@ -89,7 +89,7 @@ The codebase is organized into the following modules:
 | `@fourjs/assets` (`packages/assets/`) | `@fourjs/core` | 9 | 0 |
 | `@fourjs/physics-soft` (`packages/physics-soft/`) | (none) | 1 | 0 |
 | `@fourjs/physics-rapier` (`packages/physics-rapier/`) | `@fourjs/physics`, `@fourjs/core`, `@fourjs/math` | 8 | 0 |
-| `@fourjs/render-webgl` (`packages/render-webgl/`) | `@fourjs/render`, `@fourjs/core`, `@fourjs/math` | 23 | 0 |
+| `@fourjs/render-webgl` (`packages/render-webgl/`) | `@fourjs/render`, `@fourjs/core`, `@fourjs/math` | 24 | 0 |
 | `@fourjs/physics` (`packages/physics/`) | `@fourjs/core`, `@fourjs/math`, `@fourjs/motion`, `@fourjs/scene` | 25 | 0 |
 | `@fourjs/geometry` (`packages/geometry/`) | `@fourjs/math`, `@fourjs/core` | 12 | 0 |
 | `@fourjs/render` (`packages/render/`) | `@fourjs/math`, `@fourjs/materials`, `@fourjs/geometry`, `@fourjs/core`, `@fourjs/scene` | 30 | 0 |
@@ -1968,7 +1968,8 @@ graph LR
 | `./gl-node-program.js` | `GlNodeProgram, GlNodeProgramCache, emitShaderGraphGlsl, registerNodeMaterialPipeline` | Re-export |
 | `./gl-shadow-registry.js` | `clearRegisteredShadowPipeline, resolveShadowPipelineFactory` | Re-export |
 | `./gl-shadow.js` | `ShadowProgram, registerShadowPipeline` | Re-export |
-| `./gl-standard.js` | `StandardProgram` | Re-export |
+| `./gl-standard-registry.js` | `clearRegisteredStandardPipeline, resolveStandardPipelineFactory` | Re-export |
+| `./gl-standard.js` | `StandardProgram, registerStandardPipeline` | Re-export |
 | `./gl-texture.js` | `TextureCache` | Re-export |
 | `./register.js` | `isWebgl2Supported, registerWebglRenderer` | Re-export |
 | `./webgl-renderer.js` | `WebglRenderer` | Re-export |
@@ -1985,12 +1986,32 @@ graph LR
 | `./node-pipeline-registry.js` | `NodeItemMaterial, NodeMaterialPipelineFactory, NodeMaterialProgram, NodeMaterialPrograms` | Re-export (type-only) |
 | `./gl-node-program.js` | `EmittedNodeShader` | Re-export (type-only) |
 | `./gl-shadow-registry.js` | `ShadowCasterPipeline, ShadowPipelineFactory` | Re-export (type-only) |
+| `./gl-standard-registry.js` | `StandardPipeline, StandardPipelineFactory` | Re-export (type-only) |
 | `./gl-texture.js` | `CacheableTexture, TextureRecord` | Re-export (type-only) |
 | `./webgl-renderer.js` | `WebglCanvas, WebglContextAttributes, WebglContextEventLike` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `GlBatching`, `createGlBatching`, `EFFECT_TEXTURE_UNIT`, `EFFECT_VERTEX_COUNT`, `clearRegisteredEffectPipeline`, `resolveEffectPipelineFactory`, `EffectProgram`, `registerEffectPipeline`, `GeometryCache`, `clearRegisteredParticlePipeline`, `particleItemFloats`, `resolveParticlePipelineFactory`, `PARTICLE_ATTRIBUTE_LOCATIONS`, `PARTICLE_DEPTH_TEXTURE_UNIT`, `PARTICLE_GL`, `PARTICLE_VERTEX_SHADER_SOURCE`, `ParticleAppearanceProgram`, `ParticleBatchCache`, `ParticleProgram`, `ParticleTrailBatchCache`, `ParticleTrailProgram`, `registerParticlePipeline`, `COLOR_ATTRIBUTE_LOCATION`, `GL`, `LitProgram`, `MAP_TEXTURE_UNIT`, `METAL_ROUGHNESS_TEXTURE_UNIT`, `EMISSIVE_TEXTURE_UNIT`, `NORMAL_ATTRIBUTE_LOCATION`, `POSITION_ATTRIBUTE_LOCATION`, `HEMISPHERE_LIGHT_GLSL`, `HemisphereLightUniforms`, `PUNCTUAL_LIGHT_GLSL`, `PunctualLightUniforms`, `SHADOW_GLSL`, `SHADOW_TEXTURE_UNIT`, `ShadowUniforms`, `SpriteProgram`, `UV_ATTRIBUTE_LOCATION`, `UnlitProgram`, `clearRegisteredPickingPipeline`, `resolvePickingServiceFactory`, `IdPassProgram`, `PICKING_GL`, `ParticleIdProgram`, `SkinnedIdProgram`, `WebglPickingService`, `registerPickingPipeline`, `RenderTargetCache`, `JOINTS_ATTRIBUTE_LOCATION`, `WEIGHTS_ATTRIBUTE_LOCATION`, `clearRegisteredSkinningPipeline`, `resolveSkinningPipelineFactory`, `SKINNING_GLSL`, `SkinnedLitProgram`, `SkinnedShadowProgram`, `SkinnedUnlitProgram`, `registerSkinningPipeline`, `NODE_SURFACE_TEXTURE_UNIT_BASE`, `clearRegisteredNodeMaterialPipeline`, `resolveNodeMaterialPipelineFactory`, `GlNodeProgram`, `GlNodeProgramCache`, `emitShaderGraphGlsl`, `registerNodeMaterialPipeline`, `clearRegisteredShadowPipeline`, `resolveShadowPipelineFactory`, `ShadowProgram`, `registerShadowPipeline`, `StandardProgram`, `TextureCache`, `isWebgl2Supported`, `registerWebglRenderer`, `WebglRenderer`, `BatchGlContext`, `RenderBatching`, `EffectPipeline`, `EffectPipelineFactory`, `CacheableGeometry`, `GeometryRecord`, `ParticleAppearancePipeline`, `ParticleBillboardPipeline`, `ParticlePipelineFactory`, `ParticlePrograms`, `ParticleBatchRecord`, `ParticleGlContext`, `ParticleTrailBatchRecord`, `GlBuffer`, `GlProgramHandle`, `GlShader`, `GlQuery`, `GlSync`, `GlTexture`, `GlUniformLocation`, `GlVertexArray`, `WebglContext`, `GlFramebuffer`, `GlRenderbuffer`, `PickingRendererHost`, `PickingServiceFactory`, `CacheableRenderTarget`, `RenderTargetRecord`, `SkinnedLitPipeline`, `SkinnedPrograms`, `SkinnedShadowPipeline`, `SkinnedUnlitPipeline`, `SkinningPipelineFactory`, `NodeItemMaterial`, `NodeMaterialPipelineFactory`, `NodeMaterialProgram`, `NodeMaterialPrograms`, `EmittedNodeShader`, `ShadowCasterPipeline`, `ShadowPipelineFactory`, `CacheableTexture`, `TextureRecord`, `WebglCanvas`, `WebglContextAttributes`, `WebglContextEventLike`
+- Re-exports: `GlBatching`, `createGlBatching`, `EFFECT_TEXTURE_UNIT`, `EFFECT_VERTEX_COUNT`, `clearRegisteredEffectPipeline`, `resolveEffectPipelineFactory`, `EffectProgram`, `registerEffectPipeline`, `GeometryCache`, `clearRegisteredParticlePipeline`, `particleItemFloats`, `resolveParticlePipelineFactory`, `PARTICLE_ATTRIBUTE_LOCATIONS`, `PARTICLE_DEPTH_TEXTURE_UNIT`, `PARTICLE_GL`, `PARTICLE_VERTEX_SHADER_SOURCE`, `ParticleAppearanceProgram`, `ParticleBatchCache`, `ParticleProgram`, `ParticleTrailBatchCache`, `ParticleTrailProgram`, `registerParticlePipeline`, `COLOR_ATTRIBUTE_LOCATION`, `GL`, `LitProgram`, `MAP_TEXTURE_UNIT`, `METAL_ROUGHNESS_TEXTURE_UNIT`, `EMISSIVE_TEXTURE_UNIT`, `NORMAL_ATTRIBUTE_LOCATION`, `POSITION_ATTRIBUTE_LOCATION`, `HEMISPHERE_LIGHT_GLSL`, `HemisphereLightUniforms`, `PUNCTUAL_LIGHT_GLSL`, `PunctualLightUniforms`, `SHADOW_GLSL`, `SHADOW_TEXTURE_UNIT`, `ShadowUniforms`, `SpriteProgram`, `UV_ATTRIBUTE_LOCATION`, `UnlitProgram`, `clearRegisteredPickingPipeline`, `resolvePickingServiceFactory`, `IdPassProgram`, `PICKING_GL`, `ParticleIdProgram`, `SkinnedIdProgram`, `WebglPickingService`, `registerPickingPipeline`, `RenderTargetCache`, `JOINTS_ATTRIBUTE_LOCATION`, `WEIGHTS_ATTRIBUTE_LOCATION`, `clearRegisteredSkinningPipeline`, `resolveSkinningPipelineFactory`, `SKINNING_GLSL`, `SkinnedLitProgram`, `SkinnedShadowProgram`, `SkinnedUnlitProgram`, `registerSkinningPipeline`, `NODE_SURFACE_TEXTURE_UNIT_BASE`, `clearRegisteredNodeMaterialPipeline`, `resolveNodeMaterialPipelineFactory`, `GlNodeProgram`, `GlNodeProgramCache`, `emitShaderGraphGlsl`, `registerNodeMaterialPipeline`, `clearRegisteredShadowPipeline`, `resolveShadowPipelineFactory`, `ShadowProgram`, `registerShadowPipeline`, `clearRegisteredStandardPipeline`, `resolveStandardPipelineFactory`, `StandardProgram`, `registerStandardPipeline`, `TextureCache`, `isWebgl2Supported`, `registerWebglRenderer`, `WebglRenderer`, `BatchGlContext`, `RenderBatching`, `EffectPipeline`, `EffectPipelineFactory`, `CacheableGeometry`, `GeometryRecord`, `ParticleAppearancePipeline`, `ParticleBillboardPipeline`, `ParticlePipelineFactory`, `ParticlePrograms`, `ParticleBatchRecord`, `ParticleGlContext`, `ParticleTrailBatchRecord`, `GlBuffer`, `GlProgramHandle`, `GlShader`, `GlQuery`, `GlSync`, `GlTexture`, `GlUniformLocation`, `GlVertexArray`, `WebglContext`, `GlFramebuffer`, `GlRenderbuffer`, `PickingRendererHost`, `PickingServiceFactory`, `CacheableRenderTarget`, `RenderTargetRecord`, `SkinnedLitPipeline`, `SkinnedPrograms`, `SkinnedShadowPipeline`, `SkinnedUnlitPipeline`, `SkinningPipelineFactory`, `NodeItemMaterial`, `NodeMaterialPipelineFactory`, `NodeMaterialProgram`, `NodeMaterialPrograms`, `EmittedNodeShader`, `ShadowCasterPipeline`, `ShadowPipelineFactory`, `StandardPipeline`, `StandardPipelineFactory`, `CacheableTexture`, `TextureRecord`, `WebglCanvas`, `WebglContextAttributes`, `WebglContextEventLike`
+
+---
+
+### `packages/render-webgl/src/gl-standard-registry.ts` - The standard pipeline's registration slot (§59, §62; 2026-09-11) — the
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@fourjs/math` | `Matrix4` |
+| `@fourjs/render` | `SceneLights` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./gl-program.js` | `WebglContext` | Import (type-only) |
+
+**Exports:**
+- Interfaces: `StandardPipeline`, `StandardPipelineFactory`
+- Functions: `setStandardPipelineFactory`, `resolveStandardPipelineFactory`, `clearRegisteredStandardPipeline`
 
 ---
 
@@ -2105,9 +2126,11 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./gl-program.js` | `EMISSIVE_TEXTURE_UNIT, MAP_TEXTURE_UNIT, METAL_ROUGHNESS_TEXTURE_UNIT, HEMISPHERE_LIGHT_GLSL, HemisphereLightUniforms, PUNCTUAL_LIGHT_GLSL, PunctualLightUniforms, SHADOW_GLSL, ShadowUniforms, createLinkedProgram, matrixScratch, requireUniform, uploadNormalMatrix, GlProgramHandle, GlUniformLocation, WebglContext` | Import |
+| `./gl-standard-registry.js` | `setStandardPipelineFactory` | Import |
 
 **Exports:**
 - Classes: `StandardProgram`
+- Functions: `registerStandardPipeline`
 
 ---
 
@@ -2211,7 +2234,7 @@ graph LR
 | `./gl-skinning-registry.js` | `resolveSkinningPipelineFactory, SkinnedPrograms, SkinnedShadowPipeline` | Import |
 | `./node-pipeline-registry.js` | `NODE_SURFACE_TEXTURE_UNIT_BASE, resolveNodeMaterialPipelineFactory, NodeMaterialProgram, NodeMaterialPrograms` | Import |
 | `./gl-shadow-registry.js` | `resolveShadowPipelineFactory, ShadowCasterPipeline` | Import |
-| `./gl-standard.js` | `StandardProgram` | Import |
+| `./gl-standard-registry.js` | `resolveStandardPipelineFactory, StandardPipeline` | Import |
 | `./gl-texture.js` | `TextureCache, CacheableTexture` | Import |
 
 **Exports:**
@@ -6322,10 +6345,10 @@ graph LR
 | `packages/render-webgpu/src/index` | 27 files | 0 files |
 | `packages/render-webgpu/src/webgpu-renderer` | 23 files | 2 files |
 | `packages/physics/src/index` | 24 files | 0 files |
+| `packages/render-webgl/src/index` | 21 files | 0 files |
 | `packages/physics/src/world` | 15 files | 6 files |
 | `packages/motion/src/index` | 21 files | 0 files |
-| `packages/render-webgl/src/index` | 20 files | 0 files |
-| `packages/render-webgl/src/gl-program` | 0 files | 19 files |
+| `packages/render-webgl/src/gl-program` | 0 files | 20 files |
 | `packages/scene/src/index` | 16 files | 0 files |
 | `packages/render-webgl/src/webgl-renderer` | 14 files | 2 files |
 | `packages/physics/src/types` | 0 files | 16 files |
@@ -6503,12 +6526,12 @@ graph TD
         N79[gl-effect]
         N80[gl-shadow-registry]
         N81[index]
-        N82[gl-skinning-glsl]
-        N83[gl-particles]
-        N84[gl-picking-registry]
-        N85[gl-geometry]
-        N86[node-pipeline-registry]
-        N87[...13 more]
+        N82[gl-standard-registry]
+        N83[gl-skinning-glsl]
+        N84[gl-particles]
+        N85[gl-picking-registry]
+        N86[gl-geometry]
+        N87[...14 more]
     end
 
     subgraph Packages/physics
@@ -6745,17 +6768,17 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 323 |
+| Total TypeScript Files | 324 |
 | Total Modules | 24 |
-| Total Lines of Code | 158509 |
-| Total Exports | 3339 |
-| Total Re-exports | 2113 |
+| Total Lines of Code | 159003 |
+| Total Exports | 3348 |
+| Total Re-exports | 2118 |
 | Total Classes | 202 |
-| Total Interfaces | 615 |
-| Total Functions | 549 |
+| Total Interfaces | 617 |
+| Total Functions | 553 |
 | Total Type Guards | 27 |
 | Total Enums | 0 |
-| Type-only Imports | 419 |
+| Type-only Imports | 421 |
 | Runtime Circular Deps | 0 |
 | Type-only Circular Deps | 7 |
 
