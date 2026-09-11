@@ -72,6 +72,8 @@ import { inflateSync } from "node:zlib";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { framesFor, waitForFrames } from "./helpers/wait.js";
+
 // --- PNG decoding (copied from example.spec.ts) -----------------------------
 
 /** A decoded, unfiltered 8-bit image: `pixels` is `width * height` samples. */
@@ -708,7 +710,7 @@ test.describe("examples/ui-demo (§73–§75): @fourjs/ui in a rendered scene", 
     // so no event is dispatched at all. The wait is an upper bound on event
     // delivery, not a performance floor.
     await clickWorld(page, rect, EMPTY_POINT_X, EMPTY_POINT_Y);
-    await page.waitForTimeout(SETTLE_SECONDS * 1000);
+    await waitForFrames(page, framesFor(SETTLE_SECONDS));
     const after = await readStatus(page);
     expect(
       after.clicks,

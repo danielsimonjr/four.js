@@ -69,6 +69,13 @@ import { inflateSync } from "node:zlib";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import {
+  framesFor,
+  installFrameCounter,
+  waitForFrames,
+  waitUntilFrameCount,
+} from "./helpers/wait.js";
+
 /** A decoded, unfiltered 8-bit image: `pixels` is `width * height` samples. */
 interface DecodedImage {
   readonly width: number;
@@ -409,7 +416,9 @@ async function openPlayground(
     route.fulfill({ status: 200, contentType: "image/x-icon", body: "" }),
   );
   await page.goto(PLAYGROUND_URL, { waitUntil: "load" });
-  return { errors, loadedAt: Date.now() };
+  // `loadedAt` is a frame count, not a wall-clock instant: "N seconds since
+  // load" is measured in animation frames drawn since this point.
+  return { errors, loadedAt: await installFrameCounter(page) };
 }
 
 /**
@@ -428,16 +437,17 @@ async function waitForRunning(page: Page): Promise<void> {
   );
 }
 
-/** Blocks until `seconds` have passed since `loadedAt`. */
+/**
+ * Blocks until `ceil(seconds · 60)` animation frames have been drawn since
+ * `loadedAt` (the frame count {@link openPlayground} returned) — at least
+ * `seconds` of wall clock, and at least that many frames of simulation.
+ */
 async function waitUntilSinceLoad(
   page: Page,
   loadedAt: number,
   seconds: number,
 ): Promise<void> {
-  const remaining = loadedAt + seconds * 1000 - Date.now();
-  if (remaining > 0) {
-    await page.waitForTimeout(remaining);
-  }
+  await waitUntilFrameCount(page, loadedAt + framesFor(seconds));
 }
 
 async function grab(canvas: Locator): Promise<DecodedImage> {
@@ -751,7 +761,7 @@ test.describe("§108: gravity, collisions, impulses and sensors in the browser",
 
     // A loop that throws on its first frames does so after `running`, so keep
     // the page alive long enough for that to be collected.
-    await page.waitForTimeout(1000);
+    await waitForFrames(page, framesFor(1));
     expect(errors).toEqual([]);
   });
 
@@ -777,7 +787,7 @@ test.describe("§108: gravity, collisions, impulses and sensors in the browser",
 
     await waitUntilSinceLoad(page, loadedAt, SETTLE_SAMPLE_SECONDS);
     const settled = await grab(canvas);
-    await page.waitForTimeout(SETTLE_GAP_SECONDS * 1000);
+    await waitForFrames(page, framesFor(SETTLE_GAP_SECONDS));
     const later = await grab(canvas);
 
     for (const [label, centerX] of [
@@ -941,9 +951,9 @@ test.describe("§108: gravity, collisions, impulses and sensors in the browser",
     ).toBeGreaterThanOrEqual(IMPULSE_RISE_WORLD);
 
     // What goes up comes down: the half is at rest again a few seconds later.
-    await page.waitForTimeout(RESETTLE_SECONDS * 1000);
+    await waitForFrames(page, framesFor(RESETTLE_SECONDS));
     const restA = await grab(canvas);
-    await page.waitForTimeout(SETTLE_GAP_SECONDS * 1000);
+    await waitForFrames(page, framesFor(SETTLE_GAP_SECONDS));
     const restB = await grab(canvas);
     expect(
       changedPixels(restA, restB),

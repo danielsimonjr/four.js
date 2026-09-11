@@ -75,6 +75,8 @@ import { inflateSync } from "node:zlib";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { framesFor, readFrameCount, waitForFrames } from "./helpers/wait.js";
+
 /** A decoded, unfiltered 8-bit image: `pixels` is `width * height` samples. */
 interface DecodedImage {
   readonly width: number;
@@ -876,7 +878,7 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
 
     // A loop that throws on its first frames does so after `running`, so keep
     // the page alive long enough for that to be collected.
-    await page.waitForTimeout(1000);
+    await waitForFrames(page, framesFor(1));
     expect(errors).toEqual([]);
   });
 
@@ -893,9 +895,17 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
     // A handful of framebuffer pairs prove the wave reached the pixels and the
     // scenery did not. The wave *period* is watched below via `data-chain-y`:
     // screenshotting for that long is what starved the simulation.
-    const pixelDeadline = Date.now() + FRAME_GAP_MS * (PIXEL_PROOF_PAIRS + 5);
-    while (bandDeltas.length < PIXEL_PROOF_PAIRS && Date.now() < pixelDeadline) {
-      await page.waitForTimeout(FRAME_GAP_MS);
+    // The budget is in frames, the unit the gap is waited in: a wall-clock
+    // deadline here starved the loop of pairs on a runner drawing slowly
+    // (measured 2 of 3 in 1.6 s), which is a count about the runner.
+    const gapFrames = framesFor(FRAME_GAP_MS / 1000);
+    const pixelFrameDeadline =
+      (await readFrameCount(page)) + gapFrames * (PIXEL_PROOF_PAIRS + 5);
+    while (
+      bandDeltas.length < PIXEL_PROOF_PAIRS &&
+      (await readFrameCount(page)) < pixelFrameDeadline
+    ) {
+      await waitForFrames(page, gapFrames);
       const frame = await grab(canvas);
 
       // The chain's band changed — it is being animated, right now.
