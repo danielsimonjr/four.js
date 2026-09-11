@@ -90,9 +90,28 @@ function refuse(message: string, context: Record<string, unknown>): FourError {
  * @throws FourError `ASSET_LOAD_FAILED` if it is not an object of
  *   `{ url: string, hash?: string }` rows.
  */
+/** Options for {@link parseAssetManifest} (2026-09-11). */
+export interface ManifestParseOptions {
+  /**
+   * Whether an entry may name another origin — a `scheme:` URL or a
+   * protocol-relative `//host/…` one. Defaults to `false`: a manifest is a
+   * fetched document (§96), and one that can point a key at any origin can
+   * direct every later `assets.load` there. Same-origin shapes (`/path`,
+   * `relative/path`) are always accepted. Set `true` for a trusted CDN layout,
+   * as `createGltfLoader({ allowAbsoluteUris: true })` does for glTF.
+   */
+  readonly allowCrossOriginUrls?: boolean;
+}
+
+/** `scheme:` or `//host` — anything that names an origin. */
+function namesAnotherOrigin(url: string): boolean {
+  return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url) || url.startsWith("//");
+}
+
 export function parseAssetManifest(
   document: unknown,
   source = "manifest",
+  options: ManifestParseOptions = {},
 ): AssetManifest {
   if (
     typeof document !== "object" ||
@@ -124,6 +143,14 @@ export function parseAssetManifest(
       throw refuse(
         `"${source}" entry ${JSON.stringify(key)} has no url (§79).`,
         { source, key },
+      );
+    }
+    if (!(options.allowCrossOriginUrls ?? false) && namesAnotherOrigin(url)) {
+      throw refuse(
+        `"${source}" entry ${JSON.stringify(key)} names another origin ` +
+          `(${JSON.stringify(url)}); only same-origin URLs are accepted ` +
+          `unless parsed with { allowCrossOriginUrls: true } (§96).`,
+        { source, key, url },
       );
     }
     if (hash !== undefined && typeof hash !== "string") {

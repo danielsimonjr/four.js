@@ -2549,3 +2549,23 @@ describe("disposal (§83)", () => {
     expect(asset.meshes).toHaveLength(1);
   });
 });
+
+describe("sub-resource abort signal (2026-09-11)", () => {
+  it("forwards the parent request's signal to the injected transport, and nothing when there is none", async () => {
+    const { bytes } = pack(TRI_POSITIONS, TRI_INDICES);
+    const inits: unknown[] = [];
+    const document = corrupt(triangleDocument(), (c) => {
+      (c["buffers"] as { uri: string }[])[0].uri = "data.bin";
+    });
+    const loader = createGltfLoader({
+      fetch: (_url, init) => {
+        inits.push(init);
+        return Promise.resolve(bytesResponse(bytes));
+      },
+    });
+    const signal = { aborted: false };
+    await loader.load(jsonResponse(document), "/m/model.gltf", { signal });
+    await loader.load(jsonResponse(document), "/m/model.gltf");
+    expect(inits).toEqual([{ signal }, undefined]);
+  });
+});

@@ -431,9 +431,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       draw — a reusable offset array is only safe once the fake-device
       transcripts copy their args; memoise the key per material. (A5/A6) WebGL
       `setColor`/`setTint` and `bindTexture` have no CPU mirrors — adding them
-      changes the F13 GL-sequence goldens, so re-record deliberately. (A7)
-      `EventEmitter.emit` slices the listener array per emit (~900
-      allocations/step at 462 physics events). (B2, B3, B5, B6, B7) measure
+      changes the F13 GL-sequence goldens, so re-record deliberately. ~~(A7) `EventEmitter.emit` slices the listener array per emit~~ **DONE
+      2026-09-11** (index loop + deferred compaction). (B2, B3, B5, B6, B7) measure
       first: Rapier wrapper allocations per body read, the resolver's
       `WeakMap` per node, the O(n·depth) interpolated list, string-keyed
       geometry/texture cache lookups per draw, the two O(n) pre-scans per
@@ -444,18 +443,16 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       **Stability.** 77 `page.waitForTimeout` calls across 14 Playwright specs
       (worst: one-scene-everything-moves 20, motor-digital-twin 13 with 2.5 s
       sleeps, particles 3–4 s) → `waitForFunction` on a frame counter.
-      `Scheduler.step` advances `simulationStep`/`simulationTime` before
-      `onFixedStep`; a throwing system leaves the accumulator holding but the
-      counters one ahead — document in §10 or reorder. Seventeen
+      ~~`Scheduler.step` counter skew on a throwing step~~ **DONE 2026-09-11**
+      (counters roll back with the accumulator). Seventeen
       `dispose()` implementations have no disposed flag (idempotent, but
       use-after-dispose is silent; `drag.ts` documents reuse on purpose).
       WebGPU picking uses `CONTEXT_LOST` where the renderer uses
       `DEVICE_LOST` for the same condition (tests pin both; pick one).
       **Security.** ~~`bun audit` non-blocking~~ **DONE 2026-09-11** (critical
-      gates; high stays visible). glTF subresource fetches carry no abort signal (manager
-      timeout discards the result but the request runs on). Manifest URLs
-      are document-controlled with no origin policy (the glTF
-      `allowAbsoluteUris` gate is the model).
+      gates; high stays visible). ~~glTF subresource fetches carry no abort signal~~ **DONE 2026-09-11**
+      (`AssetLoadContext.signal` forwarded). ~~Manifest URLs have no origin
+      policy~~ **DONE 2026-09-11** (`allowCrossOriginUrls`, default off).
 - [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust **runtime** boundary is the closed operator union (shipped); **extensible** data-declared operators remain a follow-up RFC (0001 alternative E — `SHADER_OPERATORS` is the named hook only). **Plugin trust
       boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a
       document; enforced by `tests/integration/plugin-boundary.test.ts`; explicitly not a

@@ -176,3 +176,26 @@ describe("parseAssetManifest rebuilds the record (§96, 2026-09-11)", () => {
     expect(manifest["extra"]).toEqual({ url: "c.png" });
   });
 });
+
+describe("parseAssetManifest origin policy (§96, 2026-09-11)", () => {
+  it("refuses scheme and protocol-relative URLs by default, keeps same-origin shapes", () => {
+    expect(() =>
+      parseAssetManifest({ a: { url: "https://cdn.example/a.png" } }),
+    ).toThrow(/names another origin/);
+    expect(() =>
+      parseAssetManifest({ a: { url: "//cdn.example/a.png" } }),
+    ).toThrow(/names another origin/);
+    expect(parseAssetManifest({ a: { url: "/a.png" }, b: { url: "b/c.png" } })).toEqual(
+      expect.objectContaining({ a: { url: "/a.png" }, b: { url: "b/c.png" } }),
+    );
+  });
+
+  it("accepts other origins when opted in", () => {
+    const manifest = parseAssetManifest(
+      { a: { url: "https://cdn.example/a.png" } },
+      "cdn",
+      { allowCrossOriginUrls: true },
+    );
+    expect(manifest["a"]).toEqual({ url: "https://cdn.example/a.png" });
+  });
+});

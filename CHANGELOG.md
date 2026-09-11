@@ -73,6 +73,23 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### Changed
 
+- **Scheduler:** a fixed step that throws now rolls `simulationStep` and
+  `simulationTime` back beside the accumulator it leaves holding, so the
+  re-run next frame is the same step (they ran one ahead for the rest of the
+  session before).
+- **`EventEmitter.emit` allocates nothing:** the dispatch loop captures the
+  listener count instead of copying the array, `off()` during a dispatch
+  defers its splice, and the list is compacted once the dispatch ends. Rule 3
+  semantics unchanged (tests added); physics emitted every contact on two
+  bodies through the old copy.
+- **Asset loaders receive the request's abort signal** (`AssetLoader.load`'s
+  optional third `AssetLoadContext`); the glTF loader forwards it to its
+  sub-resource fetches, so cancelling a glTF load cancels its `.bin` and
+  image requests too (RFC 0004 §6's A-18 half, the transport part).
+- **Asset manifests refuse other origins by default** (`scheme:` and
+  `//host` URLs); same-origin shapes always pass; `parseAssetManifest(…,
+  { allowCrossOriginUrls: true })` opts in — the glTF `allowAbsoluteUris`
+  model.
 - **`TODO.md` holds open work only.** Every closed row (263) moved to
   `docs/archive/TODO-DONE.md` under its original heading; the tracker went from
   ~2,400 to ~500 lines. `CLAUDE.md` states the rule (close → move in the same

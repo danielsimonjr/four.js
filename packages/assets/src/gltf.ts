@@ -118,6 +118,7 @@ import {
 import {
   DEFAULT_MAXIMUM_BYTES,
   resolveGlobalFetch,
+  type AssetLoadContext,
   type AssetLoader,
   type FetchLike,
   type FetchResponse,
@@ -337,7 +338,7 @@ export interface GltfLoaderOptions {
    * naming an external URI is refused loudly at the reference — a model with
    * a missing buffer is not a model with fewer vertices.
    */
-  readonly fetch?: FetchLike;
+  readonly fetch?: FetchLike<unknown>;
   /**
    * The image decoder for base-colour textures — {@link createTextureLoader}'s
    * own seam, injected for its reason (this package names no `Blob`, no
@@ -1214,7 +1215,11 @@ export function createGltfLoader(
 
   return {
     name,
-    async load(response: FetchResponse, url: string): Promise<GltfAsset> {
+    async load(
+      response: FetchResponse,
+      url: string,
+      context?: AssetLoadContext,
+    ): Promise<GltfAsset> {
       const body = new Uint8Array(await response.arrayBuffer());
       return parseGltf(body, url, {
         // Default to the platform transport, exactly as `AssetManager` does
@@ -1223,7 +1228,7 @@ export function createGltfLoader(
         // a first attempt, found by building a consumer app on 2026-09-07.
         // Resolved per load rather than at construction so a stubbed or
         // late-installed global is still seen.
-        fetch: options.fetch ?? resolveGlobalFetch<never>(),
+        fetch: options.fetch ?? resolveGlobalFetch<unknown>(),
         decodeTexture: options.decodeTexture,
         probeTexture: options.probeTexture,
         maximumBytes,
@@ -1232,6 +1237,7 @@ export function createGltfLoader(
         decodeText,
         name,
         allowAbsoluteUris: options.allowAbsoluteUris ?? false,
+        signal: context?.signal,
       });
     },
   };
@@ -1239,7 +1245,7 @@ export function createGltfLoader(
 
 /** The resolved options {@link parseGltf} runs with. */
 interface ResolvedOptions {
-  readonly fetch: FetchLike | undefined;
+  readonly fetch: FetchLike<unknown> | undefined;
   readonly decodeTexture: TexelDecodeLike | undefined;
   readonly probeTexture: TexelProbeLike | undefined;
   readonly maximumBytes: number;
@@ -1248,6 +1254,8 @@ interface ResolvedOptions {
   readonly decodeText: TextDecodeLike | undefined;
   readonly name: string;
   readonly allowAbsoluteUris: boolean;
+  /** The erased abort signal of the parent request, forwarded to sub-resource fetches. */
+  readonly signal: unknown;
 }
 
 /** Fetches one external subresource through the injected transport (§96). */
@@ -1280,7 +1288,10 @@ async function fetchSubresource(
   const resolved = resolveUri(baseUrl, uri);
   let response: FetchResponse;
   try {
-    response = await options.fetch(resolved);
+    response = await options.fetch(
+      resolved,
+      options.signal === undefined ? undefined : { signal: options.signal },
+    );
   } catch (error) {
     refuseFetch(baseUrl, where, resolved, error);
   }
