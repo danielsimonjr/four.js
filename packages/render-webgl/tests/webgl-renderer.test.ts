@@ -66,7 +66,7 @@ import {
   type StandardRenderItem,
   type UnlitRenderItem,
 } from "@fourjs/render";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   COLOR_ATTRIBUTE_LOCATION,
@@ -106,13 +106,22 @@ import {
   NODE_SURFACE_TEXTURE_UNIT_BASE,
   WebglRenderer,
   WebglPickingService,
+  clearRegisteredEffectPipeline,
   clearRegisteredNodeMaterialPipeline,
+  clearRegisteredParticlePipeline,
   clearRegisteredPickingPipeline,
+  clearRegisteredShadowPipeline,
   clearRegisteredSkinningPipeline,
   createGlBatching,
+  registerEffectPipeline,
+  registerParticlePipeline,
   registerPickingPipeline,
   registerNodeMaterialPipeline,
+  registerShadowPipeline,
   registerSkinningPipeline,
+  resolveEffectPipelineFactory,
+  resolveParticlePipelineFactory,
+  resolveShadowPipelineFactory,
   resolveSkinningPipelineFactory,
   type BatchGlContext,
   type NodeItemMaterial,
@@ -1434,6 +1443,20 @@ function indexOf(gl: FakeGl, name: string): number {
 
 beforeEach(() => {
   nextTestGeometryId = 0;
+  // The three pipelines that moved behind registration seams on 2026-09-11
+  // (§69 shadows, §70 effects, §36 particles) are registered for every test
+  // by default, so the suites written while they compiled at initialize keep
+  // asserting the same draws; the seam suites below clear the slot they
+  // exercise in their own `beforeEach`, the skinning precedent.
+  registerShadowPipeline();
+  registerEffectPipeline();
+  registerParticlePipeline();
+});
+
+afterEach(() => {
+  clearRegisteredShadowPipeline();
+  clearRegisteredEffectPipeline();
+  clearRegisteredParticlePipeline();
 });
 
 // ---------------------------------------------------------------------------
@@ -2800,12 +2823,13 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
 
     canvas.dispatch("webglcontextrestored");
 
-    // Unlit, sprite (WP-3a.3), particles (WP-9.3), particle trails (§36),
-    // lit (§68, 2026-08-04), standard (§59, R-13, 2026-08-08), the §70 effect
-    // pipeline (R-6, 2026-08-07), and §69's depth-only caster pipeline (R-18,
-    // 2026-08-09): §61 requires engine-owned GPU resources to be re-created
-    // before `contextrestored` is emitted, and every pipeline is.
-    expect(gl.countOf("createProgram")).toBe(8);
+    // Unlit, sprite (WP-3a.3), lit (§68, 2026-08-04) and standard (§59,
+    // R-13, 2026-08-08): §61 requires engine-owned GPU resources to be
+    // re-created before `contextrestored` is emitted, and every eager
+    // pipeline is. The particle, effect and shadow pipelines are registered
+    // seams since 2026-09-11 and come back lazily, on the next draw that
+    // needs them — the skinned pair's rule (see their own suites).
+    expect(gl.countOf("createProgram")).toBe(4);
     expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
       GL.DEPTH_TEST,
       GL.SCISSOR_TEST,
@@ -2911,7 +2935,9 @@ describe("WebglRenderer — disposal (§83)", () => {
 
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(8);
+    // The four eager programs; nothing in this scene acquired a registered
+    // pipeline (2026-09-11).
+    expect(gl.countOf("deleteProgram")).toBe(4);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(3);
     expect(renderer.disposed).toBe(true);
@@ -2935,7 +2961,7 @@ describe("WebglRenderer — disposal (§83)", () => {
     renderer.dispose();
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(8);
+    expect(gl.countOf("deleteProgram")).toBe(4);
   });
 
   it("succeeds during a lost context, without touching the context", async () => {
@@ -7632,11 +7658,12 @@ describe("EffectProgram — the §70 pipeline (R-6)", () => {
 
 describe("WebglRenderer.initialize — a partial pipeline failure (R-6)", () => {
   it.each([
-    ["lit", 4, 3],
-    ["standard", 5, 4],
-    ["effect", 6, 5],
-    // §69's caster pipeline is built last (R-18), so it disposes all six.
-    ["shadow", 7, 6],
+    // Four eager programs since 2026-09-11 — unlit, sprite, lit, standard;
+    // the particle, effect and shadow pipelines compile behind their seams
+    // on first use and have their own fail-once tests.
+    ["sprite", 2, 1],
+    ["lit", 3, 2],
+    ["standard", 4, 3],
   ])(
     "disposes the programs already built when the %s one will not allocate",
     async (_name, failProgramAt, alreadyBuilt) => {
@@ -7663,6 +7690,12 @@ describe("WebglRenderer.renderEffect — drawing one (§70, R-6)", () => {
     const { renderer, gl } = await initialized();
     renderer.resize(320, 240);
     const source = new RenderTarget({ width: 64, height: 64 });
+    // The registered pipeline compiles on the first effect (2026-09-11); a
+    // throwaway pass over another target absorbs that — and the program's
+    // once-per-lifetime sampler upload with it — so the transcript below is
+    // the steady-state pass, while `source` is still seen for the first
+    // time, which the cache's allocation calls at its head depend on.
+    renderer.renderEffect(effectPass(new RenderTarget({ width: 4, height: 4 })));
     gl.reset();
 
     renderer.renderEffect(effectPass(source));
@@ -7695,7 +7728,7 @@ describe("WebglRenderer.renderEffect — drawing one (§70, R-6)", () => {
       "viewport",
       "disable",
       "useProgram",
-      "uniform1i",
+      // No `uniform1i` here: the sampler uploaded once, in the warm-up pass.
       "activeTexture",
       "bindTexture",
       "bindVertexArray",
@@ -7756,6 +7789,8 @@ describe("WebglRenderer.renderEffect — drawing one (§70, R-6)", () => {
   it("uses the effect pipeline, not one of the scene pipelines", async () => {
     const { renderer, gl } = await initialized();
     const source = new RenderTarget({ width: 8, height: 8 });
+    // Compiled on the first effect, not at initialize (2026-09-11).
+    renderer.renderEffect(effectPass(source));
     const effect = effectProgramHandle(gl);
     gl.reset();
 
@@ -7988,6 +8023,10 @@ describe("WebglRenderer.render — untouched by §70 (R-6)", () => {
     // uses none is one more program compiled at initialization — and this
     // asserts that the frame itself never touches it.
     const { renderer, gl, camera } = await initialized();
+    // Since 2026-09-11 the effect program compiles on the first effect pass
+    // rather than at initialize; run one so there is a handle to assert
+    // against, then check the frame never selects it.
+    renderer.renderEffect(effectPass(new RenderTarget({ width: 4, height: 4 })));
     const effect = effectProgramHandle(gl);
     const root = createRoot();
     root.add(
@@ -8856,8 +8895,10 @@ describe("WebglRenderer — §61 context-loss recovery (A-24)", () => {
     // `contextrestored` is emitted, because a shader compile inside a frame
     // could throw where §61 forbids throwing; everything keyed by an
     // application object comes back on the next draw that asks for it, because
-    // the caches cannot know which of them the next frame will use.
-    expect(gl.countOf("createProgram")).toBe(8);
+    // the caches cannot know which of them the next frame will use. Four
+    // since 2026-09-11: the registered particle, effect and shadow pipelines
+    // are re-acquired lazily too (their own suites assert that).
+    expect(gl.countOf("createProgram")).toBe(4);
     for (const allocator of RESOURCE_ALLOCATORS) {
       expect([allocator, gl.countOf(allocator)]).toEqual([allocator, 0]);
     }
@@ -11427,8 +11468,8 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     const { root, skeleton } = skinnedScene();
     skeleton.jointMatrices[13] = 5;
     const views = [createView(camera)];
-    // Eight programs at initialize (incl. particle trails), none skinned.
-    expect(gl.countOf("createProgram")).toBe(8);
+    // Four programs at initialize (2026-09-11), none skinned.
+    expect(gl.countOf("createProgram")).toBe(4);
     gl.reset();
 
     renderer.render(root, views);
@@ -11483,8 +11524,8 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     registerSkinningPipeline();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      // Program 9 is the first skinned compile (8 at initialize).
-      const { renderer, gl, camera } = await initialized({ failProgramAt: 9 });
+      // Program 5 is the first skinned compile (4 at initialize).
+      const { renderer, gl, camera } = await initialized({ failProgramAt: 5 });
       const { root } = skinnedScene();
       const views = [createView(camera)];
       gl.reset();
@@ -11513,9 +11554,9 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     canvas.dispatch("webglcontextlost");
     gl.reset();
     canvas.dispatch("webglcontextrestored");
-    // The restore rebuilds the eight eager programs only — the skinned pair
+    // The restore rebuilds the four eager programs only — the skinned pair
     // waits for the next skinned draw.
-    expect(gl.countOf("createProgram")).toBe(8);
+    expect(gl.countOf("createProgram")).toBe(4);
 
     gl.reset();
     renderer.render(root, views);
@@ -11532,9 +11573,9 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
 
     renderer.dispose();
 
-    // Eight eager programs plus the skinned colour pair. This scene has no
-    // shadow light, so the caster was never compiled — 10, not 11.
-    expect(gl.countOf("deleteProgram")).toBe(10);
+    // Four eager programs plus the skinned colour pair. This scene has no
+    // shadow light, so neither caster was ever compiled — 6, not 8.
+    expect(gl.countOf("deleteProgram")).toBe(6);
   });
 
   it("casts a skinned mesh's deformed silhouette in the §69 shadow pass", async () => {
@@ -11560,9 +11601,10 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
 
     renderer.render(root, [createView(camera)]);
 
-    // Colour pair (2) plus the skinned caster (1), compiled inside the frame
-    // because this scene both skins and casts.
-    expect(gl.countOf("createProgram")).toBe(3);
+    // The registered §69 caster (1, first — the shadow pass runs before the
+    // view loop), the colour pair (2) and the skinned caster (1), all
+    // compiled inside the frame because this scene both skins and casts.
+    expect(gl.countOf("createProgram")).toBe(4);
     // Two casters: unskinned ShadowProgram, then the skinned sibling.
     expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
     const casterUniforms = skinnedShadowUniforms(gl);
@@ -11597,8 +11639,9 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
       renderer.render(root, [createView(camera)]);
 
       // Unskinned caster only — a bind-pose shadow is a different picture.
+      // The one program is the registered §69 caster itself (2026-09-11).
       expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
-      expect(gl.countOf("createProgram")).toBe(0);
+      expect(gl.countOf("createProgram")).toBe(1);
       expect(warn).toHaveBeenCalledTimes(1);
       expect(String(warn.mock.calls[0][0])).toContain(
         "registerSkinningPipeline",
@@ -11626,8 +11669,9 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
 
     renderer.render(root, [createView(camera)]);
 
-    // Colour pair only — opting out of casting must not compile the caster.
-    expect(gl.countOf("createProgram")).toBe(2);
+    // The §69 caster plus the colour pair — opting out of casting must not
+    // compile the skinned caster.
+    expect(gl.countOf("createProgram")).toBe(3);
     expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
     expect(() => skinnedShadowUniforms(gl)).toThrow(
       /skinned shadow program never resolved/,
@@ -11664,10 +11708,10 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     registerSkinningPipeline();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      // 8 at initialize; colour pair is 9–10 (shadow pass compiles them first);
-      // the caster is 11.
+      // 4 at initialize; the registered §69 caster is 5; the colour pair is
+      // 6–7 (the shadow pass compiles them first); the skinned caster is 8.
       const { renderer, gl, camera } = await initialized({
-        failProgramAt: 11,
+        failProgramAt: 8,
       });
       const root = new AmbientRoot([0.1, 0.1, 0.1]);
       const light = new TestShadowLight(8);
@@ -11684,8 +11728,9 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
       renderer.render(root, views);
       renderer.render(root, views);
 
-      // Asked once, refused once, never asked again. Colour pair compiled.
-      expect(gl.countOf("createProgram")).toBe(3);
+      // Asked once, refused once, never asked again. The §69 caster and the
+      // colour pair compiled.
+      expect(gl.countOf("createProgram")).toBe(4);
       expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(2);
       expect(() => skinnedShadowUniforms(gl)).toThrow(
         /skinned shadow program never resolved/,
@@ -11749,8 +11794,8 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
 
     renderer.dispose();
 
-    // Eight eager + colour pair + caster.
-    expect(gl.countOf("deleteProgram")).toBe(11);
+    // Four eager + the §69 caster + colour pair + skinned caster.
+    expect(gl.countOf("deleteProgram")).toBe(8);
   });
 
   it("casts a skinned-unlit mesh through the same caster program", async () => {
@@ -11798,8 +11843,9 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     renderer.render(root, [createView(camera)]);
 
     // The caster compiles (the item is a skinned caster) then skips the draw,
-    // matching the colour path's pipeline-then-geometry order.
-    expect(gl.countOf("createProgram")).toBe(3);
+    // matching the colour path's pipeline-then-geometry order. Four with the
+    // registered §69 caster (2026-09-11).
+    expect(gl.countOf("createProgram")).toBe(4);
     expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
     expect(
       uploadsAt(gl, skinnedShadowUniforms(gl).get("model")),
@@ -11810,8 +11856,10 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
     registerSkinningPipeline();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
+      // 4 at initialize; the registered §69 caster is 5; the colour pair's
+      // first program is 6.
       const { renderer, gl, camera } = await initialized({
-        failProgramAt: 9,
+        failProgramAt: 6,
       });
       const root = new AmbientRoot([0.1, 0.1, 0.1]);
       const light = new TestShadowLight(8);
@@ -11827,7 +11875,8 @@ describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => 
       renderer.render(root, [createView(camera)]);
 
       expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(1);
-      expect(gl.countOf("createProgram")).toBe(1);
+      // The §69 caster, then the refused first half of the colour pair.
+      expect(gl.countOf("createProgram")).toBe(2);
       expect(() => skinnedLitUniforms(gl)).toThrow();
     } finally {
       warn.mockRestore();
@@ -12362,9 +12411,10 @@ describe("WebglRenderer — §60 node materials (RFC 0001)", () => {
 
     gl.reset();
     renderer.dispose();
-    // Eight eager programs (7 pipelines + restore already counted) — assert
-    // only that the node program's delete is among them.
-    expect(gl.countOf("deleteProgram")).toBeGreaterThanOrEqual(8);
+    // Four eager programs plus the node program (2026-09-11: the particle,
+    // effect and shadow pipelines are registered seams this scene never
+    // acquired) — assert only that the node program's delete is among them.
+    expect(gl.countOf("deleteProgram")).toBeGreaterThanOrEqual(5);
   });
 
   it("a displaced node material casts nothing; an undisplaced one casts exactly (§69)", async () => {
@@ -12832,5 +12882,642 @@ describe("WebglRenderer.readPixels (§61, §92; 2026-08-29)", () => {
     expect(error.code).toBe("UNSUPPORTED_GPU_FEATURE");
     renderer.dispose();
     target.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The three registration seams of 2026-09-11 — §69 shadows, §70 effects and
+// §36 particles moved out of `initialize` and behind `register…Pipeline()`,
+// the skinning slot's shape (RFC 0003). Each suite clears its own slot in
+// `beforeEach` (the file-level `beforeEach` registers all three) and asserts
+// the four answers: unregistered → skipped with one warning; registered →
+// drawn, compiled once; context loss → re-acquired lazily; compile failure →
+// latched once.
+// ---------------------------------------------------------------------------
+
+describe("registerShadowPipeline — the registry slot (§69, 2026-09-11)", () => {
+  beforeEach(() => {
+    clearRegisteredShadowPipeline();
+  });
+
+  it("starts empty, fills on registration, and clears for tests", () => {
+    expect(resolveShadowPipelineFactory()).toBeNull();
+    registerShadowPipeline();
+    expect(resolveShadowPipelineFactory()).not.toBeNull();
+    registerShadowPipeline();
+    expect(resolveShadowPipelineFactory()).not.toBeNull();
+    clearRegisteredShadowPipeline();
+    expect(resolveShadowPipelineFactory()).toBeNull();
+  });
+
+  it("compiles the caster program through the factory", () => {
+    registerShadowPipeline();
+    const gl = createFakeGl();
+    const program = resolveShadowPipelineFactory()?.create(gl);
+    expect(program).toBeDefined();
+    expect(gl.countOf("linkProgram")).toBe(1);
+    program?.dispose();
+    program?.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.render — the §69 shadow seam (2026-09-11)", () => {
+  function shadowScene(): { root: AmbientRoot; light: TestShadowLight } {
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const light = new TestShadowLight(8);
+    root.add(light, litRenderable(), litRenderable());
+    return { root, light };
+  }
+
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredShadowPipeline();
+  });
+
+  it("skips the shadow pass with one warning when nothing is registered, and still lights", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, camera } = await initialized();
+      const { root } = shadowScene();
+      const views = [createView(camera)];
+      gl.reset();
+
+      renderer.render(root, views);
+      renderer.render(root, views);
+
+      // No map: no framebuffer, no compile, no `useShadow` — but both lit
+      // surfaces still draw, unshadowed, under their lights.
+      expect(gl.countOf("createProgram")).toBe(0);
+      expect(gl.countOf("bindFramebuffer")).toBe(0);
+      expect(gl.countOf("createFramebuffer")).toBe(0);
+      expect(gl.countOf("drawArrays")).toBe(4);
+      expect(uploadsAt(gl, litUniforms(gl).get("useShadow"))).toEqual([]);
+      expect(
+        uploadsAt(gl, litUniforms(gl).get("lightColor")).length,
+      ).toBeGreaterThan(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain(
+        "registerShadowPipeline",
+      );
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("compiles the caster lazily on the first shadowed frame, once, and renders the map", async () => {
+    registerShadowPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const { root } = shadowScene();
+    const views = [createView(camera)];
+    expect(gl.countOf("createProgram")).toBe(4);
+    gl.reset();
+
+    renderer.render(root, views);
+
+    expect(gl.countOf("createProgram")).toBe(1);
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(2);
+    expect(uploadsAt(gl, litUniforms(gl).get("useShadow"))).toEqual([1]);
+
+    gl.reset();
+    renderer.render(root, views);
+    expect(gl.countOf("createProgram")).toBe(0);
+    expect(uploadsAt(gl, shadowUniforms(gl).get("model"))).toHaveLength(2);
+  });
+
+  it("issues no shadow call in a frame whose light does not cast, registered or not", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root, light } = shadowScene();
+    light.castShadow = false;
+    const views = [createView(camera)];
+    renderer.render(root, views);
+    gl.reset();
+    renderer.render(root, views);
+    const before = JSON.stringify(gl.calls);
+
+    registerShadowPipeline();
+    gl.reset();
+    renderer.render(root, views);
+
+    expect(JSON.stringify(gl.calls)).toBe(before);
+    expect(gl.countOf("createProgram")).toBe(0);
+  });
+
+  it("latches a compile failure: one warning, no map, no retry, lit draws intact", async () => {
+    registerShadowPipeline();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      // Program 5 is the caster (4 at initialize).
+      const { renderer, gl, camera } = await initialized({ failProgramAt: 5 });
+      const { root } = shadowScene();
+      const views = [createView(camera)];
+      gl.reset();
+
+      renderer.render(root, views);
+      renderer.render(root, views);
+
+      expect(gl.countOf("createProgram")).toBe(1);
+      expect(gl.countOf("bindFramebuffer")).toBe(0);
+      expect(gl.countOf("drawArrays")).toBe(4);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("failed to compile");
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("drops the caster on context loss and recompiles lazily after restore", async () => {
+    registerShadowPipeline();
+    const { renderer, gl, canvas, camera } = await initialized();
+    const { root } = shadowScene();
+    const views = [createView(camera)];
+    renderer.render(root, views);
+
+    canvas.dispatch("webglcontextlost");
+    gl.reset();
+    canvas.dispatch("webglcontextrestored");
+    expect(gl.countOf("createProgram")).toBe(4);
+
+    gl.reset();
+    renderer.render(root, views);
+    expect(gl.countOf("createProgram")).toBe(1);
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    // Two caster draws into the map plus the two lit draws — the dead
+    // program's uniform table still sits in the fake, so count draws rather
+    // than look a location up by name.
+    expect(gl.countOf("drawArrays")).toBe(4);
+  });
+
+  it("recompiles after a restore even when the lost context had refused the caster", async () => {
+    registerShadowPipeline();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, canvas, camera } = await initialized({
+        failProgramAt: 5,
+      });
+      const { root } = shadowScene();
+      const views = [createView(camera)];
+      renderer.render(root, views);
+      canvas.dispatch("webglcontextlost");
+      canvas.dispatch("webglcontextrestored");
+      gl.reset();
+
+      renderer.render(root, views);
+
+      // The latch cleared with the context: asked again, and this time built.
+      expect(gl.countOf("createProgram")).toBe(1);
+      expect(gl.countOf("createFramebuffer")).toBe(1);
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("disposes the compiled caster with the renderer (§83)", async () => {
+    registerShadowPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const { root } = shadowScene();
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.dispose();
+
+    // Four eager programs plus the caster.
+    expect(gl.countOf("deleteProgram")).toBe(5);
+  });
+});
+
+describe("registerEffectPipeline — the registry slot (§70, 2026-09-11)", () => {
+  beforeEach(() => {
+    clearRegisteredEffectPipeline();
+  });
+
+  it("starts empty, fills on registration, and clears for tests", () => {
+    expect(resolveEffectPipelineFactory()).toBeNull();
+    registerEffectPipeline();
+    expect(resolveEffectPipelineFactory()).not.toBeNull();
+    registerEffectPipeline();
+    expect(resolveEffectPipelineFactory()).not.toBeNull();
+    clearRegisteredEffectPipeline();
+    expect(resolveEffectPipelineFactory()).toBeNull();
+  });
+
+  it("compiles the effect program through the factory", () => {
+    registerEffectPipeline();
+    const gl = createFakeGl();
+    const program = resolveEffectPipelineFactory()?.create(gl);
+    expect(program).toBeDefined();
+    expect(gl.countOf("linkProgram")).toBe(1);
+    program?.dispose();
+    program?.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.renderEffect — the §70 effect seam (2026-09-11)", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredEffectPipeline();
+  });
+
+  it("skips the pass with one warning when nothing is registered", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl } = await initialized();
+      const source = new RenderTarget({ width: 8, height: 8 });
+      gl.reset();
+
+      renderer.renderEffect(effectPass(source));
+      renderer.renderEffect(effectPass(source, { kind: "grade" }));
+
+      // No program selected, no triangle, no state borrowed — the source's
+      // allocation is the cache's and happens before the seam is consulted.
+      expect(gl.countOf("createProgram")).toBe(0);
+      expect(gl.countOf("useProgram")).toBe(0);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(gl.countOf("disable")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain(
+        "registerEffectPipeline",
+      );
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("refuses a feedback loop before consulting the seam — no warning at all", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl } = await initialized();
+      const target = new RenderTarget({ width: 8, height: 8 });
+      gl.reset();
+
+      renderer.renderEffect(effectPass(target, { kind: "copy" }, target));
+
+      expect(gl.calls).toHaveLength(0);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("compiles lazily on the first effect, once, and draws through it", async () => {
+    registerEffectPipeline();
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    expect(gl.countOf("createProgram")).toBe(4);
+    gl.reset();
+
+    renderer.renderEffect(effectPass(source));
+
+    expect(gl.countOf("createProgram")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(gl.callsOf("useProgram")[0]?.args[0]).toBe(effectProgramHandle(gl));
+
+    gl.reset();
+    renderer.renderEffect(effectPass(source, { kind: "grade" }));
+    expect(gl.countOf("createProgram")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(uploadsAt(gl, effectUniforms(gl).get("useGrade"))).toEqual([1]);
+  });
+
+  it("latches a compile failure: one warning, no draw, no retry", async () => {
+    registerEffectPipeline();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl } = await initialized({ failProgramAt: 5 });
+      const source = new RenderTarget({ width: 8, height: 8 });
+      gl.reset();
+
+      renderer.renderEffect(effectPass(source));
+      renderer.renderEffect(effectPass(source));
+
+      expect(gl.countOf("createProgram")).toBe(1);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("failed to compile");
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("drops the program on context loss and recompiles lazily after restore", async () => {
+    registerEffectPipeline();
+    const { renderer, gl, canvas } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source));
+
+    canvas.dispatch("webglcontextlost");
+    gl.reset();
+    canvas.dispatch("webglcontextrestored");
+    expect(gl.countOf("createProgram")).toBe(4);
+
+    gl.reset();
+    renderer.renderEffect(effectPass(source));
+    expect(gl.countOf("createProgram")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(1);
+    // A fresh program, so the sampler uploads again — once.
+    expect(gl.countOf("uniform1i")).toBe(1);
+  });
+
+  it("disposes the compiled program with the renderer (§83)", async () => {
+    registerEffectPipeline();
+    const { renderer, gl } = await initialized();
+    renderer.renderEffect(effectPass(new RenderTarget({ width: 8, height: 8 })));
+    gl.reset();
+
+    renderer.dispose();
+
+    expect(gl.countOf("deleteProgram")).toBe(5);
+  });
+});
+
+describe("registerParticlePipeline — the registry slot (§36, 2026-09-11)", () => {
+  beforeEach(() => {
+    clearRegisteredParticlePipeline();
+  });
+
+  it("starts empty, fills on registration, and clears for tests", () => {
+    expect(resolveParticlePipelineFactory()).toBeNull();
+    registerParticlePipeline();
+    expect(resolveParticlePipelineFactory()).not.toBeNull();
+    registerParticlePipeline();
+    expect(resolveParticlePipelineFactory()).not.toBeNull();
+    clearRegisteredParticlePipeline();
+    expect(resolveParticlePipelineFactory()).toBeNull();
+  });
+
+  it("compiles the billboard program with the caches, and the two tiers on demand", () => {
+    registerParticlePipeline();
+    const gl = createFakeGl();
+    const programs = resolveParticlePipelineFactory()?.create(gl);
+    expect(programs).toBeDefined();
+    expect(gl.countOf("linkProgram")).toBe(1);
+    expect(programs?.batches.size).toBe(0);
+    expect(programs?.trailBatches.size).toBe(0);
+
+    const appearance = programs?.acquireAppearance();
+    expect(appearance).not.toBeNull();
+    expect(gl.countOf("linkProgram")).toBe(2);
+    expect(programs?.acquireAppearance()).toBe(appearance);
+    const trail = programs?.acquireTrail();
+    expect(trail).not.toBeNull();
+    expect(gl.countOf("linkProgram")).toBe(3);
+    expect(programs?.acquireTrail()).toBe(trail);
+    expect(gl.countOf("linkProgram")).toBe(3);
+
+    programs?.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(3);
+    expect(programs?.batches.disposed).toBe(true);
+    expect(programs?.trailBatches.disposed).toBe(true);
+  });
+
+  it("latches a refused appearance or trail compile without retrying", () => {
+    registerParticlePipeline();
+    const gl = createFakeGl({ failProgramAt: 2 });
+    const programs = resolveParticlePipelineFactory()?.create(gl);
+    expect(programs?.acquireAppearance()).toBeNull();
+    expect(programs?.acquireAppearance()).toBeNull();
+    // 1 (billboard) + 1 (the refused appearance); the trail still compiles.
+    expect(gl.countOf("createProgram")).toBe(2);
+    expect(programs?.acquireTrail()).not.toBeNull();
+    expect(gl.countOf("createProgram")).toBe(3);
+
+    const gl2 = createFakeGl({ failProgramAt: 2 });
+    const programs2 = resolveParticlePipelineFactory()?.create(gl2);
+    expect(programs2?.acquireTrail()).toBeNull();
+    expect(programs2?.acquireTrail()).toBeNull();
+    expect(gl2.countOf("createProgram")).toBe(2);
+    programs2?.dispose();
+    expect(gl2.countOf("deleteProgram")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.render — the §36 particle seam (2026-09-11)", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredParticlePipeline();
+  });
+
+  it("skips particle items with one warning when nothing is registered — not even the quad uploads", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, camera } = await initialized();
+      const particles = new TestParticles(4);
+      const views = [createView(camera)];
+      gl.reset();
+
+      renderer.render(particles.asNode, views);
+      renderer.render(particles.asNode, views);
+
+      expect(gl.countOf("createProgram")).toBe(0);
+      expect(gl.countOf("drawArraysInstanced")).toBe(0);
+      expect(gl.countOf("createVertexArray")).toBe(0);
+      expect(gl.countOf("createBuffer")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain(
+        "registerParticlePipeline",
+      );
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("keeps a particle-free frame's transcript byte-identical under registration", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(renderable(triangleGeometry()), sprite());
+    const views = [createView(camera)];
+    renderer.render(root, views);
+    gl.reset();
+    renderer.render(root, views);
+    const before = JSON.stringify(gl.calls);
+
+    registerParticlePipeline();
+    gl.reset();
+    renderer.render(root, views);
+    expect(JSON.stringify(gl.calls)).toBe(before);
+  });
+
+  it("compiles lazily on the first particle item, once, and draws through it", async () => {
+    registerParticlePipeline();
+    const { renderer, gl, camera } = await initialized();
+    const particles = new TestParticles(4);
+    const views = [createView(camera)];
+    expect(gl.countOf("createProgram")).toBe(4);
+    gl.reset();
+
+    renderer.render(particles.asNode, views);
+
+    expect(gl.countOf("createProgram")).toBe(1);
+    expect(gl.countOf("drawArraysInstanced")).toBe(1);
+    // Compiled before the quad uploads — the skinned arm's pipeline-then-
+    // geometry order, so a skipped item contributes nothing at all.
+    expect(indexOf(gl, "createProgram")).toBeLessThan(
+      indexOf(gl, "createBuffer"),
+    );
+
+    gl.reset();
+    renderer.render(particles.asNode, views);
+    expect(gl.countOf("createProgram")).toBe(0);
+    expect(gl.countOf("drawArraysInstanced")).toBe(1);
+  });
+
+  it("latches a compile failure: one warning, no draw, no retry", async () => {
+    registerParticlePipeline();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, camera } = await initialized({ failProgramAt: 5 });
+      const particles = new TestParticles(4);
+      const views = [createView(camera)];
+      gl.reset();
+
+      renderer.render(particles.asNode, views);
+      renderer.render(particles.asNode, views);
+
+      expect(gl.countOf("createProgram")).toBe(1);
+      expect(gl.countOf("drawArraysInstanced")).toBe(0);
+      expect(gl.countOf("createVertexArray")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("failed to compile");
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("drops the programs and caches on context loss and re-acquires lazily after restore", async () => {
+    registerParticlePipeline();
+    const { renderer, gl, canvas, camera } = await initialized();
+    const particles = new TestParticles(4);
+    const views = [createView(camera)];
+    renderer.render(particles.asNode, views);
+
+    canvas.dispatch("webglcontextlost");
+    gl.reset();
+    canvas.dispatch("webglcontextrestored");
+    expect(gl.countOf("createProgram")).toBe(4);
+
+    gl.reset();
+    renderer.render(particles.asNode, views);
+    expect(gl.countOf("createProgram")).toBe(1);
+    // Fresh quad and batch handles, and no delete against the dead ones.
+    expect(gl.countOf("createVertexArray")).toBe(2);
+    expect(gl.countOf("deleteVertexArray")).toBe(0);
+    expect(gl.countOf("drawArraysInstanced")).toBe(1);
+  });
+
+  it("disposes the compiled programs and both caches with the renderer (§83)", async () => {
+    registerParticlePipeline();
+    const { renderer, gl, camera } = await initialized();
+    renderer.render(new TestParticles(4).asNode, [createView(camera)]);
+    gl.reset();
+
+    renderer.dispose();
+
+    // Four eager programs plus the billboard program; the shared quad's
+    // vertex array and this system's, and the quad's buffer plus the
+    // instance buffer.
+    expect(gl.countOf("deleteProgram")).toBe(5);
+    expect(gl.countOf("deleteVertexArray")).toBe(2);
+    expect(gl.countOf("deleteBuffer")).toBe(2);
+  });
+});
+
+describe("WebglRenderer.render — the trail tier behind the particle seam (§36, 2026-09-11)", () => {
+  /** A particle double carrying a two-triangle ribbon (§36's trail tier). */
+  function trailed(): TestParticles {
+    const particles = new TestParticles(2);
+    const withTrail = particles as unknown as {
+      hasTrail: boolean;
+      trailVertices: Float32Array;
+      trailVertexCount: number;
+    };
+    withTrail.hasTrail = true;
+    withTrail.trailVertices = new Float32Array(6 * TRAIL_VERTEX_FLOATS);
+    withTrail.trailVertexCount = 6;
+    return particles;
+  }
+
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredParticlePipeline();
+    registerParticlePipeline();
+  });
+
+  it("compiles the trail program on the first ribbon and draws it after the billboards", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const particles = trailed();
+    const views = [createView(camera)];
+    gl.reset();
+
+    renderer.render(particles.asNode, views);
+
+    // Billboard program, then the trail program — both inside the frame.
+    expect(gl.countOf("createProgram")).toBe(2);
+    expect(gl.countOf("drawArraysInstanced")).toBe(1);
+    expect(gl.callsOf("drawArrays").map((call) => call.args)).toEqual([
+      [GL.TRIANGLES, 0, 6],
+    ]);
+    expect(indexOf(gl, "drawArraysInstanced")).toBeLessThan(
+      indexOf(gl, "drawArrays"),
+    );
+
+    gl.reset();
+    renderer.render(particles.asNode, views);
+    // Warm: no compile, one ribbon upload, one ribbon draw.
+    expect(gl.countOf("createProgram")).toBe(0);
+    expect(gl.countOf("bufferSubData")).toBe(2);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("counts the ribbon's triangles in §84's statistics", async () => {
+    const { renderer, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+
+    renderer.render(trailed().asNode, [createView(camera)]);
+
+    // One instanced billboard draw (two instances of the quad's two
+    // triangles) plus one ribbon draw of two triangles.
+    expect(statistics.drawCalls).toBe(2);
+    expect(statistics.triangles).toBe(2 * 2 + 2);
+  });
+
+  it("skips only the ribbon when the trail program will not compile — the billboards still draw", async () => {
+    // 4 at initialize; the billboard is 5; the trail is 6.
+    const { renderer, gl, camera } = await initialized({ failProgramAt: 6 });
+    const particles = trailed();
+    const views = [createView(camera)];
+    gl.reset();
+
+    renderer.render(particles.asNode, views);
+    renderer.render(particles.asNode, views);
+
+    // Asked once for the trail, refused once, never asked again.
+    expect(gl.countOf("createProgram")).toBe(2);
+    expect(gl.countOf("drawArraysInstanced")).toBe(2);
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("disposes the trail program and its cache with the renderer (§83)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.render(trailed().asNode, [createView(camera)]);
+    gl.reset();
+
+    renderer.dispose();
+
+    // Four eager + billboard + trail.
+    expect(gl.countOf("deleteProgram")).toBe(6);
+    // The shared quad's array, the system's instance array, and the ribbon's.
+    expect(gl.countOf("deleteVertexArray")).toBe(3);
   });
 });
