@@ -70,9 +70,43 @@
  * | motor-digital-twin   | 1.22 MB  | 1.22 MB  | —        | 1.25 MB     | 1.25 MB   | unchanged at MB precision. |
  * | character-controller | 1.15 MB  | 1.15 MB  | —        | 1.20 MB     | 1.20 MB   | unchanged at MB precision. |
  *
- * No limit was raised. `StandardProgram` stays compiled at initialize —
- * `StandardMaterial` is a core §57 family and making it opt-in is an owner
- * decision.
+ * No limit was raised. `StandardProgram` stayed compiled at initialize in
+ * that packet — `StandardMaterial` is a core §57 family and making it opt-in
+ * was an owner decision, taken the same day (below).
+ *
+ * **2026-09-11, follow-up (`registerStandardPipeline()` + audit A5/A6
+ * mirrors):** the owner authorised moving `StandardProgram` behind the same
+ * seam (init now compiles three programs: unlit, sprite, lit), and the WebGL
+ * backend gained two CPU mirrors — a last-colour mirror in every
+ * `setColor`/`setTint`/`setBaseColor` (skip an identical `uniform4fv`;
+ * forgotten by `use()`) and a per-frame bound-texture mirror on the map unit
+ * (skip a `bindTexture` of the handle unit 0 already holds under the same
+ * pipeline). Measured on this worktree (same commands, gzip), the previous
+ * row's "after" → this row's "after":
+ *
+ * | Example              | Before   | After    | Delta    | Prior limit | New limit | Rationale |
+ * |----------------------|----------|----------|----------|-------------|-----------|-----------|
+ * | first-2d-scene       | 56.00 kB | 55.03 kB | −0.97 kB | 150 kB      | 150 kB    | §86 gate, left alone. |
+ * | first-3d-scene       | 41.28 kB | 40.23 kB | −1.05 kB | 42 kB       | 41 kB     | 40.23 × 1.015 = 40.83 → 41 kB (1.9 % headroom). |
+ * | particles-demo       | 43.24 kB | 42.22 kB | −1.02 kB | 43.5 kB     | 43 kB     | 42.22 × 1.015 = 42.85 → 43 kB (1.8 % headroom). |
+ * | ui-demo              | 48.16 kB | 47.05 kB | −1.11 kB | 49 kB       | 48 kB     | 47.05 × 1.015 = 47.76 → 48 kB (2.0 % headroom). |
+ * | flagship             | 1.98 MB  | 1.98 MB  | —        | 2.05 MB     | 2.05 MB   | unchanged at MB precision. |
+ * | motor-digital-twin   | 1.22 MB  | 1.22 MB  | —        | 1.25 MB     | 1.25 MB   | unchanged at MB precision. |
+ * | character-controller | 1.15 MB  | 1.15 MB  | —        | 1.20 MB     | 1.20 MB   | unchanged at MB precision. |
+ *
+ * The ~1 kB per bundle is `StandardProgram` and its two shaders leaving
+ * every example (none draws a `StandardMaterial`); the mirrors add a few
+ * dozen bytes each. GL calls per frame on `benchmarks/render-batching.mjs`'s
+ * scenes, through the counting-GL seam (`tests/integration/helpers/
+ * recording-gl.ts`), steady-state second frame, before → after the mirrors:
+ * 10 000 sprites over one atlas — `uniform4fv` 10 000 → 1, `bindTexture`
+ * 10 001 → 2 (one bind, one end-of-frame unbind), all GL calls 50 015 →
+ * 30 017; 5 000 rectangles over one `UnlitMaterial` — `uniform4fv` 5 000 → 1,
+ * `bindTexture` 0 → 0, all GL calls 20 007 → 15 008. The first cut of the
+ * colour mirror kept its four floats in a `Float32Array` and never matched a
+ * double like `0.2` (5 000 → 5 000 on the shape row); the shipped mirror
+ * holds doubles, and the unit test now uses `[0.2, 0.6, 1, 1]` for exactly
+ * that reason. No limit was raised.
  */
 
 export const SIZE_BUDGETS_DOC = "tools/size-budgets.mjs";

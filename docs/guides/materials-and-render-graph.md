@@ -79,23 +79,28 @@ Particles use `ParticleRenderable` (see the
 [performance guide](performance-optimization.md)); geometry comes from
 `four/geometry`'s `boxGeometry`, `planeGeometry`, and `circleGeometry2D`.
 
-On WebGL 2, three of the backend's pipelines are **registration seams**
+On WebGL 2, four of the backend's pipelines are **registration seams**
 (2026-09-11, the `registerSkinningPipeline()` shape): call
 `registerShadowPipeline()` before a light's `castShadow` can produce a map,
 `registerEffectPipeline()` before a `RenderGraph` copy / grade /
-output-transform pass will draw, and `registerParticlePipeline()` before a
-`ParticleRenderable` is drawn. Each is one explicit call at application
-setup, never an import side effect; an unregistered feature is skipped with
-one development warning naming the call (shadows fall back to unshadowed
-lighting, effects and particles to absence), and a bundle that never calls
-one carries none of that pipeline. §60 graph effects go through
-`registerNodeMaterialPipeline()` instead. WebGPU compiles all three eagerly.
+output-transform pass will draw, `registerParticlePipeline()` before a
+`ParticleRenderable` is drawn, and `registerStandardPipeline()` before a
+`StandardMaterial` surface is drawn (an owner decision — §59 is a core
+family, and the seam still pays for itself in every bundle that shades with
+`LitMaterial` alone). Each is one explicit call at application setup, never
+an import side effect; an unregistered feature is skipped with one
+development warning naming the call (shadows fall back to unshadowed
+lighting; effects, particles and standard surfaces to absence — never a
+Lambert stand-in), and a bundle that never calls one carries none of that
+pipeline. §60 graph effects go through `registerNodeMaterialPipeline()`
+instead. WebGPU compiles all four eagerly.
 
 ```ts
 import {
   registerEffectPipeline,
   registerParticlePipeline,
   registerShadowPipeline,
+  registerStandardPipeline,
   registerWebglRenderer,
 } from "fourJS/render-webgl";
 
@@ -103,6 +108,7 @@ registerWebglRenderer();
 registerShadowPipeline(); // §69: the depth-only caster pass
 registerEffectPipeline(); // §70: copy, colour grade, output transform
 registerParticlePipeline(); // §36: instanced billboards, trails, R-32 appearance
+registerStandardPipeline(); // §59: the metallic-roughness surface
 ```
 
 Facts of this tier worth knowing before you fight them:

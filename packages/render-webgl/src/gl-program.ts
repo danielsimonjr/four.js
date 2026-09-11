@@ -1775,6 +1775,28 @@ export class UnlitProgram implements Disposable {
 
   #disposed = false;
 
+  /**
+   * CPU mirror of the last colour this program uploaded (audit A5,
+   * 2026-09-11) — four numbers plus a validity bit. A draw whose colour and
+   * opacity resolve to the four values already in the program object uploads
+   * nothing: with N items sharing one material that is one `uniform4fv` per
+   * program per frame instead of N. Invalidated by {@link use}, so a switch
+   * away and back re-uploads (uniform values do survive a switch, but the
+   * mirror does not claim to know what ran in between); a context restore
+   * builds a new program and therefore a fresh mirror.
+   *
+   * Plain doubles, **not** a `Float32Array`: the comparison is against the
+   * material's own doubles, and a float32 mirror rounds `0.2` to
+   * `0.2000000029…` and never matches — the skip silently never fires for
+   * any colour that is not float32-exact (found on the render-batching
+   * benchmark scene: 5 000 shapes over one `[0.2, 0.6, 1, 1]` material still
+   * uploaded 5 000 times). The scratch `Float32Array` is filled from the
+   * mirror for the upload itself.
+   */
+  readonly #colorMirror: [number, number, number, number] = [0, 0, 0, 0];
+
+  #colorMirrorValid = false;
+
   private constructor(
     gl: WebglContext,
     program: GlProgramHandle,
@@ -1842,6 +1864,7 @@ export class UnlitProgram implements Disposable {
   /** Makes this the current program. Call once per frame, before any upload. */
   use(): void {
     this.#gl.useProgram(this.#program);
+    this.#colorMirrorValid = false;
   }
 
   /**
@@ -1877,10 +1900,26 @@ export class UnlitProgram implements Disposable {
     color: readonly [number, number, number, number],
     opacity = 1,
   ): void {
-    colorScratch[0] = color[0];
-    colorScratch[1] = color[1];
-    colorScratch[2] = color[2];
-    colorScratch[3] = color[3] * opacity;
+    const alpha = color[3] * opacity;
+    const mirror = this.#colorMirror;
+    if (
+      this.#colorMirrorValid &&
+      mirror[0] === color[0] &&
+      mirror[1] === color[1] &&
+      mirror[2] === color[2] &&
+      mirror[3] === alpha
+    ) {
+      return;
+    }
+    mirror[0] = color[0];
+    mirror[1] = color[1];
+    mirror[2] = color[2];
+    mirror[3] = alpha;
+    this.#colorMirrorValid = true;
+    colorScratch[0] = mirror[0];
+    colorScratch[1] = mirror[1];
+    colorScratch[2] = mirror[2];
+    colorScratch[3] = mirror[3];
     this.#gl.uniform4fv(this.#colorLocation, colorScratch);
   }
 
@@ -1979,6 +2018,28 @@ export class SpriteProgram implements Disposable {
 
   #disposed = false;
 
+  /**
+   * CPU mirror of the last colour this program uploaded (audit A5,
+   * 2026-09-11) — four numbers plus a validity bit. A draw whose colour and
+   * opacity resolve to the four values already in the program object uploads
+   * nothing: with N items sharing one material that is one `uniform4fv` per
+   * program per frame instead of N. Invalidated by {@link use}, so a switch
+   * away and back re-uploads (uniform values do survive a switch, but the
+   * mirror does not claim to know what ran in between); a context restore
+   * builds a new program and therefore a fresh mirror.
+   *
+   * Plain doubles, **not** a `Float32Array`: the comparison is against the
+   * material's own doubles, and a float32 mirror rounds `0.2` to
+   * `0.2000000029…` and never matches — the skip silently never fires for
+   * any colour that is not float32-exact (found on the render-batching
+   * benchmark scene: 5 000 shapes over one `[0.2, 0.6, 1, 1]` material still
+   * uploaded 5 000 times). The scratch `Float32Array` is filled from the
+   * mirror for the upload itself.
+   */
+  readonly #colorMirror: [number, number, number, number] = [0, 0, 0, 0];
+
+  #colorMirrorValid = false;
+
   private constructor(
     gl: WebglContext,
     program: GlProgramHandle,
@@ -2032,6 +2093,7 @@ export class SpriteProgram implements Disposable {
   /** Makes this the current program. Call before any upload below. */
   use(): void {
     this.#gl.useProgram(this.#program);
+    this.#colorMirrorValid = false;
   }
 
   /**
@@ -2077,10 +2139,26 @@ export class SpriteProgram implements Disposable {
    * ownership of its array.
    */
   setTint(tint: readonly [number, number, number, number], opacity = 1): void {
-    colorScratch[0] = tint[0];
-    colorScratch[1] = tint[1];
-    colorScratch[2] = tint[2];
-    colorScratch[3] = tint[3] * opacity;
+    const alpha = tint[3] * opacity;
+    const mirror = this.#colorMirror;
+    if (
+      this.#colorMirrorValid &&
+      mirror[0] === tint[0] &&
+      mirror[1] === tint[1] &&
+      mirror[2] === tint[2] &&
+      mirror[3] === alpha
+    ) {
+      return;
+    }
+    mirror[0] = tint[0];
+    mirror[1] = tint[1];
+    mirror[2] = tint[2];
+    mirror[3] = alpha;
+    this.#colorMirrorValid = true;
+    colorScratch[0] = mirror[0];
+    colorScratch[1] = mirror[1];
+    colorScratch[2] = mirror[2];
+    colorScratch[3] = mirror[3];
     this.#gl.uniform4fv(this.#tintLocation, colorScratch);
   }
 
@@ -2166,6 +2244,28 @@ export class LitProgram implements Disposable {
 
   #disposed = false;
 
+  /**
+   * CPU mirror of the last colour this program uploaded (audit A5,
+   * 2026-09-11) — four numbers plus a validity bit. A draw whose colour and
+   * opacity resolve to the four values already in the program object uploads
+   * nothing: with N items sharing one material that is one `uniform4fv` per
+   * program per frame instead of N. Invalidated by {@link use}, so a switch
+   * away and back re-uploads (uniform values do survive a switch, but the
+   * mirror does not claim to know what ran in between); a context restore
+   * builds a new program and therefore a fresh mirror.
+   *
+   * Plain doubles, **not** a `Float32Array`: the comparison is against the
+   * material's own doubles, and a float32 mirror rounds `0.2` to
+   * `0.2000000029…` and never matches — the skip silently never fires for
+   * any colour that is not float32-exact (found on the render-batching
+   * benchmark scene: 5 000 shapes over one `[0.2, 0.6, 1, 1]` material still
+   * uploaded 5 000 times). The scratch `Float32Array` is filled from the
+   * mirror for the upload itself.
+   */
+  readonly #colorMirror: [number, number, number, number] = [0, 0, 0, 0];
+
+  #colorMirrorValid = false;
+
   private constructor(
     gl: WebglContext,
     program: GlProgramHandle,
@@ -2242,6 +2342,7 @@ export class LitProgram implements Disposable {
   /** Makes this the current program. Call before any upload below. */
   use(): void {
     this.#gl.useProgram(this.#program);
+    this.#colorMirrorValid = false;
   }
 
   /**
@@ -2275,10 +2376,26 @@ export class LitProgram implements Disposable {
     color: readonly [number, number, number, number],
     opacity = 1,
   ): void {
-    colorScratch[0] = color[0];
-    colorScratch[1] = color[1];
-    colorScratch[2] = color[2];
-    colorScratch[3] = color[3] * opacity;
+    const alpha = color[3] * opacity;
+    const mirror = this.#colorMirror;
+    if (
+      this.#colorMirrorValid &&
+      mirror[0] === color[0] &&
+      mirror[1] === color[1] &&
+      mirror[2] === color[2] &&
+      mirror[3] === alpha
+    ) {
+      return;
+    }
+    mirror[0] = color[0];
+    mirror[1] = color[1];
+    mirror[2] = color[2];
+    mirror[3] = alpha;
+    this.#colorMirrorValid = true;
+    colorScratch[0] = mirror[0];
+    colorScratch[1] = mirror[1];
+    colorScratch[2] = mirror[2];
+    colorScratch[3] = mirror[3];
     this.#gl.uniform4fv(this.#colorLocation, colorScratch);
   }
 

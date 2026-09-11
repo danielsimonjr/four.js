@@ -31,7 +31,8 @@ assumes the ones above it:
    `registerPickingPipeline` / `createPickingService`, and
    `createPickProvider` / `PointerInput.pickProvider`. (WebGL 2's other
    registration seams — `registerShadowPipeline`, `registerEffectPipeline`,
-   `registerParticlePipeline`, 2026-09-11 — are listed in
+   `registerParticlePipeline`, `registerStandardPipeline`, 2026-09-11 — are
+   listed in
    [materials and the render graph](materials-and-render-graph.md).)
 3. **[Fixed-step simulation](fixed-step-simulation.md)** — §9 time domains, the
    §10 accumulator, §39 system ordering, and §43 interpolated rendering
