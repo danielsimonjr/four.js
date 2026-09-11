@@ -21,6 +21,15 @@
  * minimal-2D-app gate. `__FOUR_DEV__: false` on every production example
  * except the twin; the wasm deltas are the solver bump, not DEV leftovers.
  *
+ * **2026-09-11 (after the register seams + dispose/emitter/WebGPU packets merged):**
+ * shadow / effect / particle programs now compile only after `register*()`,
+ * so light-free bundles shed them: first-2d 58.08 → 56.20, first-3d 43.42 →
+ * 41.45 (limit 44 → 42), ui-demo 50.25 → 48.23 (limit 51 → 49). particles-demo
+ * keeps its programs (it registers them) and measured 43.42 after the dispose
+ * flags and the allocation-free emitter landed — 80 B under the 43.5 kB limit
+ * set on 2026-09-09, which is not headroom; 44 kB restores the ~1.3 % the
+ * other rows keep. The seams packet's own table follows.
+ *
  * **2026-09-11 (after #92, measured locally on the rebased RFC-audit branch):**
  * #92's `HemisphereLight` (§68) grew **every** example bundle by ~480–520 B
  * gzip, light-free ones included — the A/B at 07d4eab (pre-#92) vs 318e6bd:

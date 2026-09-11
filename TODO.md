@@ -434,10 +434,8 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       first: Rapier wrapper allocations per body read, the resolver's
       `WeakMap` per node, the O(n·depth) interpolated list, string-keyed
       geometry/texture cache lookups per draw, the two O(n) pre-scans per
-      WebGL frame. (D) `ShadowProgram`, `StandardProgram`, `EffectProgram`,
-      the particle programs compile at init and ride every bundle (~2.7 /
-      8.2 / 5.0 / 8.8 kB gz standalone) — each is a `register*()` seam
-      candidate like skinning/picking/node materials; A/B per module.
+      WebGL frame. ~~(D) shadow / effect / particle programs compiled at init~~ **DONE
+      2026-09-11** (three register seams; `StandardProgram` seam in flight).
       **Stability.** ~~77 `page.waitForTimeout` calls across 14 Playwright specs~~
       **DONE 2026-09-11** (0 left; `tests/browser/helpers/wait.ts`). The
       playground `each sensor zone repaints` race (a ~0.36 s screenshot window)

@@ -73,6 +73,19 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### Changed
 
+- **WebGL: shadow, effect and particle pipelines are register seams.**
+  `registerShadowPipeline()`, `registerEffectPipeline()`,
+  `registerParticlePipeline()` from `@fourjs/render-webgl` (the
+  `registerSkinningPipeline()` shape: a registry module the renderer imports,
+  a heavy module linked only by the call). Init compiles four programs
+  instead of eight; unregistered features skip with one dev warning naming
+  the registrar; context loss drops and lazily re-acquires them. Bundles:
+  first-2d-scene 58.1 → 56.2 kB, first-3d-scene 43.4 → 41.5 kB (limit
+  42 kB), ui-demo 50.3 → 48.2 kB (limit 49 kB). Examples, fixtures, suites
+  and guides register what they use; `COMPATIBILITY.md` §2 rows updated;
+  28/28 WebGL browser gates green. **Behavioural change:** an application
+  drawing particles, shadows or fixed effects on WebGL 2 must call the
+  matching registrar (as it already must for skinning and picking).
 - **Browser gates no longer sleep.** All 77 `page.waitForTimeout` calls across
   14 specs are replaced by condition waits from a shared
   `tests/browser/helpers/wait.ts`: a rAF frame counter, the page's published

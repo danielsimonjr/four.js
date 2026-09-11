@@ -470,6 +470,17 @@ readable; never delete the pointer itself.
   `PoseBuffer` is the resource. `RigidBody.dispose()` while registered never
   makes a step throw: the world drains through package-internal helpers.
 
+- **2026-09-11 — Register seams for shadow / effect / particles (WebGL).**
+  The A-3 rule held again: a module `let` + `register*()` is the only thing
+  that takes a compiled-at-init program out of a bundle; lazy compile alone
+  does not. Four programs compile at init now (unlit, sprite, lit, standard;
+  standard's seam is a follow-up in flight). Constants a renderer needs from
+  a heavy module (`EFFECT_TEXTURE_UNIT`, `particleItemFloats`) move to the
+  registry module and are re-exported from the old one. Two worktree agents
+  running Playwright at once collide on ports 4173–4183: serialise browser
+  gates. `bun run graph` regenerates `docs/Architecture/*` — commit it with
+  the packet that changed the graph.
+
 - **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
   (the exception each golden's `_warning` names). Values came from the
   scenario helpers, not from editing hashes by hand. 0.20 contact persistence

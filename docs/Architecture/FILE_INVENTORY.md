@@ -1,26 +1,26 @@
 # Complete File Inventory
 
-**Generated**: 2026-09-09 (by tools/create-dependency-graph)
+**Generated**: 2026-09-11 (by tools/create-dependency-graph)
 
 Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-root cross-package `tests/`, `tools/`, build/test `*.config.ts`, `examples/`, and `docs/` reference sources — tagged with a disposition. A completeness census: no `.ts` may be silently missing. The self-check gate (`verifyFileCensus`) does a MAXIMAL, location-agnostic repo walk (broader than this census’s enumerated discovery) and HARD-FAILS `npm run docs:deps` if any `.ts` on disk is unaccounted, or if any `orphan` exists.
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 826
+**Total files**: 833
 
 ## Disposition counts
 
 | Disposition | Count | Meaning |
 | --- | --: | --- |
-| `reachable` | 271 | A `src/` file in the module graph, reachable from a root. |
+| `reachable` | 275 | A `src/` file in the module graph, reachable from a root. |
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 1 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 474 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 477 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
 | `config` | 17 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 14 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **826** | |
+| **Total** | **833** | |
 
 ## Per-area counts
 
@@ -28,15 +28,15 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | --- | --: |
 | `config` | 17 |
 | `examples` | 14 |
-| `src` | 320 |
-| `tests` | 474 |
+| `src` | 324 |
+| `tests` | 477 |
 | `tools` | 1 |
 
 ## Per-package counts
 
 | Package | Files |
 | --- | --: |
-| `(root)` | 219 |
+| `(root)` | 220 |
 | `@fourjs/animation` | 32 |
 | `@fourjs/assets` | 20 |
 | `@fourjs/core` | 26 |
@@ -54,8 +54,8 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@fourjs/render` | 64 |
 | `@fourjs/render-canvas` | 2 |
 | `@fourjs/render-svg` | 2 |
-| `@fourjs/render-webgl` | 28 |
-| `@fourjs/render-webgpu` | 48 |
+| `@fourjs/render-webgl` | 31 |
+| `@fourjs/render-webgpu` | 51 |
 | `@fourjs/scene` | 35 |
 | `@fourjs/serialization` | 11 |
 | `@fourjs/text` | 6 |
@@ -480,15 +480,18 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-svg/src/index.ts` | @fourjs/render-svg | src | build-entry |
 | `packages/render-svg/tests/smoke.test.ts` | @fourjs/render-svg | tests | test |
 | `packages/render-webgl/src/gl-batch.ts` | @fourjs/render-webgl | src | reachable |
+| `packages/render-webgl/src/gl-effect-registry.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-effect.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-geometry.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-gpu-timer.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-node-program.ts` | @fourjs/render-webgl | src | reachable |
+| `packages/render-webgl/src/gl-particles-registry.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-particles.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-picking-registry.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-picking.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-program.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-render-target.ts` | @fourjs/render-webgl | src | reachable |
+| `packages/render-webgl/src/gl-shadow-registry.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-shadow.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-skinning-glsl.ts` | @fourjs/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-skinning-registry.ts` | @fourjs/render-webgl | src | reachable |
@@ -526,6 +529,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgpu/src/wgpu-picking-registry.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-picking.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-pipeline-cache.ts` | @fourjs/render-webgpu | src | reachable |
+| `packages/render-webgpu/src/wgpu-pipeline-memo.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-readback.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-render-target.ts` | @fourjs/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-shadow.ts` | @fourjs/render-webgpu | src | reachable |
@@ -543,12 +547,14 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgpu/tests/wgpu-caches.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-compute.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-effect.test.ts` | @fourjs/render-webgpu | tests | test |
+| `packages/render-webgpu/tests/wgpu-gpu-timer.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-lit.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-node-angle.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-node-program.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-particle-simulation.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-particles.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-picking.test.ts` | @fourjs/render-webgpu | tests | test |
+| `packages/render-webgpu/tests/wgpu-pipeline-memo.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-readback-region.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-readback.test.ts` | @fourjs/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-render-target.test.ts` | @fourjs/render-webgpu | tests | test |
@@ -730,6 +736,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/browser/geometry-refresh.spec.ts` | (root) | tests | test |
 | `tests/browser/gltf-model.spec.ts` | (root) | tests | test |
 | `tests/browser/gltf.spec.ts` | (root) | tests | test |
+| `tests/browser/helpers/wait.ts` | (root) | tests | test |
 | `tests/browser/interaction.spec.ts` | (root) | tests | test |
 | `tests/browser/mechanism.spec.ts` | (root) | tests | test |
 | `tests/browser/mipmaps.spec.ts` | (root) | tests | test |
