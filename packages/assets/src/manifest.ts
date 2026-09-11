@@ -105,6 +105,13 @@ export function parseAssetManifest(
       { source },
     );
   }
+  // Rebuilt rather than returned: a parsed document is content (§96), and the
+  // copy has no prototype, so a key such as "constructor" or "hasOwnProperty"
+  // is an ordinary entry and nothing else.
+  const manifest = Object.create(null) as Record<
+    string,
+    { url: string; hash?: string }
+  >;
   for (const [key, entry] of Object.entries(document)) {
     if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
       throw refuse(
@@ -125,8 +132,9 @@ export function parseAssetManifest(
         { source, key },
       );
     }
+    manifest[key] = hash === undefined ? { url } : { url, hash };
   }
-  return document as AssetManifest;
+  return manifest;
 }
 
 /**

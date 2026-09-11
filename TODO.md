@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of **2026-09-11**, recounted not estimated (`grep -c '^- \[ \]'` / `'^- \[x\]'`): **11 open**, **263 closed** (2026-09-10 main: 11 / 260; the rebased RFC-audit branch adds two Done rows; the `pick-latency` benchmark row opened and closed 2026-09-11). Closed this pass: **RFC 0005 residue** (WebGPU skinned id pass was the last named slice). Audit confirmed the other 11 still have remaining work or are standing/owner-gated. Same-day slices on still-open rows: WebGPU idle-skip (`WgpuBatching.#canSkipUpload`). Of the 11, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. TypeDoc/`typescript@6.0.3` isolation remains in tier 4 (Vitest 5 already landed; not a second `[ ]`). RFC 0007/0008/0009 stay Proposed (implementation waits on owner acceptance).
+Counts as of **2026-09-11**, recounted not estimated (`grep -c '^- \[ \]'` / `'^- \[x\]'`): **12 open**, **263 closed** (2026-09-10 main: 11 / 260; the rebased RFC-audit branch adds two Done rows; the `pick-latency` benchmark row opened and closed 2026-09-11; +1 open row for the 2026-09-11 audit follow-ups). Closed this pass: **RFC 0005 residue** (WebGPU skinned id pass was the last named slice). Audit confirmed the other 11 still have remaining work or are standing/owner-gated. Same-day slices on still-open rows: WebGPU idle-skip (`WgpuBatching.#canSkipUpload`). Of the 11, **1 is standing** (dogfooding map), **1 is owner-gated** (first publish), and the rest are post-1.0 / hardware packets. TypeDoc/`typescript@6.0.3` isolation remains in tier 4 (Vitest 5 already landed; not a second `[ ]`). RFC 0007/0008/0009 stay Proposed (implementation waits on owner acceptance).
 
 ### 0 · Blocked on an event, not on effort
 
@@ -1961,6 +1961,47 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       multi-texture-unit widening `gl-program.ts` records (R-13 follow-up) —
       metallic-roughness landed 2026-09-06; normal/occlusion/emissive remain.
       The loader parses them already and widens without a format change.
+- [ ] **2026-09-11 audit follow-ups** (three read-only audits; the mechanical
+      findings landed the same day — see CHANGELOG — these need a measurement
+      or a decision first):
+      **Performance.** (B1) Rapier adapters build `collisionstay` payloads
+      (`#pairKey` strings, `contacts[]`, `Vector3`s per contact) for every
+      active pair every step whether or not any listener exists — the
+      benchmark's largest suspect (~9 of 10.4 ms/step at 5k piled bodies);
+      gate on `RigidBody` listener presence, numeric pair keys, lazy
+      `contacts`; re-run `physics-step` golden. (B4) `contentVersionOf` hashes
+      all 16 world-matrix floats per batched item (`batch.ts:347`); a pool
+      matrix version would replace it — re-run the idle-skip tests. (A2/A3)
+      WebGPU allocates a dynamic-offset array and a pipeline-key string per
+      draw — a reusable offset array is only safe once the fake-device
+      transcripts copy their args; memoise the key per material. (A5/A6) WebGL
+      `setColor`/`setTint` and `bindTexture` have no CPU mirrors — adding them
+      changes the F13 GL-sequence goldens, so re-record deliberately. (A7)
+      `EventEmitter.emit` slices the listener array per emit (~900
+      allocations/step at 462 physics events). (B2, B3, B5, B6, B7) measure
+      first: Rapier wrapper allocations per body read, the resolver's
+      `WeakMap` per node, the O(n·depth) interpolated list, string-keyed
+      geometry/texture cache lookups per draw, the two O(n) pre-scans per
+      WebGL frame. (D) `ShadowProgram`, `StandardProgram`, `EffectProgram`,
+      the particle programs compile at init and ride every bundle (~2.7 /
+      8.2 / 5.0 / 8.8 kB gz standalone) — each is a `register*()` seam
+      candidate like skinning/picking/node materials; A/B per module.
+      **Stability.** 77 `page.waitForTimeout` calls across 14 Playwright specs
+      (worst: one-scene-everything-moves 20, motor-digital-twin 13 with 2.5 s
+      sleeps, particles 3–4 s) → `waitForFunction` on a frame counter.
+      `Scheduler.step` advances `simulationStep`/`simulationTime` before
+      `onFixedStep`; a throwing system leaves the accumulator holding but the
+      counters one ahead — document in §10 or reorder. Seventeen
+      `dispose()` implementations have no disposed flag (idempotent, but
+      use-after-dispose is silent; `drag.ts` documents reuse on purpose).
+      WebGPU picking uses `CONTEXT_LOST` where the renderer uses
+      `DEVICE_LOST` for the same condition (tests pin both; pick one).
+      **Security.** `bun audit --audit-level=high` runs with
+      `continue-on-error` (`ci.yml:154`) — owner call whether to gate on
+      critical. glTF subresource fetches carry no abort signal (manager
+      timeout discards the result but the request runs on). Manifest URLs
+      are document-controlled with no origin policy (the glTF
+      `allowAbsoluteUris` gate is the model).
 - [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust **runtime** boundary is the closed operator union (shipped); **extensible** data-declared operators remain a follow-up RFC (0001 alternative E — `SHADER_OPERATORS` is the named hook only). **Plugin trust
       boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a
       document; enforced by `tests/integration/plugin-boundary.test.ts`; explicitly not a

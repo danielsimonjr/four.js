@@ -162,3 +162,17 @@ describe("loadFromManifest", () => {
     await expect(pending).rejects.toThrow(/aborted/);
   });
 });
+
+describe("parseAssetManifest rebuilds the record (§96, 2026-09-11)", () => {
+  it("returns a prototype-free copy so content keys cannot shadow Object.prototype", () => {
+    const manifest = parseAssetManifest({
+      constructor: { url: "a.png" },
+      hasOwnProperty: { url: "b.png", hash: "x" },
+      extra: { url: "c.png", ignored: true },
+    });
+    expect(Object.getPrototypeOf(manifest)).toBeNull();
+    expect(manifest["constructor"]).toEqual({ url: "a.png" });
+    expect(manifest["hasOwnProperty"]).toEqual({ url: "b.png", hash: "x" });
+    expect(manifest["extra"]).toEqual({ url: "c.png" });
+  });
+});

@@ -4169,6 +4169,13 @@ export class WebgpuRenderer implements Renderer {
       this.#skinnedPrograms?.forget();
       this.#skinnedPrograms = null;
       this.#skinnedProgramsFailed = false;
+      // The frame-level handles too: `render` already returns while lost,
+      // but a handle that outlives its device is the kind of thing a future
+      // restore path would trip over (2026-09-11 stability audit).
+      this.#bindGroupLayout = null;
+      this.#uniformBuffer = null;
+      this.#bindGroup = null;
+      this.#depthTexture = null;
       this.#spriteLayout = null;
       this.#spriteBindGroup = null;
       this.#particleLayout = null;

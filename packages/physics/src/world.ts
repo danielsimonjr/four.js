@@ -894,6 +894,9 @@ export class PhysicsWorld {
   readonly #checksumAngular = new Vector3();
 
   /** Break-monitoring scratch, so the per-step joint pass allocates nothing. */
+  /** Per-step snapshot scratch for {@link PhysicsWorld.#monitorJointBreakage}. */
+  readonly #jointScratch: JointRegistration[] = [];
+
   readonly #reactionLinear = new Vector3();
 
   readonly #reactionAngular = new Vector3();
@@ -1364,6 +1367,7 @@ export class PhysicsWorld {
    * may be added again once their bodies are.
    */
   removeBody(node: Node): boolean {
+    this.#assertNotDisposed();
     const registration = this.#bodiesByNode.get(node);
     if (registration === undefined) {
       return false;
@@ -4145,7 +4149,12 @@ export class PhysicsWorld {
     const linear = this.#reactionLinear;
     const angular = this.#reactionAngular;
     // Snapshot first: a break mutates the registry while it is being walked.
-    const registrations = [...this.#jointsByJoint.values()];
+    // Into world-owned scratch (cleared afterwards), not a fresh array — this
+    // runs every step for every world with a joint (2026-09-11 audit).
+    const registrations = this.#jointScratch;
+    for (const registration of this.#jointsByJoint.values()) {
+      registrations.push(registration);
+    }
     for (const registration of registrations) {
       const joint = registration.joint;
       if (!joint.breakable) {
@@ -4171,6 +4180,7 @@ export class PhysicsWorld {
       };
       this.#queue.push(event);
     }
+    registrations.length = 0;
   }
 
   /**

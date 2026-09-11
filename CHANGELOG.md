@@ -69,6 +69,58 @@ specification; until then, entries are grouped by date under **Unreleased**.
   the §58 paint tier leave the deferred list. Spec revision **1.15**
   matches that §60 honesty.
 
+## Unreleased — security, stability and performance pass (2026-09-11)
+
+Three read-only audits (security against §96, stability of lifecycle/error
+paths, per-frame hot paths) over the whole tree; the mechanical findings are
+applied here with tests, the ones needing a measurement or a decision are
+recorded in `TODO.md` ("2026-09-11 audit follow-ups").
+
+### Security (§96)
+
+- **glTF subresource URIs are relative-only by default.** A document naming an
+  absolute, protocol-relative, root-relative or scheme-carrying `.bin` / image
+  URI is refused (`ASSET_LOAD_FAILED`, message names the option); a trusted CDN
+  layout opts in with `createGltfLoader({ allowAbsoluteUris: true })`.
+- **`cloneJsonValue` has a 1024-level depth ceiling** (`UNTRUSTED_INPUT_REJECTED`),
+  the same figure `parseUntrustedJson` enforces, so the documented
+  `migrateSceneDocument(JSON.parse(text), …)` path can no longer be driven into
+  stack exhaustion by a deep document.
+- **Asset manifests are rebuilt into a prototype-free record**; a content key
+  such as `constructor` is an ordinary entry.
+- **Rapier snapshot envelopes** check the declared meta + solver lengths against
+  the buffer and shape-check the meta JSON (`UNTRUSTED_INPUT_REJECTED`) instead
+  of letting a `SyntaxError` / `TypeError` escape the restore (2D and 3D).
+- **Scene documents:** string fields are capped at 4096 characters; an engine-
+  shaped node id at or above 2^52 is kept but no longer reserves the counter
+  beside its saturation point.
+- **Physics shapes:** convex hulls and triangle meshes refuse more than
+  `MAXIMUM_SHAPE_POINTS` (2^20) points.
+
+### Stability
+
+- **WebGPU GPU timer:** a `mapAsync` still in flight across device loss or
+  `dispose()` no longer surfaces as an unhandled rejection and no longer leaves
+  its slot `busy` forever.
+- **WebGPU `readPixels`:** a map that rejects mid-flight (device lost, buffer
+  destroyed) now rejects with `FourError` `DEVICE_LOST` carrying the original
+  as `cause`, matching the §61 contract.
+- **`PhysicsWorld.removeBody`** after `dispose()` throws
+  `INVALID_APPLICATION_STATE` like its siblings instead of returning `false`.
+- **WebGPU loss handler** also nulls the frame bind group / layout / uniform
+  buffer / depth texture handles.
+
+### Performance
+
+- **Render list:** the default §66 sort now runs only when an item sorts before
+  the one generated ahead of it. A heterogeneous scene already in order (opaque
+  then transparent, ascending `renderOrder`) skips the per-frame O(n log n)
+  pass; output is byte-identical (stable sort fixed point). Regression test added.
+- **WebGPU skinning:** `packPalette` copies the palette with `set`/`fill`
+  instead of a 768-iteration scalar loop.
+- **Physics:** the per-step joint-breakage monitor snapshots into world-owned
+  scratch instead of spreading the registry into a fresh array.
+
 ## Unreleased — sync after #91/#92 and gate repair (2026-09-11)
 
 ### Fixed

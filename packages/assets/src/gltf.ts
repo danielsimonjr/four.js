@@ -358,6 +358,16 @@ export interface GltfLoaderOptions {
    * `AssetManager` that fetched it.
    */
   readonly maximumBytes?: number;
+
+  /**
+   * Whether a document may name an **absolute** or root-relative subresource
+   * URI (`https://…`, `//host/…`, `/path`, any `scheme:`). Defaults to
+   * `false`: a glTF is untrusted content (§96), and a document that can pick
+   * the origin its `.bin` comes from can direct the injected transport
+   * anywhere. Relative URIs resolve lexically against the asset's own URL and
+   * cannot climb above its root. Set `true` for a trusted CDN layout.
+   */
+  readonly allowAbsoluteUris?: boolean;
   /** §96 decoded-texture bound, forwarded to {@link createTextureLoader}. */
   readonly maximumDecodedBytes?: number;
   /** §96 expansion-ratio bound, forwarded to {@link createTextureLoader}. */
@@ -720,8 +730,13 @@ function decodeBase64(
  * segments normalized, because this package names no `URL` global and a §33
  * loader should resolve identically everywhere.
  */
+/** Scheme-carrying, protocol-relative, or root-relative — anything not relative to the asset. */
+function isAbsoluteUri(uri: string): boolean {
+  return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(uri) || uri.startsWith("/");
+}
+
 function resolveUri(baseUrl: string, uri: string): string {
-  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(uri) || uri.startsWith("/")) {
+  if (isAbsoluteUri(uri)) {
     return uri;
   }
   const slash = baseUrl.lastIndexOf("/");
@@ -1216,6 +1231,7 @@ export function createGltfLoader(
         maximumExpansionRatio: options.maximumExpansionRatio,
         decodeText,
         name,
+        allowAbsoluteUris: options.allowAbsoluteUris ?? false,
       });
     },
   };
@@ -1231,6 +1247,7 @@ interface ResolvedOptions {
   readonly maximumExpansionRatio: number | undefined;
   readonly decodeText: TextDecodeLike | undefined;
   readonly name: string;
+  readonly allowAbsoluteUris: boolean;
 }
 
 /** Fetches one external subresource through the injected transport (§96). */
@@ -1248,6 +1265,16 @@ async function fetchSubresource(
       `the document names external ${kind} "${uri}" but this loader was built ` +
         `without a transport. Pass { fetch } to createGltfLoader.`,
       { uri },
+    );
+  }
+  if (!options.allowAbsoluteUris && isAbsoluteUri(uri)) {
+    refuse(
+      baseUrl,
+      where,
+      `the document names ${kind} "${uri}" by an absolute or root-relative ` +
+        `URI; only URIs relative to the asset are fetched unless the loader ` +
+        `was built with { allowAbsoluteUris: true } (§96).`,
+      { uri, limitName: "allowAbsoluteUris" },
     );
   }
   const resolved = resolveUri(baseUrl, uri);

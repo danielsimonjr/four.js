@@ -436,6 +436,18 @@ readable; never delete the pointer itself.
   #86). Spec revision numbers: check the table's tail before minting — #91
   and this branch both took 1.15; the audit row is 1.16.
 
+- **2026-09-11 — Security / stability / performance pass.** Facts to keep:
+  glTF subresource URIs are **relative-only by default** (`allowAbsoluteUris`
+  opts in) — a glTF is a §96 document that drives fetches; `cloneJsonValue`
+  has the same 1024 depth ceiling as `parseUntrustedJson`, so the
+  `JSON.parse` → `migrateSceneDocument` path is bounded; Rapier snapshot meta
+  is shape-checked. The render list's default sort is skipped whenever no
+  item sorts before its predecessor (a stable sort's fixed point), not only
+  for homogeneous lists. Two WebGPU `mapAsync` sites now convert rejections
+  (GPU timer drops the sample; readback → `DEVICE_LOST` with `cause`).
+  Audit reports were subagent output; every applied item was re-read in
+  source before editing. Unapplied items are in TODO with file:line.
+
 - **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
   (the exception each golden's `_warning` names). Values came from the
   scenario helpers, not from editing hashes by hand. 0.20 contact persistence

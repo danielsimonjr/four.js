@@ -183,6 +183,12 @@ export class WgpuGpuTimer {
       }
       captured.buffer.unmap?.();
       captured.busy = false;
+    }, () => {
+      // A `mapAsync` still in flight when the device is lost or the timer is
+      // disposed rejects (`AbortError` / `OperationError`). The sample is
+      // simply dropped; the slot must not stay `busy` forever, and nothing
+      // may surface as an unhandled rejection at the host (§61, §89).
+      captured.busy = false;
     });
   }
 
