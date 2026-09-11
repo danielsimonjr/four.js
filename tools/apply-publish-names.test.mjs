@@ -140,12 +140,13 @@ test("rewriteCode leaves the English word `four` and unquoted prose alone", () =
 
 // --- the real workspace ----------------------------------------------------
 
-const packages = readWorkspacePackages(root);
+const workspace = readWorkspacePackages(root);
+const packages = workspace.filter((p) => p.manifest.private !== true);
 const versions = new Map(
   packages.map((p) => [p.manifest.name, p.manifest.version]),
 );
 
-test("every workspace package maps to a published name and checks clean", () => {
+test("every publishable workspace package maps to a published name and checks clean", () => {
   assert.ok(
     packages.length >= 24,
     `found only ${packages.length} workspace packages`,
@@ -202,6 +203,7 @@ test("the umbrella's subpath exports survive the rewrite intact (§91 tree-shaki
     "./physics-rapier",
     "./render-webgl",
     "./application",
+    "./text/harfbuzz",
   ]) {
     assert.ok(keys.includes(subpath), `umbrella export "${subpath}" was lost`);
     assert.equal(
@@ -221,7 +223,7 @@ test("the umbrella's subpath exports survive the rewrite intact (§91 tree-shaki
   for (const subpath of keys) {
     if (subpath === "." || subpath === "./application") continue;
     assert.ok(
-      deps.has(PUBLISH_PREFIX + subpath.slice(2)),
+      deps.has(PUBLISH_PREFIX + subpath.slice(2).split("/")[0]),
       `umbrella subpath "${subpath}" has no matching published dependency`,
     );
   }
@@ -241,4 +243,34 @@ test("a check-only run of the whole workspace reports no problems and writes not
       "the checkout must not be rewritten in place",
     );
   }
+});
+
+test("private documentation workspace is discovered but never staged for publication", () => {
+  const docs = workspace.find((p) => p.relDir === "tools/docs");
+  assert.ok(docs);
+  assert.equal(docs.manifest.private, true);
+  const { problems, staged, notes } = applyPublishNames({ root });
+  assert.deepEqual(problems, []);
+  assert.ok(staged.every((p) => p.manifest.private !== true));
+  assert.ok(!staged.some((p) => p.manifest.name === docs.manifest.name));
+  assert.ok(!notes.some((note) => note.includes("@fourjs-tools/docs")));
+});
+
+test("code rewrite preserves nested shaping entry-point specifiers", () => {
+  const { text, count } = rewriteCode('export * from "@fourjs/text/harfbuzz";');
+  assert.equal(count, 1);
+  assert.equal(text, 'export * from "@danielsimonjr/fourjs-text/harfbuzz";');
+});
+
+test("code rewrite preserves nested umbrella imports without matching other package names", () => {
+  const source = [
+    'import { HarfBuzzShapingEngine } from "fourJS/text/harfbuzz";',
+    'const mod = await import("fourJS/text/harfbuzz");',
+    'import { value } from "fourJS-extra";',
+  ].join("\n");
+  const { text, count } = rewriteCode(source);
+  assert.equal(count, 2);
+  assert.ok(text.includes('from "@danielsimonjr/fourjs/text/harfbuzz"'));
+  assert.ok(text.includes('import("@danielsimonjr/fourjs/text/harfbuzz")'));
+  assert.ok(text.includes('from "fourJS-extra"'));
 });

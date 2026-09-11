@@ -24,6 +24,7 @@
 
 import {
   analyzeShaderGraph,
+  analyzeShaderNodeType,
   type ShaderAttributeName,
   type ShaderBinaryOp,
   type ShaderDomain,
@@ -233,6 +234,7 @@ export class ShaderGraphBuilder {
   readonly output: ShaderGraphOutput = new ShaderGraphOutput(this);
 
   readonly #nodes: ShaderNode[] = [];
+  #uniformBlock = false;
 
   /** Auto-named textures created so far — `texture0`, `texture1`, …. */
   #textureCount = 0;
@@ -245,6 +247,12 @@ export class ShaderGraphBuilder {
 
   constructor(domain: ShaderDomain = "surface") {
     this.domain = domain;
+  }
+
+  /** Opt into one padded std140 uniform upload per material draw on WebGL 2. */
+  useUniformBlock(): this {
+    this.#uniformBlock = true;
+    return this;
   }
 
   /** How many nodes the graph holds so far. */
@@ -270,6 +278,7 @@ export class ShaderGraphBuilder {
     const offset = this.output.positionOffset;
     const graph: ShaderGraph = {
       domain: this.domain,
+      ...(this.#uniformBlock ? { uniformTransport: "std140" as const } : {}),
       nodes: [...this.#nodes],
       color: color.nodeId,
       ...(offset === null ? {} : { positionOffset: offset.nodeId }),
@@ -421,6 +430,12 @@ export class ShaderGraphBuilder {
       source: this.own(source).nodeId,
       pattern,
     });
+  }
+
+  /** Value type of an expression, validated with the graph's normal rules. */
+  typeOf(expression: ShaderExpression): ShaderValueType {
+    const id = this.own(expression).nodeId;
+    return analyzeShaderNodeType(this.#nodes, this.domain, id);
   }
 
   /** @internal Lifts an operand into this builder's graph (§85 on mixing). */

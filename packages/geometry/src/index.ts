@@ -64,10 +64,7 @@ export {
   DEFAULT_MAXIMUM_SVG_DOCUMENT_LENGTH,
   parseSvgDocument,
 } from "./svg-document.js";
-export type {
-  SvgPathFormatOptions,
-  SvgPathParseOptions,
-} from "./svg-path.js";
+export type { SvgPathFormatOptions, SvgPathParseOptions } from "./svg-path.js";
 export {
   DEFAULT_MAXIMUM_PATH_DATA_LENGTH,
   formatSvgPathData,
@@ -102,3 +99,5 @@ export {
   expandStroke,
   triangulatePolygon,
 } from "./tessellation.js";
+
+export { CpuSkinning } from "./cpu-skinning.js";

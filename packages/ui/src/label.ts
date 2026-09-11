@@ -1,3 +1,4 @@
+import type { TextLayoutOptions } from "@fourjs/text";
 /**
  * `Label` (§73) — a widget whose intrinsic size is its text (§74, §56).
  *
@@ -62,7 +63,13 @@ import { layoutText, type GlyphAtlas, type TextLayout } from "@fourjs/text";
 import { UIWidget, type UIWidgetOptions } from "./widget.js";
 
 /** Construction options for a {@link Label}. */
-export interface LabelOptions extends UIWidgetOptions {
+export interface LabelOptions
+  extends
+    UIWidgetOptions,
+    Pick<
+      TextLayoutOptions,
+      "shaper" | "fontId" | "script" | "language" | "direction" | "features"
+    > {
   /** {@link Label.text}. Default `""`. */
   text?: string;
   /** {@link Label.atlas}. Default `null`. */
@@ -95,6 +102,10 @@ function requireFinite(name: string, value: number): number {
 }
 
 export class Label extends UIWidget {
+  #shaping: Pick<
+    TextLayoutOptions,
+    "shaper" | "fontId" | "script" | "language" | "direction" | "features"
+  >;
   #text = "";
   #atlas: GlyphAtlas | null = null;
   #size = 1;
@@ -105,6 +116,16 @@ export class Label extends UIWidget {
 
   constructor(options: LabelOptions = {}) {
     super(options);
+    this.#shaping = {
+      shaper: options.shaper,
+      fontId: options.fontId,
+      script: options.script,
+      language: options.language,
+      direction: options.direction,
+      features: options.features && Object.freeze({ ...options.features }),
+    };
+    if (options.shaper && !options.fontId)
+      throw new RangeError("fontId is required with a shaper");
     // Text is inert data — a label is not a pointer target unless the
     // application says so (a label inside a button must not steal the hit).
     if (options.interactive === undefined) this.interactive = false;
@@ -185,6 +206,7 @@ export class Label extends UIWidget {
           : layoutText(this.#text, atlas, {
               size: this.#size,
               letterSpacing: this.#letterSpacing,
+              ...this.#shaping,
             });
     }
     return this.#layout;

@@ -32,14 +32,15 @@
  * 100 000-instance row); indirect rendering (WebGPU); static-versus-dynamic
  * GPU buffer usage (every geometry uploads `STATIC_DRAW` today); level of
  * detail, impostors, billboards, and the merging tools (ordinary packets).
- * CPU skinning, bone textures, and dual-quaternion skinning are likewise
- * deferred with reasons recorded in RFC 0003.
+ * CPU skinning is available explicitly through `CpuSkinning` in
+ * `@fourjs/geometry`; bone textures and dual-quaternion skinning remain deferred.
  *
  * ## Two known inaccuracies, entered deliberately (RFC 0003 §6)
  *
- * **No engine API returns skinned vertex positions** — the rule that keeps
- * vertex skinning outside the §33 envelope (the palette goes to the GPU;
- * nothing comes back; §33's checksum is over bodies, not vertices). Two
+ * **GPU skinning is never read back into simulation.** For CPU vertex
+ * positions, `CpuSkinning` provides a separate same-runtime deterministic
+ * implementation; attach its output to an ordinary renderable to use deformed
+ * geometry for CPU picking or bounds. Automatic GPU-skinned meshes retain two
  * documented consequences, recorded at this type because this is where a user
  * meets them:
  *
@@ -62,7 +63,9 @@
  */
 
 import { FourError } from "@fourjs/core";
+import { CpuSkinning, type BufferGeometry } from "@fourjs/geometry";
 import type { Material } from "@fourjs/materials";
+import type { Matrix4 } from "@fourjs/math";
 import { Bone, MorphWeights, Skeleton, type Node } from "@fourjs/scene";
 
 import {
@@ -140,6 +143,72 @@ const pendingSkeletons = new WeakMap<Mesh<Material>, PendingSkeleton>();
 export class Mesh<M extends Material = SurfaceMaterial> extends Renderable<M> {
   #skeleton: Skeleton | null = null;
 
+  #skinningMode: "gpu" | "cpu" = "gpu";
+
+  #cpuSkinning: CpuSkinning | null = null;
+
+  /**
+   * CPU mode supplies deformed geometry to rendering, bounds and picking.
+   * It supports palettes larger than the GPU uniform tier. Set this before
+   * assigning a large skeleton. CPU results belong to the same-runtime tier.
+   */
+  get skinningMode(): "gpu" | "cpu" {
+    return this.#skinningMode;
+  }
+
+  set skinningMode(value: "gpu" | "cpu") {
+    if (value !== "gpu" && value !== "cpu") {
+      throw new TypeError("Mesh skinningMode must be gpu or cpu.");
+    }
+    if (
+      value === "gpu" &&
+      (this.skeleton?.jointCount ?? 0) > MAX_SKINNING_JOINTS
+    ) {
+      throw new FourError(
+        "UNSUPPORTED_GPU_FEATURE",
+        "The skeleton exceeds the GPU uniform palette limit.",
+      );
+    }
+    this.#skinningMode = value;
+    if (value === "gpu") {
+      this.#cpuSkinning?.dispose();
+      this.#cpuSkinning = null;
+    }
+  }
+
+  /** Authored geometry, kept in bind pose even when CPU deformation is active. */
+  get bindGeometry(): BufferGeometry {
+    return super.geometry;
+  }
+
+  override get geometry(): BufferGeometry {
+    return this.updateCpuGeometry();
+  }
+
+  /** Updates the CPU pose; render interpolation may supply render-only worlds. */
+  updateCpuGeometry(worldOf?: (node: Node) => Matrix4): BufferGeometry {
+    const source = super.geometry;
+    const skeleton = this.skeleton;
+    if (this.#skinningMode !== "cpu" || skeleton === null) {
+      return source;
+    }
+    const deformation = (this.#cpuSkinning ??= new CpuSkinning(source));
+    skeleton.update(this, worldOf);
+    return deformation.update(skeleton.jointMatrices);
+  }
+
+  override set geometry(value: BufferGeometry) {
+    this.#cpuSkinning?.dispose();
+    this.#cpuSkinning = null;
+    super.geometry = value;
+  }
+
+  /** Releases only generated CPU geometry; shared authored resources remain alive. */
+  dispose(): void {
+    this.#cpuSkinning?.dispose();
+    this.#cpuSkinning = null;
+  }
+
   /**
    * Builds a mesh for `geometry` and `material` — `Renderable`'s constructor,
    * inherited unchanged. The skeleton is assigned afterwards, because a §79
@@ -175,7 +244,11 @@ export class Mesh<M extends Material = SurfaceMaterial> extends Renderable<M> {
   }
 
   set skeleton(value: Skeleton | null) {
-    if (value !== null && value.bones.length > MAX_SKINNING_JOINTS) {
+    if (
+      this.#skinningMode === "gpu" &&
+      value !== null &&
+      value.bones.length > MAX_SKINNING_JOINTS
+    ) {
       throw new FourError(
         "UNSUPPORTED_GPU_FEATURE",
         `Mesh ${this.id} was given a skeleton of ` +

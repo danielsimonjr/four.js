@@ -90,6 +90,9 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      - name: Check release-name mapping and export preservation
+        run: bun run publish-names:test
+
       - name: Check specification
         run: bun run check-spec
 

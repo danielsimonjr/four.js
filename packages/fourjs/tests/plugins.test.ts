@@ -28,6 +28,7 @@ import {
   SCENE_MIGRATIONS,
   SHADER_OPERATORS,
   SIMULATION_SYSTEMS,
+  PATH_PLANNERS,
   SOLVER_REGISTRY,
   UI_CONTROLS,
 } from "../src/plugins.js";
@@ -294,6 +295,7 @@ describe("capability tokens", () => {
     const ui = await import("@fourjs/ui");
     const own = await import("../src/capabilities.js");
     expect(SIMULATION_SYSTEMS).toBe(motion.SIMULATION_SYSTEMS);
+    expect(PATH_PLANNERS).toBe(motion.PATH_PLANNERS);
     expect(SOLVER_REGISTRY).toBe(physics.SOLVER_REGISTRY);
     expect(RENDERER_REGISTRY).toBe(render.RENDERER_REGISTRY);
     expect(RENDER_GRAPH).toBe(render.RENDER_GRAPH);

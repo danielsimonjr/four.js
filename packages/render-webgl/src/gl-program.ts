@@ -401,6 +401,18 @@ export interface WebglContext {
     type: number,
     pixels: ArrayBufferView | null,
   ): void;
+  /** Updates existing RGBA8 storage without reallocating it. */
+  texSubImage2D?(
+    target: number,
+    level: number,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    format: number,
+    type: number,
+    pixels: ArrayBufferView,
+  ): void;
   texParameteri(target: number, pname: number, param: number): void;
   /**
    * Builds the full mip chain of the bound texture (§77's mipmaps; R-30b,
@@ -547,6 +559,14 @@ export interface WebglContext {
   bindBuffer(target: number, buffer: GlBuffer | null): void;
   bufferData(target: number, data: ArrayBufferView, usage: number): void;
   deleteBuffer(buffer: GlBuffer): void;
+  /** Optional on structural test contexts; required by opt-in node std140. */
+  getUniformBlockIndex?(program: GlProgramHandle, name: string): number;
+  uniformBlockBinding?(
+    program: GlProgramHandle,
+    index: number,
+    binding: number,
+  ): void;
+  bindBufferBase?(target: number, index: number, buffer: GlBuffer | null): void;
 
   createVertexArray(): GlVertexArray | null;
   bindVertexArray(array: GlVertexArray | null): void;

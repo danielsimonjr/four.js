@@ -1575,7 +1575,7 @@ describe("materials (§59 tier)", () => {
     );
   });
 
-  it("validates but does not decode the remaining unstaged texture slots", async () => {
+  it("decodes default normal and occlusion maps as linear data", async () => {
     const asset = await load(
       corrupt(texturedDocument(), (c) => {
         const materials = c["materials"] as Record<string, unknown>[];
@@ -1587,13 +1587,13 @@ describe("materials (§59 tier)", () => {
         materials[0]["normalTexture"] = { index: 0 };
         materials[0]["occlusionTexture"] = { index: 0 };
       }),
+      { decodeTexture: fakeDecode },
     );
-    expect(asset.materials[0].ignoredTextures).toEqual([
-      "normalTexture",
-      "occlusionTexture",
-    ]);
-    expect(asset.textures).toEqual([null]);
-    expect(asset.ignored.join("\n")).toMatch(/texture slot/);
+    expect(asset.materials[0].ignoredTextures).toEqual([]);
+    expect(asset.materials[0].normalTexture).toBe(0);
+    expect(asset.materials[0].occlusionTexture).toBe(0);
+    expect(asset.textures[0]?.colorSpace).toBe("linear");
+    expect(asset.ignored.join("\n")).not.toMatch(/texture slot/);
   });
 
   it("decodes a metallicRoughnessTexture and does not warn it ignored", async () => {

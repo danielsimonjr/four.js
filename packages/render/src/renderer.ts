@@ -85,6 +85,7 @@
 
 import type { Disposable } from "@fourjs/core";
 import { EventEmitter, FourError } from "@fourjs/core";
+import type { MaterialTexture } from "@fourjs/materials";
 import type { Rectangle2 } from "@fourjs/math";
 import type { Node, PoseBuffer, Viewport } from "@fourjs/scene";
 
@@ -759,6 +760,9 @@ export interface Renderer extends Disposable {
    * for what deliberately did not move.
    */
   compute?(pass: ComputePassDescriptor): void;
+
+  /** Pre-upload CPU texture bytes and wait for GPU completion. False means disposed, lost, or superseded while waiting; unavailable completion primitives reject. */
+  prepareTexture?(texture: MaterialTexture): Promise<boolean>;
 
   /**
    * Reads back `target`'s colour attachment — or the `region` rectangle of it

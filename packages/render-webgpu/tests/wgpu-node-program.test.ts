@@ -1545,3 +1545,96 @@ describe("frameWantsStencil — the node clause (WP-R1.9)", () => {
     expect(frameWantsStencil(plain, true)).toBe(false);
   });
 });
+
+it("maps each WGSL node statement back to its graph ID and stage", () => {
+  const emitted = emitShaderGraphWgsl(displacedGraph());
+  expect(
+    emitted.sourceMap.some((location) => location.stage === "vertex"),
+  ).toBe(true);
+  expect(
+    emitted.sourceMap.some((location) => location.stage === "fragment"),
+  ).toBe(true);
+  for (const location of emitted.sourceMap) {
+    expect(emitted.code.split("\n")[location.line - 1]).toContain(
+      `let n${String(location.nodeId)} :`,
+    );
+  }
+});
+
+it("retains asynchronous WebGPU compiler diagnostics with node provenance", async () => {
+  const { device, store } = createStore();
+  const graph = colorGraph();
+  const emitted = emitShaderGraphWgsl(graph);
+  const location = emitted.sourceMap[0];
+  device.createShaderModule = () => ({
+    getCompilationInfo: () =>
+      Promise.resolve({
+        messages: [
+          { type: "warning", message: "warning", lineNum: 1, linePos: 1 },
+          {
+            type: "error",
+            message: "bad local",
+            lineNum: location.line,
+            linePos: location.column,
+          },
+          { type: "error", message: "bad global", lineNum: 999, linePos: 1 },
+        ],
+      }),
+  });
+  store.beginFrame([nodeItem(triangle(), new TestNodeMaterial(graph))], 1);
+  await vi.waitFor(() => expect(store.compilationErrors).toHaveLength(1));
+  const context = store.compilationErrors[0].context;
+  expect(context).toMatchObject({
+    source: emitted.code,
+    sourceMap: emitted.sourceMap,
+    messages: [{ node: location }, { node: undefined }],
+  });
+  store.dispose();
+});
+
+it("ignores successful and late disposed WebGPU compilation reports", async () => {
+  const { device, store } = createStore();
+  const getCompilationInfo = vi.fn(() => Promise.resolve({ messages: [] }));
+  device.createShaderModule = () => ({ getCompilationInfo });
+  store.beginFrame(
+    [nodeItem(triangle(), new TestNodeMaterial(colorGraph()))],
+    1,
+  );
+  await vi.waitFor(() => expect(getCompilationInfo).toHaveBeenCalled());
+  expect(store.compilationErrors).toEqual([]);
+  const second = createStore();
+  second.device.createShaderModule = () => ({
+    getCompilationInfo: () =>
+      Promise.resolve({
+        messages: [{ type: "error", message: "late", lineNum: 1, linePos: 1 }],
+      }),
+  });
+  second.store.beginFrame(
+    [nodeItem(triangle(), new TestNodeMaterial(colorGraph()))],
+    1,
+  );
+  second.store.dispose();
+  await new Promise<void>((resolve) => {
+    queueMicrotask(resolve);
+  });
+  expect(second.store.compilationErrors).toEqual([]);
+  store.dispose();
+});
+
+it("contains rejected WebGPU diagnostic requests without an unhandled rejection", async () => {
+  const { device, store } = createStore();
+  device.createShaderModule = () => ({
+    getCompilationInfo: () => Promise.reject(new Error("device lost")),
+  });
+  store.beginFrame(
+    [nodeItem(triangle(), new TestNodeMaterial(colorGraph()))],
+    1,
+  );
+  await vi.waitFor(() => expect(store.compilationErrors).toHaveLength(1));
+  expect(store.compilationErrors[0].message).toContain("retrieve");
+  expect(store.compilationErrors[0].cause).toHaveProperty(
+    "message",
+    "device lost",
+  );
+  store.dispose();
+});

@@ -64,6 +64,14 @@ const OUTER: [number, number, number, number] = [0, 0.2, 1, 1];
 
 declare global {
   interface Window {
+    fourNodeUniformBlockProbe?: () => {
+      initialMismatches: number;
+      updatedMismatches: number;
+      changedPixels: number;
+      center: number[];
+      drawCalls: number[];
+      glErrors: number[];
+    };
     fourNodeMaterialProbe?: () => {
       pixels: number[];
       drawCalls: number;
@@ -123,6 +131,102 @@ void renderer.initialize({ canvas }).then(() => {
     // surface — the `preserveDrawingBuffer`-free idiom every fixture uses.
     gl?.readPixels(0, 0, WIDTH, HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     return { pixels: Array.from(pixels), drawCalls: statistics.drawCalls };
+  };
+  window.fourNodeUniformBlockProbe = () => {
+    if (gl === null) throw new Error("WebGL 2 context unavailable");
+    const makeMaterial = (block: boolean) => {
+      const b = new NodeMaterialBuilder();
+      if (block) b.useUniformBlock();
+      const gain = b.uniform("gain", "float");
+      const offset = b.uniform("offset", "vec2");
+      const bias = b.uniform("bias", "vec3");
+      const tint = b.uniform("tint", "vec4");
+      const colorMatrix = b.uniform("colorMatrix", "mat3");
+      const warp = b.uniform("warp", "mat4");
+      const position = b.attribute("position");
+      b.output.positionOffset = warp
+        .multiply(b.vec4(position, 1))
+        .swizzle("xyz")
+        .subtract(position);
+      const rgb = colorMatrix
+        .multiply(b.vec3(b.uv().add(offset), 0.2))
+        .add(bias)
+        .multiply(gain)
+        .multiply(tint.swizzle("xyz"));
+      b.output.color = b.vec4(rgb, tint.swizzle("w"));
+      return b.build({
+        uniforms: {
+          gain: 0.65,
+          offset: [0.1, 0.15],
+          bias: [0.1, 0.05, 0.03],
+          tint: [0.75, 0.65, 0.5, 1],
+          colorMatrix: [0.7, 0.1, 0.05, 0.2, 0.6, 0.1, 0.05, 0.15, 0.55],
+          warp: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.15, 0.1, 0, 1],
+        },
+      });
+    };
+    const individual = makeMaterial(false);
+    const block = makeMaterial(true);
+    const geometry = planeGeometry({ width: 4, height: 4 });
+    const mesh = new Renderable(geometry, individual);
+    const blockScene = new Scene();
+    blockScene.add(mesh);
+    const drawCalls: number[] = [];
+    const glErrors: number[] = [];
+    const render = (next: typeof individual) => {
+      mesh.material = next;
+      resolveWorldTransforms(blockScene);
+      resetRenderStatistics(statistics);
+      renderer.render(blockScene, views);
+      const pixels = new Uint8Array(WIDTH * HEIGHT * 4);
+      gl.readPixels(0, 0, WIDTH, HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      drawCalls.push(statistics.drawCalls);
+      glErrors.push(gl.getError());
+      return pixels;
+    };
+    const initialIndividual = render(individual);
+    const initialBlock = render(block);
+    for (const next of [individual, block]) {
+      next.setUniform("gain", 0.35);
+      next.setUniform("bias", [0.2, 0.1, 0.05]);
+      next.setUniform("tint", [0.4, 0.8, 0.6, 1]);
+    }
+    // Reverse the order on the second pair: validate per-program binding state
+    // as well as a block program's subsequent per-material updates.
+    const updatedBlock = render(block);
+    const updatedIndividual = render(individual);
+    let initialMismatches = 0;
+    let updatedMismatches = 0;
+    let changedPixels = 0;
+    for (let index = 0; index < initialIndividual.length; index += 1) {
+      if (initialIndividual[index] !== initialBlock[index])
+        initialMismatches += 1;
+      if (updatedIndividual[index] !== updatedBlock[index])
+        updatedMismatches += 1;
+      if (
+        index % 4 === 0 &&
+        (initialIndividual[index] !== updatedIndividual[index] ||
+          initialIndividual[index + 1] !== updatedIndividual[index + 1] ||
+          initialIndividual[index + 2] !== updatedIndividual[index + 2])
+      )
+        changedPixels += 1;
+    }
+    const centerIndex = ((HEIGHT / 2) * WIDTH + WIDTH / 2) * 4;
+    const center = Array.from(
+      initialBlock.subarray(centerIndex, centerIndex + 4),
+    );
+    blockScene.remove(mesh);
+    geometry.dispose();
+    individual.dispose();
+    block.dispose();
+    return {
+      initialMismatches,
+      updatedMismatches,
+      changedPixels,
+      center,
+      drawCalls,
+      glErrors,
+    };
   };
   document.body.dataset["nodeMaterialReady"] = "1";
 });

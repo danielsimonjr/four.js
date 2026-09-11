@@ -2469,6 +2469,23 @@ export class WebgpuRenderer implements Renderer {
     return factory.create(host);
   }
 
+  /** Upload a CPU texture and wait until its queued GPU upload has completed. */
+  async prepareTexture(texture: WgpuCacheableTexture): Promise<boolean> {
+    this.#assertUsable("prepareTexture");
+    const textures = this.#textures;
+    if (textures === null)
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "WebgpuRenderer.prepareTexture() needs an initialized renderer.",
+      );
+    if (this.#deviceLost)
+      throw new FourError(
+        "CONTEXT_LOST",
+        "Cannot prepare a texture while the rendering context is lost.",
+      );
+    return (await textures.acquireAsync(texture)) !== null;
+  }
+
   /**
    * Reads back `target`'s colour attachment — or the `region` rectangle of it
    * — as tightly packed RGBA8 bytes: §61's `readPixels` (WP-R1.6 shipped the

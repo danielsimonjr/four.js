@@ -157,9 +157,9 @@ export const LIGHT_PUNCTUAL_DIRECTION_OFFSET = 336;
 export const LIGHT_PUNCTUAL_PARAMS_OFFSET = 464;
 
 /**
- * Size of one `LightUniforms` block in bytes — the layout in the module
- * header, ending on its last member. The binding size, not the stride:
- * `DRAW_UNIFORM_BYTES`' distinction, third statement.
+ * Size of the original light-data prefix, before shadow and hemisphere tails.
+ * Kept stable as the shadow-matrix offset. Use {@link LIGHT_BINDING_BYTES}
+ * for the current unshadowed shader binding, not this prefix size.
  */
 export const LIGHT_UNIFORM_BYTES = 592;
 

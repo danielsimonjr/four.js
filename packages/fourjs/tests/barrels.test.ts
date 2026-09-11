@@ -35,6 +35,7 @@ const barrels: ReadonlyArray<readonly [string, () => Promise<object>]> = [
   ["scene", () => import("../src/scene.js")],
   ["serialization", () => import("../src/serialization.js")],
   ["text", () => import("../src/text.js")],
+  ["text/harfbuzz", () => import("../src/text-harfbuzz.js")],
   ["ui", () => import("../src/ui.js")],
   ["application", () => import("../src/application.js")],
   ["index", () => import("../src/index.js")],

@@ -1,0 +1,22 @@
+{
+  "benchmark": "shader-uniform-block",
+  "recordedAt": "2026-09-11T17:24:12.927Z",
+  "host": {
+    "hostNode": "v24.19.0",
+    "hostPlatform": "linux x64",
+    "hostCpuModel": "INTEL(R) XEON(R) PLATINUM 8573C",
+    "hostCpuCount": 9,
+    "hostTotalMemoryGb": 21.5
+  },
+  "uniformCount": 16,
+  "draws": 1000,
+  "individual": {
+    "uploadCalls": 16000,
+    "payloadBytes": 64000
+  },
+  "std140": {
+    "uploadCalls": 1000,
+    "payloadBytes": 256000
+  },
+  "scope": "instrumented WebGL calls; excludes driver overhead and GPU timing"
+}

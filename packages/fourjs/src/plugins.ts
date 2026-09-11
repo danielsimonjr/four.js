@@ -57,7 +57,7 @@
 
 export { ASSET_LOADERS } from "@fourjs/assets";
 export { SHADER_OPERATORS } from "@fourjs/materials";
-export { SIMULATION_SYSTEMS } from "@fourjs/motion";
+export { PATH_PLANNERS, SIMULATION_SYSTEMS } from "@fourjs/motion";
 export { SOLVER_REGISTRY } from "@fourjs/physics";
 export {
   COMPUTE_WORKLOADS,

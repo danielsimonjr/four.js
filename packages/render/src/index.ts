@@ -323,3 +323,15 @@ export type {
 export { Texture } from "./texture.js";
 export type { ViewRenderListOptions } from "./view-list.js";
 export { buildViewRenderList, sortRenderListByDepth } from "./view-list.js";
+
+export { GpuReadbackSource, isGpuReadbackSource } from "./gpu-readback.js";
+export type { GpuReadbackSourceOptions } from "./gpu-readback.js";
+export { DEFAULT_RASTER_MAXIMUM_BYTES } from "./raster-limits.js";
+export { createShaderSourceMap } from "@fourjs/materials";
+export type { ShaderSourceLocation, ShaderSourceMap } from "@fourjs/materials";
+export { ImageBitmapTexture, VideoTexture } from "./host-texture.js";
+export type {
+  ImageReadSurface,
+  HostTextureOptions,
+  VideoTextureSource,
+} from "./host-texture.js";

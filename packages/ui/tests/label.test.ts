@@ -1,3 +1,4 @@
+import { IdentityShapingEngine, type ShapeQuery } from "@fourjs/text";
 /**
  * `Label` (§73, §74's intrinsic text size, §56's MVP text tier).
  *
@@ -134,5 +135,33 @@ describe("Label", () => {
     expect(panel.measuredHeight).toBe(32); // 12 + 4 gap + 12 + padding
     expect([first.layoutLeft, first.layoutTop]).toEqual([2, 2]);
     expect([second.layoutLeft, second.layoutTop]).toEqual([2, 18]);
+  });
+});
+
+it("forwards shaping options", () => {
+  let received: ShapeQuery | undefined;
+  class Spy extends IdentityShapingEngine {
+    override shape(query: ShapeQuery) {
+      received = query;
+      return super.shape(query);
+    }
+  }
+  const shaper = new Spy(),
+    fontId = shaper.addFont(new Uint8Array());
+  void new Label({
+    atlas,
+    text: "fi",
+    shaper,
+    fontId,
+    script: "latn",
+    language: "en",
+    features: { liga: 1 },
+  }).textLayout;
+  expect(received).toMatchObject({
+    text: "fi",
+    fontId,
+    script: "latn",
+    language: "en",
+    features: { liga: 1 },
   });
 });

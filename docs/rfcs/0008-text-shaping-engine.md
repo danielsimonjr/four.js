@@ -1,8 +1,8 @@
 # RFC 0008: §56 full text shaping engine (HarfBuzz-wasm vs native)
 
-- **Status:** draft — proposed to the owner 2026-09-06; corrected 2026-09-10 (review pass, see *Review log*)
+- **Status:** accepted 2026-09-11 — implementation requested by the owner; recommendations adopted.
 - **Date:** 2026-09-06
-- **Owner decision:** pending
+- **Owner decision:** 2026-09-11: implement all RFCs and remaining TODO items.
 - **Spec sections affected:** §56 (primary), §33, §49, §73, §76, §79, §83, §85, §86, §89, §90, §91, §96, §98
 
 ## Context
@@ -26,7 +26,7 @@ Verified against the tree (2026-09-06):
   post-walk. The module header lists shaping as staged on this RFC.
 - The `Text` node lives in the umbrella `four` (R-28): one geometry over one
   atlas material. It consumes `layoutText`'s quads. It does not shape.
-- `@fourjs/ui` `Label` measures through the same layout. Text *input*
+- `@fourjs/ui` `Label` measures through the same layout. Text _input_
   (selection, caret, clusters) is still blocked on a real shaper (S-6).
 - RFC 0004 alternative C was rejected in part because an engine `fillText`
   would pre-empt this decision. That rejection still holds.
@@ -37,7 +37,7 @@ Two things §56 names that this RFC does **not** decide:
   today; crisp scale is a rasterisation problem, not a shaping problem. A
   shaper that emits glyph ids works with bitmap, SDF, or MSDF atlases.
 - **Line breaking (UAX #14).** `text-layout.ts` already says wrapping is a
-  different packet — it decides where lines *end*, not how a run is shaped.
+  different packet — it decides where lines _end_, not how a run is shaped.
   A shaper must expose cluster and break-opportunity data so wrapping can
   land later without a second engine choice.
 
@@ -62,14 +62,14 @@ Reasons, against the native alternative argued in § Alternatives:
   rustybuzz). A first-party "native" shaper that claimed §56 completeness
   would be a multi-year Unicode project the repository is not staffed to
   own.
-- WASM is the only form that runs in the browser *and* in the headless
+- WASM is the only form that runs in the browser _and_ in the headless
   Node/Bun suites without a native addon. A `.node` HarfBuzz binding would
   split the matrix (browser vs CI) and fail the "engine runs without DOM"
   rule `@fourjs/text` already keeps.
 - Same WASM module + same font bytes + same script/language/features is
   **same-runtime deterministic** (§33). Host-OS text APIs are not.
 
-"Native" in this RFC means a first-party TypeScript shaper *or* a
+"Native" in this RFC means a first-party TypeScript shaper _or_ a
 host-OS/ICU binding. Both lose for full §56. A small first-party path
 remains as the **default identity shaper** (today's 1:1 code-point walk) so
 the MVP tier and the §86 payload budget do not move.
@@ -165,8 +165,8 @@ defaulting to `Infinity` is documentation"), no `eval`, no native code.
 A malformed table is `UNTRUSTED_INPUT_REJECTED`, not a throw from inside
 wasm that escapes as an opaque trap — the adapter catches wasm faults and
 re-throws `FourError`. A-23's split applies to the two inputs: the font
-*bytes* are content, so bytes over `maximumFontBytes` are also
-`UNTRUSTED_INPUT_REJECTED`; the *option* is application-built, so a
+_bytes_ are content, so bytes over `maximumFontBytes` are also
+`UNTRUSTED_INPUT_REJECTED`; the _option_ is application-built, so a
 non-finite or non-positive `maximumFontBytes` is a `RangeError` (§85), the
 same pair `CanvasTexture`'s `maximumBytes` validation draws.
 
@@ -182,17 +182,17 @@ pins a wasm build (hash in the adapter) and a golden: known font +
 `"fi"` + `liga` → one ligature glyph, bit-identical clusters and
 advances.
 
-Host measurement (`measureText`, `Intl.Segmenter` as the *engine*) is
+Host measurement (`measureText`, `Intl.Segmenter` as the _engine_) is
 rejected as a shaper: segmenter locale data and font rasterisation differ
 by platform. `Intl.Segmenter` MAY be used later for UAX #14 wrapping as
-an *optional* host hint, with a first-party fallback; that is the
+an _optional_ host hint, with a first-party fallback; that is the
 wrapping packet, not this one.
 
 Shaped advances are **font units**, converted to world units by
 `layoutText` using the same `size / lineHeight` scale the MVP already
 defines. Conversion is deterministic arithmetic in `@fourjs/text`.
 
-Painted or host-rasterised glyph *images* remain display content (RFC
+Painted or host-rasterised glyph _images_ remain display content (RFC
 0004's rule). Glyph **metrics** from HarfBuzz are not: they are a pure
 function of bytes. Atlas rasterisation (FreeType, msdfgen, the built-in
 bitmap) is a later/other packet and stays out of checksums if it is
@@ -258,7 +258,7 @@ mark-to-base — each is a specialist problem HarfBuzz already solved.
 Owning a partial shaper that applications will treat as complete is
 worse than staging. A first-party path **already exists**: the identity
 shaper. That is the native implementation this RFC keeps, and it is
-explicitly *not* the full engine.
+explicitly _not_ the full engine.
 
 **B. Host-OS / browser shaping (`measureText`, `Intl`, CoreText,
 Uniscribe, DirectWrite).** Nicest visual match to the platform. Rejected:
@@ -270,7 +270,7 @@ RFC 0004 already refused a DOM-typed paint seam for this reason.
 
 **C. rustybuzz (Rust → wasm) instead of HarfBuzz C → wasm.** rustybuzz
 is a HarfBuzz subset/port. It is an implementation detail of the
-adapter, not a second engine. The packet may pick either wasm *build*
+adapter, not a second engine. The packet may pick either wasm _build_
 so long as the ABI above is stable and the build is pinned. This RFC
 does not freeze the crate vs `harfbuzzjs` vs a custom build; it freezes
 **HarfBuzz-compatible shaping** behind `ShapingEngine`.
@@ -319,7 +319,7 @@ Rows in `docs/COMPATIBILITY.md` this RFC moves:
 - **Scene format versions (§79).** Unmoved in the first packet. A
   `Text` document already stores string + style, not glyph ids. Shaping
   is recovered at load from the string plus a font key (A-16:
-  resources are keys). A font *key* in the document is a later additive
+  resources are keys). A font _key_ in the document is a later additive
   row if `@fourjs/assets` grows fonts.
 - **Plugin API versions (§81).** Unmoved. A shaper is a value the
   application constructs (RFC 0002's preferred shape). No new

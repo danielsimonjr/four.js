@@ -28,34 +28,13 @@
  * | `metalness`          | {@link StandardMaterial.metalness} (+ optional packed {@link StandardMaterial.metalRoughnessMap}) |
  * | `roughness`          | {@link StandardMaterial.roughness} (+ the same packed map) |
  * | `emissive`           | {@link StandardMaterial.emissive} (+ optional {@link StandardMaterial.emissiveMap}) |
- * | `normalMap`          | **staged** — needs the tangent attribute        |
- * | `occlusionMap`       | **staged** — needs an AO multiply the BRDF does not evaluate |
+ * | `normalMap`          | WebGL tangent-space map using a derivative tangent frame |
+ * | `occlusionMap`       | WebGL red-channel ambient occlusion |
  *
- * The two staged maps stay staged for causes that are recorded elsewhere:
- *
- * - **`normalMap` needs tangents.** A tangent-space normal map is meaningless
- *   without a per-vertex tangent frame, and §53's tangent attribute was
- *   deliberately left out by R-19 (2026-08-07) when `uvs` and `colors` landed —
- *   see `@fourjs/geometry`'s `BufferGeometry`. Shipping the field without the
- *   attribute would put a texture in the public API that every geometry in the
- *   engine silently ignores. This packet does **not** pretend it shipped PBR
- *   normal mapping.
- * - **Unit 2 is the packed metallic-roughness map.** The unit allocator
- *   (`@fourjs/render-webgl`'s `gl-program.ts`, named since WP-3a.3) binds
- *   albedo on unit 0, the shadow map on unit 1, and
- *   {@link StandardMaterial.metalRoughnessMap} on unit 2. WebGL now samples
- *   {@link StandardMaterial.emissiveMap} on unit 3 (glTF factor × texture,
- *   sRGB). Occlusion stays staged: the BRDF has no AO term to multiply, so
- *   a free unit is not enough. WebGPU leaves emissive unsampled this slice —
- *   groups 2 and 3 already hold albedo and metallic-roughness when both maps
- *   exist, and the four-group budget is full.
- *
- * **WebGPU (2026-09-09).** {@link StandardMaterial.metalRoughnessMap}
- * samples on both backends — WebGL on texture unit 2, WebGPU at bind
- * group 3 when albedo occupies group 2 and at group 2 when it does not.
- * Do not read a WebGPU standard draw as ignoring this map.
- * {@link StandardMaterial.emissiveMap} is the opposite: WebGL-only until
- * a fifth group (or a spare binding inside an existing group) exists.
+ * Normal and occlusion textures use linear data, and the geometry's first UV
+ * set. Degenerate UVs preserve the geometric normal. Occlusion affects only
+ * indirect diffuse lighting; direct lights and emission remain unoccluded.
+ * These two maps and emissive textures currently sample on WebGL only.
  *
  * §59's seven physical extensions are `PhysicalMaterial`'s (§57's family puts it
  * above this class) and are not sketched here.
@@ -192,6 +171,18 @@ export interface StandardMaterialOptions extends MaterialOptions {
    * `null`.
    */
   emissiveMap?: MaterialTexture | null;
+
+  /** Linear tangent-space normal texture (WebGL); defaults to null. */
+  normalMap?: MaterialTexture | null;
+
+  /** Linear red-channel ambient occlusion texture (WebGL); defaults to null. */
+  occlusionMap?: MaterialTexture | null;
+
+  /** Tangent-space normal XY scale; defaults to 1. */
+  normalScale?: number;
+
+  /** Ambient occlusion strength; nominally 0–1, defaults to 1. */
+  occlusionStrength?: number;
 
   /**
    * Initial {@link StandardMaterial.metalness}; defaults to `0` (a dielectric).
@@ -336,6 +327,12 @@ export class StandardMaterial extends Material {
 
   #emissiveMap: MaterialTexture | null;
 
+  #normalMap: MaterialTexture | null;
+
+  #occlusionMap: MaterialTexture | null;
+  #normalScale: number;
+  #occlusionStrength: number;
+
   #metalness: number;
 
   #roughness: number;
@@ -358,6 +355,16 @@ export class StandardMaterial extends Material {
     this.#map = options.map ?? null;
     this.#metalRoughnessMap = options.metalRoughnessMap ?? null;
     this.#emissiveMap = options.emissiveMap ?? null;
+    this.#normalMap = options.normalMap ?? null;
+    this.#occlusionMap = options.occlusionMap ?? null;
+    this.#normalScale = requireFiniteScalar(
+      "normalScale",
+      options.normalScale ?? 1,
+    );
+    this.#occlusionStrength = requireFiniteScalar(
+      "occlusionStrength",
+      options.occlusionStrength ?? 1,
+    );
     this.#metalness = requireFiniteScalar("metalness", options.metalness ?? 0);
     this.#roughness = requireFiniteScalar("roughness", options.roughness ?? 1);
   }
@@ -427,6 +434,46 @@ export class StandardMaterial extends Material {
 
   set emissiveMap(value: MaterialTexture | null) {
     this.#emissiveMap = value;
+    this.markDirty();
+  }
+
+  /** Linear tangent-space normals sampled on WebGL using UV derivatives. */
+  get normalMap(): MaterialTexture | null {
+    return this.#normalMap;
+  }
+
+  set normalMap(value: MaterialTexture | null) {
+    this.#normalMap = value;
+    this.markDirty();
+  }
+
+  /** Red-channel ambient occlusion; does not attenuate direct light or emission. */
+  get occlusionMap(): MaterialTexture | null {
+    return this.#occlusionMap;
+  }
+
+  set occlusionMap(value: MaterialTexture | null) {
+    this.#occlusionMap = value;
+    this.markDirty();
+  }
+
+  /** Scales tangent-space normal X/Y before normalization; defaults to 1. */
+  get normalScale(): number {
+    return this.#normalScale;
+  }
+
+  set normalScale(value: number) {
+    this.#normalScale = requireFiniteScalar("normalScale", value);
+    this.markDirty();
+  }
+
+  /** Blends between unoccluded (0) and the texture's red channel (1). */
+  get occlusionStrength(): number {
+    return this.#occlusionStrength;
+  }
+
+  set occlusionStrength(value: number) {
+    this.#occlusionStrength = requireFiniteScalar("occlusionStrength", value);
     this.markDirty();
   }
 

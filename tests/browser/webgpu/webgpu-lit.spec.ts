@@ -26,7 +26,7 @@
 
 import {
   DRAW_UNIFORM_BYTES,
-  LIGHT_UNIFORM_BYTES,
+  LIGHT_BINDING_BYTES,
   STANDARD_UNIFORM_BYTES,
   litShaderSource,
   standardShaderSource,
@@ -146,7 +146,7 @@ const PAGE_PRELUDE = `
     return floats;
   };
   const lightBlock = (options) => {
-    const floats = new Float32Array(148);
+    const floats = new Float32Array(lightBytes / 4);
     floats[0] = options.ambient; floats[1] = options.ambient; floats[2] = options.ambient;
     // direction (0,-1,0), directional colour dark so the lamp dominates.
     floats[5] = -1;
@@ -519,7 +519,7 @@ test.describe("WebGPU shaded pipelines, on a real adapter", () => {
     const result = await inPage<CompileResult>(page, VARIANTS_SCRIPT, {
       size: SIZE,
       variants: variantCases(),
-      lightBytes: LIGHT_UNIFORM_BYTES,
+      lightBytes: LIGHT_BINDING_BYTES,
       standardBytes: STANDARD_UNIFORM_BYTES,
       drawBytes: DRAW_UNIFORM_BYTES,
     });
@@ -550,7 +550,7 @@ test.describe("WebGPU shaded pipelines, on a real adapter", () => {
     const result = await inPage<SphereResult>(page, SPHERE_SCRIPT, {
       size: SIZE,
       shader: litShaderSource(true, false),
-      lightBytes: LIGHT_UNIFORM_BYTES,
+      lightBytes: LIGHT_BINDING_BYTES,
       drawBytes: DRAW_UNIFORM_BYTES,
     });
     test.skip(

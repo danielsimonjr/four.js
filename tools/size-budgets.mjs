@@ -30,6 +30,21 @@
  * |----------------|-----------------|-------------|-----------|-----------|
  * | particles-demo | 43.04 kB        | 43 kB       | 43.5 kB   | +38 B over — id-pass / appearance already in the demo graph. A: hold at 43 → red; B: 43.5 kB. |
  * | ui-demo        | 49.51 kB        | 49.5 kB     | 50 kB     | +11 B over — PickProvider on `@fourjs/input` rides the retained-mode graph. B: 50 kB. |
+ *
+ * **2026-09-11 RFC packets:** clean A/B builds on the same Bun 1.4.2 /
+ * Vite 8.2.2 toolchain, baseline main 318e6bd vs this branch. Main already
+ * exceeded all three old limits; the new production Mesh skinning/texture
+ * lifecycle and shaped UI paths account for the additional branch growth.
+ * Optional HarfBuzz WASM remains outside default bundles.
+ *
+ * | Example        | Main gzip | Branch gzip | Prior limit | New limit |
+ * |----------------|-----------|-------------|-------------|-----------|
+ * | first-3d-scene | 43.42 kB  | 45.05 kB    | 43 kB       | 46 kB     |
+ * | particles-demo| 43.72 kB  | 45.33 kB    | 43.5 kB     | 46 kB     |
+ * | ui-demo       | 50.25 kB  | 53.60 kB    | 50 kB       | 54.5 kB   |
+ *
+ * These retain ~1.5–2.1% headroom. The normative first-2d limit remains
+ * 150 kB (61.29 kB measured); all solver-bearing example limits remain.
  */
 
 export const SIZE_BUDGETS_DOC = "tools/size-budgets.mjs";

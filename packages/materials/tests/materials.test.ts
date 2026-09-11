@@ -817,3 +817,53 @@ describe("StandardMaterial — §59's metallic-roughness workflow (R-13)", () =>
     expect(material.version).toBe(1);
   });
 });
+
+describe("StandardMaterial data maps", () => {
+  it("defaults to absent maps and preserves shared texture ownership", () => {
+    const material = new StandardMaterial();
+    expect(material.normalMap).toBeNull();
+    expect(material.occlusionMap).toBeNull();
+    const texture = fakeTexture("normal-ao");
+    const mapped = new StandardMaterial({
+      normalMap: texture,
+      occlusionMap: texture,
+    });
+    expect(mapped.normalMap).toBe(texture);
+    expect(mapped.occlusionMap).toBe(texture);
+    expect(mapped.version).toBe(0);
+    material.normalMap = texture;
+    material.occlusionMap = texture;
+    expect(material.version).toBe(2);
+    expect(material.normalMap).toBe(texture);
+    expect(material.occlusionMap).toBe(texture);
+    material.normalMap = null;
+    material.occlusionMap = null;
+    expect(material.version).toBe(4);
+    expect(material.normalMap).toBeNull();
+    expect(material.occlusionMap).toBeNull();
+  });
+});
+
+it("versions and validates normal scale and occlusion strength", () => {
+  const material = new StandardMaterial();
+  expect(material.normalScale).toBe(1);
+  expect(material.occlusionStrength).toBe(1);
+  material.normalScale = 0.5;
+  material.occlusionStrength = 0.25;
+  expect(material.normalScale).toBe(0.5);
+  expect(material.occlusionStrength).toBe(0.25);
+  expect(material.version).toBe(2);
+  expect(() => {
+    material.normalScale = NaN;
+  }).toThrow(/finite/);
+  expect(() => {
+    material.occlusionStrength = Infinity;
+  }).toThrow(/finite/);
+  expect(material.version).toBe(2);
+  const authored = new StandardMaterial({
+    normalScale: 0,
+    occlusionStrength: 0,
+  });
+  expect(authored.normalScale).toBe(0);
+  expect(authored.occlusionStrength).toBe(0);
+});

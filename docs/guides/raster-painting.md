@@ -115,3 +115,35 @@ cost to the §10 accumulator.
   `CanvasTexture` in the UI layer; deferred siblings — video textures,
   `ImageBitmap` sources, in-place resize, dirty-rectangle upload — are listed
   with what each waits on in RFC 0004's §6 table.
+
+## GPU readback snapshots (RFC 0009)
+
+`GpuReadbackSource` bridges asynchronous GPU readback to a synchronous raster
+source. Refresh between rendered frames; never feed these display pixels into
+simulation, checksums, snapshots, or replay.
+
+```ts
+import { CanvasTexture, GpuReadbackSource } from "fourJS/render";
+
+const source = new GpuReadbackSource(target, { colorSpace: "srgb" });
+const texture = new CanvasTexture(source);
+// After the renderer has finished submitting the target's frame:
+if (await source.refresh(renderer)) {
+  texture.invalidate();
+  texture.update();
+}
+// Attach texture to a material drawn into a different target.
+// When finished:
+texture.dispose();
+source.dispose();
+```
+
+Before the first refresh the snapshot is zero-filled. Refresh returns `false`
+for an unsupported renderer or a disposed source; backend failures reject.
+Only one refresh may be in flight. A target resize requires a new source.
+The default independent snapshot limit is 64 MiB. Rows remain bottom-first;
+color space defaults to sRGB and is never guessed from the target.
+
+Render-graph validation detects a texture sampling a snapshot of its own output
+target, including delayed feedback. Use `target.colorTexture` directly when
+CPU bytes are unnecessary.

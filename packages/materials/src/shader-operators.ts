@@ -2,18 +2,11 @@
  * The §81 materials / shader-node registry — a named map of operator
  * factories a host (or a plugin the host installed) can register into.
  *
- * The shader graph's {@link ShaderNode} union stays **closed** (RFC 0001;
- * `shader-graph.ts`). Nothing here widens that union or lets a scene
- * document name a new operator. What this table is: RFC 0001's deferred
- * alternative E as a *named factory hook* — a plugin can stash
- * `"my-wrap"` → a function that returns a {@link ShaderNode} the closed
- * union already admits (a `unary`/`binary`/`mix`/… node), and an authoring
- * tool can look that factory up by name. The IR a backend compiles is still
- * only the closed set.
- *
- * There is no existing runtime operator table to wrap: the closed ops are
- * TypeScript union members, not registered values. This map is the first
- * runtime table.
+ * The shader graph's {@link ShaderNode} union stays closed. Native factories
+ * construct its existing nodes; {@link ShaderOperatorRegistry.registerDefinition}
+ * accepts JSON-safe named subgraphs with typed parameters, which
+ * {@link ShaderFunction} validates and inlines into that same closed IR.
+ * Neither route accepts executable shader source.
  *
  * Re-adding the **identical** factory under the same name is a no-op. A
  * *different* factory under an occupied name throws — a silent overwrite
@@ -24,6 +17,11 @@
  */
 
 import { FourError } from "@fourjs/core";
+
+import {
+  ShaderFunction,
+  type ShaderFunctionDefinition,
+} from "./shader-function.js";
 
 import type { ShaderNode, ShaderNodeId } from "./shader-graph.js";
 
@@ -47,6 +45,8 @@ export type ShaderOperatorFactory = (
  */
 export class ShaderOperatorRegistry {
   readonly #operators = new Map<string, ShaderOperatorFactory>();
+  readonly #definitions = new Map<string, ShaderFunction>();
+  readonly #names: string[] = [];
 
   /**
    * Registers `factory` under `name`. Returns `this` so registrations chain.
@@ -56,6 +56,12 @@ export class ShaderOperatorRegistry {
    */
   register(name: string, factory: ShaderOperatorFactory): this {
     requireName(name, "shader operator");
+    if (this.#definitions.has(name)) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `A data-declared shader operator named ${JSON.stringify(name)} is already registered (§81).`,
+      );
+    }
     const existing = this.#operators.get(name);
     if (existing !== undefined) {
       if (existing === factory) {
@@ -68,12 +74,36 @@ export class ShaderOperatorRegistry {
       );
     }
     this.#operators.set(name, factory);
+    this.#names.push(name);
     return this;
   }
 
-  /** Whether `name` has a factory. */
+  /**
+   * Registers a JSON-declared reusable operator. The declaration is copied,
+   * validated, frozen and lowered only through the closed node IR (§96).
+   * Existing names cannot be overwritten by either registration form.
+   */
+  registerDefinition(definition: ShaderFunctionDefinition): this {
+    if (this.has(definition.name)) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `A shader operator named ${JSON.stringify(definition.name)} is already registered (§81).`,
+      );
+    }
+    const fn = new ShaderFunction(definition);
+    this.#definitions.set(definition.name, fn);
+    this.#names.push(definition.name);
+    return this;
+  }
+
+  /** The safe data-declared operator for a name, or undefined. */
+  getDefinition(name: string): ShaderFunction | undefined {
+    return this.#definitions.get(name);
+  }
+
+  /** Whether `name` has a factory or data declaration. */
   has(name: string): boolean {
-    return this.#operators.has(name);
+    return this.#operators.has(name) || this.#definitions.has(name);
   }
 
   /** The factory for `name`, or `undefined`. */
@@ -83,12 +113,12 @@ export class ShaderOperatorRegistry {
 
   /** Registered names, in insertion order. */
   get names(): readonly string[] {
-    return [...this.#operators.keys()];
+    return [...this.#names];
   }
 
   /** Number of registered operators. */
   get size(): number {
-    return this.#operators.size;
+    return this.#names.length;
   }
 }
 

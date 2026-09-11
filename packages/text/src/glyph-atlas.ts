@@ -144,6 +144,8 @@ export interface GlyphAtlas {
 
   /** Every covered character, keyed by single-character string. */
   readonly glyphs: ReadonlyMap<string, GlyphAtlasEntry>;
+  /** Font-specific glyph IDs; built-in IDs equal Unicode code points. */
+  readonly glyphsById?: ReadonlyMap<number, GlyphAtlasEntry>;
 
   /** The cell drawn for characters absent from {@link GlyphAtlas.glyphs}. */
   readonly fallback: GlyphAtlasEntry;
@@ -312,6 +314,9 @@ export function buildGlyphAtlas(
     height,
     data,
     glyphs,
+    glyphsById: new Map(
+      [...glyphs].map(([char, entry]) => [char.codePointAt(0)!, entry]),
+    ),
     fallback,
     font,
     cellWidth: font.cellWidth,

@@ -103,6 +103,14 @@ function walk(directory: string, out: string[]): void {
  * identifiers catch a cross-package one, whatever spelling the import takes.
  */
 const FORBIDDEN = [
+  /from\s+"[^"]*\/host-texture\.js"/,
+  /\bImageBitmapTexture\b/,
+  /\bVideoTexture\b/,
+  /\bVideoTextureSource\b/,
+  /from\s+"[^"]*\/gpu-readback\.js"/,
+  /\bGpuReadbackSource\b/,
+  /\bGpuReadbackSourceOptions\b/,
+  /\bisGpuReadbackSource\b/,
   /from\s+"[^"]*\/raster\.js"/,
   /\bRasterSource\b/,
   /\bRasterOrigin\b/,

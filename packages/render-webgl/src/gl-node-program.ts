@@ -54,10 +54,12 @@
  * and invisible to authors.
  */
 
-import { DEV, devWarnOnce, type Disposable } from "@fourjs/core";
+import { DEV, FourError, devWarnOnce, type Disposable } from "@fourjs/core";
 import type { Matrix4 } from "@fourjs/math";
 import {
   analyzeShaderGraph,
+  createShaderSourceMap,
+  type ShaderSourceMap,
   type ShaderAttributeName,
   type ShaderDomain,
   type ShaderGraph,
@@ -83,11 +85,18 @@ import {
   type NodeMaterialPrograms,
 } from "./node-pipeline-registry.js";
 
+import { GlNodeUniformBlock } from "./gl-node-uniform-block.js";
+
 /** What the emitter hands the program class — source plus binding metadata. */
 export interface EmittedNodeShader {
   readonly domain: ShaderDomain;
+  readonly uniformBlock?: boolean;
   readonly vertex: string;
   readonly fragment: string;
+  readonly sourceMap: {
+    readonly vertex: ShaderSourceMap;
+    readonly fragment: ShaderSourceMap;
+  };
   /** Whether any reachable node reads §9 render time. */
   readonly usesTime: boolean;
   /** Reachable uniforms, reflection order (§33). */
@@ -193,6 +202,7 @@ const BINARY_OPERATORS: Readonly<Record<string, string>> = {
 function nodeExpression(
   node: ShaderNode,
   stage: "vertex" | "fragment",
+  uniformBlock: boolean,
 ): string {
   switch (node.kind) {
     case "constant":
@@ -200,6 +210,8 @@ function nodeExpression(
         ? glslNumber(node.value[0])
         : `${node.type}(${node.value.map(glslNumber).join(", ")})`;
     case "uniform":
+      if (uniformBlock && node.type === "float") return `u_${node.name}.x`;
+      if (uniformBlock && node.type === "vec3") return `u_${node.name}.xyz`;
       return uniformReadExpression(node.name, node.type);
     case "attribute":
       return stage === "vertex"
@@ -256,7 +268,11 @@ function emitLocals(
     if (!reachable[index]) {
       continue;
     }
-    const expression = nodeExpression(graph.nodes[index], stage);
+    const expression = nodeExpression(
+      graph.nodes[index],
+      stage,
+      graph.uniformTransport === "std140",
+    );
     out += `  ${analysis.nodeTypes[index]} n${String(index)} = ${expression};\n`;
   }
   return out;
@@ -267,6 +283,20 @@ function emitUniformDeclarations(
   graph: ShaderGraph,
   reachable: readonly boolean[],
 ): string {
+  if (graph.uniformTransport === "std140") {
+    const uniforms = analyzeShaderGraph(graph).reflection.uniforms;
+    if (uniforms.length === 0) return "";
+    return (
+      "layout(std140) uniform FourNodeUniforms {\n" +
+      uniforms
+        .map(
+          ({ name, type }) =>
+            `  ${type === "mat3" || type === "mat4" ? "mat4" : "vec4"} u_${name};\n`,
+        )
+        .join("") +
+      "};\n"
+    );
+  }
   let out = "";
   const seen = new Set<string>();
   for (let index = 0; index < graph.nodes.length; index += 1) {
@@ -342,7 +372,15 @@ export function emitShaderGraphGlsl(graph: ShaderGraph): EmittedNodeShader {
       `  fragColor = n${String(graph.color)};\n}\n`;
     return {
       domain: "screen",
+      ...(graph.uniformTransport === "std140" &&
+      analysis.reflection.uniforms.length > 0
+        ? { uniformBlock: true }
+        : {}),
       vertex: SCREEN_VERTEX_SHADER_SOURCE,
+      sourceMap: {
+        vertex: createShaderSourceMap(SCREEN_VERTEX_SHADER_SOURCE),
+        fragment: createShaderSourceMap(fragment, "fragment"),
+      },
       fragment,
       usesTime,
       uniforms: analysis.reflection.uniforms,
@@ -404,6 +442,14 @@ export function emitShaderGraphGlsl(graph: ShaderGraph): EmittedNodeShader {
 
   return {
     domain: "surface",
+    ...(graph.uniformTransport === "std140" &&
+    analysis.reflection.uniforms.length > 0
+      ? { uniformBlock: true }
+      : {}),
+    sourceMap: {
+      vertex: createShaderSourceMap(vertex),
+      fragment: createShaderSourceMap(fragment, "fragment"),
+    },
     vertex,
     fragment,
     usesTime,
@@ -448,6 +494,8 @@ export class GlNodeProgram implements NodeMaterialProgram, Disposable {
   readonly #timeLocation: GlUniformLocation | null;
 
   readonly #uniforms: readonly UniformBinding[];
+  readonly #block: GlNodeUniformBlock | null;
+  readonly #uniformRecords: readonly ShaderUniformReflection[];
 
   readonly #uniformsByName: ReadonlyMap<string, UniformBinding>;
 
@@ -463,14 +511,26 @@ export class GlNodeProgram implements NodeMaterialProgram, Disposable {
   #disposed = false;
 
   private constructor(gl: WebglContext, emitted: EmittedNodeShader) {
-    const program = createLinkedProgram(
-      gl,
-      "node-material",
-      emitted.vertex,
-      emitted.fragment,
-    );
+    let program: GlProgramHandle;
+    try {
+      program = createLinkedProgram(
+        gl,
+        "node-material",
+        emitted.vertex,
+        emitted.fragment,
+      );
+    } catch (error: unknown) {
+      if (error instanceof FourError) {
+        throw new FourError(error.code, error.message, {
+          cause: error,
+          context: { ...error.context, sourceMap: emitted.sourceMap },
+        });
+      }
+      throw error;
+    }
     try {
       this.#gl = gl;
+      this.#uniformRecords = emitted.uniforms;
       this.#program = program;
       const surface = emitted.domain === "surface";
       this.unitBase = surface ? NODE_SURFACE_TEXTURE_UNIT_BASE : 0;
@@ -486,7 +546,9 @@ export class GlNodeProgram implements NodeMaterialProgram, Disposable {
       this.#timeLocation = emitted.usesTime
         ? requireUniform(gl, program, "time", "node-material")
         : null;
-      this.#uniforms = emitted.uniforms.map((record) => ({
+      this.#uniforms = (
+        emitted.uniformBlock === true ? [] : emitted.uniforms
+      ).map((record) => ({
         name: record.name,
         type: record.type,
         location: requireUniform(
@@ -503,6 +565,10 @@ export class GlNodeProgram implements NodeMaterialProgram, Disposable {
       this.#samplerLocations = emitted.textures.map((name) =>
         requireUniform(gl, program, `s_${name}`, "node-material"),
       );
+      this.#block =
+        emitted.uniformBlock === true
+          ? new GlNodeUniformBlock(gl, program, emitted.uniforms)
+          : null;
     } catch (error: unknown) {
       gl.deleteProgram(program);
       throw error;
@@ -521,6 +587,7 @@ export class GlNodeProgram implements NodeMaterialProgram, Disposable {
 
   use(): void {
     this.#gl.useProgram(this.#program);
+    this.#block?.bind();
     if (!this.#samplersUploaded) {
       // Once per program lifetime, and only with the program current
       // (`uniform1i` writes into the bound program — the `setSampler` rule).
@@ -570,12 +637,22 @@ export class GlNodeProgram implements NodeMaterialProgram, Disposable {
       this.#gl.uniform1f(this.#opacityLocation, opacity);
       this.#opacity = opacity;
     }
-    for (const binding of this.#uniforms) {
-      this.#upload(binding, material.getUniform(binding.name));
+    if (this.#block !== null) {
+      for (const uniform of this.#uniformRecords) {
+        this.#block.set(uniform.name, material.getUniform(uniform.name));
+      }
+      this.#block.upload();
+    } else {
+      for (const binding of this.#uniforms)
+        this.#upload(binding, material.getUniform(binding.name));
     }
   }
 
   setUniform(name: string, value: ArrayLike<number>): void {
+    if (this.#block !== null) {
+      if (this.#block.set(name, value)) this.#block.upload();
+      return;
+    }
     const binding = this.#uniformsByName.get(name);
     if (binding === undefined) {
       // §61: inside a frame nothing throws; `validateEffectRenderPass`
@@ -644,6 +721,7 @@ export class GlNodeProgram implements NodeMaterialProgram, Disposable {
       return;
     }
     this.#disposed = true;
+    this.#block?.dispose();
     this.#gl.deleteProgram(this.#program);
   }
 }

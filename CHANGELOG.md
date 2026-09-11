@@ -6,6 +6,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — RFC implementation packets (2026-09-11)
+
+### Added
+
+- RFC 0007 waypoint planning, deterministic steering and trajectory conversion; plugin
+  token and independent oracle/golden/65,536-node performance evidence.
+- RFC 0008 optional HarfBuzz shaping, glyph-ID layout, Text/Label forwarding and OFL
+  Latin/Arabic fixtures; explicit wasm/font input and bounded SFNT validation.
+- RFC 0009 GPU-readback raster snapshots with disposal/concurrency/size validation and
+  delayed-feedback detection, including every standard-material texture slot.
+- CPU skinning integrated into Mesh rendering, interpolation, bounds, picking and
+  scene serialization, including rigs larger than the GPU uniform-palette limit.
+- Shader functions, safe declarative operators, finite variants, per-node GLSL/WGSL
+  diagnostics and opt-in WebGL std140 uploads with a recorded call/byte comparison.
+- Regional texture upload journals, bitmap/video sources, raster sampler settings,
+  asynchronous texture preparation and residency reporting.
+- WebGL normal/occlusion texture sampling and authored glTF scale/strength factors.
+
+### Fixed
+
+- Shader graph validation now rejects unknown unary/binary operators and inherited
+  type/attribute names instead of allowing source injection through serialized input.
+- Path distance overflow is refused before it can produce invalid indices/NaNs.
+- Render-graph feedback detection includes metallic-roughness, emissive, normal and AO
+  samplers, not just base color.
+
+- Release staging skips private tooling workspaces and preserves nested shaping
+  imports. Its regression suite now runs in pull-request CI. A local staging pass
+  validates all 24 public packages; it does not publish to npm.
+
+### Validation
+
+- 7,556 package tests in 298 files pass under coverage; all 24 package gates
+  (95% aggregate / 80% per-file floor) remain unchanged. 685 integration and
+  determinism tests in 98 files pass, including fresh-process planning goldens.
+- Chromium/WebGPU full run: 108/110 passed; the two failures exposed a stale
+  pre-hemisphere browser fixture (592-byte prefix used as a 720-byte binding).
+  Corrected it to use `LIGHT_BINDING_BYTES`; both reruns pass. All three existing
+  visual goldens pass unchanged. Runtime: Chromium 152 with SwiftShader; pinned
+  Chromium 153 download was unavailable. This is not physical-GPU R-33 evidence.
+- Workspace/example builds, TS 7 test checks and isolated TS 6 cross-checks, lint,
+  spec/docs/compatibility checks, browser-safe dependency graph and duplicate gates
+  pass. Release-name tests (13) and graph-tool tests (10) pass; local staging
+  preserves 26 umbrella exports across all 24 public packages.
+- Clean main-versus-branch gzip measurements justify three example-budget updates
+  in `tools/size-budgets.mjs`. The minimal 2D app is 61.29 kB against the unchanged
+  150 kB normative ceiling. The optional HarfBuzz WASM is outside default bundles.
+
+### Scope
+
+This is a feature implementation wave, not a declaration that every TODO is complete.
+The dated TODO section names the remaining backend, graph, batching, rendering,
+hardware and release work. Coverage thresholds and the normative 150 kB budget remain.
+
 ## Unreleased — hemisphere light (2026-09-10)
 
 ### Added

@@ -86,6 +86,10 @@
  * fed by `Texture` itself at construction and disposal (`resource-memory.ts`),
  * which is what keeps them true for a texture no renderer has met yet.
  *
+ * Regional dirty histories preserve allocations and bind groups when storage
+ * and sampler metadata are unchanged; writeTexture receives the region origin,
+ * source offset and original row stride. prepareTexture waits for queue completion.
+ *
  * ## Eviction policy
  *
  * Identical to `WgpuGeometryCache`'s and to the GL twin's, for identical
@@ -96,6 +100,7 @@
  * allocations that belong to a device that is gone (§61).
  */
 
+import { FourError } from "@fourjs/core";
 import type { RenderItem } from "@fourjs/render";
 import { warnDisposedInUse } from "@fourjs/render";
 
@@ -412,7 +417,11 @@ export class WgpuTextureCache {
   /** The device's anisotropy ceiling, or `0` while it has never been resolved. */
   #maxAnisotropy = 0;
 
+  readonly #pending = new Map<string, number>();
+
   #disposed = false;
+
+  readonly #states = new WeakMap<WgpuTextureRecord, string>();
 
   constructor(device: GpuDevice) {
     this.#device = device;
@@ -480,6 +489,38 @@ export class WgpuTextureCache {
       if (existing.version === texture.version) {
         return existing;
       }
+      const region = texture.getDirtyRegion?.(existing.version);
+      if (
+        !texture.disposed &&
+        texture.data !== null &&
+        region != null &&
+        this.#states.get(existing) === textureState(texture)
+      ) {
+        this.#device.queue.writeTexture(
+          { texture: existing.texture, origin: [region.x, region.y, 0] },
+          texture.data,
+          {
+            offset: (region.y * texture.width + region.x) * BYTES_PER_TEXEL,
+            bytesPerRow: texture.width * BYTES_PER_TEXEL,
+            rowsPerImage: texture.height,
+          },
+          [region.width, region.height],
+        );
+        if (existing.levels > 1)
+          this.#generateMipmaps(
+            existing.texture,
+            (texture.colorSpace ?? "linear") === "srgb"
+              ? "rgba8unorm-srgb"
+              : "rgba8unorm",
+            texture.width,
+            texture.height,
+            existing.levels,
+          );
+        const updated = { ...existing, version: texture.version };
+        this.#states.set(updated, textureState(texture));
+        this.#records.set(texture.id, updated);
+        return updated;
+      }
       this.#destroyRecord(existing);
       this.#records.delete(texture.id);
     }
@@ -490,9 +531,55 @@ export class WgpuTextureCache {
     }
 
     const record = this.#upload(texture);
+    this.#states.set(record, textureState(texture));
     this.#records.set(texture.id, record);
     this.#byteLength += record.byteLength;
     return record;
+  }
+
+  /** Submitted-version residency; async preparation exposes work still in flight. */
+  residency(
+    texture: WgpuCacheableTexture,
+  ): "absent" | "stale" | "uploading" | "resident" {
+    const record = this.#records.get(texture.id);
+    if (record === undefined || texture.disposed) return "absent";
+    if (record.version !== texture.version) return "stale";
+    return this.#pending.has(texture.id) ? "uploading" : "resident";
+  }
+
+  /** Pre-upload and resolve only after the device queue completes that work. */
+  async acquireAsync(
+    texture: WgpuCacheableTexture,
+  ): Promise<WgpuTextureRecord | null> {
+    if (this.#disposed || texture.disposed) return null;
+    const queue = this.#device.queue;
+    if (queue.onSubmittedWorkDone === undefined)
+      throw new FourError(
+        "NOT_IMPLEMENTED",
+        "Asynchronous texture preparation requires queue completion notification.",
+      );
+    const record = this.acquire(texture);
+    if (record === null) return null;
+    this.#pending.set(texture.id, (this.#pending.get(texture.id) ?? 0) + 1);
+    try {
+      await queue.onSubmittedWorkDone();
+      return !this.#disposed &&
+        !texture.disposed &&
+        texture.version === record.version &&
+        this.#records.get(texture.id) === record
+        ? record
+        : null;
+    } catch (error) {
+      if (this.#records.get(texture.id) === record) {
+        this.#records.delete(texture.id);
+        this.#destroyRecord(record);
+      }
+      throw error;
+    } finally {
+      const count = this.#pending.get(texture.id) ?? 1;
+      if (count <= 1) this.#pending.delete(texture.id);
+      else this.#pending.set(texture.id, count - 1);
+    }
   }
 
   /**
@@ -802,4 +889,18 @@ export class WgpuTextureCache {
     record.texture.destroy?.();
     this.#byteLength -= record.byteLength;
   }
+}
+
+/** Storage and sampler identity; a metadata edit requires a full upload. */
+function textureState(texture: WgpuCacheableTexture): string {
+  return [
+    texture.width,
+    texture.height,
+    texture.colorSpace,
+    texture.filter,
+    texture.minFilter,
+    texture.wrap,
+    texture.mipmaps,
+    texture.anisotropy,
+  ].join("|");
 }

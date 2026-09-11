@@ -163,6 +163,8 @@ export type ShaderNode =
  * application (see `WebglRenderer.renderTime`).
  */
 export interface ShaderGraph {
+  /** Opt-in padded std140 on WebGL; WebGPU already transports uniforms in a block. */
+  readonly uniformTransport?: "individual" | "std140";
   readonly domain: ShaderDomain;
   readonly nodes: readonly ShaderNode[];
   /** `vec4`, required. The fragment result, in the domain's colour space (§60a). */
@@ -355,6 +357,20 @@ function binaryResultType(
   left: ShaderValueType,
   right: ShaderValueType,
 ): ShaderValueType {
+  if (
+    ![
+      "add",
+      "subtract",
+      "multiply",
+      "divide",
+      "min",
+      "max",
+      "dot",
+      "step",
+    ].includes(op)
+  ) {
+    refuse(index, `unknown binary operator ${JSON.stringify(op)}`);
+  }
   if (op === "dot") {
     if (isVector(left) && left === right) {
       return "float";
@@ -405,6 +421,22 @@ function unaryResultType(
   op: ShaderUnaryOp,
   source: ShaderValueType,
 ): ShaderValueType {
+  if (
+    ![
+      "sin",
+      "cos",
+      "abs",
+      "floor",
+      "fract",
+      "normalize",
+      "negate",
+      "saturate",
+      "length",
+      "angle",
+    ].includes(op)
+  ) {
+    refuse(index, `unknown unary operator ${JSON.stringify(op)}`);
+  }
   if (op === "normalize") {
     if (isVector(source)) {
       return source;
@@ -446,7 +478,32 @@ function unaryResultType(
  * frame, §61), and `validateEffectRenderPass` runs it for a §70 graph effect.
  */
 export function analyzeShaderGraph(graph: ShaderGraph): ShaderGraphAnalysis {
+  return analyzeGraph(graph, true);
+}
+
+/** @internal Validates an authoring expression without requiring a vec4 output. */
+export function analyzeShaderNodeType(
+  nodes: readonly ShaderNode[],
+  domain: ShaderDomain,
+  nodeId: ShaderNodeId,
+): ShaderValueType {
+  return analyzeGraph({ nodes, domain, color: nodeId }, false).nodeTypes[
+    nodeId
+  ];
+}
+
+function analyzeGraph(
+  graph: ShaderGraph,
+  requireColor: boolean,
+): ShaderGraphAnalysis {
   const nodes = graph.nodes;
+  if (
+    graph.uniformTransport !== undefined &&
+    graph.uniformTransport !== "individual" &&
+    graph.uniformTransport !== "std140"
+  ) {
+    refuse(null, "unknown uniform transport");
+  }
   if (graph.domain !== "surface" && graph.domain !== "screen") {
     refuse(null, `unknown domain ${JSON.stringify(graph.domain)}`);
   }
@@ -472,7 +529,7 @@ export function analyzeShaderGraph(graph: ShaderGraph): ShaderGraphAnalysis {
     switch (node.kind) {
       case "constant": {
         const components = SHADER_VALUE_COMPONENTS[node.type];
-        if (components === undefined) {
+        if (typeof components !== "number") {
           refuse(index, `unknown type ${JSON.stringify(node.type)}`);
         }
         if (node.value.length !== components) {
@@ -494,7 +551,7 @@ export function analyzeShaderGraph(graph: ShaderGraph): ShaderGraphAnalysis {
         break;
       }
       case "uniform": {
-        if (SHADER_VALUE_COMPONENTS[node.type] === undefined) {
+        if (typeof SHADER_VALUE_COMPONENTS[node.type] !== "number") {
           refuse(index, `unknown type ${JSON.stringify(node.type)}`);
         }
         if (
@@ -522,7 +579,7 @@ export function analyzeShaderGraph(graph: ShaderGraph): ShaderGraphAnalysis {
       }
       case "attribute": {
         const attributeType = SHADER_ATTRIBUTE_TYPES[node.name];
-        if (attributeType === undefined) {
+        if (typeof attributeType !== "string") {
           refuse(index, `unknown attribute ${JSON.stringify(node.name)}`);
         }
         if (graph.domain === "screen" && node.name !== "uv") {
@@ -662,7 +719,7 @@ export function analyzeShaderGraph(graph: ShaderGraph): ShaderGraphAnalysis {
   if (!Number.isInteger(color) || color < 0 || color >= nodes.length) {
     refuse(null, `color must name a node; got ${String(color)}`);
   }
-  if (types[color] !== "vec4") {
+  if (requireColor && types[color] !== "vec4") {
     refuse(null, `color must be vec4; got ${types[color]}`);
   }
   const offset = graph.positionOffset;

@@ -64,3 +64,11 @@ export type {
 export type { ColorRGBA, UnlitMaterialOptions } from "./unlit-material.js";
 export { UnlitMaterial } from "./unlit-material.js";
 export { liveMaterialCount } from "./resource-memory.js";
+export { ShaderFunction } from "./shader-function.js";
+export type { ShaderFunctionDefinition } from "./shader-function.js";
+export { ShaderVariantSet } from "./shader-variants.js";
+export { createShaderSourceMap } from "./shader-source-map.js";
+export type {
+  ShaderSourceLocation,
+  ShaderSourceMap,
+} from "./shader-source-map.js";
