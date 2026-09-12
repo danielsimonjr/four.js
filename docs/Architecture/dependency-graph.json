@@ -3,9 +3,9 @@
     "name": "fourjs-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-09-12",
-    "totalFiles": 332,
+    "totalFiles": 335,
     "totalModules": 24,
-    "totalExports": 3378
+    "totalExports": 3388
   },
   "entryPoints": [
     {
@@ -8996,9 +8996,31 @@
               "FetchResponse"
             ],
             "typeOnly": true
+          },
+          {
+            "file": "./image-memory.js",
+            "imports": [
+              "assertImageDecoderMemory"
+            ]
+          },
+          {
+            "file": "./texture.js",
+            "imports": [
+              "DEFAULT_MAXIMUM_DECODED_BYTES",
+              "DEFAULT_MAXIMUM_EXPANSION_RATIO",
+              "TextureLoaderOptions"
+            ]
           }
         ],
-        "workspaceDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@fourjs/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
         "exports": [
           "textLoader",
           "jsonLoader",
@@ -9010,7 +9032,8 @@
           "ImageAsset"
         ],
         "interfaces": [
-          "ImageBitmapLike"
+          "ImageBitmapLike",
+          "ImageLoaderOptions"
         ],
         "functions": [
           "createImageLoader"
@@ -9045,6 +9068,12 @@
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./image-memory.js",
+            "imports": [
+              "assertImageDecoderMemory"
+            ]
+          },
           {
             "file": "./asset-manager.js",
             "imports": [
@@ -9123,6 +9152,12 @@
               "FetchResponse"
             ],
             "typeOnly": true
+          },
+          {
+            "file": "./image-memory.js",
+            "imports": [
+              "assertImageDecoderMemory"
+            ]
           }
         ],
         "workspaceDependencies": [
@@ -9318,6 +9353,21 @@
             "reExport": true
           },
           {
+            "file": "./wasm-memory.js",
+            "imports": [
+              "limitWasmMemory"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./bounded-png.js",
+            "imports": [
+              "createBoundedPngDecoder",
+              "DEFAULT_IMAGE_WORKING_BYTES"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./loader-registry.js",
             "imports": [
               "RegisteredAssetLoader"
@@ -9405,7 +9455,8 @@
             "file": "./loaders.js",
             "imports": [
               "ImageBitmapLike",
-              "ImageDecodeLike"
+              "ImageDecodeLike",
+              "ImageLoaderOptions"
             ],
             "reExport": true,
             "typeOnly": true
@@ -9416,6 +9467,14 @@
               "GzipDecodeLike",
               "GzipLoaderOptions",
               "GzipReader"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./bounded-png.js",
+            "imports": [
+              "BoundedPngDecoderOptions"
             ],
             "reExport": true,
             "typeOnly": true
@@ -9446,6 +9505,9 @@
           "jsonLoader",
           "textLoader",
           "createGzipLoader",
+          "limitWasmMemory",
+          "createBoundedPngDecoder",
+          "DEFAULT_IMAGE_WORKING_BYTES",
           "PACKAGE_NAME",
           "RegisteredAssetLoader",
           "AbortHandle",
@@ -9491,9 +9553,11 @@
           "GltfSkinRecord",
           "ImageBitmapLike",
           "ImageDecodeLike",
+          "ImageLoaderOptions",
           "GzipDecodeLike",
           "GzipLoaderOptions",
-          "GzipReader"
+          "GzipReader",
+          "BoundedPngDecoderOptions"
         ],
         "reExported": [
           "ASSET_LOADERS",
@@ -9519,6 +9583,9 @@
           "jsonLoader",
           "textLoader",
           "createGzipLoader",
+          "limitWasmMemory",
+          "createBoundedPngDecoder",
+          "DEFAULT_IMAGE_WORKING_BYTES",
           "RegisteredAssetLoader",
           "AbortHandle",
           "AbortSignalLike",
@@ -9563,9 +9630,11 @@
           "GltfSkinRecord",
           "ImageBitmapLike",
           "ImageDecodeLike",
+          "ImageLoaderOptions",
           "GzipDecodeLike",
           "GzipLoaderOptions",
-          "GzipReader"
+          "GzipReader",
+          "BoundedPngDecoderOptions"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -9703,6 +9772,100 @@
         ],
         "functions": [
           "createGzipLoader"
+        ]
+      },
+      "packages/assets/src/wasm-memory.ts": {
+        "description": "Copies a single-memory Wasm32 codec and caps its declared linear memory.",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@fourjs/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "exports": [
+          "limitWasmMemory"
+        ],
+        "functions": [
+          "limitWasmMemory"
+        ]
+      },
+      "packages/assets/src/image-memory.ts": {
+        "description": "Only decoder implementations that establish the runtime's memory ceiling",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@fourjs/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "exports": [
+          "registerBoundedImageDecoder",
+          "assertImageDecoderMemory"
+        ],
+        "functions": [
+          "registerBoundedImageDecoder",
+          "assertImageDecoderMemory"
+        ]
+      },
+      "packages/assets/src/bounded-png.ts": {
+        "description": "Application-pinned `squoosh_png_bg.wasm` from `@jsquash/png@3.1.1`.",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./image-memory.js",
+            "imports": [
+              "registerBoundedImageDecoder"
+            ]
+          },
+          {
+            "file": "./texture.js",
+            "imports": [
+              "DEFAULT_MAXIMUM_DECODED_BYTES",
+              "DEFAULT_MAXIMUM_EXPANSION_RATIO",
+              "DecodedTexels",
+              "TexelDecodeLike"
+            ]
+          },
+          {
+            "file": "./wasm-memory.js",
+            "imports": [
+              "limitWasmMemory"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@fourjs/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "exports": [
+          "DEFAULT_IMAGE_WORKING_BYTES",
+          "createBoundedPngDecoder"
+        ],
+        "interfaces": [
+          "BoundedPngDecoderOptions"
+        ],
+        "functions": [
+          "createBoundedPngDecoder"
+        ],
+        "constants": [
+          "DEFAULT_IMAGE_WORKING_BYTES"
         ]
       }
     },
@@ -26242,7 +26405,10 @@
           "packages/assets/src/index.ts",
           "packages/assets/src/asset-manager.ts",
           "packages/assets/src/capabilities.ts",
-          "packages/assets/src/gzip.ts"
+          "packages/assets/src/gzip.ts",
+          "packages/assets/src/wasm-memory.ts",
+          "packages/assets/src/image-memory.ts",
+          "packages/assets/src/bounded-png.ts"
         ]
       },
       {
@@ -26555,18 +26721,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 332,
+    "totalTypeScriptFiles": 335,
     "totalModules": 24,
-    "totalLinesOfCode": 159634,
-    "totalExports": 3378,
+    "totalLinesOfCode": 160360,
+    "totalExports": 3388,
     "totalClasses": 212,
-    "totalInterfaces": 622,
-    "totalFunctions": 547,
+    "totalInterfaces": 624,
+    "totalFunctions": 551,
     "totalTypeGuards": 28,
     "totalEnums": 0,
-    "totalConstants": 498,
-    "totalReExports": 2143,
-    "totalTypeOnlyImports": 427,
+    "totalConstants": 499,
+    "totalReExports": 2148,
+    "totalTypeOnlyImports": 428,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 7,
     "unusedFilesCount": 0,
