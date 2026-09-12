@@ -53,7 +53,7 @@ The codebase is organized into the following modules:
 - **packages/physics-soft**: 1 file
 - **packages/text**: 5 files
 - **packages/render-webgpu**: 29 files
-- **packages/assets**: 10 files
+- **packages/assets**: 13 files
 - **packages/ui**: 16 files
 - **packages/fourjs**: 35 files
 - **packages/materials**: 17 files
@@ -85,7 +85,7 @@ The codebase is organized into the following modules:
 | `@fourjs/physics-soft` (`packages/physics-soft/`) | (none) | 1 | 0 |
 | `@fourjs/text` (`packages/text/`) | `@fourjs/core` | 5 | 3 |
 | `@fourjs/render-webgpu` (`packages/render-webgpu/`) | `@fourjs/render`, `@fourjs/core`, `@fourjs/math`, `@fourjs/scene` | 29 | 0 |
-| `@fourjs/assets` (`packages/assets/`) | `@fourjs/core` | 10 | 0 |
+| `@fourjs/assets` (`packages/assets/`) | `@fourjs/core` | 13 | 0 |
 | `@fourjs/ui` (`packages/ui/`) | `@fourjs/math`, `@fourjs/core`, `@fourjs/scene`, `@fourjs/input`, `@fourjs/text` | 16 | 0 |
 | `fourJS` (`packages/fourjs/`) | `@fourjs/core`, `@fourjs/geometry`, `@fourjs/materials`, `@fourjs/motion`, `@fourjs/physics`, `@fourjs/render`, `@fourjs/scene`, `@fourjs/serialization`, `@fourjs/text`, `@fourjs/ui`, `@fourjs/render-canvas`, `@fourjs/input`, `@fourjs/physics-box2d`, `@fourjs/diagnostics`, `@fourjs/math`, `@fourjs/assets`, `@fourjs/animation`, `@fourjs/render-webgpu`, `@fourjs/render-webgl`, `@fourjs/render-svg`, `@fourjs/physics-rapier`, `@fourjs/physics-soft`, `@fourjs/particles` | 35 | 1 |
 | `@fourjs/materials` (`packages/materials/`) | `@fourjs/math`, `@fourjs/core` | 17 | 0 |
@@ -2164,14 +2164,21 @@ graph LR
 
 ### `packages/assets/src/loaders.ts` - The built-in loaders (§76) — text, JSON, binary, image.
 
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@fourjs/core` | `FourError` |
+
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
 | `./asset-manager.js` | `AssetLoader, FetchResponse` | Import (type-only) |
+| `./image-memory.js` | `assertImageDecoderMemory` | Import |
+| `./texture.js` | `DEFAULT_MAXIMUM_DECODED_BYTES, DEFAULT_MAXIMUM_EXPANSION_RATIO, TextureLoaderOptions` | Import |
 
 **Exports:**
 - Classes: `ImageAsset`
-- Interfaces: `ImageBitmapLike`
+- Interfaces: `ImageBitmapLike`, `ImageLoaderOptions`
 - Types: `ImageDecodeLike`
 - Functions: `createImageLoader`
 - Constants: `textLoader`, `jsonLoader`, `binaryLoader`
@@ -2197,6 +2204,7 @@ graph LR
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
+| `./image-memory.js` | `assertImageDecoderMemory` | Import |
 | `./asset-manager.js` | `DEFAULT_MAXIMUM_BYTES, resolveGlobalFetch, AssetLoader, FetchLike, FetchResponse` | Import |
 | `./content-hash.js` | `resolveGlobalTextDecoder, TextDecodeLike` | Import |
 | `./texture.js` | `createTextureDecoder, TexelDecodeLike, TexelProbeLike, TextureAsset, TextureFilterMode, TextureWrapMode` | Import |
@@ -2220,6 +2228,7 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./asset-manager.js` | `AssetLoader, FetchResponse` | Import (type-only) |
+| `./image-memory.js` | `assertImageDecoderMemory` | Import |
 
 **Exports:**
 - Classes: `TextureAsset`
@@ -2283,18 +2292,21 @@ graph LR
 | `./gltf.js` | `GltfAsset, createGltfLoader` | Re-export |
 | `./loaders.js` | `ImageAsset, binaryLoader, createImageLoader, jsonLoader, textLoader` | Re-export |
 | `./gzip.js` | `createGzipLoader` | Re-export |
+| `./wasm-memory.js` | `limitWasmMemory` | Re-export |
+| `./bounded-png.js` | `createBoundedPngDecoder, DEFAULT_IMAGE_WORKING_BYTES` | Re-export |
 | `./loader-registry.js` | `RegisteredAssetLoader` | Re-export (type-only) |
 | `./asset-manager.js` | `AbortHandle, AbortSignalLike, AssetGraph, AssetGraphLoadOptions, AssetLoadOptions, AssetLoader, AssetManagerOptions, AssetProgressEvent, AssetWatchLike, AssetWithDependencies, ByteReaderLike, FetchInit, FetchLike, FetchResponse, ReadableBodyLike, ResponseHeadersLike, TimerLike, WorkerLike` | Re-export (type-only) |
 | `./content-hash.js` | `DigestLike, TextDecodeLike` | Re-export (type-only) |
 | `./manifest.js` | `AssetManifest, AssetManifestEntry, ManifestLoadOptions` | Re-export (type-only) |
 | `./texture.js` | `DecodedTexels, TexelDecodeLike, TexelProbeLike, TextureColorSpace, TextureFilterMode, TextureLoaderOptions, TextureWrapMode` | Re-export (type-only) |
 | `./gltf.js` | `GltfAnimationRecord, GltfChannelPath, GltfChannelRecord, GltfLoaderOptions, GltfMaterialRecord, GltfMeshRecord, GltfNodeRecord, GltfPrimitiveMode, GltfPrimitiveRecord, GltfSceneRecord, GltfSkinRecord` | Re-export (type-only) |
-| `./loaders.js` | `ImageBitmapLike, ImageDecodeLike` | Re-export (type-only) |
+| `./loaders.js` | `ImageBitmapLike, ImageDecodeLike, ImageLoaderOptions` | Re-export (type-only) |
 | `./gzip.js` | `GzipDecodeLike, GzipLoaderOptions, GzipReader` | Re-export (type-only) |
+| `./bounded-png.js` | `BoundedPngDecoderOptions` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `ASSET_LOADERS`, `AssetLoaderRegistry`, `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `CONTENT_HASH_ALGORITHM`, `loadFromManifest`, `manifestLoader`, `manifestUrl`, `parseAssetManifest`, `DEFAULT_MAXIMUM_DECODED_BYTES`, `DEFAULT_MAXIMUM_EXPANSION_RATIO`, `TextureAsset`, `createTextureDecoder`, `createTextureLoader`, `GltfAsset`, `createGltfLoader`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `createGzipLoader`, `RegisteredAssetLoader`, `AbortHandle`, `AbortSignalLike`, `AssetGraph`, `AssetGraphLoadOptions`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`, `AssetProgressEvent`, `AssetWatchLike`, `AssetWithDependencies`, `ByteReaderLike`, `FetchInit`, `FetchLike`, `FetchResponse`, `ReadableBodyLike`, `ResponseHeadersLike`, `TimerLike`, `WorkerLike`, `DigestLike`, `TextDecodeLike`, `AssetManifest`, `AssetManifestEntry`, `ManifestLoadOptions`, `DecodedTexels`, `TexelDecodeLike`, `TexelProbeLike`, `TextureColorSpace`, `TextureFilterMode`, `TextureLoaderOptions`, `TextureWrapMode`, `GltfAnimationRecord`, `GltfChannelPath`, `GltfChannelRecord`, `GltfLoaderOptions`, `GltfMaterialRecord`, `GltfMeshRecord`, `GltfNodeRecord`, `GltfPrimitiveMode`, `GltfPrimitiveRecord`, `GltfSceneRecord`, `GltfSkinRecord`, `ImageBitmapLike`, `ImageDecodeLike`, `GzipDecodeLike`, `GzipLoaderOptions`, `GzipReader`
+- Re-exports: `ASSET_LOADERS`, `AssetLoaderRegistry`, `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `CONTENT_HASH_ALGORITHM`, `loadFromManifest`, `manifestLoader`, `manifestUrl`, `parseAssetManifest`, `DEFAULT_MAXIMUM_DECODED_BYTES`, `DEFAULT_MAXIMUM_EXPANSION_RATIO`, `TextureAsset`, `createTextureDecoder`, `createTextureLoader`, `GltfAsset`, `createGltfLoader`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `createGzipLoader`, `limitWasmMemory`, `createBoundedPngDecoder`, `DEFAULT_IMAGE_WORKING_BYTES`, `RegisteredAssetLoader`, `AbortHandle`, `AbortSignalLike`, `AssetGraph`, `AssetGraphLoadOptions`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`, `AssetProgressEvent`, `AssetWatchLike`, `AssetWithDependencies`, `ByteReaderLike`, `FetchInit`, `FetchLike`, `FetchResponse`, `ReadableBodyLike`, `ResponseHeadersLike`, `TimerLike`, `WorkerLike`, `DigestLike`, `TextDecodeLike`, `AssetManifest`, `AssetManifestEntry`, `ManifestLoadOptions`, `DecodedTexels`, `TexelDecodeLike`, `TexelProbeLike`, `TextureColorSpace`, `TextureFilterMode`, `TextureLoaderOptions`, `TextureWrapMode`, `GltfAnimationRecord`, `GltfChannelPath`, `GltfChannelRecord`, `GltfLoaderOptions`, `GltfMaterialRecord`, `GltfMeshRecord`, `GltfNodeRecord`, `GltfPrimitiveMode`, `GltfPrimitiveRecord`, `GltfSceneRecord`, `GltfSkinRecord`, `ImageBitmapLike`, `ImageDecodeLike`, `ImageLoaderOptions`, `GzipDecodeLike`, `GzipLoaderOptions`, `GzipReader`, `BoundedPngDecoderOptions`
 
 ---
 
@@ -2353,6 +2365,51 @@ graph LR
 - Interfaces: `GzipReader`, `GzipLoaderOptions`
 - Types: `GzipDecodeLike`
 - Functions: `createGzipLoader`
+
+---
+
+### `packages/assets/src/wasm-memory.ts` - Copies a single-memory Wasm32 codec and caps its declared linear memory.
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@fourjs/core` | `FourError` |
+
+**Exports:**
+- Functions: `limitWasmMemory`
+
+---
+
+### `packages/assets/src/image-memory.ts` - Only decoder implementations that establish the runtime's memory ceiling
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@fourjs/core` | `FourError` |
+
+**Exports:**
+- Functions: `registerBoundedImageDecoder`, `assertImageDecoderMemory`
+
+---
+
+### `packages/assets/src/bounded-png.ts` - Application-pinned `squoosh_png_bg.wasm` from `@jsquash/png@3.1.1`.
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@fourjs/core` | `FourError` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./image-memory.js` | `registerBoundedImageDecoder` | Import |
+| `./texture.js` | `DEFAULT_MAXIMUM_DECODED_BYTES, DEFAULT_MAXIMUM_EXPANSION_RATIO, DecodedTexels, TexelDecodeLike` | Import |
+| `./wasm-memory.js` | `limitWasmMemory` | Import |
+
+**Exports:**
+- Interfaces: `BoundedPngDecoderOptions`
+- Functions: `createBoundedPngDecoder`
+- Constants: `DEFAULT_IMAGE_WORKING_BYTES`
 
 ---
 
@@ -6495,6 +6552,7 @@ graph LR
 | `packages/render-webgpu/src/wgpu-bindings` | 1 file | 11 files |
 | `packages/animation/src/controller` | 9 files | 3 files |
 | `packages/render/src/render-target` | 2 files | 9 files |
+| `packages/assets/src/index` | 11 files | 0 files |
 | `packages/physics/src/rigid-body` | 4 files | 7 files |
 | `packages/physics/src/collider` | 8 files | 3 files |
 | `packages/diagnostics/src/index` | 11 files | 0 files |
@@ -6507,7 +6565,6 @@ graph LR
 | `packages/render/src/raster` | 6 files | 3 files |
 | `packages/render-webgpu/src/wgpu-node-program` | 8 files | 1 file |
 | `packages/render-webgpu/src/wgpu-skinning` | 8 files | 1 file |
-| `packages/assets/src/index` | 9 files | 0 files |
 | `packages/ui/src/widget` | 0 files | 9 files |
 | `packages/fourjs/src/index` | 9 files | 0 files |
 | `packages/physics/src/serializers` | 8 files | 1 file |
@@ -6622,200 +6679,201 @@ graph TD
         N55[asset-manager]
         N56[capabilities]
         N57[gzip]
+        N58[...3 more]
     end
 
     subgraph Packages/ui
-        N58[canvas-view]
-        N59[panel]
-        N60[control-registry]
-        N61[progress]
-        N62[accessibility]
-        N63[widget]
-        N64[checkable]
-        N65[label]
-        N66[numbers]
-        N67[radio]
-        N68[...6 more]
+        N59[canvas-view]
+        N60[panel]
+        N61[control-registry]
+        N62[progress]
+        N63[accessibility]
+        N64[widget]
+        N65[checkable]
+        N66[label]
+        N67[numbers]
+        N68[radio]
+        N69[...6 more]
     end
 
     subgraph Packages/fourjs
-        N69[scene-serializers]
-        N70[render-canvas]
-        N71[physics]
-        N72[pick-provider]
-        N73[physics-box2d]
-        N74[ui]
-        N75[compute-pass]
-        N76[application]
-        N77[gltf]
-        N78[diagnostics]
-        N79[...25 more]
+        N70[scene-serializers]
+        N71[render-canvas]
+        N72[physics]
+        N73[pick-provider]
+        N74[physics-box2d]
+        N75[ui]
+        N76[compute-pass]
+        N77[application]
+        N78[gltf]
+        N79[diagnostics]
+        N80[...25 more]
     end
 
     subgraph Packages/materials
-        N80[shader-function]
-        N81[unlit-material]
-        N82[node-material]
-        N83[standard-material]
-        N84[lit-material]
-        N85[stencil-state]
-        N86[texture]
-        N87[material]
-        N88[sprite-material]
-        N89[shader-graph]
-        N90[...7 more]
+        N81[shader-function]
+        N82[unlit-material]
+        N83[node-material]
+        N84[standard-material]
+        N85[lit-material]
+        N86[stencil-state]
+        N87[texture]
+        N88[material]
+        N89[sprite-material]
+        N90[shader-graph]
+        N91[...7 more]
     end
 
     subgraph Packages/core
-        N91[conventions]
-        N92[dev]
-        N93[leak-registry]
-        N94[disposable]
-        N95[plugin]
-        N96[space]
-        N97[component]
-        N98[errors]
-        N99[units]
-        N100[random]
-        N101[...4 more]
+        N92[conventions]
+        N93[dev]
+        N94[leak-registry]
+        N95[disposable]
+        N96[plugin]
+        N97[space]
+        N98[component]
+        N99[errors]
+        N100[units]
+        N101[random]
+        N102[...4 more]
     end
 
     subgraph Packages/geometry
-        N102[primitive-support]
-        N103[cpu-skinning]
-        N104[path]
-        N105[buffer-geometry]
-        N106[primitives]
-        N107[path-boolean]
-        N108[geometry]
-        N109[tessellation]
-        N110[svg-document]
-        N111[svg-path]
-        N112[...3 more]
+        N103[primitive-support]
+        N104[cpu-skinning]
+        N105[path]
+        N106[buffer-geometry]
+        N107[primitives]
+        N108[path-boolean]
+        N109[geometry]
+        N110[tessellation]
+        N111[svg-document]
+        N112[svg-path]
+        N113[...3 more]
     end
 
     subgraph Packages/physics
-        N113[serializers]
-        N114[shapes]
-        N115[rigid-body]
-        N116[types]
-        N117[adapter]
-        N118[descriptors]
-        N119[stale-handle]
-        N120[world]
-        N121[physics-event-system]
-        N122[body-access]
-        N123[...15 more]
+        N114[serializers]
+        N115[shapes]
+        N116[rigid-body]
+        N117[types]
+        N118[adapter]
+        N119[descriptors]
+        N120[stale-handle]
+        N121[world]
+        N122[physics-event-system]
+        N123[body-access]
+        N124[...15 more]
     end
 
     subgraph Packages/input
-        N124[pointer-events]
-        N125[pointer-input]
-        N126[propagation]
-        N127[key-events]
-        N128[drag]
-        N129[keyboard-input]
-        N130[keyboard-state]
-        N131[index]
-        N132[pick]
+        N125[pointer-events]
+        N126[pointer-input]
+        N127[propagation]
+        N128[key-events]
+        N129[drag]
+        N130[keyboard-input]
+        N131[keyboard-state]
+        N132[index]
+        N133[pick]
     end
 
     subgraph Packages/animation
-        N133[mixer]
-        N134[timeline]
-        N135[layer-stack]
-        N136[controller]
-        N137[binding]
-        N138[clip]
-        N139[track]
-        N140[values]
-        N141[animation-system]
-        N142[tween]
-        N143[...4 more]
+        N134[mixer]
+        N135[timeline]
+        N136[layer-stack]
+        N137[controller]
+        N138[binding]
+        N139[clip]
+        N140[track]
+        N141[values]
+        N142[animation-system]
+        N143[tween]
+        N144[...4 more]
     end
 
     subgraph Packages/physics-box2d
-        N144[index]
+        N145[index]
     end
 
     subgraph Packages/diagnostics
-        N145[resource-audit]
-        N146[replay-player]
-        N147[leak-registry]
-        N148[allocation-audit]
-        N149[validation]
-        N150[recorder]
-        N151[stats]
-        N152[debug-draw]
-        N153[checksum]
-        N154[index]
-        N155[...2 more]
+        N146[resource-audit]
+        N147[replay-player]
+        N148[leak-registry]
+        N149[allocation-audit]
+        N150[validation]
+        N151[recorder]
+        N152[stats]
+        N153[debug-draw]
+        N154[checksum]
+        N155[index]
+        N156[...2 more]
     end
 
     subgraph Packages/render-canvas
-        N156[index]
+        N157[index]
     end
 
     subgraph Packages/particles
-        N157[types]
-        N158[particle-system]
-        N159[trail]
-        N160[particle-renderable]
-        N161[pool]
-        N162[fields]
-        N163[emitter]
-        N164[random]
-        N165[index]
+        N158[types]
+        N159[particle-system]
+        N160[trail]
+        N161[particle-renderable]
+        N162[pool]
+        N163[fields]
+        N164[emitter]
+        N165[random]
+        N166[index]
     end
 
     subgraph Packages/serialization
-        N166[serializer]
-        N167[format]
-        N168[index]
-        N169[capabilities]
-        N170[migration]
+        N167[serializer]
+        N168[format]
+        N169[index]
+        N170[capabilities]
+        N171[migration]
     end
 
     subgraph Packages/render-webgl
-        N171[webgl-renderer]
-        N172[gl-gpu-timer]
-        N173[node-pipeline-registry]
-        N174[gl-geometry]
-        N175[gl-render-target]
-        N176[gl-skinning-glsl]
-        N177[gl-skinning]
-        N178[gl-node-program]
-        N179[gl-shadow]
-        N180[register]
-        N181[...11 more]
+        N172[webgl-renderer]
+        N173[gl-gpu-timer]
+        N174[node-pipeline-registry]
+        N175[gl-geometry]
+        N176[gl-render-target]
+        N177[gl-skinning-glsl]
+        N178[gl-skinning]
+        N179[gl-node-program]
+        N180[gl-shadow]
+        N181[register]
+        N182[...11 more]
     end
 
     subgraph Packages/math
-        N182[rectangle2]
-        N183[color]
-        N184[frustum]
-        N185[vector2]
-        N186[vector3]
-        N187[quaternion]
-        N188[vector4]
-        N189[alloc-counter]
-        N190[index]
-        N191[matrix4]
-        N192[...1 more]
+        N183[rectangle2]
+        N184[color]
+        N185[frustum]
+        N186[vector2]
+        N187[vector3]
+        N188[quaternion]
+        N189[vector4]
+        N190[alloc-counter]
+        N191[index]
+        N192[matrix4]
+        N193[...1 more]
     end
 
     subgraph Packages/motion
-        N193[waypoint-graph-planner]
-        N194[serializers]
-        N195[camera-shake]
-        N196[trajectories]
-        N197[kinematic-controller]
-        N198[motion-component]
-        N199[integrators]
-        N200[prediction]
-        N201[scheduler]
-        N202[camera-rigs]
-        N203[...14 more]
+        N194[waypoint-graph-planner]
+        N195[serializers]
+        N196[camera-shake]
+        N197[trajectories]
+        N198[kinematic-controller]
+        N199[motion-component]
+        N200[integrators]
+        N201[prediction]
+        N202[scheduler]
+        N203[camera-rigs]
+        N204[...14 more]
     end
 
     N2 --> N8
@@ -6873,6 +6931,7 @@ graph TD
     N46 --> N38
     N46 --> N41
     N48 --> N55
+    N48 --> N51
     N50 --> N55
     N50 --> N49
     N50 --> N51
@@ -6892,7 +6951,6 @@ graph TD
     N56 --> N53
     N57 --> N55
     N57 --> N51
-    N58 --> N66
 ```
 
 ---
@@ -6902,17 +6960,17 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 332 |
+| Total TypeScript Files | 335 |
 | Total Modules | 24 |
-| Total Lines of Code | 159634 |
-| Total Exports | 3378 |
-| Total Re-exports | 2143 |
+| Total Lines of Code | 160360 |
+| Total Exports | 3388 |
+| Total Re-exports | 2148 |
 | Total Classes | 212 |
-| Total Interfaces | 622 |
-| Total Functions | 547 |
+| Total Interfaces | 624 |
+| Total Functions | 551 |
 | Total Type Guards | 28 |
 | Total Enums | 0 |
-| Type-only Imports | 427 |
+| Type-only Imports | 428 |
 | Runtime Circular Deps | 0 |
 | Type-only Circular Deps | 7 |
 
