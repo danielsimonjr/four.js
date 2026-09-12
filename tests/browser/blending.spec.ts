@@ -893,8 +893,9 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
     // A handful of framebuffer pairs prove the wave reached the pixels and the
     // scenery did not. The wave *period* is watched below via `data-chain-y`:
     // screenshotting for that long is what starved the simulation.
-    const pixelDeadline = Date.now() + FRAME_GAP_MS * (PIXEL_PROOF_PAIRS + 5);
-    while (bandDeltas.length < PIXEL_PROOF_PAIRS && Date.now() < pixelDeadline) {
+    // Capture all required pairs. Screenshot latency is not simulation time;
+    // the test's timeout already bounds a stalled browser.
+    for (let pair = 0; pair < PIXEL_PROOF_PAIRS; pair += 1) {
       await page.waitForTimeout(FRAME_GAP_MS);
       const frame = await grab(canvas);
 

@@ -147,3 +147,25 @@ it("places independent LTR/RTL runs, ligatures, offsets and source clusters", ()
     0.2 - atlas.descent / atlas.lineHeight,
   );
 });
+
+it("identity shaping preserves custom character atlas metrics without glyph-ID mappings", () => {
+  const original = buildGlyphAtlas();
+  const atlas = {
+    ...original,
+    glyphsById: undefined,
+    glyphs: new Map(original.glyphs).set("A", {
+      ...original.glyphs.get("A")!,
+      width: 3,
+      advance: 11,
+    }),
+  };
+  const shaper = new IdentityShapingEngine();
+  const fontId = shaper.addFont(new Uint8Array());
+  const options = { size: 0.7, letterSpacing: 0.03 };
+  const shaped = layoutText("A B\nAA", atlas, { ...options, shaper, fontId });
+  expect({
+    ...shaped,
+    quads: shaped.quads.map(({ cluster: _cluster, ...q }) => q),
+  }).toEqual(layoutText("A B\nAA", atlas, options));
+  shaper.dispose();
+});

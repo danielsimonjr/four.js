@@ -2121,7 +2121,7 @@ export class Rapier2dAdapter
     }
   }
 
-  /** @inheritDoc DebugBodyAccess.countContacts */
+  /** Number of contact points across collider manifolds in the current solver world. */
   countContacts(): number {
     const world = this.#requireWorld();
     const narrowPhase = world.narrowPhase;

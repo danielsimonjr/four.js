@@ -1,26 +1,26 @@
 # Complete File Inventory
 
-**Generated**: 2026-09-11 (by tools/create-dependency-graph)
+**Generated**: 2026-09-12 (by tools/create-dependency-graph)
 
 Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-root cross-package `tests/`, `tools/`, build/test `*.config.ts`, `examples/`, and `docs/` reference sources — tagged with a disposition. A completeness census: no `.ts` may be silently missing. The self-check gate (`verifyFileCensus`) does a MAXIMAL, location-agnostic repo walk (broader than this census’s enumerated discovery) and HARD-FAILS `npm run docs:deps` if any `.ts` on disk is unaccounted, or if any `orphan` exists.
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 867
+**Total files**: 871
 
 ## Disposition counts
 
 | Disposition | Count | Meaning |
 | --- | --: | --- |
-| `reachable` | 283 | A `src/` file in the module graph, reachable from a root. |
+| `reachable` | 284 | A `src/` file in the module graph, reachable from a root. |
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 4 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 500 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 503 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
 | `config` | 17 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 14 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **867** | |
+| **Total** | **871** | |
 
 ## Per-area counts
 
@@ -28,17 +28,17 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | --- | --: |
 | `config` | 17 |
 | `examples` | 14 |
-| `src` | 335 |
-| `tests` | 500 |
+| `src` | 336 |
+| `tests` | 503 |
 | `tools` | 1 |
 
 ## Per-package counts
 
 | Package | Files |
 | --- | --: |
-| `(root)` | 233 |
+| `(root)` | 235 |
 | `@fourjs/animation` | 32 |
-| `@fourjs/assets` | 20 |
+| `@fourjs/assets` | 22 |
 | `@fourjs/core` | 26 |
 | `@fourjs/diagnostics` | 27 |
 | `@fourjs/geometry` | 25 |
@@ -130,6 +130,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/assets/src/capabilities.ts` | @fourjs/assets | src | reachable |
 | `packages/assets/src/content-hash.ts` | @fourjs/assets | src | reachable |
 | `packages/assets/src/gltf.ts` | @fourjs/assets | src | reachable |
+| `packages/assets/src/gzip.ts` | @fourjs/assets | src | reachable |
 | `packages/assets/src/index.ts` | @fourjs/assets | src | build-entry |
 | `packages/assets/src/loader-registry.ts` | @fourjs/assets | src | reachable |
 | `packages/assets/src/loaders.ts` | @fourjs/assets | src | reachable |
@@ -141,6 +142,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/assets/tests/capabilities.test.ts` | @fourjs/assets | tests | test |
 | `packages/assets/tests/content-hash.test.ts` | @fourjs/assets | tests | test |
 | `packages/assets/tests/gltf.test.ts` | @fourjs/assets | tests | test |
+| `packages/assets/tests/gzip.test.ts` | @fourjs/assets | tests | test |
 | `packages/assets/tests/loaders.test.ts` | @fourjs/assets | tests | test |
 | `packages/assets/tests/manifest.test.ts` | @fourjs/assets | tests | test |
 | `packages/assets/tests/security.test.ts` | @fourjs/assets | tests | test |
@@ -745,6 +747,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/browser/fixtures/gltf-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/gpu-readback-check.ts` | (root) | tests | test |
 | `tests/browser/fixtures/gpu-readback-page.ts` | (root) | tests | test |
+| `tests/browser/fixtures/gzip-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/mipmaps-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/node-material-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/picking-page.ts` | (root) | tests | test |
@@ -763,6 +766,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/browser/gltf-model.spec.ts` | (root) | tests | test |
 | `tests/browser/gltf.spec.ts` | (root) | tests | test |
 | `tests/browser/gpu-readback.spec.ts` | (root) | tests | test |
+| `tests/browser/gzip.spec.ts` | (root) | tests | test |
 | `tests/browser/interaction.spec.ts` | (root) | tests | test |
 | `tests/browser/mechanism.spec.ts` | (root) | tests | test |
 | `tests/browser/mipmaps.spec.ts` | (root) | tests | test |

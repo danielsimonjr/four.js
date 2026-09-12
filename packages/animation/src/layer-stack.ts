@@ -4,7 +4,7 @@
  * One {@link AnimationController} writes one pose. A stack evaluates several
  * controllers in declaration order onto the same target: the first layer
  * *replaces*, and each later layer either lerps over that pose or — when
- * `additive` — adds through {@link ./values.js#ValueAdapter.add}.
+ * `additive` — adds through {@link ValueAdapter.add}.
  *
  * ## Claims
  *
@@ -48,12 +48,12 @@ export interface AnimationLayer {
   readonly controller: AnimationController;
   /**
    * Blend or add weight. Default `1`. Finite; values outside `[0, 1]`
-   * extrapolate the same way {@link ./values.js#ValueAdapter.lerp} does.
+   * extrapolate the same way {@link ValueAdapter.lerp} does.
    */
   readonly weight?: number;
   /**
    * When true on a layer *after* the first, the pose is added through
-   * {@link ./values.js#ValueAdapter.add}. The first layer always replaces,
+   * {@link ValueAdapter.add}. The first layer always replaces,
    * even if this is set. Default `false` (weighted lerp over the pose so far).
    */
   readonly additive?: boolean;

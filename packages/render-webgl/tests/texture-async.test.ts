@@ -18,6 +18,33 @@ function setup() {
   };
 }
 describe("asynchronous GL texture preparation", () => {
+  it.each(["mutation", "loss"])(
+    "isolates completion from an older allocation after %s",
+    async (action) => {
+      const { gl, cache, texture } = setup();
+      gl.clientWaitSync = vi
+        .fn()
+        .mockReturnValueOnce(0x911b)
+        .mockReturnValue(0x911a);
+      let release = () => {};
+      const old = cache.acquireAsync(
+        texture,
+        () =>
+          new Promise<void>((resolve) => {
+            release = resolve;
+          }),
+      );
+      if (action === "mutation") texture.markDirty();
+      else cache.forget();
+      expect(await cache.acquireAsync(texture)).not.toBeNull();
+      expect(cache.residency(texture)).toBe("resident");
+      release();
+      expect(await old).toBeNull();
+      expect(cache.residency(texture)).toBe("resident");
+      texture.dispose();
+      cache.dispose();
+    },
+  );
   it("waits nonblocking for the fence and reports pending/resident/stale versions", async () => {
     const { gl, cache, texture } = setup();
     expect(cache.residency(texture)).toBe("absent");

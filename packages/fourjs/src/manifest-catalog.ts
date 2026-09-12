@@ -44,8 +44,7 @@ import {
 } from "./scene-serializers.js";
 
 /**
- * Options for {@link preloadManifestIntoCatalog}, over {@link
- * ManifestLoadOptions}.
+ * Options for {@link preloadManifestIntoCatalog}, over `ManifestLoadOptions` from `@fourjs/assets`.
  *
  * @typeParam T the value the loader produces
  * @typeParam R the catalog entry, after an optional {@link
@@ -61,7 +60,7 @@ export interface PreloadManifestIntoCatalogOptions<
    *
    * Duplicates are dropped after the first, so a document that names the
    * same material twice still takes one reference. A key the manifest
-   * does not name is refused by {@link loadFromManifest}, at the call.
+   * does not name is refused by `loadFromManifest` from `@fourjs/assets`, at the call.
    */
   readonly keys?: readonly string[];
   /**
@@ -92,17 +91,16 @@ function uniqueKeys(keys: readonly string[]): string[] {
 
 /**
  * Walks a §79 manifest (or a document's named keys) through
- * {@link loadFromManifest} and returns a catalog whose {@link
+ * `loadFromManifest` from `@fourjs/assets` and returns a catalog whose {@link
  * SceneResourceCatalog.get} is synchronous.
  *
  * @param assets the manager that fetches and verifies
  * @param manifest the key → URL + hash map
  * @param loader the decoder for every named key
- * @param options {@link ManifestLoadOptions} plus an optional key list
+ * @param options `ManifestLoadOptions` from `@fourjs/assets` plus an optional key list
  *   and an optional lift into the catalog's type
  * @returns a catalog with both `get` and `keyOf` populated
- * @throws FourError `ASSET_LOAD_FAILED` exactly as {@link
- *   loadFromManifest} does — an unknown key, a missing hash under
+ * @throws FourError `ASSET_LOAD_FAILED` exactly as `loadFromManifest` does — an unknown key, a missing hash under
  *   `requireHash`, or a hash mismatch included
  */
 export function preloadManifestIntoCatalog<T extends object>(

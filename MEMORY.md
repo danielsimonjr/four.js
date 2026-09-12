@@ -4410,3 +4410,43 @@ LIGHT_BINDING_BYTES and 2/2 rerun passed; visual 3/3 unchanged. Chromium 152/Swi
 only, not R-33 hardware evidence. Release staging had included the private docs
 workspace; now excluded, nested shaping imports preserved; 13 regression tests in PR CI,
 and 24 packages stage locally. Example-size A/B recorded in tools/size-budgets.mjs.
+
+### 2026-09-11 — PR #93 post-merge review
+
+Merged baseline: 3f48b1d. Texture async waiter identity must be the GPU allocation,
+not the authored texture ID: version replacement and device/context recovery can
+outlive an earlier waiter. WeakMap record counts retain concurrency semantics and
+isolate replaced allocations. Identity shaping must read the character atlas and
+use its cell width, preserving legacy custom atlases without a glyph-ID map.
+
+Next §96 packet adds createGzipLoader with an injected cancellable pull reader.
+Finite defaults: 64 MiB output / 1000× expansion. The host validates gzip checksums;
+the loader validates headers and bounds output before each copy, returning only
+after stream completion. Growth plus trimming requires at most twice the output
+limit; host-internal allocations and deadline preemption remain host concerns.
+Draco/Basis are still absent. No dependency or normative size/coverage gate changed.
+
+Merged-main CI 34658678579 failed because shape.test.ts's 257×256-ring fixture
+exceeded its 20s timeout, not a coverage percentage. Path.fillRings now skips
+winding tests when a probe is outside a precomputed ring bound. The fixture uses
+1,025×64 rings (65,600 vertices), checks the highest index, and retains the 20s
+limit; full local instrumented render run measured 932ms. Exact winding still
+handles overlapping bounds/nesting. TypeDoc declaration was bumped to 7.0.2 by
+#84 although the lock's nested resolution stayed 6.0.3. Restored the declaration,
+regenerated lock, verified frozen install, and test declared/resolved mismatch in
+the compiler guard. API documentation warnings fixed without disabling validation.
+
+Browser review also caught the blending ANIMATED test's 1.6s screenshot deadline:
+only two of three required pairs fit on the software renderer. It now captures
+exactly three pairs under the existing test timeout, preserving all pixel/motion
+assertions. Full browser validation uses the repository's serial worker setting.
+
+Validation completed 2026-09-12: 7,574 package tests / 299 files and all 24
+coverage gates pass; 685 integration/determinism tests pass; the complete serial
+browser run passes all 114 checks, including three unchanged visual goldens.
+Chromium 152 / software GPU only, not R-33 hardware evidence. Builds, TypeScript
+7/6 checks, lint, spec/docs/compatibility, dependency/duplicate gates, 13 release-name
+and 10 graph-tool tests pass. API docs are warning-free and four compiler-guard
+regressions pass. Frozen install succeeds. All existing bundle budgets pass;
+minimal 2D app: 61.34 kB gzip / 150 kB limit. No threshold, timeout or bundle budget
+was relaxed. Nothing published or merged by this follow-up.

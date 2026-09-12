@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-11",
+  "generated": "2026-09-12",
   "surfaces": {
     "packages/animation": [
       "Advanceable",
@@ -151,6 +151,7 @@
       "ByteReaderLike",
       "CONTENT_HASH_ALGORITHM",
       "createGltfLoader",
+      "createGzipLoader",
       "createImageLoader",
       "createTextureDecoder",
       "createTextureLoader",
@@ -175,6 +176,9 @@
       "GltfPrimitiveRecord",
       "GltfSceneRecord",
       "GltfSkinRecord",
+      "GzipDecodeLike",
+      "GzipLoaderOptions",
+      "GzipReader",
       "ImageAsset",
       "ImageBitmapLike",
       "ImageDecodeLike",

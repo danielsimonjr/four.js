@@ -11,15 +11,18 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const resolved = require.resolve("typescript/package.json");
 const { version } = require(resolved);
+const declared = require("./package.json").devDependencies.typescript;
 
-if (!version.startsWith("6.0.")) {
+if (!version.startsWith("6.0.") || declared !== version) {
   console.error(
     `tools/docs must resolve typescript@6.0.x (TypeDoc 0.28 peer is 5.0–6.0). ` +
-      `Got ${version} from ${resolved}. ` +
+      `Declared ${declared}; resolved ${version} from ${resolved}. ` +
       `Do not bump this package's typescript until TypeDoc ships TS 7 support ` +
       `(typedoc#3098). The root compiler is free to move; this one is not.`,
   );
   process.exit(1);
 }
 
-console.log(`tools/docs: TypeDoc will use TypeScript ${version} from ${resolved}`);
+console.log(
+  `tools/docs: TypeDoc will use TypeScript ${version} from ${resolved}`,
+);

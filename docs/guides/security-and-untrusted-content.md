@@ -14,7 +14,7 @@ deployer can write their headers from.
 ## Honest state first
 
 §96 lists seven requirements. Six are met and one is **partial**: image
-decoders are bounded; gzip, Draco, and Basis are not, because those paths
+decoders and raw gzip output are bounded; Draco and Basis are not, because those paths
 do not exist yet.
 
 | §96 requirement                                  | State      | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -24,7 +24,7 @@ do not exist yet.
 | input-size limits                                | **met**    | `AssetManagerOptions.maximumBytes` for transport; `maximumTextLength` on `decodeSceneDocument` / `decodeReplayRecording` for documents — all three finite by default                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | cancellation and timeouts for expensive decoders | **met**    | `AssetManagerOptions.timeoutSeconds` bounds a whole load, transport and decode together; `load(url, loader, { signal })` cancels one caller's load, and `AssetManagerOptions.abortController` extends both to the request itself (`canAbortTransport` reports whether a manager has it)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | documented content-security-policy behavior      | **met**    | this guide's "CSP posture" section, enforced by `tests/integration/security-csp.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| decompression limits                             | **partial** | `createTextureLoader` (2026-08-21) enforces `maximumDecodedBytes` (default 64 MiB) and `maximumExpansionRatio` (default 1000×), pre-decode when a `probe` reads the header and post-decode without one. Still absent: gzip, Draco, and Basis (no compressed path to bound), and platform decoders that cannot be pre-bounded (`createImageBitmap`) |
+| decompression limits                             | **partial** | `createTextureLoader` (2026-08-21) enforces `maximumDecodedBytes` (default 64 MiB) and `maximumExpansionRatio` (default 1000×), pre-decode when a `probe` reads the header and post-decode without one. `createGzipLoader` (2026-09-11) enforces finite decoded-byte and expansion limits while pulling a host gzip stream, cancelling on overflow. Still absent: Draco and Basis (no compressed path to bound), and platform decoders that cannot be pre-bounded (`createImageBitmap`) |
 | safe shader/plugin boundaries                    | **met**    | the plugin half (2026-08-28, `A-3`/RFC 0002): a plugin is a **value** the application installs — `PluginHost.add` and `ApplicationOptions.plugins` accept no URL, no module specifier, and no name from a document, and `tests/integration/plugin-boundary.test.ts` fails if any deserializing package reaches the host. It is a boundary, **not a sandbox** — see "Plugins run with your authority". The shader half (2026-08-28, `R-14`/RFC 0001, spec revision 1.11): **shading is a graph of closed operators, never source text** — §60's shipped surface (`ShaderGraph`/`NodeMaterial`/`NodeMaterialBuilder`, `@fourjs/materials`) accepts no GLSL or WGSL anywhere, a graph is plain JSON whose every operator is a member of a closed union validated at construction (§85, with node and sampler caps), every texture it samples is enumerable (so §63's feedback/ordering checks still see a §70 graph effect's full sample set), and §57's `ShaderMaterial` — the name a source-string material would have had — is recorded **permanently unshipped**. An operator the engine has not implemented is a refused value, not an executed one |
 
 Depth limiting is the sixth item's neighbour rather than one of the seven, and
@@ -203,19 +203,19 @@ admits no string.
 Being explicit about the holes is the point of the honest-state table; these
 are the ones that most affect how you deploy:
 
-1. **Decompression limits.** Nothing in the engine decompresses anything yet.
-   When a compressed texture or a gzipped scene lands, it needs a ratio bound
-   as well as an output bound — an input-size limit alone does not stop a zip
-   bomb.
+1. **Decoder-internal allocations.** Texture decoding and raw gzip loading now
+   have output-size and expansion-ratio bounds. These do not bound allocations
+   internal to a host decoder: supply a streaming gzip decoder with bounded
+   chunks. Draco/Basis paths remain unimplemented.
 2. **Shader boundaries left this list on 2026-08-28 (`R-14`/RFC 0001).** There
    is no path by which a scene file — or anything else — can name shader
    source, and spec revision 1.11 makes that permanent: shading is a graph of
    closed operators (§60), validated at construction, and §57's
    `ShaderMaterial` row is recorded permanently unshipped. What was settled is
    the _arrival_ rule, exactly as with plugins: a document can carry a
-   picture (a graph), never a program (source text). A future data-declared
-   custom operator (RFC 0001's deferred alternative E) would be a new trust
-   boundary and needs its own §96 pass if it ever arrives.
+   picture (a graph), never a program (source text). A data-declared
+   custom operator now lowers through `ShaderFunction` into the same validated
+   closed union (2026-09-11); no source-code execution is introduced.
 
    (The **plugin** half of this item left the list the same day with `A-3`.
    See "Plugins run with your authority" for what was actually settled — a
@@ -232,3 +232,27 @@ application's, not the engine's: fourJS never validates that a URL points
 somewhere you meant (do that before calling `load`), and it never sets response
 headers — `Content-Type`, `X-Content-Type-Options: nosniff`, and CORS policy
 are your server's.
+
+## Raw gzip assets
+
+```ts
+import { createGzipLoader } from "fourJS/assets";
+
+const gzip = createGzipLoader((bytes) =>
+  new Blob([bytes]).stream()
+    .pipeThrough(new DecompressionStream("gzip")).getReader(),
+  { maximumDecodedBytes: 64 * 1024 * 1024, maximumExpansionRatio: 1000 });
+const bytes = await assets.load("/scene.json.gz", gzip);
+```
+
+The limits are finite and positive. The loader validates the header, checks each
+chunk before copying it, cancels on overflow, and releases the reader. It publishes
+bytes only after stream completion, so a checksum failure never returns a partial
+asset. The host decoder must validate the gzip checksum and trailer, as required by
+the [Compression Standard](https://compression.spec.whatwg.org/#gzip).
+
+This is raw file decompression; do not apply it to HTTP `Content-Encoding: gzip`
+responses already decoded by fetch. `AssetManager` bounds the encoded body and the
+load deadline. Its deadline rejects the load; it does not preempt host decoder CPU
+work. Output buffer growth and the final trimmed copy retain at most twice the
+configured decoded limit, plus encoded input and host-owned decoder buffers.

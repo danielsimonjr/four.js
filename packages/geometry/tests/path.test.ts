@@ -394,6 +394,31 @@ describe("§51 flatten", () => {
 });
 
 describe("§51 fill rules and the §52 handoff", () => {
+  it("retains exact containment for disjoint triangles with overlapping bounds and a nested hole", () => {
+    for (const fillRule of ["nonzero", "even-odd"] as const) {
+      const path = new Path({ fillRule })
+        .moveTo(0, 0)
+        .lineTo(4, 0)
+        .lineTo(0, 4)
+        .close()
+        .moveTo(4, 4)
+        .lineTo(1, 4)
+        .lineTo(4, 1)
+        .close()
+        .moveTo(0.25, 0.25)
+        .lineTo(0.25, 0.75)
+        .lineTo(0.75, 0.75)
+        .lineTo(0.75, 0.25)
+        .close();
+      const regions = path.fillRings();
+      expect(regions).toHaveLength(2);
+      expect(regions.map((region) => region.holes.length)).toEqual([1, 0]);
+      expect(
+        regions.map((region) => Math.abs(doubleArea(region.outline))),
+      ).toEqual([16, 9]);
+      expect(Math.abs(doubleArea(regions[0].holes[0]))).toBe(0.5);
+    }
+  });
   const outer = (path: Path): Path =>
     path.moveTo(-4, -4).lineTo(4, -4).lineTo(4, 4).lineTo(-4, 4).close();
   const innerClockwise = (path: Path): Path =>

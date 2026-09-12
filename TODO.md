@@ -4,6 +4,41 @@ Task tracker for four.js. Keep entries short and actionable; move finished items
 (newest first) with the date. Larger context and decisions belong in `MEMORY.md`; released
 changes in `CHANGELOG.md`.
 
+## 2026-09-11 post-merge review
+
+PR #93 merged as `3f48b1d`; reviewed its planning, shaping, skinning, shader,
+readback, and texture paths. Follow-up corrections:
+
+- Texture preparation now tracks waiters by allocation, so an obsolete upload
+  cannot keep a newer completed allocation in the uploading state (both backends).
+- Fixed the merged-main CI timeout: ring bounds skip impossible containment
+  tests; the large-shape fixture still crosses 65,536 vertices and verifies the
+  highest index, using smaller rings under the unchanged timeout.
+- Replaced the blending browser test's screenshot-speed deadline with exactly
+  three required capture pairs under its existing timeout; pixel assertions remain.
+- Restored docs TypeScript 6.0.3 declaration/lock consistency and added four
+  compiler-guard regressions. Removed obsolete Vitest 5 update exclusions.
+- Repaired broken API documentation links and stale TypeDoc exclusions; docs
+  now build without warnings.
+- Identity shaping preserves custom character atlas glyphs, advances and cell
+  widths even without the optional glyph-ID map.
+- §96 next packet: `createGzipLoader` supplies bounded raw gzip decoding through
+  an injected pull reader, with cancellation, cleanup and checksum-before-return.
+  Draco/Basis and host-internal allocation limits remain open.
+- Corrected stale glTF and decompression documentation. No broad roadmap row is
+  closed by this packet; remaining GPU/rendering/text work stays listed below.
+
+
+Validation completed 2026-09-12: 7,574 package tests / 299 files and all 24
+coverage gates pass; 685 integration/determinism tests pass; the complete serial
+browser run passes all 114 checks, including three unchanged visual goldens.
+Chromium 152 / software GPU only, not R-33 hardware evidence. Builds, TypeScript
+7/6 checks, lint, spec/docs/compatibility, dependency/duplicate gates, 13 release-name
+and 10 graph-tool tests pass. API docs are warning-free and four compiler-guard
+regressions pass. Frozen install succeeds. All existing bundle budgets pass;
+minimal 2D app: 61.34 kB gzip / 150 kB limit. No threshold, timeout or bundle budget
+was relaxed. Nothing published or merged by this follow-up.
+
 ## 2026-09-11 implementation pass
 
 Owner instruction: implement all RFCs, PHs and remaining TODO items. RFCs 0007–0009
@@ -1982,7 +2017,7 @@ Daniel delegated all four. Ordered by value-over-risk, not by how annoying each 
       multi-texture-unit widening `gl-program.ts` records (R-13 follow-up) —
       metallic-roughness landed 2026-09-06; normal/occlusion/emissive remain.
       The loader parses them already and widens without a format change.
-- [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust **runtime** boundary is the closed operator union (shipped); **extensible** data-declared operators remain a follow-up RFC (0001 alternative E — `SHADER_OPERATORS` is the named hook only). **Plugin trust
+- [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Raw gzip output now bounded by `createGzipLoader` (2026-09-11). Still open for Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust **runtime** boundary is the closed operator union (shipped); data-declared operators now lower through validated `ShaderFunction` declarations (2026-09-11), without executable source. **Plugin trust
       boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a
       document; enforced by `tests/integration/plugin-boundary.test.ts`; explicitly not a
       sandbox. Guide row **partial** 2026-09-10 (`docs/guides/security-and-untrusted-content.md`: texture-loader bounds; gzip/Draco/Basis still absent)

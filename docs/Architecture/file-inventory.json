@@ -1,12 +1,12 @@
 {
-  "generated": "2026-09-11",
-  "totalFiles": 867,
+  "generated": "2026-09-12",
+  "totalFiles": 871,
   "byDisposition": {
-    "reachable": 283,
+    "reachable": 284,
     "build-entry": 48,
     "test-only": 4,
     "orphan": 0,
-    "test": 500,
+    "test": 503,
     "tool": 1,
     "config": 17,
     "example": 14
@@ -14,14 +14,14 @@
   "byArea": {
     "examples": 14,
     "config": 17,
-    "src": 335,
-    "tests": 500,
+    "src": 336,
+    "tests": 503,
     "tools": 1
   },
   "byPackage": {
-    "(root)": 233,
+    "(root)": 235,
     "@fourjs/animation": 32,
-    "@fourjs/assets": 20,
+    "@fourjs/assets": 22,
     "@fourjs/core": 26,
     "@fourjs/diagnostics": 27,
     "fourJS": 53,
@@ -495,11 +495,18 @@
       "loc": 2579
     },
     {
+      "file": "packages/assets/src/gzip.ts",
+      "package": "@fourjs/assets",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 131
+    },
+    {
       "file": "packages/assets/src/index.ts",
       "package": "@fourjs/assets",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 116
+      "loc": 119
     },
     {
       "file": "packages/assets/src/loader-registry.ts",
@@ -513,7 +520,7 @@
       "package": "@fourjs/assets",
       "area": "src",
       "disposition": "reachable",
-      "loc": 188
+      "loc": 179
     },
     {
       "file": "packages/assets/src/manifest.ts",
@@ -570,6 +577,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 2532
+    },
+    {
+      "file": "packages/assets/tests/gzip.test.ts",
+      "package": "@fourjs/assets",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 142
     },
     {
       "file": "packages/assets/tests/loaders.test.ts",
@@ -1073,7 +1087,7 @@
       "package": "fourJS",
       "area": "src",
       "disposition": "reachable",
-      "loc": 145
+      "loc": 143
     },
     {
       "file": "packages/fourjs/src/materials.ts",
@@ -1388,7 +1402,7 @@
       "package": "@fourjs/geometry",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2290
+      "loc": 2310
     },
     {
       "file": "packages/geometry/src/primitive-support.ts",
@@ -1472,7 +1486,7 @@
       "package": "@fourjs/geometry",
       "area": "tests",
       "disposition": "test",
-      "loc": 1043
+      "loc": 1068
     },
     {
       "file": "packages/geometry/tests/primitives-3d.test.ts",
@@ -3208,7 +3222,7 @@
       "package": "@fourjs/render-webgl",
       "area": "tests",
       "disposition": "test",
-      "loc": 126
+      "loc": 153
     },
     {
       "file": "packages/render-webgl/tests/texture-updates.test.ts",
@@ -3446,7 +3460,7 @@
       "package": "@fourjs/render-webgpu",
       "area": "tests",
       "disposition": "test",
-      "loc": 91
+      "loc": 117
     },
     {
       "file": "packages/render-webgpu/tests/texture-updates.test.ts",
@@ -4034,7 +4048,7 @@
       "package": "@fourjs/render",
       "area": "tests",
       "disposition": "test",
-      "loc": 1131
+      "loc": 1138
     },
     {
       "file": "packages/render/tests/smoke.test.ts",
@@ -4440,7 +4454,7 @@
       "package": "@fourjs/text",
       "area": "src",
       "disposition": "reachable",
-      "loc": 507
+      "loc": 512
     },
     {
       "file": "packages/text/tests/harfbuzz.test.ts",
@@ -4454,7 +4468,7 @@
       "package": "@fourjs/text",
       "area": "tests",
       "disposition": "test",
-      "loc": 150
+      "loc": 172
     },
     {
       "file": "packages/text/tests/smoke.test.ts",
@@ -4706,7 +4720,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 1139
+      "loc": 1140
     },
     {
       "file": "tests/browser/character-controller.spec.ts",
@@ -4798,6 +4812,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 81
+    },
+    {
+      "file": "tests/browser/fixtures/gzip-page.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 31
     },
     {
       "file": "tests/browser/fixtures/mipmaps-page.ts",
@@ -4924,6 +4945,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 3
+    },
+    {
+      "file": "tests/browser/gzip.spec.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 45
     },
     {
       "file": "tests/browser/interaction.spec.ts",

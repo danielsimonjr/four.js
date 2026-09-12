@@ -15,6 +15,32 @@ function setup() {
   };
 }
 describe("asynchronous WebGPU texture preparation", () => {
+  it.each(["mutation", "loss"])(
+    "isolates completion from an older allocation after %s",
+    async (action) => {
+      const { queue, cache, texture } = setup();
+      let release = () => {};
+      queue.onSubmittedWorkDone = vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise<void>((resolve) => {
+              release = resolve;
+            }),
+        )
+        .mockResolvedValue(undefined);
+      const old = cache.acquireAsync(texture);
+      if (action === "mutation") texture.markDirty();
+      else cache.forget();
+      expect(await cache.acquireAsync(texture)).not.toBeNull();
+      expect(cache.residency(texture)).toBe("resident");
+      release();
+      expect(await old).toBeNull();
+      expect(cache.residency(texture)).toBe("resident");
+      texture.dispose();
+      cache.dispose();
+    },
+  );
   it("waits for queue completion and exposes residency", async () => {
     const { queue, cache, texture } = setup();
     let release = () => {};

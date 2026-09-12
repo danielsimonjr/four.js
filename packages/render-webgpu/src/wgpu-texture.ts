@@ -417,7 +417,7 @@ export class WgpuTextureCache {
   /** The device's anisotropy ceiling, or `0` while it has never been resolved. */
   #maxAnisotropy = 0;
 
-  readonly #pending = new Map<string, number>();
+  readonly #pending = new WeakMap<WgpuTextureRecord, number>();
 
   #disposed = false;
 
@@ -544,7 +544,7 @@ export class WgpuTextureCache {
     const record = this.#records.get(texture.id);
     if (record === undefined || texture.disposed) return "absent";
     if (record.version !== texture.version) return "stale";
-    return this.#pending.has(texture.id) ? "uploading" : "resident";
+    return this.#pending.has(record) ? "uploading" : "resident";
   }
 
   /** Pre-upload and resolve only after the device queue completes that work. */
@@ -560,7 +560,7 @@ export class WgpuTextureCache {
       );
     const record = this.acquire(texture);
     if (record === null) return null;
-    this.#pending.set(texture.id, (this.#pending.get(texture.id) ?? 0) + 1);
+    this.#pending.set(record, (this.#pending.get(record) ?? 0) + 1);
     try {
       await queue.onSubmittedWorkDone();
       return !this.#disposed &&
@@ -576,9 +576,9 @@ export class WgpuTextureCache {
       }
       throw error;
     } finally {
-      const count = this.#pending.get(texture.id) ?? 1;
-      if (count <= 1) this.#pending.delete(texture.id);
-      else this.#pending.set(texture.id, count - 1);
+      const count = this.#pending.get(record) ?? 1;
+      if (count <= 1) this.#pending.delete(record);
+      else this.#pending.set(record, count - 1);
     }
   }
 

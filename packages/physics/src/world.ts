@@ -1743,7 +1743,7 @@ export class PhysicsWorld {
    *
    * §42-style who-wins: allowed only when `node.transformAuthority ===
    * "physics"` (the solver owns the body). Any other authority refuses the
-   * write and warns once via {@link warnAuthorityConflict}. `"static"` bodies
+   * write and warns once via `warnAuthorityConflict` from `@fourjs/motion`. `"static"` bodies
    * refuse — they have no velocity. `"dynamic"` and `"kinematic-velocity"`
    * accept; `"kinematic-position"` refuses the same way as static (velocity is
    * not an input of that model).

@@ -32,7 +32,7 @@ import { Vector3 } from "@fourjs/math";
  * The structural shape of `@fourjs/serialization`'s `ComponentSerializer<T>` —
  * declared here rather than imported because the frozen §3.1 matrix has no
  * scene → serialization edge. Same duck-typing move as
- * {@link ./skeleton.js#MORPH_WEIGHTS_SERIALIZER}.
+ * {@link MORPH_WEIGHTS_SERIALIZER}.
  */
 export interface NodeSpaceSerializerShape<T> {
   serialize(component: T): JsonValue;
@@ -40,7 +40,7 @@ export interface NodeSpaceSerializerShape<T> {
 }
 
 export interface NodeSpaceOptions {
-  /** §8 mode. Default {@link DEFAULT_SPACE_MODE} (`"world"`). */
+  /** §8 mode. Default `"world"`. */
   readonly space?: SpaceMode;
   /**
    * Optional plane normal for `"local-plane"` / `"billboard"`.
