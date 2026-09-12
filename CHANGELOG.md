@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## Unreleased — post-merge review (2026-09-11)
+
+### Fixed
+
+- WebGL/WebGPU texture residency no longer reports a new completed allocation as
+  uploading while an obsolete allocation's wait is outstanding.
+- Fixed the merged-main CI timeout: ring bounds skip impossible containment
+  tests; the large-shape fixture still crosses 65,536 vertices and verifies the
+  highest index, using smaller rings under the unchanged timeout.
+- Replaced the blending browser test's screenshot-speed deadline with exactly
+  three required capture pairs under its existing timeout; pixel assertions remain.
+- Restored docs TypeScript 6.0.3 declaration/lock consistency and added four
+  compiler-guard regressions. Removed obsolete Vitest 5 update exclusions.
+- Repaired broken API documentation links and stale TypeDoc exclusions; docs
+  now build without warnings.
+- Identity shaping retains legacy custom-atlas glyphs, advances and cell widths
+  without requiring the optional glyph-ID map.
+- Asset/security documentation reflects shipped glTF, safe shader functions and
+  bounded texture/gzip decoding.
+
+### Added
+
+- Raw gzip asset loader over a host streaming decoder, with finite output/ratio
+  bounds, cancellation and cleanup, and no partial return before checksum validation.
+- Regression cases for allocation replacement/recovery and custom atlas parity;
+  real gzip corruption/limit tests and a Chromium host-adapter check.
+
+### Validation
+
+Validation completed 2026-09-12: 7,574 package tests / 299 files and all 24
+coverage gates pass; 685 integration/determinism tests pass; the complete serial
+browser run passes all 114 checks, including three unchanged visual goldens.
+Chromium 152 / software GPU only, not R-33 hardware evidence. Builds, TypeScript
+7/6 checks, lint, spec/docs/compatibility, dependency/duplicate gates, 13 release-name
+and 10 graph-tool tests pass. API docs are warning-free and four compiler-guard
+regressions pass. Frozen install succeeds. All existing bundle budgets pass;
+minimal 2D app: 61.34 kB gzip / 150 kB limit. No threshold, timeout or bundle budget
+was relaxed. Nothing published or merged by this follow-up.
+
 ## Unreleased — RFC implementation packets (2026-09-11)
 
 ### Added

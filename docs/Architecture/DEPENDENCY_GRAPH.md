@@ -1,6 +1,6 @@
 # fourjs-monorepo - Dependency Graph
 
-**Version**: 0.0.0 | **Last Updated**: 2026-09-11
+**Version**: 0.0.0 | **Last Updated**: 2026-09-12
 
 This document provides a comprehensive dependency graph of all files, components, imports, functions, and variables in the codebase.
 
@@ -53,7 +53,7 @@ The codebase is organized into the following modules:
 - **packages/physics-soft**: 1 file
 - **packages/text**: 5 files
 - **packages/render-webgpu**: 29 files
-- **packages/assets**: 9 files
+- **packages/assets**: 10 files
 - **packages/ui**: 16 files
 - **packages/fourjs**: 35 files
 - **packages/materials**: 17 files
@@ -85,7 +85,7 @@ The codebase is organized into the following modules:
 | `@fourjs/physics-soft` (`packages/physics-soft/`) | (none) | 1 | 0 |
 | `@fourjs/text` (`packages/text/`) | `@fourjs/core` | 5 | 3 |
 | `@fourjs/render-webgpu` (`packages/render-webgpu/`) | `@fourjs/render`, `@fourjs/core`, `@fourjs/math`, `@fourjs/scene` | 29 | 0 |
-| `@fourjs/assets` (`packages/assets/`) | `@fourjs/core` | 9 | 0 |
+| `@fourjs/assets` (`packages/assets/`) | `@fourjs/core` | 10 | 0 |
 | `@fourjs/ui` (`packages/ui/`) | `@fourjs/math`, `@fourjs/core`, `@fourjs/scene`, `@fourjs/input`, `@fourjs/text` | 16 | 0 |
 | `fourJS` (`packages/fourjs/`) | `@fourjs/core`, `@fourjs/geometry`, `@fourjs/materials`, `@fourjs/motion`, `@fourjs/physics`, `@fourjs/render`, `@fourjs/scene`, `@fourjs/serialization`, `@fourjs/text`, `@fourjs/ui`, `@fourjs/render-canvas`, `@fourjs/input`, `@fourjs/physics-box2d`, `@fourjs/diagnostics`, `@fourjs/math`, `@fourjs/assets`, `@fourjs/animation`, `@fourjs/render-webgpu`, `@fourjs/render-webgl`, `@fourjs/render-svg`, `@fourjs/physics-rapier`, `@fourjs/physics-soft`, `@fourjs/particles` | 35 | 1 |
 | `@fourjs/materials` (`packages/materials/`) | `@fourjs/math`, `@fourjs/core` | 17 | 0 |
@@ -2282,6 +2282,7 @@ graph LR
 | `./texture.js` | `DEFAULT_MAXIMUM_DECODED_BYTES, DEFAULT_MAXIMUM_EXPANSION_RATIO, TextureAsset, createTextureDecoder, createTextureLoader` | Re-export |
 | `./gltf.js` | `GltfAsset, createGltfLoader` | Re-export |
 | `./loaders.js` | `ImageAsset, binaryLoader, createImageLoader, jsonLoader, textLoader` | Re-export |
+| `./gzip.js` | `createGzipLoader` | Re-export |
 | `./loader-registry.js` | `RegisteredAssetLoader` | Re-export (type-only) |
 | `./asset-manager.js` | `AbortHandle, AbortSignalLike, AssetGraph, AssetGraphLoadOptions, AssetLoadOptions, AssetLoader, AssetManagerOptions, AssetProgressEvent, AssetWatchLike, AssetWithDependencies, ByteReaderLike, FetchInit, FetchLike, FetchResponse, ReadableBodyLike, ResponseHeadersLike, TimerLike, WorkerLike` | Re-export (type-only) |
 | `./content-hash.js` | `DigestLike, TextDecodeLike` | Re-export (type-only) |
@@ -2289,10 +2290,11 @@ graph LR
 | `./texture.js` | `DecodedTexels, TexelDecodeLike, TexelProbeLike, TextureColorSpace, TextureFilterMode, TextureLoaderOptions, TextureWrapMode` | Re-export (type-only) |
 | `./gltf.js` | `GltfAnimationRecord, GltfChannelPath, GltfChannelRecord, GltfLoaderOptions, GltfMaterialRecord, GltfMeshRecord, GltfNodeRecord, GltfPrimitiveMode, GltfPrimitiveRecord, GltfSceneRecord, GltfSkinRecord` | Re-export (type-only) |
 | `./loaders.js` | `ImageBitmapLike, ImageDecodeLike` | Re-export (type-only) |
+| `./gzip.js` | `GzipDecodeLike, GzipLoaderOptions, GzipReader` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `ASSET_LOADERS`, `AssetLoaderRegistry`, `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `CONTENT_HASH_ALGORITHM`, `loadFromManifest`, `manifestLoader`, `manifestUrl`, `parseAssetManifest`, `DEFAULT_MAXIMUM_DECODED_BYTES`, `DEFAULT_MAXIMUM_EXPANSION_RATIO`, `TextureAsset`, `createTextureDecoder`, `createTextureLoader`, `GltfAsset`, `createGltfLoader`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `RegisteredAssetLoader`, `AbortHandle`, `AbortSignalLike`, `AssetGraph`, `AssetGraphLoadOptions`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`, `AssetProgressEvent`, `AssetWatchLike`, `AssetWithDependencies`, `ByteReaderLike`, `FetchInit`, `FetchLike`, `FetchResponse`, `ReadableBodyLike`, `ResponseHeadersLike`, `TimerLike`, `WorkerLike`, `DigestLike`, `TextDecodeLike`, `AssetManifest`, `AssetManifestEntry`, `ManifestLoadOptions`, `DecodedTexels`, `TexelDecodeLike`, `TexelProbeLike`, `TextureColorSpace`, `TextureFilterMode`, `TextureLoaderOptions`, `TextureWrapMode`, `GltfAnimationRecord`, `GltfChannelPath`, `GltfChannelRecord`, `GltfLoaderOptions`, `GltfMaterialRecord`, `GltfMeshRecord`, `GltfNodeRecord`, `GltfPrimitiveMode`, `GltfPrimitiveRecord`, `GltfSceneRecord`, `GltfSkinRecord`, `ImageBitmapLike`, `ImageDecodeLike`
+- Re-exports: `ASSET_LOADERS`, `AssetLoaderRegistry`, `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `CONTENT_HASH_ALGORITHM`, `loadFromManifest`, `manifestLoader`, `manifestUrl`, `parseAssetManifest`, `DEFAULT_MAXIMUM_DECODED_BYTES`, `DEFAULT_MAXIMUM_EXPANSION_RATIO`, `TextureAsset`, `createTextureDecoder`, `createTextureLoader`, `GltfAsset`, `createGltfLoader`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `createGzipLoader`, `RegisteredAssetLoader`, `AbortHandle`, `AbortSignalLike`, `AssetGraph`, `AssetGraphLoadOptions`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`, `AssetProgressEvent`, `AssetWatchLike`, `AssetWithDependencies`, `ByteReaderLike`, `FetchInit`, `FetchLike`, `FetchResponse`, `ReadableBodyLike`, `ResponseHeadersLike`, `TimerLike`, `WorkerLike`, `DigestLike`, `TextDecodeLike`, `AssetManifest`, `AssetManifestEntry`, `ManifestLoadOptions`, `DecodedTexels`, `TexelDecodeLike`, `TexelProbeLike`, `TextureColorSpace`, `TextureFilterMode`, `TextureLoaderOptions`, `TextureWrapMode`, `GltfAnimationRecord`, `GltfChannelPath`, `GltfChannelRecord`, `GltfLoaderOptions`, `GltfMaterialRecord`, `GltfMeshRecord`, `GltfNodeRecord`, `GltfPrimitiveMode`, `GltfPrimitiveRecord`, `GltfSceneRecord`, `GltfSkinRecord`, `ImageBitmapLike`, `ImageDecodeLike`, `GzipDecodeLike`, `GzipLoaderOptions`, `GzipReader`
 
 ---
 
@@ -2331,6 +2333,26 @@ graph LR
 
 **Exports:**
 - Constants: `ASSET_LOADERS`
+
+---
+
+### `packages/assets/src/gzip.ts` - Host gzip decoder. Must validate the complete stream and checksum, rejecting
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@fourjs/core` | `FourError` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./asset-manager.js` | `AssetLoader, ByteReaderLike` | Import (type-only) |
+| `./texture.js` | `DEFAULT_MAXIMUM_DECODED_BYTES, DEFAULT_MAXIMUM_EXPANSION_RATIO` | Import |
+
+**Exports:**
+- Interfaces: `GzipReader`, `GzipLoaderOptions`
+- Types: `GzipDecodeLike`
+- Functions: `createGzipLoader`
 
 ---
 
@@ -6485,11 +6507,11 @@ graph LR
 | `packages/render/src/raster` | 6 files | 3 files |
 | `packages/render-webgpu/src/wgpu-node-program` | 8 files | 1 file |
 | `packages/render-webgpu/src/wgpu-skinning` | 8 files | 1 file |
+| `packages/assets/src/index` | 9 files | 0 files |
 | `packages/ui/src/widget` | 0 files | 9 files |
 | `packages/fourjs/src/index` | 9 files | 0 files |
 | `packages/physics/src/serializers` | 8 files | 1 file |
 | `packages/physics/src/shapes` | 1 file | 8 files |
-| `packages/motion/src/serializers` | 8 files | 1 file |
 
 ---
 
@@ -6599,200 +6621,201 @@ graph TD
         N54[index]
         N55[asset-manager]
         N56[capabilities]
+        N57[gzip]
     end
 
     subgraph Packages/ui
-        N57[canvas-view]
-        N58[panel]
-        N59[control-registry]
-        N60[progress]
-        N61[accessibility]
-        N62[widget]
-        N63[checkable]
-        N64[label]
-        N65[numbers]
-        N66[radio]
-        N67[...6 more]
+        N58[canvas-view]
+        N59[panel]
+        N60[control-registry]
+        N61[progress]
+        N62[accessibility]
+        N63[widget]
+        N64[checkable]
+        N65[label]
+        N66[numbers]
+        N67[radio]
+        N68[...6 more]
     end
 
     subgraph Packages/fourjs
-        N68[scene-serializers]
-        N69[render-canvas]
-        N70[physics]
-        N71[pick-provider]
-        N72[physics-box2d]
-        N73[ui]
-        N74[compute-pass]
-        N75[application]
-        N76[gltf]
-        N77[diagnostics]
-        N78[...25 more]
+        N69[scene-serializers]
+        N70[render-canvas]
+        N71[physics]
+        N72[pick-provider]
+        N73[physics-box2d]
+        N74[ui]
+        N75[compute-pass]
+        N76[application]
+        N77[gltf]
+        N78[diagnostics]
+        N79[...25 more]
     end
 
     subgraph Packages/materials
-        N79[shader-function]
-        N80[unlit-material]
-        N81[node-material]
-        N82[standard-material]
-        N83[lit-material]
-        N84[stencil-state]
-        N85[texture]
-        N86[material]
-        N87[sprite-material]
-        N88[shader-graph]
-        N89[...7 more]
+        N80[shader-function]
+        N81[unlit-material]
+        N82[node-material]
+        N83[standard-material]
+        N84[lit-material]
+        N85[stencil-state]
+        N86[texture]
+        N87[material]
+        N88[sprite-material]
+        N89[shader-graph]
+        N90[...7 more]
     end
 
     subgraph Packages/core
-        N90[conventions]
-        N91[dev]
-        N92[leak-registry]
-        N93[disposable]
-        N94[plugin]
-        N95[space]
-        N96[component]
-        N97[errors]
-        N98[units]
-        N99[random]
-        N100[...4 more]
+        N91[conventions]
+        N92[dev]
+        N93[leak-registry]
+        N94[disposable]
+        N95[plugin]
+        N96[space]
+        N97[component]
+        N98[errors]
+        N99[units]
+        N100[random]
+        N101[...4 more]
     end
 
     subgraph Packages/geometry
-        N101[primitive-support]
-        N102[cpu-skinning]
-        N103[path]
-        N104[buffer-geometry]
-        N105[primitives]
-        N106[path-boolean]
-        N107[geometry]
-        N108[tessellation]
-        N109[svg-document]
-        N110[svg-path]
-        N111[...3 more]
+        N102[primitive-support]
+        N103[cpu-skinning]
+        N104[path]
+        N105[buffer-geometry]
+        N106[primitives]
+        N107[path-boolean]
+        N108[geometry]
+        N109[tessellation]
+        N110[svg-document]
+        N111[svg-path]
+        N112[...3 more]
     end
 
     subgraph Packages/physics
-        N112[serializers]
-        N113[shapes]
-        N114[rigid-body]
-        N115[types]
-        N116[adapter]
-        N117[descriptors]
-        N118[stale-handle]
-        N119[world]
-        N120[physics-event-system]
-        N121[body-access]
-        N122[...15 more]
+        N113[serializers]
+        N114[shapes]
+        N115[rigid-body]
+        N116[types]
+        N117[adapter]
+        N118[descriptors]
+        N119[stale-handle]
+        N120[world]
+        N121[physics-event-system]
+        N122[body-access]
+        N123[...15 more]
     end
 
     subgraph Packages/input
-        N123[pointer-events]
-        N124[pointer-input]
-        N125[propagation]
-        N126[key-events]
-        N127[drag]
-        N128[keyboard-input]
-        N129[keyboard-state]
-        N130[index]
-        N131[pick]
+        N124[pointer-events]
+        N125[pointer-input]
+        N126[propagation]
+        N127[key-events]
+        N128[drag]
+        N129[keyboard-input]
+        N130[keyboard-state]
+        N131[index]
+        N132[pick]
     end
 
     subgraph Packages/animation
-        N132[mixer]
-        N133[timeline]
-        N134[layer-stack]
-        N135[controller]
-        N136[binding]
-        N137[clip]
-        N138[track]
-        N139[values]
-        N140[animation-system]
-        N141[tween]
-        N142[...4 more]
+        N133[mixer]
+        N134[timeline]
+        N135[layer-stack]
+        N136[controller]
+        N137[binding]
+        N138[clip]
+        N139[track]
+        N140[values]
+        N141[animation-system]
+        N142[tween]
+        N143[...4 more]
     end
 
     subgraph Packages/physics-box2d
-        N143[index]
+        N144[index]
     end
 
     subgraph Packages/diagnostics
-        N144[resource-audit]
-        N145[replay-player]
-        N146[leak-registry]
-        N147[allocation-audit]
-        N148[validation]
-        N149[recorder]
-        N150[stats]
-        N151[debug-draw]
-        N152[checksum]
-        N153[index]
-        N154[...2 more]
+        N145[resource-audit]
+        N146[replay-player]
+        N147[leak-registry]
+        N148[allocation-audit]
+        N149[validation]
+        N150[recorder]
+        N151[stats]
+        N152[debug-draw]
+        N153[checksum]
+        N154[index]
+        N155[...2 more]
     end
 
     subgraph Packages/render-canvas
-        N155[index]
+        N156[index]
     end
 
     subgraph Packages/particles
-        N156[types]
-        N157[particle-system]
-        N158[trail]
-        N159[particle-renderable]
-        N160[pool]
-        N161[fields]
-        N162[emitter]
-        N163[random]
-        N164[index]
+        N157[types]
+        N158[particle-system]
+        N159[trail]
+        N160[particle-renderable]
+        N161[pool]
+        N162[fields]
+        N163[emitter]
+        N164[random]
+        N165[index]
     end
 
     subgraph Packages/serialization
-        N165[serializer]
-        N166[format]
-        N167[index]
-        N168[capabilities]
-        N169[migration]
+        N166[serializer]
+        N167[format]
+        N168[index]
+        N169[capabilities]
+        N170[migration]
     end
 
     subgraph Packages/render-webgl
-        N170[webgl-renderer]
-        N171[gl-gpu-timer]
-        N172[node-pipeline-registry]
-        N173[gl-geometry]
-        N174[gl-render-target]
-        N175[gl-skinning-glsl]
-        N176[gl-skinning]
-        N177[gl-node-program]
-        N178[gl-shadow]
-        N179[register]
-        N180[...11 more]
+        N171[webgl-renderer]
+        N172[gl-gpu-timer]
+        N173[node-pipeline-registry]
+        N174[gl-geometry]
+        N175[gl-render-target]
+        N176[gl-skinning-glsl]
+        N177[gl-skinning]
+        N178[gl-node-program]
+        N179[gl-shadow]
+        N180[register]
+        N181[...11 more]
     end
 
     subgraph Packages/math
-        N181[rectangle2]
-        N182[color]
-        N183[frustum]
-        N184[vector2]
-        N185[vector3]
-        N186[quaternion]
-        N187[vector4]
-        N188[alloc-counter]
-        N189[index]
-        N190[matrix4]
-        N191[...1 more]
+        N182[rectangle2]
+        N183[color]
+        N184[frustum]
+        N185[vector2]
+        N186[vector3]
+        N187[quaternion]
+        N188[vector4]
+        N189[alloc-counter]
+        N190[index]
+        N191[matrix4]
+        N192[...1 more]
     end
 
     subgraph Packages/motion
-        N192[waypoint-graph-planner]
-        N193[serializers]
-        N194[camera-shake]
-        N195[trajectories]
-        N196[kinematic-controller]
-        N197[motion-component]
-        N198[integrators]
-        N199[prediction]
-        N200[scheduler]
-        N201[camera-rigs]
-        N202[...14 more]
+        N193[waypoint-graph-planner]
+        N194[serializers]
+        N195[camera-shake]
+        N196[trajectories]
+        N197[kinematic-controller]
+        N198[motion-component]
+        N199[integrators]
+        N200[prediction]
+        N201[scheduler]
+        N202[camera-rigs]
+        N203[...14 more]
     end
 
     N2 --> N8
@@ -6864,12 +6887,12 @@ graph TD
     N54 --> N51
     N54 --> N50
     N54 --> N48
+    N54 --> N57
     N55 --> N49
     N56 --> N53
-    N57 --> N65
-    N57 --> N62
-    N58 --> N62
-    N59 --> N62
+    N57 --> N55
+    N57 --> N51
+    N58 --> N66
 ```
 
 ---
@@ -6879,21 +6902,21 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 331 |
+| Total TypeScript Files | 332 |
 | Total Modules | 24 |
-| Total Lines of Code | 159486 |
-| Total Exports | 3373 |
-| Total Re-exports | 2139 |
+| Total Lines of Code | 159634 |
+| Total Exports | 3378 |
+| Total Re-exports | 2143 |
 | Total Classes | 212 |
-| Total Interfaces | 620 |
-| Total Functions | 546 |
+| Total Interfaces | 622 |
+| Total Functions | 547 |
 | Total Type Guards | 28 |
 | Total Enums | 0 |
-| Type-only Imports | 425 |
+| Type-only Imports | 427 |
 | Runtime Circular Deps | 0 |
 | Type-only Circular Deps | 7 |
 
 ---
 
-*Last Updated*: 2026-09-11
+*Last Updated*: 2026-09-12
 *Version*: 0.0.0

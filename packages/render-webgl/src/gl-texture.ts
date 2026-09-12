@@ -232,7 +232,7 @@ export class TextureCache {
   #maxAnisotropy = 0;
 
   #generation = 0;
-  readonly #pending = new Map<string, number>();
+  readonly #pending = new WeakMap<TextureRecord, number>();
 
   constructor(gl: WebglContext) {
     this.#gl = gl;
@@ -326,7 +326,7 @@ export class TextureCache {
     const record = this.#records.get(texture.id);
     if (record === undefined || texture.disposed) return "absent";
     if (record.version !== texture.version) return "stale";
-    return this.#pending.has(texture.id) ? "uploading" : "resident";
+    return this.#pending.has(record) ? "uploading" : "resident";
   }
 
   /** Upload and wait for GPU completion without a blocking client wait. */
@@ -357,7 +357,7 @@ export class TextureCache {
         "Could not allocate a texture upload fence.",
       );
     const generation = this.#generation;
-    this.#pending.set(texture.id, (this.#pending.get(texture.id) ?? 0) + 1);
+    this.#pending.set(record, (this.#pending.get(record) ?? 0) + 1);
     try {
       for (let attempt = 0; attempt < maximumPolls; attempt++) {
         if (
@@ -388,9 +388,9 @@ export class TextureCache {
       throw error;
     } finally {
       if (generation === this.#generation) gl.deleteSync(sync);
-      const count = this.#pending.get(texture.id) ?? 1;
-      if (count <= 1) this.#pending.delete(texture.id);
-      else this.#pending.set(texture.id, count - 1);
+      const count = this.#pending.get(record) ?? 1;
+      if (count <= 1) this.#pending.delete(record);
+      else this.#pending.set(record, count - 1);
     }
   }
 

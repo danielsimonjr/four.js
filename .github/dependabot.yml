@@ -52,13 +52,8 @@ updates:
       # stack. Do not "fix" it by moving tools/docs onto 7; wait for typedoc#3098.
       # Never re-add a typescript ignore to the ROOT, which would pin the compiler too.
       #
-      # vitest stays BLOCKED, and for a reason unrelated to TypeScript. vitest 4+ remaps V8
-      # coverage accurately where vitest 3 over-reports, so the bump does not break the
-      # runner -- all 7,246 tests pass on vitest 5 -- it exposes real coverage gaps that
-      # currently fail six thresholds across five packages. Do the coverage work first
-      # (TODO.md), then this ignore can go. See docs/MIGRATION.md section 5.
-      - dependency-name: 'vitest'
-        versions: ['>=4']
+      # Vitest 5 and coverage-v8 5 are installed and all coverage gates pass
+      # (2026-09-11). Their former >=4 ignores are removed.
       # @dimforge/rapier{2,3}d-compat 0.20.0 adopted 2026-09-06 (contactPair now
       # takes bodies; CCD / contact-distance / snapshot-joint goldens updated).
       # Further 0.20.x / 0.21+ patches may propose themselves; do not re-ignore
@@ -75,8 +70,6 @@ updates:
       # staying on js-yaml 4. Lift when both copies move together.
       - dependency-name: 'js-yaml'
         versions: ['>=5']
-      - dependency-name: '@vitest/coverage-v8'
-        versions: ['>=4']
 
   # Keep the action versions current. Grouped so a week of bumps is one PR, not six.
   - package-ecosystem: 'github-actions'

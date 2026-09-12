@@ -220,15 +220,17 @@ describe("Shape2D — the family's shared half", () => {
     "widens to a 32-bit index buffer past 65 536 vertices",
     { timeout: 20_000 },
     () => {
-      // 257 disjoint 256-gons: 65 792 vertices, which is one region more than a
-      // `Uint16Array` index can address, and cheap because both the tessellator
-      // and the fill-rule grouping are quadratic in the *ring*, not in the total.
+      // 1,025 disjoint 64-gons: 65,600 vertices cross the 16-bit boundary.
+      // Smaller rings bound the tessellator's quadratic per-ring validation;
+      // Path.fillRings rejects disjoint bounds before winding-number scans.
+      const rings = 1025,
+        vertices = 64;
       const path = new Path();
-      for (let ring = 0; ring < 257; ring += 1) {
-        const cx = (ring % 17) * 4;
-        const cy = Math.floor(ring / 17) * 4;
-        for (let i = 0; i < 256; i += 1) {
-          const angle = (Math.PI * 2 * i) / 256;
+      for (let ring = 0; ring < rings; ring += 1) {
+        const cx = (ring % 33) * 4;
+        const cy = Math.floor(ring / 33) * 4;
+        for (let i = 0; i < vertices; i += 1) {
+          const angle = (Math.PI * 2 * i) / vertices;
           const x = cx + Math.cos(angle);
           const y = cy + Math.sin(angle);
           if (i === 0) path.moveTo(x, y);
@@ -237,9 +239,14 @@ describe("Shape2D — the family's shared half", () => {
         path.close();
       }
       const shape = new PathShape({ path, material: material() });
-      expect(shape.geometry.vertexCount).toBe(257 * 256);
-      expect(shape.geometry.indices).toBeInstanceOf(Uint32Array);
-      expectAreaJustUnder(shape, 257 * Math.PI, 0.01 * 257 * Math.PI);
+      expect(shape.geometry.vertexCount).toBe(rings * vertices);
+      const indices = shape.geometry.indices!;
+      expect(indices).toBeInstanceOf(Uint32Array);
+      let highest = 0;
+      for (const index of indices) highest = Math.max(highest, index);
+      expect(highest).toBe(rings * vertices - 1);
+      expectAreaJustUnder(shape, rings * Math.PI, 0.01 * rings * Math.PI);
+      shape.dispose();
     },
   );
 });

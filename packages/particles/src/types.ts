@@ -344,7 +344,7 @@ export interface ParticleRange {
  * One stop on a normalized-age ramp (`t ∈ [0, 1]`).
  *
  * Interior stops must lie strictly between `0` and `1` and be sorted ascending
- * when passed to {@link evaluateLifetimeRamp}.
+ * when passed to {@link evaluateLifetimeRampNumber} or {@link evaluateLifetimeRampColor}.
  */
 export interface ParticleLifetimeStop<T> {
   /** Normalized age in `(0, 1)`. */

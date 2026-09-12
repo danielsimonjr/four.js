@@ -2,10 +2,10 @@
   "metadata": {
     "name": "fourjs-monorepo",
     "version": "0.0.0",
-    "lastUpdated": "2026-09-11",
-    "totalFiles": 331,
+    "lastUpdated": "2026-09-12",
+    "totalFiles": 332,
     "totalModules": 24,
-    "totalExports": 3373
+    "totalExports": 3378
   },
   "entryPoints": [
     {
@@ -9311,6 +9311,13 @@
             "reExport": true
           },
           {
+            "file": "./gzip.js",
+            "imports": [
+              "createGzipLoader"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./loader-registry.js",
             "imports": [
               "RegisteredAssetLoader"
@@ -9402,6 +9409,16 @@
             ],
             "reExport": true,
             "typeOnly": true
+          },
+          {
+            "file": "./gzip.js",
+            "imports": [
+              "GzipDecodeLike",
+              "GzipLoaderOptions",
+              "GzipReader"
+            ],
+            "reExport": true,
+            "typeOnly": true
           }
         ],
         "workspaceDependencies": [],
@@ -9428,6 +9445,7 @@
           "createImageLoader",
           "jsonLoader",
           "textLoader",
+          "createGzipLoader",
           "PACKAGE_NAME",
           "RegisteredAssetLoader",
           "AbortHandle",
@@ -9472,7 +9490,10 @@
           "GltfSceneRecord",
           "GltfSkinRecord",
           "ImageBitmapLike",
-          "ImageDecodeLike"
+          "ImageDecodeLike",
+          "GzipDecodeLike",
+          "GzipLoaderOptions",
+          "GzipReader"
         ],
         "reExported": [
           "ASSET_LOADERS",
@@ -9497,6 +9518,7 @@
           "createImageLoader",
           "jsonLoader",
           "textLoader",
+          "createGzipLoader",
           "RegisteredAssetLoader",
           "AbortHandle",
           "AbortSignalLike",
@@ -9540,7 +9562,10 @@
           "GltfSceneRecord",
           "GltfSkinRecord",
           "ImageBitmapLike",
-          "ImageDecodeLike"
+          "ImageDecodeLike",
+          "GzipDecodeLike",
+          "GzipLoaderOptions",
+          "GzipReader"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -9637,6 +9662,47 @@
         ],
         "constants": [
           "ASSET_LOADERS"
+        ]
+      },
+      "packages/assets/src/gzip.ts": {
+        "description": "Host gzip decoder. Must validate the complete stream and checksum, rejecting",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./asset-manager.js",
+            "imports": [
+              "AssetLoader",
+              "ByteReaderLike"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./texture.js",
+            "imports": [
+              "DEFAULT_MAXIMUM_DECODED_BYTES",
+              "DEFAULT_MAXIMUM_EXPANSION_RATIO"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@fourjs/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "exports": [
+          "createGzipLoader"
+        ],
+        "interfaces": [
+          "GzipReader",
+          "GzipLoaderOptions"
+        ],
+        "functions": [
+          "createGzipLoader"
         ]
       }
     },
@@ -26175,7 +26241,8 @@
           "packages/assets/src/loader-registry.ts",
           "packages/assets/src/index.ts",
           "packages/assets/src/asset-manager.ts",
-          "packages/assets/src/capabilities.ts"
+          "packages/assets/src/capabilities.ts",
+          "packages/assets/src/gzip.ts"
         ]
       },
       {
@@ -26488,18 +26555,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 331,
+    "totalTypeScriptFiles": 332,
     "totalModules": 24,
-    "totalLinesOfCode": 159486,
-    "totalExports": 3373,
+    "totalLinesOfCode": 159634,
+    "totalExports": 3378,
     "totalClasses": 212,
-    "totalInterfaces": 620,
-    "totalFunctions": 546,
+    "totalInterfaces": 622,
+    "totalFunctions": 547,
     "totalTypeGuards": 28,
     "totalEnums": 0,
     "totalConstants": 498,
-    "totalReExports": 2139,
-    "totalTypeOnlyImports": 425,
+    "totalReExports": 2143,
+    "totalTypeOnlyImports": 427,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 7,
     "unusedFilesCount": 0,

@@ -38,20 +38,11 @@
  * distinct cache slot; hoist it to a module constant if two call sites should
  * share one.
  *
- * ## glTF / GLB — STAGED (dated note, 2026-08-02, WP-11.2)
+ * ## Other formats
  *
- * §78 requires the glTF loader to deliver geometry, materials, textures, skins,
- * morph targets, animations, cameras, and light extensions, sharing immutable
- * geometry and textures while never sharing mutable transforms. Three of those
- * have no engine behind them yet: the §77 texture tier (2D/cube/array textures,
- * mipmaps, wrap and filter modes, color-space metadata) does not exist, §55
- * materials beyond the unlit tier do not exist, and skins/morph targets have no
- * representation in `@fourjs/geometry`. A loader that parsed a `.glb` container
- * and returned buffers with nowhere to put them would be a stub wearing the
- * name of a feature — the plan's P11-2 wording ("dishonest to ship as a stub")
- * is the decision, and this note is the record of it. Until then a `.gltf`
- * document is loadable as JSON and a `.glb` as an `ArrayBuffer`, which is
- * exactly what a future loader would build on.
+ * `createGltfLoader` in `gltf.ts` parses the landed glTF/GLB tier; `four` owns
+ * scene assembly. `createGzipLoader` in `gzip.ts` handles raw gzip bodies with
+ * bounded output over an injected streaming decoder (§96).
  */
 
 import type { AssetLoader, FetchResponse } from "./asset-manager.js";

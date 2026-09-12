@@ -421,6 +421,11 @@ function layoutShaped(
     });
   const size = options.size,
     scale = size / atlas.lineHeight;
+  const identity = options.shaper instanceof IdentityShapingEngine;
+  const entryFor = (glyphId: number): GlyphAtlasEntry =>
+    (identity
+      ? atlas.glyphs.get(String.fromCodePoint(glyphId))
+      : atlas.glyphsById?.get(glyphId)) ?? atlas.fallback;
   const quads: (MutableTextQuad & { cluster: number })[] = [];
   const lines = text.split("\n"),
     widths: number[] = [],
@@ -440,8 +445,8 @@ function layoutShaped(
     for (const run of runs) {
       const glyphs = run.glyphs.filter((g) => line[g.cluster] !== "\r");
       const advances = glyphs.map((g) =>
-        options.shaper instanceof IdentityShapingEngine
-          ? (atlas.glyphsById?.get(g.glyphId) ?? atlas.fallback).advance * scale
+        identity
+          ? entryFor(g.glyphId).advance * scale
           : (g.advanceX * size) / 1000,
       );
       let runWidth = 0;
@@ -453,7 +458,7 @@ function layoutShaped(
       let cursor = run.direction === "rtl" ? pen + runWidth : pen;
       for (let i = 0; i < glyphs.length; i++) {
         const g = glyphs[i],
-          entry = atlas.glyphsById?.get(g.glyphId) ?? atlas.fallback;
+          entry = entryFor(g.glyphId);
         if (run.direction === "rtl") {
           if (i) cursor -= spacing;
           cursor -= advances[i];
@@ -464,7 +469,7 @@ function layoutShaped(
         if (!entry.blank)
           quads.push({
             x0: x,
-            x1: x + entry.width * scale,
+            x1: x + (identity ? atlas.cellWidth : entry.width) * scale,
             y0: y - atlas.descent * scale,
             y1: y + atlas.ascent * scale,
             u0: entry.u0,

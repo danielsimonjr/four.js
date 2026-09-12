@@ -159,7 +159,7 @@ export function reportFinalized(id: number): void {
 }
 
 /**
- * Drains finalized-but-never-disposed records and {@link devWarnOnce}s each.
+ * Drains finalized-but-never-disposed records and emits a deduplicated warning for each.
  * Returns how many warnings this call emitted. Production: `0`.
  */
 export function auditFinalizedLeaks(): number {
@@ -180,7 +180,7 @@ export function auditFinalizedLeaks(): number {
 
 /**
  * Forgets every registration and pending leak. Exported for tests, matching
- * {@link resetDevWarnings}.
+ * `resetDevWarnings` in `@fourjs/core`.
  */
 export function resetLeakRegistry(): void {
   byId.clear();

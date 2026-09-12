@@ -113,3 +113,6 @@ export {
   jsonLoader,
   textLoader,
 } from "./loaders.js";
+
+export { createGzipLoader } from "./gzip.js";
+export type { GzipDecodeLike, GzipLoaderOptions, GzipReader } from "./gzip.js";

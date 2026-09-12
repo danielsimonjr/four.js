@@ -165,10 +165,7 @@
 
 import type { Matrix3 } from "@fourjs/math";
 
-import {
-  booleanPolygons,
-  type BooleanOp,
-} from "./path-boolean.js";
+import { booleanPolygons, type BooleanOp } from "./path-boolean.js";
 import { requirePositive } from "./primitive-support.js";
 import type { Point2D, Polyline2D } from "./tessellation.js";
 
@@ -762,8 +759,8 @@ export class Path {
    *
    * ## How the grouping is decided
    *
-   * Every ring is probed against every other by winding number, which gives
-   * both rules at once: under `even-odd` a ring is filled when an even number
+   * Ring bounds reject impossible containment first; remaining candidates are
+   * probed by winding number, which gives both rules at once: under `even-odd` a ring is filled when an even number
    * of rings contain it, under `nonzero` when the winding just inside it — the
    * winding of the containing rings plus its own — is not zero. Each unfilled
    * ring is then attached to the innermost ring containing it, which is always
@@ -799,6 +796,8 @@ export class Path {
     requirePositive("tolerance", tolerance);
     const rings: Point2D[][] = [];
     const areas: number[] = [];
+    const bounds: { minX: number; minY: number; maxX: number; maxY: number }[] =
+      [];
     for (const subpath of flattenSubpaths(this.#commands, tolerance)) {
       const points = subpath.points;
       // An *open* subpath keeps a final point that returns to its first — for
@@ -820,10 +819,21 @@ export class Path {
       }
       rings.push(points);
       areas.push(area);
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+      for (const point of points) {
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      }
+      bounds.push({ minX, minY, maxX, maxY });
     }
 
-    // Containment, once: every ring probed against every other by winding
-    // number, which answers both fill rules at the same time.
+    // Containment, once: bounds prune impossible candidates; exact winding
+    // answers both fill rules for the rest.
     const count = rings.length;
     const containers: number[][] = [];
     const surrounding: number[] = [];
@@ -835,6 +845,16 @@ export class Path {
         if (i === j) {
           continue;
         }
+        // A point outside a ring's bounds has zero winding. Keep equality
+        // on the exact path, preserving the existing boundary convention.
+        const box = bounds[i];
+        if (
+          probe.x < box.minX ||
+          probe.x > box.maxX ||
+          probe.y < box.minY ||
+          probe.y > box.maxY
+        )
+          continue;
         const turns = windingNumber(probe.x, probe.y, rings[i]);
         winding += turns;
         if (turns !== 0) {

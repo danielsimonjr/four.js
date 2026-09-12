@@ -28,7 +28,7 @@
  * once, so the controller cannot be a layer that starts and stops mixers. It is
  * a **pose evaluator in its own right**: it resolves one binding per animated
  * property (a *channel*), samples the source and destination clips into scratch,
- * mixes them through the channel's {@link ./values.js#ValueAdapter}, and writes
+ * mixes them through the channel's {@link ValueAdapter}, and writes
  * the result once. One claim per channel, held for the controller's whole life,
  * so a controller and a tween still resolve by §16's one rule.
  *
@@ -67,7 +67,7 @@
  * | exit time                | `exitTime` seconds of source-state time that must have elapsed |
  * | transition interruption  | `interruptible` (default `true`) — see below |
  * | blend trees              | a state may be a {@link ./blend-tree.js#BlendTree} |
- * | layered animation        | {@link ./layer-stack.js#AnimationLayerStack} |
+ * | layered animation        | {@link AnimationLayerStack} |
  * | "any state" transitions  | `from: "*"` (see below) |
  * | clip events              | {@link AnimationController.onClipEvent} |
  * | `when` string sugar      | compiles to the typed records below |
@@ -139,7 +139,7 @@
  * Shipped here: blend trees (1D lerp + 2D inverse-distance of ≤3 neighbours),
  * `from: "*"` any-state transitions, clip-event dispatch with mixer `(from, to]`
  * semantics, `when` string sugar, and `liveInterrupt` at one interruption depth.
- * Layered / additive animation lives on {@link ./layer-stack.js#AnimationLayerStack}.
+ * Layered / additive animation lives on {@link AnimationLayerStack}.
  *
  * Still **not** shipped:
  *
@@ -917,7 +917,7 @@ export class AnimationController implements Advanceable {
 
   /**
    * Index of the channel on `path`, or `-1` when this controller does not
-   * animate it. Used by {@link ./layer-stack.js#AnimationLayerStack}.
+   * animate it. Used by {@link AnimationLayerStack}.
    */
   channelIndexOf(path: string): number {
     const index = this.#channelIndex.get(path);
@@ -950,7 +950,7 @@ export class AnimationController implements Advanceable {
 
   /**
    * Detaches this controller from the §16 claim registry and from writing
-   * properties. {@link ./layer-stack.js#AnimationLayerStack} calls this before
+   * properties. {@link AnimationLayerStack} calls this before
    * {@link AnimationController.play} so the stack is the sole writer.
    *
    * @throws FourError `INVALID_APPLICATION_STATE` — already played.
